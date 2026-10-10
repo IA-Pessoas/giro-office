@@ -8,6 +8,19 @@ datasource db {
   provider = "postgresql"
 }
 
+model AuditRequest {
+  id              String   @id @default(uuid())
+  organization_id String?
+  user_id         String?
+  created_at      DateTime @default(now())
+  action          String?
+  referring       String?
+  referring_id    String?
+  changes_json    Json?
+
+  @@map("audit_requests")
+}
+
 model PessoalGroup {
   id              String   @id @default(uuid())
   name            String
@@ -63,8 +76,6 @@ model Payroll {
   group           PessoalGroup @relation(fields: [group_id], references: [id], onDelete: Restrict)
   responsible     User?         @relation(fields: [responsible_id], references: [id])
   union           UnionPessoal? @relation(fields: [union_id], references: [id], onDelete: Restrict)
-  // Ausente no canônico (lá o select de client_name falha): o extract seleciona client.name.
-  client          Client?       @relation(fields: [client_id], references: [id])
   groupAssignmentPreviewDetails PessoalGroupAssignmentPreviewDetail[]
 
   @@map("pessoal.payroll")
@@ -73,10 +84,11 @@ model Payroll {
 model Client {
   id              String @id @default(uuid())
   name            String
+  dominio_code    String?
+  cpf_cnpj        String @default("")
   status          String
   pessoal         Boolean
   organization_id String
-  payroll         Payroll?
   obrigationsPessoal ObrigationsPessoal[]
 
   @@map("clients")

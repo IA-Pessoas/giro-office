@@ -1281,12 +1281,14 @@ export class ClientService implements ClientWorkerService {
           service_unique: true,
         },
       });
-      // O schema de integração só aceita os regimes compartilhados; a troca também é auditada.
-      if (data.regime !== undefined && (existing.regime ?? null) !== (data.regime ?? null)) {
-        await this.auditClientChanges(id, organizationId, authorization, {
-          regime: { from: existing.regime ?? null, to: data.regime ?? null },
-        });
+      // Regime (catálogo compartilhado) e Instagram (editável pelo Marketing) entram na trilha.
+      const changes: ClientAuditEvent["changes"] = {};
+      for (const field of ["regime", "instagram"] as const) {
+        if (data[field] !== undefined && (existing[field] ?? null) !== (data[field] ?? null)) {
+          changes[field] = { from: existing[field] ?? null, to: data[field] ?? null };
+        }
       }
+      await this.auditClientChanges(id, organizationId, authorization, changes);
       return row;
     } catch (error) {
       if (isUniqueConstraintError(error)) {

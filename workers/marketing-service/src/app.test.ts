@@ -8,7 +8,11 @@ const INTERNAL_TOKEN = "marketing-gateway-internal-token";
 function services() {
   const passwords = { list: vi.fn(async () => [{ id: "p-1" }]) };
   return {
-    dashboard: { getDashboard: vi.fn(async () => ({ alerts: [] })) },
+    dashboard: {
+      getDashboard: vi.fn(async () => ({ alerts: [] })),
+      getMonthlyBirthdays: vi.fn(async () => ({ month: 5 })),
+      getMarketingStock: vi.fn(async () => ({ items: [] })),
+    },
     controls: {},
     events: {
       updateEvent: vi.fn(async () => null),
@@ -52,6 +56,31 @@ describe("marketing Worker", () => {
     expect(s.dashboard.getDashboard).toHaveBeenCalledWith(ORGANIZATION_ID);
   });
 
+  it("serve os aniversariantes do mês escolhido e recusa mês inválido", async () => {
+    const { app, s } = setup();
+    const response = await app.request("/marketing/birthdays?month=5", {
+      headers: gateway({ marketing: 1 }),
+    });
+    const invalid = await app.request("/marketing/birthdays?month=13", {
+      headers: gateway({ marketing: 1 }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(s.dashboard.getMonthlyBirthdays).toHaveBeenCalledWith(ORGANIZATION_ID, 5);
+    expect(invalid.status).toBe(400);
+    expect(s.dashboard.getMonthlyBirthdays).toHaveBeenCalledTimes(1);
+  });
+
+  it("serve o estoque do Marketing só para quem tem o módulo Marketing", async () => {
+    const { app, s } = setup();
+    const response = await app.request("/marketing/stock", { headers: gateway({ marketing: 1 }) });
+    const tiOnly = await app.request("/marketing/stock", { headers: gateway({ ti: 2 }) });
+
+    expect(response.status).toBe(200);
+    expect(s.dashboard.getMarketingStock).toHaveBeenCalledWith(ORGANIZATION_ID);
+    expect(tiOnly.status).toBe(403);
+  });
+
   it("serve as rotas de credenciais, eventos e edições", async () => {
     const { app } = setup();
     for (const path of [
@@ -93,6 +122,21 @@ describe("marketing Worker", () => {
       body: JSON.stringify({ name: "Feira" }),
     });
     expect(response.status).toBe(404);
+  });
+
+  it("atribui a alteração ao usuário autenticado", async () => {
+    const { app, s } = setup();
+    await app.request(`/marketing/events/${EVENT_ID}`, {
+      method: "PUT",
+      headers: gateway({ marketing: 2 }),
+      body: JSON.stringify({ name: "Feira" }),
+    });
+    expect(s.events.updateEvent).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      EVENT_ID,
+      { name: "Feira" },
+      "user-1",
+    );
   });
 
   it("recusa requisição sem autenticação", async () => {

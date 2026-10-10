@@ -19,6 +19,8 @@ model Client {
   competence_output  DateTime?
   contabil           Boolean?
   fiscal             Boolean?
+  status             String
+  deletion_date      DateTime?
   organization_id    String
   controlContabil    ControlContabil[]
   triageClosings     TriageClosing[]
@@ -35,6 +37,38 @@ model User {
   organization_id String?
 
   @@map("users")
+}
+
+model ContingencyDraft {
+  id              String   @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime @default(now())
+  snapshot        String
+  content_hash    String
+  reviewed_by     String?
+  reviewed_at     DateTime?
+  reviewed_hash   String?
+
+  @@index([organization_id, created_at])
+  @@map("contabil.contingency_drafts")
+}
+
+model NoahConversion {
+  id              String   @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime @default(now())
+  source_name     String
+  source_sha256   String
+  result_sha256   String
+  csv             String
+  row_count       Int
+  file_count      Int
+  rejections      Json
+
+  @@index([organization_id, created_at])
+  @@map("contabil.noah_conversions")
 }
 
 // Só leitura: históricos do Controle (#1722) e da Relação Contábil (#1723).
@@ -120,12 +154,26 @@ model ResponsibleContabil {
   @@map("contabil.responsibles")
 }
 
+model ClientCloud {
+  id              String   @id @default(uuid())
+  client_id       String
+  type            String
+  link            String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  organization_id String
+
+  @@map("clientes.clouds")
+}
+
 model TriageConfig {
   id              String   @id @default(uuid())
   client_id       String
   type            String
   active_items    Json
-  updated_at      DateTime
+  priority        Boolean  @default(false)
+  delivery_method String?  @db.VarChar(100)
+  updated_at      DateTime @updatedAt
   organization_id String
 
   @@unique([organization_id, client_id, type])
@@ -139,7 +187,13 @@ model TriageMonthly {
   type            String
   checklist       Json
   item_notes      Json     @default("{}")
+  download_date   DateTime?
+  settlement_date DateTime?
   billing_amount  String?
+  triad_moviment  Boolean  @default(false)
+  responsible_id  String?
+  notes           String?
+  justification   String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
   archived_at     DateTime?

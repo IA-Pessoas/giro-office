@@ -5,6 +5,8 @@ import {
   createObligationBodySchema,
   detailObligationQuerySchema,
   generateObligationsParamsSchema,
+  listObligationPortfolioQuerySchema,
+  obligationHistoryQuerySchema,
   obligationIdParamsSchema,
   updateObligationFieldBodySchema,
 } from "../schemas/obligation.schemas.js";
@@ -23,6 +25,33 @@ export function createObligationRoutes(service: ObligationService): Router {
       response.status(200).json(createSuccessResponse(result));
     } catch (err: unknown) {
       logError("Erro ao detalhar obrigacao de pessoal", { err });
+      next(err);
+    }
+  });
+
+  router.get("/portfolio", async (request, response, next) => {
+    try {
+      const context = getPessoalOrganizationContext(request);
+      const query = parseWithZod(listObligationPortfolioQuerySchema, request.query);
+      const result = await service.listPortfolio(context, query);
+
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao listar carteira de obrigacoes de pessoal", { err });
+      next(err);
+    }
+  });
+
+  router.get("/:id/history", async (request, response, next) => {
+    try {
+      const context = getPessoalOrganizationContext(request);
+      const params = parseWithZod(obligationIdParamsSchema, request.params);
+      const query = parseWithZod(obligationHistoryQuerySchema, request.query);
+      const result = await service.history(context, params.id, query);
+
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao consultar historico de obrigacao de pessoal", { err });
       next(err);
     }
   });

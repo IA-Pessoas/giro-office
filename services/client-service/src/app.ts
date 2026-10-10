@@ -14,6 +14,7 @@ import "express-async-errors";
 
 import type { ClientServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
+import { type ClientEntityAudit, createClientEntityAudit } from "./integrations/audit.js";
 import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildClientServiceOpenApiSpec } from "./openapi/spec.js";
 import { createClientRouter } from "./routes/client.routes.js";
@@ -51,6 +52,7 @@ export interface CreateAppOptions {
   historyStorage: HistoryFileStorage;
   commercialProjectionService?: InternalCommercialRouteDeps;
   cnpjLookupProvider?: CnpjLookupProvider;
+  audit?: ClientEntityAudit;
 }
 
 export function createApp({
@@ -61,6 +63,7 @@ export function createApp({
   historyStorage,
   commercialProjectionService,
   cnpjLookupProvider,
+  audit = createClientEntityAudit(env, logger),
 }: CreateAppOptions): express.Express {
   const app = express();
 
@@ -131,6 +134,7 @@ export function createApp({
       prisma,
       historyStorage,
       cnpjLookupProvider: cnpjLookupProvider ?? createCnpjLookupProvider(env),
+      audit,
       historyUploadRateLimit: createRateLimitMiddleware({
         key: "client-service:history-upload",
         max: env.uploadRateLimitMax,

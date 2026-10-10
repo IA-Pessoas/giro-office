@@ -18,6 +18,39 @@ interface BirthdayAggregate {
   items: Array<{ id: string; name: string; day: number }>;
 }
 
+export interface MarketingBirthdayPerson {
+  id: string;
+  name: string;
+  birthDate: string;
+  day: number;
+}
+
+export interface MarketingMonthlyBirthdays {
+  month: number;
+  employees: {
+    total: number;
+    items: Array<MarketingBirthdayPerson & { department: string | null }>;
+  };
+  clients: {
+    total: number;
+    items: Array<MarketingBirthdayPerson & { companies: string }>;
+  };
+}
+
+export interface MarketingStockItem {
+  id: string;
+  name: string;
+  quantity: number;
+  lastEntryAt: string | null;
+  lastExitAt: string | null;
+}
+
+export interface MarketingStock {
+  department: { id: string; name: string };
+  totals: { items: number; quantity: number };
+  items: MarketingStockItem[];
+}
+
 export interface MarketingEnvelope<T> {
   success: boolean;
   data: T;

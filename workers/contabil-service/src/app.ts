@@ -6,9 +6,22 @@ import {
   ServiceError,
   serializeError,
 } from "@workspace/shared/http";
+import {
+  type ContabilTriagePortfolioFilterable,
+  type FiscalTriagePortfolioFilterable,
+  filterContabilTriagePortfolio,
+  filterFiscalTriagePortfolio,
+  fiscalTriagePortfolioFiltersFromQuery,
+} from "@workspace/shared/triagem";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
+import {
+  contingencyIdParamsSchema,
+  contingencyQuerySchema,
+  contingencyReviewSchema,
+} from "../../../services/contabil-service/src/schemas/contingency.schemas.js";
 import {
   controlCompetenceBodySchema,
   controlHistoryQuerySchema,
@@ -16,9 +29,12 @@ import {
   createControlBodySchema,
   createYearControlsBodySchema,
   detailControlQuerySchema,
-  listControlQuerySchema,
   updateControlFieldBodySchema,
 } from "../../../services/contabil-service/src/schemas/control.schemas.js";
+import {
+  noahIdParamsSchema,
+  noahUploadQuerySchema,
+} from "../../../services/contabil-service/src/schemas/noah.schemas.js";
 import {
   createRelationshipBodySchema,
   relationshipClientIdParamsSchema,
@@ -32,10 +48,14 @@ import {
   responsibleIdParamsSchema,
   updateResponsibleBodySchema,
 } from "../../../services/contabil-service/src/schemas/responsible.schemas.js";
+import { CONTINGENCY_LIMITS } from "../../../services/contabil-service/src/services/contingencyCalculationService.js";
+import { ContingencyService } from "../../../services/contabil-service/src/services/contingencyService.js";
 import {
   type ControlHistoryPrisma,
   listControlHistory,
 } from "../../../services/contabil-service/src/services/controlHistoryService.js";
+import { NOAH_LIMITS } from "../../../services/contabil-service/src/services/noahConversionService.js";
+import { NoahService } from "../../../services/contabil-service/src/services/noahService.js";
 import {
   listRelationshipHistory,
   type RelationshipHistoryPrisma,
@@ -59,14 +79,25 @@ import {
 import {
   closingQuerySchema,
   closingUpdateSchema,
+  cloudCreateSchema,
+  cloudIdSchema,
+  cloudListSchema,
+  cloudUpdateSchema,
+  contabilPortfolioSchema,
   documentItemSchema,
   documentsBulkSchema,
   editabilitySchema,
   fiscalPortfolioSchema,
+  fiscalSettingsBodySchema,
+  fiscalSettingsQuerySchema,
   monthlyIdSchema,
   monthlySchema,
+  monthlyUpdateSchema,
   statementArchiveSchema,
+  statementHistorySchema,
   statementSchema,
+  triageConfigBodySchema,
+  triageConfigQuerySchema,
 } from "./schemas.js";
 import {
   type AuthContext,
@@ -93,11 +124,13 @@ type ContabilOptions = {
   env?: ContabilWorkerEnv;
   prisma?: ContabilPrisma;
   controlService?: ControlService;
+  contingencyService?: Pick<ContingencyService, "simulate" | "review" | "export">;
   relationshipService?: RelationshipService;
   responsibleService?: ResponsibleService;
   triageClosingService?: ClosingService;
   triageDocumentsService?: DocumentsService;
   reportingService?: ReportingService;
+  noahService?: Pick<NoahService, "create" | "download">;
 };
 type ContabilContext = { Bindings: ContabilWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type Context = {
@@ -150,6 +183,11 @@ function withPrisma<T>(
   return withWorkerPrisma(env, PrismaClient, (client) =>
     callback(client as unknown as ContabilPrisma),
   );
+}
+
+/** Aplica um filtro da carteira sobre `items` da resposta, mantendo o resto (competência). */
+function filterItems<T>(data: Record<string, unknown>, filter: (items: T[]) => T[]) {
+  return { ...data, items: filter(Array.isArray(data.items) ? (data.items as T[]) : []) };
 }
 
 function executeAuthWrite(c: Context): void {
@@ -242,8 +280,117 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     await next();
   });
 
+  app.post(
+    "/contabil/noah",
+    (c, next) => {
+      executeAuthWrite(c);
+      return next();
+    },
+    bodyLimit({
+      maxSize: NOAH_LIMITS.zipBytes,
+      onError: () => {
+        throw new ServiceError(413, "O ZIP excede 5 MiB.");
+      },
+    }),
+    async (c) => {
+      if (c.req.header("content-type")?.split(";")[0] !== "application/zip") {
+        throw new ServiceError(415, "Envie um arquivo ZIP.");
+      }
+      const { filename } = parseWithZod(noahUploadQuerySchema, c.req.query());
+      const bytes = Buffer.from(await c.req.arrayBuffer());
+      const auth = contabilAuthContext(c.get("auth"));
+      const invoke = (service: Pick<NoahService, "create">) =>
+        service.create(bytes, filename, auth);
+      const data = options.noahService
+        ? await invoke(options.noahService)
+        : await withPrisma(c, options, (prisma) => invoke(new NoahService(prisma)));
+      c.header("Cache-Control", "no-store");
+      return c.json(createSuccessResponse(data), 201);
+    },
+  );
+
+  app.get("/contabil/noah/:id/csv", async (c) => {
+    const { id } = parseWithZod(noahIdParamsSchema, { id: c.req.param("id") });
+    const auth = contabilAuthContext(c.get("auth"));
+    const invoke = (service: Pick<NoahService, "download">) => service.download(id, auth);
+    const csv = options.noahService
+      ? await invoke(options.noahService)
+      : await withPrisma(c, options, (prisma) => invoke(new NoahService(prisma)));
+    return new Response(csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="NOAH-${id}.csv"`,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  });
+
+  app.post(
+    "/contabil/contingency",
+    async (c, next) => {
+      requireContabilWrite(c.get("auth"));
+      if (c.req.header("content-type")?.split(";")[0].trim() !== "application/vnd.ms-excel") {
+        throw new ServiceError(415, "Envie um arquivo XLS.");
+      }
+      return next();
+    },
+    bodyLimit({
+      maxSize: CONTINGENCY_LIMITS.bytes,
+      onError: () => {
+        throw new ServiceError(413, "O XLS excede 5 MiB.");
+      },
+    }),
+    async (c) => {
+      const input = parseWithZod(contingencyQuerySchema, c.req.query());
+      const bytes = Buffer.from(await c.req.arrayBuffer());
+      const invoke = (service: Pick<ContingencyService, "simulate">) =>
+        service.simulate(bytes, input, contabilAuthContext(c.get("auth")));
+      const result = options.contingencyService
+        ? await invoke(options.contingencyService)
+        : await withPrisma(c, options, (prisma) => invoke(new ContingencyService(prisma)));
+      c.header("Cache-Control", "no-store");
+      return c.json(createSuccessResponse(result));
+    },
+  );
+
+  app.post("/contabil/contingency/:id/review", async (c) => {
+    requireContabilWrite(c.get("auth"));
+    const { id } = parseWithZod(contingencyIdParamsSchema, { id: c.req.param("id") });
+    const { content_hash } = parseWithZod(contingencyReviewSchema, await readJson(c));
+    const auth = contabilAuthContext(c.get("auth"));
+    const invoke = (service: Pick<ContingencyService, "review">) =>
+      service.review(id, content_hash, auth);
+    const result = options.contingencyService
+      ? await invoke(options.contingencyService)
+      : await withPrisma(c, options, (prisma) => invoke(new ContingencyService(prisma)));
+    c.header("Cache-Control", "no-store");
+    return c.json(createSuccessResponse(result));
+  });
+
+  app.get("/contabil/contingency/:id/export", async (c) => {
+    requireContabilWrite(c.get("auth"));
+    const { id } = parseWithZod(contingencyIdParamsSchema, { id: c.req.param("id") });
+    const { content_hash } = parseWithZod(contingencyReviewSchema, c.req.query());
+    const auth = contabilAuthContext(c.get("auth"));
+    const invoke = (service: Pick<ContingencyService, "export">) =>
+      service.export(id, content_hash, auth);
+    const html = options.contingencyService
+      ? await invoke(options.contingencyService)
+      : await withPrisma(c, options, (prisma) => invoke(new ContingencyService(prisma)));
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename="contingencia-${id}.html"`,
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  });
+
   app.get("/contabil/controls/list", async (c) => {
-    const query = parseWithZod(listControlQuerySchema, c.req.query());
+    const query = parseWithZod(contabilPortfolioSchema, c.req.query());
     const auth = c.get("auth");
     const invoke = (service: ControlService) => service.list(query.competence, auth.organizationId);
     const data = options.controlService
@@ -251,7 +398,17 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       : await withPrisma(c, options, async (prisma) =>
           invoke(createControlService(prisma, createContabilAudit(options.env ?? c.env))),
         );
-    return c.json(createSuccessResponse(data));
+    return c.json(
+      createSuccessResponse(
+        filterItems<ContabilTriagePortfolioFilterable>(data, (items) =>
+          filterContabilTriagePortfolio(items, {
+            responsibleId: query.responsible_id,
+            regime: query.regime,
+            closingStatus: query.status,
+          }),
+        ),
+      ),
+    );
   });
 
   app.post("/contabil/controls/year", async (c) => {
@@ -570,7 +727,13 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const data = await withDocuments(c, (service) =>
       service.listFiscalPortfolio(query.competence, authContext(c.get("auth"))),
     );
-    return c.json(createSuccessResponse(data));
+    return c.json(
+      createSuccessResponse(
+        filterItems<FiscalTriagePortfolioFilterable>(data, (items) =>
+          filterFiscalTriagePortfolio(items, fiscalTriagePortfolioFiltersFromQuery(query)),
+        ),
+      ),
+    );
   });
   app.get("/triagem/editability", async (c) => {
     const query = parseWithZod(editabilitySchema, c.req.query());
@@ -601,6 +764,42 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     );
     return c.json(createSuccessResponse(data));
   });
+  app.patch("/triagem/monthly/:id", async (c) => {
+    const params = parseWithZod(monthlyIdSchema, { id: c.req.param("id") });
+    const body = parseWithZod(monthlyUpdateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.updateMonthly(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/fiscal-settings", async (c) => {
+    const query = parseWithZod(fiscalSettingsQuerySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.getFiscalSettings(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.put("/triagem/fiscal-settings", async (c) => {
+    const body = parseWithZod(fiscalSettingsBodySchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.saveFiscalSettings(body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/config", async (c) => {
+    const query = parseWithZod(triageConfigQuerySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.getConfig(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.put("/triagem/config", async (c) => {
+    const body = parseWithZod(triageConfigBodySchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.saveConfig(body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
   app.patch("/triagem/monthly/:id/items", async (c) => {
     const params = parseWithZod(monthlyIdSchema, { id: c.req.param("id") });
     const body = parseWithZod(documentsBulkSchema, await readJson(c));
@@ -613,6 +812,35 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const query = parseWithZod(monthlySchema, c.req.query());
     const data = await withDocuments(c, (service) =>
       service.listStatements(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/clouds", async (c) => {
+    const query = parseWithZod(cloudListSchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.listClouds(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.post("/triagem/clouds", async (c) => {
+    const body = parseWithZod(cloudCreateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.createCloud(body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+  app.patch("/triagem/clouds/:id", async (c) => {
+    const params = parseWithZod(cloudIdSchema, { id: c.req.param("id") });
+    const body = parseWithZod(cloudUpdateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.updateCloud(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/statements/history", async (c) => {
+    const query = parseWithZod(statementHistorySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.listStatementHistory(query, authContext(c.get("auth"))),
     );
     return c.json(createSuccessResponse(data));
   });

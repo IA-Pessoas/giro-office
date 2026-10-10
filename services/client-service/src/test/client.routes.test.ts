@@ -14,6 +14,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../app.js";
 import { getClientServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type { ClientEntityAudit } from "../integrations/audit.js";
 import type { InternalCommercialRouteDeps } from "../routes/internalCommercial.routes.js";
 import {
   type ClientListPage,
@@ -101,6 +102,7 @@ function buildTestApp(
     cnpjLookupProvider?: CnpjLookupProvider;
     env?: Partial<ReturnType<typeof getClientServiceEnv>>;
     commercialProjectionService?: InternalCommercialRouteDeps;
+    audit?: ClientEntityAudit;
   },
 ) {
   const env = { ...getClientServiceEnv(), ...overrides?.env };
@@ -124,6 +126,7 @@ function buildTestApp(
     historyStorage,
     cnpjLookupProvider: overrides?.cnpjLookupProvider,
     commercialProjectionService: overrides?.commercialProjectionService,
+    audit: overrides?.audit ?? vi.fn(async () => {}),
   });
 }
 
@@ -391,13 +394,16 @@ describe("client-service", () => {
     const update = vi
       .fn()
       .mockResolvedValue({ id: TEST_CLIENT_ID, name: "Cliente A", instagram: "@acme" });
+    const client = {
+      findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID, type: "PJ", cpf_cnpj: "123" }),
+      update,
+    };
     const prisma = {
-      client: {
-        findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID, type: "PJ", cpf_cnpj: "123" }),
-        update,
-      },
+      client,
+      $transaction: vi.fn((run: (tx: unknown) => unknown) => run({ client })),
     } as unknown as PrismaClient;
-    const response = await request(buildTestApp({ ...mockServiceBase() }, { prisma }))
+    const audit = vi.fn(async () => {});
+    const response = await request(buildTestApp({ ...mockServiceBase() }, { prisma, audit }))
       .patch(`/client/${TEST_CLIENT_ID}/integration`)
       .set("Authorization", `Bearer ${bearerToken(TEST_ORG_ID, undefined, 0, undefined, 2)}`)
       .send({ instagram: "@acme" });
@@ -405,6 +411,13 @@ describe("client-service", () => {
     expect(response.status).toBe(200);
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: TEST_CLIENT_ID }, data: { instagram: "@acme" } }),
+    );
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: TEST_ORG_ID,
+        referringId: TEST_CLIENT_ID,
+        changes: { instagram: { from: null, to: "@acme" } },
+      }),
     );
   });
 

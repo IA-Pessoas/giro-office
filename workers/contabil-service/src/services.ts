@@ -1,8 +1,11 @@
 import {
   executeReportingQuery,
   getContabilReportingFields,
+  normalizeTriageDocumentStatus,
   type ReportingQuery,
   ServiceError,
+  TRIAGE_FISCAL_CONFIGURABLE_FIELDS,
+  TRIAGE_PENDING_DOCUMENT_STATUSES,
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
@@ -10,10 +13,12 @@ import {
   AUDIT_CREATE_ACTION,
   AUDIT_UPDATE_ACTION,
 } from "../../../services/contabil-service/src/services/auditActions.js";
+import type { ContingencyPrisma } from "../../../services/contabil-service/src/services/contingencyService.js";
 import {
   CONTROL_AUDIT_ACTIONS,
   CONTROL_AUDIT_REFERRING,
 } from "../../../services/contabil-service/src/services/controlHistoryService.js";
+import type { NoahServicePrisma } from "../../../services/contabil-service/src/services/noahService.js";
 import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
@@ -44,7 +49,9 @@ export type ContabilPrisma = {
     input: readonly Promise<unknown>[] | ((transaction: ContabilPrisma) => Promise<T>),
     options?: QueryArgs,
   ): Promise<T | unknown[]>;
-  client: Delegate;
+  client: Delegate & Pick<ContingencyPrisma["client"], "findFirst">;
+  noahConversion: NoahServicePrisma["noahConversion"];
+  contingencyDraft: ContingencyPrisma["contingencyDraft"];
   controlContabil: Delegate;
   triageClosing: Delegate;
   relationshipContabil: Delegate;
@@ -52,6 +59,7 @@ export type ContabilPrisma = {
   triageConfig: Delegate;
   triageMonthly: Delegate;
   triageBankStatement: Delegate;
+  clientCloud: Delegate;
   triageResponsible: Delegate;
   triageCompetence: Delegate;
   triageCatalogItem: Delegate;
@@ -125,7 +133,16 @@ export type DocumentsService = {
   getOrCreateMonthly(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   updateItem(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   updateAll(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  updateMonthly(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  getConfig(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  saveConfig(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  getFiscalSettings(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  saveFiscalSettings(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   listStatements(input: JsonRecord, organizationId: string): Promise<unknown[]>;
+  listStatementHistory(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  listClouds(input: JsonRecord, auth: AuthContext): Promise<unknown[]>;
+  createCloud(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  updateCloud(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   upsertStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   archiveStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
 };
@@ -222,6 +239,26 @@ function competenceInterval(competence: string): { start: Date; end: Date } {
   };
 }
 
+/** Status do cadastro de cliente inativado (client-service, `inactivate`). */
+const CLIENT_INACTIVE_STATUS = "Inativo";
+
+/**
+ * Janela de elegibilidade da carteira na competência: entrada até o fim do mês, saída e
+ * inativação a partir do início. Inativo sem data de inativação não tem como ser datado e sai.
+ */
+function portfolioWindow(start: Date, end: Date) {
+  return [
+    { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
+    { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+    {
+      OR: [
+        { deletion_date: { gte: start } },
+        { deletion_date: null, NOT: { status: CLIENT_INACTIVE_STATUS } },
+      ],
+    },
+  ];
+}
+
 function auditCreate(
   audit: Audit,
   input: AuthContext,
@@ -248,11 +285,20 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         const clients = await prisma.client.findMany({
           where: {
             organization_id: organizationId,
-            // contabil nulo é elegível, como na tela e na criação de competências.
-            AND: [
-              { OR: [{ contabil: true }, { contabil: null }] },
-              { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
-              { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+            OR: [
+              // contabil nulo é elegível, como na tela e na criação de competências.
+              {
+                AND: [
+                  { OR: [{ contabil: true }, { contabil: null }] },
+                  ...portfolioWindow(start, end),
+                ],
+              },
+              // Controle já aberto na competência mantém o histórico mesmo após saída ou inativação.
+              {
+                controlContabil: {
+                  some: { competence, organization_id: organizationId, archived_at: null },
+                },
+              },
             ],
           },
           select: {
@@ -788,15 +834,92 @@ function validStatus(value: unknown): value is TriageDocumentStatus {
   return typeof value === "string" && (triageDocumentStatuses as readonly string[]).includes(value);
 }
 
+function documentStatus(value: unknown): TriageDocumentStatus {
+  // Item ausente do checklist legado não fazia parte do movimento; o legado ainda deixava
+  // gravá-lo depois, então segue editável (sem `required: false`).
+  return normalizeTriageDocumentStatus(value) ?? "NOT_APPLICABLE";
+}
+
 function checklist(
   value: unknown,
   fields: readonly string[],
 ): Record<string, TriageDocumentStatus> {
   const source =
     value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
-  return Object.fromEntries(
-    fields.map((field) => [field, validStatus(source[field]) ? source[field] : "NOT_APPLICABLE"]),
-  ) as Record<string, TriageDocumentStatus>;
+  return Object.fromEntries(fields.map((field) => [field, documentStatus(source[field])]));
+}
+
+/**
+ * Item desativado no movimento padrão do cliente (fora de `active_items` na criação da
+ * rotina contábil). Na Fiscal, `required: false` só marca item opcional e segue editável.
+ */
+function disabledItem(notes: JsonRecord, field: string, type: "CONTABIL" | "FISCAL"): boolean {
+  return type === "CONTABIL" && jsonObject(notes[field]).required === false;
+}
+
+/** Itens ativos de `active_items` (nomes ou `{ field }`) entre `fields`, na ordem deles. */
+function activeFields(value: unknown, fields: readonly string[]): string[] {
+  const configured = initialItems(value);
+  return fields.filter(
+    (field) => field in configured && jsonObject(configured[field]).required !== false,
+  );
+}
+
+/**
+ * Faturamento vale por padrão: só sai da rotina com `{ field: "billing_amount", required: false }`
+ * explícito. A migração do legado não grava o token, e a linha FISCAL criada só para
+ * prioridade/meio de envio (#1692) tem `active_items` vazio.
+ */
+const BILLING_FIELD = "billing_amount";
+
+function billingDisabled(value: unknown): boolean {
+  const configured = initialItems(value);
+  return BILLING_FIELD in configured && jsonObject(configured[BILLING_FIELD]).required === false;
+}
+
+/** Itens configuráveis ativos; na Fiscal, o faturamento conta salvo se desligado de propósito. */
+function activeConfigurable(value: unknown, type: "CONTABIL" | "FISCAL"): string[] {
+  const active = activeFields(value, configurableFields(type));
+  if (type === "CONTABIL" || active.includes(BILLING_FIELD) || billingDisabled(value))
+    return active;
+  return [...active, BILLING_FIELD];
+}
+
+/** Configuráveis por rotina: Contábil escolhe todos os itens; Fiscal, só os especiais. */
+function configurableFields(type: "CONTABIL" | "FISCAL"): readonly string[] {
+  return type === "FISCAL" ? TRIAGE_FISCAL_CONFIGURABLE_FIELDS : triageDocumentFields;
+}
+
+/**
+ * Novo `active_items`: troca só os itens configuráveis e mantém o resto (na Fiscal, itens com
+ * prioridade ou meio de envio por documento e entradas que esta tela não edita).
+ */
+function nextActiveItems(current: unknown, selected: string[], type: "CONTABIL" | "FISCAL") {
+  if (type === "CONTABIL") return selected;
+  const configurable = new Set<string>(configurableFields(type));
+  const entries = Array.isArray(current) ? current : [];
+  const fieldOf = (item: unknown) => (typeof item === "string" ? item : jsonObject(item).field);
+  const kept = entries.filter((item) => {
+    const field = fieldOf(item);
+    return typeof field !== "string" || !configurable.has(field);
+  });
+  // Documento que segue selecionado mantém prioridade e meio de envio do objeto existente.
+  const chosen = selected.map((field) => {
+    const existing = entries.find((item) => fieldOf(item) === field);
+    return existing && typeof existing === "object"
+      ? { ...jsonObject(existing), required: true }
+      : field;
+  });
+  // Faturamento desmarcado precisa ficar explícito: ausente significa "aplica".
+  const billingOff = selected.includes(BILLING_FIELD)
+    ? []
+    : [{ field: BILLING_FIELD, required: false }];
+  return [...kept, ...chosen, ...billingOff];
+}
+
+function dateOnly(value: unknown): Date | null | undefined {
+  if (value === undefined || value === null) return value;
+  return new Date(`${String(value)}T00:00:00.000Z`);
 }
 
 function itemNotes(value: unknown, fields: readonly string[]): JsonRecord {
@@ -875,6 +998,16 @@ async function canEdit(
   });
   if (!assigned)
     throw new ServiceError(403, "Permissão insuficiente para alterar pendências documentais.");
+}
+
+/** Dado do cliente compartilhado pelas rotinas: quem edita a Contábil ou a Fiscal altera. */
+async function canEditEitherRoutine(prisma: ContabilPrisma, clientId: string, auth: AuthContext) {
+  try {
+    await canEdit(prisma, clientId, auth, "CONTABIL");
+  } catch (error) {
+    if (!(error instanceof ServiceError) || error.statusCode !== 403) throw error;
+    await canEdit(prisma, clientId, auth, "FISCAL");
+  }
 }
 
 function initialItems(value: unknown): JsonRecord {
@@ -1087,13 +1220,7 @@ export function createDocumentsService(
         where: {
           organization_id: auth.organizationId,
           OR: [
-            {
-              fiscal: true,
-              AND: [
-                { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
-                { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
-              ],
-            },
+            { fiscal: true, AND: portfolioWindow(start, end) },
             { triageMonthlys: { some: monthlyScope } },
           ],
         },
@@ -1144,6 +1271,17 @@ export function createDocumentsService(
           })
         : [];
       const userNames = new Map(users.map((user) => [user.id, user.name]));
+      const settings = clients.length
+        ? await prisma.triageConfig.findMany({
+            where: {
+              organization_id: auth.organizationId,
+              type: "FISCAL",
+              client_id: { in: clients.map((client) => String(client.id)) },
+            },
+            select: { client_id: true, priority: true, delivery_method: true },
+          })
+        : [];
+      const settingsByClient = new Map(settings.map((row) => [String(row.client_id), row]));
       const fiscalFields = triageFiscalFields.slice(0, -1);
 
       return {
@@ -1161,6 +1299,8 @@ export function createDocumentsService(
             regime: client.regime,
             responsible_id: responsibleId,
             responsible_name: responsibleId ? (userNames.get(responsibleId) ?? null) : null,
+            priority: settingsByClient.get(String(client.id))?.priority === true,
+            delivery_method: settingsByClient.get(String(client.id))?.delivery_method ?? null,
             can_edit: Number(auth.modules?.fiscal ?? 0) >= 2 || assignedId(client) === auth.userId,
             has_competence: Boolean(snapshot),
             planned_checklist: required
@@ -1240,48 +1380,52 @@ export function createDocumentsService(
             const existing = await transaction.triageMonthly.findFirst({ where: identity });
             if (existing) return existing;
             await canEdit(transaction, String(input.client_id), auth, type);
-            let configured: JsonRecord = {};
-            if (type === "FISCAL") {
-              const competence = await transaction.triageCompetence.findFirst({
-                where: {
-                  client_id: input.client_id,
-                  competence: input.competence,
-                  organization_id: auth.organizationId,
-                  archived_at: null,
-                },
-                select: { configuration_snapshot: true },
-              });
-              if (!competence)
-                throw new ServiceError(
-                  409,
-                  "Crie a competência fiscal antes de iniciar a rotina mensal.",
-                );
-              const snapshot = competence.configuration_snapshot;
-              const configs =
-                snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)
-                  ? (snapshot as JsonRecord).configs
-                  : undefined;
-              const fiscal = Array.isArray(configs)
-                ? (configs.find(
-                    (item) =>
-                      item && typeof item === "object" && (item as JsonRecord).type === "FISCAL",
-                  ) as JsonRecord | undefined)
-                : undefined;
-              configured = initialItems(fiscal?.active_items);
-            } else {
-              const config = await transaction.triageConfig.findFirst({
-                where: { client_id: input.client_id, organization_id: auth.organizationId, type },
-                select: { active_items: true },
-              });
-              configured = initialItems(config?.active_items);
-            }
+            const competence = await transaction.triageCompetence.findFirst({
+              where: {
+                client_id: input.client_id,
+                competence: input.competence,
+                organization_id: auth.organizationId,
+                archived_at: null,
+              },
+              select: { configuration_snapshot: true },
+            });
+            if (type === "FISCAL" && !competence)
+              throw new ServiceError(
+                409,
+                "Crie a competência fiscal antes de iniciar a rotina mensal.",
+              );
+            // Com competência aberta vale o movimento padrão congelado nela; sem, o atual.
+            // Snapshot sem a config da rotina (competência aberta antes do padrão) usa o atual.
+            const configs = jsonObject(competence?.configuration_snapshot).configs;
+            const config =
+              (Array.isArray(configs)
+                ? configs.map(jsonObject).find((item) => item.type === type)
+                : undefined) ??
+              (type === "CONTABIL"
+                ? await transaction.triageConfig.findFirst({
+                    where: {
+                      client_id: input.client_id,
+                      organization_id: auth.organizationId,
+                      type,
+                    },
+                    select: { active_items: true },
+                  })
+                : undefined);
+            const configured = initialItems(config?.active_items);
+            // Sem movimento padrão nenhum item é desativado: a rotina segue editável como antes.
+            // Na Fiscal, `required: false` marca o item fora da configuração (opcional) e esconde o
+            // faturamento de quem não o tem; na Contábil, desativa o item.
+            const unconfigured = config
+              ? { note: null, justification: null, required: false }
+              : { note: null, justification: null };
             const fields = type === "FISCAL" ? triageFiscalFields : triageDocumentFields;
             const checklistValue = Object.fromEntries(
               fields.map((field) => {
                 const value = configured[field];
+                // Mesmo critério de `fiscalRequiredItems` e do Fiscal: só `required: false` desliga.
                 const required =
                   value && typeof value === "object" && !Array.isArray(value)
-                    ? (value as JsonRecord).required === true
+                    ? (value as JsonRecord).required !== false
                     : false;
                 return [field, required ? "PENDING" : "NOT_APPLICABLE"];
               }),
@@ -1289,7 +1433,8 @@ export function createDocumentsService(
             const notes = Object.fromEntries(
               fields.map((field) => [
                 field,
-                configured[field] ?? { note: null, justification: null },
+                configured[field] ??
+                  (field === BILLING_FIELD ? { note: null, justification: null } : unconfigured),
               ]),
             );
             const values = Object.values(notes) as JsonRecord[];
@@ -1406,6 +1551,8 @@ export function createDocumentsService(
             type === "FISCAL" ? triageFiscalFields.slice(0, -1) : fields,
           );
           const currentNotes = itemNotes(current.item_notes, fields);
+          if (!billing && disabledItem(currentNotes, field, type))
+            throw new ServiceError(409, "Item desativado no movimento padrão do cliente.");
           const nextNotes = {
             ...currentNotes,
             [field]: {
@@ -1454,13 +1601,16 @@ export function createDocumentsService(
           if (!current) throw new ServiceError(404, "Pendência documental mensal não encontrada.");
           await canEdit(transaction, String(current.client_id), auth, type);
           const values = checklist(current.checklist, fields);
+          const notes = itemNotes(current.item_notes, fields);
           const updated = await transaction.triageMonthly.update({
             where: { id },
             data: {
               checklist: Object.fromEntries(
                 fields.map((field) => [
                   field,
-                  values[field] === "NOT_APPLICABLE" ? values[field] : input.status,
+                  values[field] === "NOT_APPLICABLE" || disabledItem(notes, field, type)
+                    ? values[field]
+                    : input.status,
                 ]),
               ),
               updated_at: new Date(),
@@ -1483,6 +1633,205 @@ export function createDocumentsService(
       });
       return monthlyDto(changed.updated, type);
     },
+    async updateMonthly(id, input, auth) {
+      const type = routineType(input.type);
+      const notes = normalizeOptionalNote(input.notes, "Observação da rotina");
+      const justification = normalizeOptionalCatalogCode(
+        input.justification,
+        "Justificativa da rotina",
+      );
+      const responsibleId =
+        input.responsible_id === undefined || input.responsible_id === null
+          ? input.responsible_id
+          : String(input.responsible_id);
+      const result = await prisma.$transaction(
+        async (transaction) => {
+          await lock(transaction, `triagem.monthly:${id}`);
+          const current = await transaction.triageMonthly.findFirst({
+            where: { id, organization_id: auth.organizationId, type, archived_at: null },
+          });
+          if (!current) throw new ServiceError(404, "Pendência documental mensal não encontrada.");
+          await canEdit(transaction, String(current.client_id), auth, type);
+          if (responsibleId) {
+            const user = await transaction.user.findFirst({
+              where: { id: responsibleId, organization_id: auth.organizationId },
+              select: { id: true },
+            });
+            if (!user) throw new ServiceError(400, "Responsável não encontrado na organização.");
+          }
+          await assertActiveCatalogItems(
+            transaction,
+            "JUSTIFICATION",
+            [justification],
+            auth.organizationId,
+            String(current.client_id),
+            String(current.competence),
+          );
+          const data: JsonRecord = {
+            ...(typeof input.triad_moviment === "boolean"
+              ? { triad_moviment: input.triad_moviment }
+              : {}),
+            ...(notes !== undefined ? { notes } : {}),
+            ...(justification !== undefined ? { justification } : {}),
+            ...(responsibleId !== undefined ? { responsible_id: responsibleId } : {}),
+            ...(input.download_date !== undefined
+              ? { download_date: dateOnly(input.download_date) }
+              : {}),
+            ...(input.settlement_date !== undefined
+              ? { settlement_date: dateOnly(input.settlement_date) }
+              : {}),
+          };
+          await resetRlsRole(transaction);
+          const updated = await transaction.triageMonthly.update({
+            where: { id },
+            data: { ...data, updated_at: new Date() },
+          });
+          return { current, updated };
+        },
+        { isolationLevel: "Serializable" },
+      );
+      const changed = result as { current: JsonRecord; updated: JsonRecord };
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Atualizar movimento mensal da triagem",
+        referring: "triagem.monthly",
+        referringId: id,
+        oldData: changed.current,
+        updatedData: changed.updated,
+      });
+      return monthlyDto(changed.updated, type);
+    },
+    async getConfig(input, auth) {
+      const type = routineType(input.type);
+      if (type === "FISCAL" && Number(auth.modules?.fiscal ?? auth.permission ?? 0) < 1)
+        throw new ServiceError(403, "Permissão insuficiente para consultar a Triagem Fiscal.");
+      const config = await prisma.triageConfig.findFirst({
+        where: { client_id: input.client_id, organization_id: auth.organizationId, type },
+        select: { active_items: true },
+      });
+      return {
+        client_id: input.client_id,
+        type,
+        configured: Boolean(config),
+        active_items: activeConfigurable(config?.active_items, type),
+      };
+    },
+    async saveConfig(input, auth) {
+      const type = routineType(input.type);
+      const clientId = String(input.client_id);
+      const activeItems = activeFields(input.active_items, configurableFields(type));
+      const identity = { organization_id: auth.organizationId, client_id: clientId, type };
+      const result = await prisma.$transaction(async (transaction) => {
+        await lock(transaction, `triagem.configs:${auth.organizationId}:${clientId}:${type}`);
+        await assertClientInOrganization(transaction, clientId, auth.organizationId);
+        await canEdit(transaction, clientId, auth, type);
+        const current = await transaction.triageConfig.findFirst({
+          where: identity,
+          select: { active_items: true },
+        });
+        const stored = nextActiveItems(current?.active_items, activeItems, type);
+        const updated = await transaction.triageConfig.upsert({
+          where: { organization_id_client_id_type: identity },
+          create: { ...identity, active_items: stored },
+          update: { active_items: stored },
+        });
+        return { current, updated };
+      });
+      const changed = result as { current: JsonRecord | null; updated: JsonRecord };
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action:
+          type === "FISCAL"
+            ? "Configurar documentos fiscais especiais"
+            : "Configurar movimento padrão",
+        referring: "triagem.configs",
+        referringId: clientId,
+        oldData: {
+          active_items: activeConfigurable(changed.current?.active_items, type),
+        },
+        updatedData: { active_items: activeItems },
+      });
+      return { client_id: clientId, type, configured: true, active_items: activeItems };
+    },
+    async getFiscalSettings(input, auth) {
+      if (Number(auth.modules?.fiscal ?? auth.permission ?? 0) < 1)
+        throw new ServiceError(403, "Permissão insuficiente para consultar a Triagem Fiscal.");
+      await assertClientInOrganization(prisma, String(input.client_id), auth.organizationId);
+      const config = await prisma.triageConfig.findFirst({
+        where: { client_id: input.client_id, organization_id: auth.organizationId, type: "FISCAL" },
+        select: { priority: true, delivery_method: true },
+      });
+      return {
+        client_id: input.client_id,
+        priority: config?.priority === true,
+        delivery_method: config?.delivery_method ?? null,
+      };
+    },
+    async saveFiscalSettings(input, auth) {
+      const clientId = String(input.client_id);
+      const deliveryMethod = normalizeOptionalCatalogCode(input.delivery_method, "Meio de envio");
+      const identity = {
+        organization_id: auth.organizationId,
+        client_id: clientId,
+        type: "FISCAL",
+      };
+      const data = {
+        ...(typeof input.priority === "boolean" ? { priority: input.priority } : {}),
+        ...(deliveryMethod !== undefined ? { delivery_method: deliveryMethod } : {}),
+      };
+      const result = await prisma.$transaction(async (transaction) => {
+        await lock(transaction, `triagem.configs:${auth.organizationId}:${clientId}:FISCAL`);
+        await assertClientInOrganization(transaction, clientId, auth.organizationId);
+        await canEdit(transaction, clientId, auth, "FISCAL");
+        if (deliveryMethod) {
+          // Valor do cliente não tem competência: vale o catálogo ativo da organização.
+          const item = await transaction.triageCatalogItem.findFirst({
+            where: {
+              organization_id: auth.organizationId,
+              kind: "DELIVERY_METHOD",
+              code: deliveryMethod,
+              archived_at: null,
+            },
+            select: { code: true },
+          });
+          if (!item) throw new ServiceError(400, "Meio de envio não está disponível no catálogo.");
+        }
+        const current = await transaction.triageConfig.findFirst({
+          where: identity,
+          select: { priority: true, delivery_method: true },
+        });
+        const updated = await transaction.triageConfig.upsert({
+          where: { organization_id_client_id_type: identity },
+          // Só cria a linha fiscal; itens configurados vazios equivalem a "sem configuração".
+          create: { ...identity, active_items: [], ...data },
+          update: data,
+        });
+        return { current, updated };
+      });
+      const changed = result as { current: JsonRecord | null; updated: JsonRecord };
+      const saved = {
+        priority: changed.updated.priority === true,
+        delivery_method: (changed.updated.delivery_method as string | null | undefined) ?? null,
+      };
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Configurar prioridade e meio de envio fiscal",
+        referring: "triagem.configs",
+        referringId: clientId,
+        oldData: {
+          priority: changed.current?.priority === true,
+          delivery_method: (changed.current?.delivery_method as string | null | undefined) ?? null,
+        },
+        updatedData: saved,
+      });
+      return { client_id: clientId, ...saved };
+    },
     async listStatements(input, organizationId) {
       return prisma.triageBankStatement.findMany({
         where: {
@@ -1493,6 +1842,108 @@ export function createDocumentsService(
         },
         orderBy: { bank_id: "asc" },
       });
+    },
+    async listStatementHistory(input, auth) {
+      const clientId = String(input.client_id);
+      await assertClientInOrganization(prisma, clientId, auth.organizationId);
+      const competence = {
+        ...(typeof input.from === "string" ? { gte: input.from } : {}),
+        ...(typeof input.to === "string" ? { lte: input.to } : {}),
+      };
+      // ponytail: até 500 marcadores (anos de bancos de um cliente); paginar se passar disso.
+      const limit = 500;
+      const found = await prisma.triageBankStatement.findMany({
+        where: {
+          organization_id: auth.organizationId,
+          client_id: clientId,
+          archived_at: null,
+          ...(Object.keys(competence).length ? { competence } : {}),
+          ...(input.pending === true
+            ? { status: { in: [...TRIAGE_PENDING_DOCUMENT_STATUSES] } }
+            : {}),
+        },
+        select: { competence: true, bank_id: true, status: true },
+        orderBy: [{ competence: "desc" }, { bank_id: "asc" }],
+        take: limit + 1,
+      });
+      // Cortado no limite, faltam as competências mais antigas: a resposta avisa.
+      const truncated = found.length > limit;
+      const rows = found.slice(0, limit);
+      // Agrupado por competência: cada banco aparece no período a que pertence.
+      const pending = new Set<string>(TRIAGE_PENDING_DOCUMENT_STATUSES);
+      const groups = new Map<string, JsonRecord[]>();
+      for (const row of rows) {
+        const key = String(row.competence);
+        const group = groups.get(key) ?? [];
+        group.push({ bank_id: row.bank_id, status: row.status });
+        groups.set(key, group);
+      }
+      return {
+        client_id: clientId,
+        truncated,
+        competences: [...groups].map(([competenceKey, statements]) => ({
+          competence: competenceKey,
+          pending: statements.filter((item) => pending.has(String(item.status))).length,
+          statements,
+        })),
+      };
+    },
+    async listClouds(input, auth) {
+      const clientId = String(input.client_id);
+      await assertClientInOrganization(prisma, clientId, auth.organizationId);
+      return prisma.clientCloud.findMany({
+        where: { organization_id: auth.organizationId, client_id: clientId },
+        select: { id: true, client_id: true, type: true, link: true, updated_at: true },
+        orderBy: [{ created_at: "asc" }, { id: "asc" }],
+      });
+    },
+    async createCloud(input, auth) {
+      const clientId = String(input.client_id);
+      await assertClientInOrganization(prisma, clientId, auth.organizationId);
+      await canEditEitherRoutine(prisma, clientId, auth);
+      const reference = { type: String(input.type), link: String(input.link) };
+      // Só a referência (tipo e link): sem upload nem sincronização com o provedor.
+      const cloud = await prisma.clientCloud.create({
+        data: { organization_id: auth.organizationId, client_id: clientId, ...reference },
+      });
+      await audit.createLog({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Cadastrar nuvem do cliente",
+        referring: "clientes.clouds",
+        referringId: String(cloud.id),
+        changes: JSON.stringify(reference),
+      });
+      return cloud;
+    },
+    async updateCloud(id, input, auth) {
+      const data = {
+        ...(typeof input.type === "string" ? { type: input.type } : {}),
+        ...(typeof input.link === "string" ? { link: input.link } : {}),
+      };
+      const result = await prisma.$transaction(async (transaction) => {
+        await lock(transaction, `clientes.clouds:${id}`);
+        const current = await transaction.clientCloud.findFirst({
+          where: { id, organization_id: auth.organizationId },
+        });
+        if (!current) throw new ServiceError(404, "Nuvem do cliente não encontrada.");
+        await canEditEitherRoutine(transaction, String(current.client_id), auth);
+        const updated = await transaction.clientCloud.update({ where: { id }, data });
+        return { current, updated };
+      });
+      const changed = result as { current: JsonRecord; updated: JsonRecord };
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Atualizar nuvem do cliente",
+        referring: "clientes.clouds",
+        referringId: id,
+        oldData: changed.current,
+        updatedData: changed.updated,
+      });
+      return changed.updated;
     },
     async upsertStatement(input, auth) {
       if (!validStatus(input.status))

@@ -135,6 +135,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/marketing\/birthdays$/,
+    description: { action: "consultou", item: "os aniversariantes do mês do Marketing" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/stock$/,
+    description: { action: "consultou", item: "o estoque do Marketing" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/marketing\/ai-usage-controls\/users$/,
     description: { action: "consultou", item: "os usuários elegíveis para a pesquisa de IA" },
   },
@@ -971,6 +981,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/pessoal\/obrigations\/portfolio$/,
+    description: { action: "consultou", item: "a carteira de obrigações" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/obrigations\/[^/]+\/history$/,
+    description: { action: "consultou", item: "o histórico de uma obrigação trabalhista" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/parcelamento\/installments\/[^/]+\/competencies$/,
     description: { action: "consultou", item: "as competências de um parcelamento" },
   },
@@ -1185,6 +1205,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "marcou", item: "notificações de solicitações de RH como lidas" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/contabil\/noah$/,
+    description: { action: "converteu", item: "comprovantes Noah em CSV" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/noah\/[^/]+\/csv$/,
+    description: { action: "baixou", item: "um CSV da conversão Noah" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/contabil\/responsibles\/client\/[^/]+$/,
     description: { action: "consultou", item: "o responsável contábil de um cliente" },
@@ -1278,6 +1308,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PATCH"],
     pattern: /^\/triagem\/urgent-requests\/[^/]+\/reopen\/?$/,
     description: { action: "reabriu", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/contingency\/[^/]+\/review$/,
+    description: { action: "conferiu", item: "valores e parâmetros da Contingência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/contingency\/[^/]+\/export$/,
+    description: { action: "exportou", item: "uma conclusão revisada da Contingência" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/contingency$/,
+    description: { action: "simulou", item: "uma contingência contábil" },
   },
   {
     methods: ["POST"],

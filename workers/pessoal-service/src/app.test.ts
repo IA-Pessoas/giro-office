@@ -112,6 +112,8 @@ function payrollService(): PessoalPayrollService {
 function obligationService(): PessoalObligationService {
   return {
     detail: vi.fn(async () => ({ id: OBLIGATION_ID, client_id: CLIENT_ID, competence: "2026-09" })),
+    listPortfolio: vi.fn(async () => ({ items: [], total: 0, page: 2, pageSize: 20 })),
+    history: vi.fn(async () => ({ obligation_id: OBLIGATION_ID, total: 0, items: [] })),
     create: vi.fn(async () => ({
       created: true,
       obligation: { id: OBLIGATION_ID, client_id: CLIENT_ID },
@@ -465,6 +467,50 @@ describe("pessoal Worker", () => {
     expect(obligations.generateForCompetence).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       "2026-09",
+    );
+  });
+
+  it("routes the obligation portfolio scoped to the organization", async () => {
+    const obligations = obligationService();
+    const app = createPessoalWorkerApp({ env: env(), obligationService: obligations });
+    const base = "https://pessoal.test/pessoal/obrigations/portfolio?competence=2026-09";
+
+    const listed = await app.request(`${base}&item=va&state=pending&page=2&pageSize=20`, {
+      headers: headers("1"),
+    });
+    const invalid = await app.request(`${base}&state=done`, { headers: headers("1") });
+    const denied = await app.request(base, { headers: headers("0") });
+
+    expect([listed.status, invalid.status, denied.status]).toEqual([200, 400, 403]);
+    expect(obligations.listPortfolio).toHaveBeenCalledTimes(1);
+    expect(obligations.listPortfolio).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID },
+      { competence: "2026-09", item: "va", state: "pending", page: 2, pageSize: 20 },
+    );
+  });
+
+  it("routes obligation history with Pessoal read permission only", async () => {
+    const obligations = obligationService();
+    const app = createPessoalWorkerApp({ env: env(), obligationService: obligations });
+    const url = `https://pessoal.test/pessoal/obrigations/${OBLIGATION_ID}/history`;
+
+    const listed = await app.request(`${url}?page=2&pageSize=10`, { headers: headers("1") });
+    const forged = await app.request(`${url}?organization_id=${ORGANIZATION_ID}`, {
+      headers: headers("1"),
+    });
+    const badId = await app.request("https://pessoal.test/pessoal/obrigations/x/history", {
+      headers: headers("1"),
+    });
+    const denied = await app.request(url, { headers: headers("0") });
+
+    expect([listed.status, forged.status, badId.status, denied.status]).toEqual([
+      200, 400, 400, 403,
+    ]);
+    expect(obligations.history).toHaveBeenCalledTimes(1);
+    expect(obligations.history).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID },
+      OBLIGATION_ID,
+      { page: 2, pageSize: 10 },
     );
   });
 

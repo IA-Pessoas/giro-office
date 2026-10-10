@@ -17,3 +17,7 @@ export const pessoalPrimaryButtonClassName =
 export const pessoalCheckboxCardClassName =
   "flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm " +
   "text-gray-700 dark:border-gray-700 dark:text-gray-300";
+
+/** Select compacto para células de tabela. */
+export const pessoalCompactSelectClassName =
+  "rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-white";

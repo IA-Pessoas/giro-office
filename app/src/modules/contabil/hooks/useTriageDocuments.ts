@@ -20,6 +20,7 @@ import {
   triageClosingQueryKey,
   triageFiscalPortfolioQueryKey,
   triageMonthlyQueryKey,
+  triageStatementHistoryQueryKey,
   triageStatementsQueryKey,
 } from "./queryKeys";
 
@@ -144,17 +145,23 @@ export function useTriageMutations(
       mutationFn: triageDocumentsService.updateStatement,
       onSuccess: async () => {
         await refresh();
-        await queryClient.invalidateQueries({
-          queryKey: triageStatementsQueryKey(clientId, competence),
-        });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: triageStatementsQueryKey(clientId, competence),
+          }),
+          queryClient.invalidateQueries({ queryKey: triageStatementHistoryQueryKey(clientId) }),
+        ]);
       },
     }),
     archiveStatement: useMutation({
       mutationFn: triageDocumentsService.archiveStatement,
       onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: triageStatementsQueryKey(clientId, competence),
-        });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: triageStatementsQueryKey(clientId, competence),
+          }),
+          queryClient.invalidateQueries({ queryKey: triageStatementHistoryQueryKey(clientId) }),
+        ]);
       },
     }),
     closing: useMutation({

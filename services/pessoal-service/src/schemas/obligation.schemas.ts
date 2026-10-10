@@ -50,3 +50,47 @@ export const updateObligationFieldBodySchema = z
 export type CreateObligationBody = z.infer<typeof createObligationBodySchema>;
 export type DetailObligationQuery = z.infer<typeof detailObligationQuerySchema>;
 export type UpdateObligationFieldBody = z.infer<typeof updateObligationFieldBodySchema>;
+
+export const OBLIGATION_ITEMS = [
+  "advance",
+  "payroll",
+  "charges",
+  "assistance_fee",
+  "bem_mais",
+  "bsf",
+  "va",
+  "vt",
+] as const;
+
+/** Estado do item na carteira: pendente (false), concluído (true), não possui (null). */
+export const OBLIGATION_ITEM_STATES = ["pending", "done", "none"] as const;
+
+export const listObligationPortfolioQuerySchema = z
+  .object({
+    competence: competenceSchema,
+    // "none" filtra obrigações sem responsável.
+    responsavel_id: z
+      .union([z.string().uuid({ message: "responsavel_id inválido." }), z.literal("none")])
+      .optional(),
+    group_id: z.string().uuid({ message: "group_id inválido." }).optional(),
+    item: z.enum(OBLIGATION_ITEMS).optional(),
+    state: z.enum(OBLIGATION_ITEM_STATES).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .strict()
+  .refine((value) => !value.state || value.item || value.state === "pending", {
+    message: "Informe o item para filtrar por concluído ou não possui.",
+    path: ["item"],
+  });
+
+export type ListObligationPortfolioQuery = z.infer<typeof listObligationPortfolioQuerySchema>;
+
+export const obligationHistoryQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).max(10_000).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+
+export type ObligationHistoryQuery = z.infer<typeof obligationHistoryQuerySchema>;

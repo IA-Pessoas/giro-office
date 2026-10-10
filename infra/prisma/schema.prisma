@@ -169,6 +169,8 @@ model Organization {
   clientsPF                     ClientPF[]
   clientTerminations            ClientTermination[]
   controlsContabil              ControlContabil[]
+  contingencyDrafts             ContingencyDraft[]
+  noahConversions               NoahConversion[]
   relationshipsContabil         RelationshipContabil[]
   responsiblesContabil          ResponsibleContabil[]
   departments                   Department[]
@@ -1661,6 +1663,39 @@ model CertificatePF {
   @@index([organization_id, expiration_date, name], map: "idx_cert_pf_org_exp_name")
   @@index([organization_id, has_certificate, expiration_date, name], map: "idx_cert_pf_org_has_exp_name")
   @@map("certificate.pf")
+}
+
+model ContingencyDraft {
+  id              String   @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime @default(now())
+  snapshot        String
+  content_hash    String
+  reviewed_by     String?
+  reviewed_at     DateTime?
+  reviewed_hash   String?
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  @@index([organization_id, created_at])
+  @@map("contabil.contingency_drafts")
+}
+
+model NoahConversion {
+  id              String       @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime     @default(now())
+  source_name     String
+  source_sha256   String
+  result_sha256   String
+  csv             String
+  row_count       Int
+  file_count      Int
+  rejections      Json
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, created_at])
+  @@map("contabil.noah_conversions")
 }
 
 model ControlContabil {
@@ -3245,6 +3280,10 @@ model TriageConfig {
   client_id       String
   type            String
   active_items    Json
+  /// Prioridade Sim/Não do cliente na rotina (só FISCAL); não é urgência nem prioridade de item.
+  priority        Boolean      @default(false)
+  /// Meio de envio do cliente (código DELIVERY_METHOD do catálogo da triagem; só FISCAL).
+  delivery_method String?      @db.VarChar(100)
   updated_at      DateTime     @updatedAt
   organization_id String
   client          Client       @relation(fields: [client_id], references: [id])

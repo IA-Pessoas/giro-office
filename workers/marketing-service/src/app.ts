@@ -6,6 +6,7 @@ import {
   marketingAiUsageControlQuerySchema,
   updateMarketingAiUsageControlBodySchema,
 } from "@workspace/marketing-service/src/schemas/marketingAiUsageControl.schemas.js";
+import { marketingMonthlyBirthdaysQuerySchema } from "@workspace/marketing-service/src/schemas/marketingDashboard.schemas.js";
 import {
   createMarketingEventBodySchema,
   marketingEventIdParamsSchema,
@@ -40,6 +41,7 @@ import {
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { createMarketingWorkerAudit } from "./audit.js";
 import { authenticateMarketingRequest, requireMarketingPermission } from "./auth.js";
 import type { MarketingWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
@@ -47,16 +49,17 @@ import { PrismaClient } from "./prisma.js";
 /** Os serviços do marketing-service Node, montados como no `app.ts` dele. */
 export function createMarketingServices(prisma: unknown, env: MarketingWorkerEnv) {
   const db = prisma as never;
+  const audit = createMarketingWorkerAudit(env);
   return {
     dashboard: new MarketingDashboardService(db),
-    controls: new MarketingAiUsageControlService(db),
-    events: new MarketingEventsService(db),
-    editions: new MarketingEventEditionsService(db),
+    controls: new MarketingAiUsageControlService(db, audit),
+    events: new MarketingEventsService(db, audit),
+    editions: new MarketingEventEditionsService(db, audit),
     passwords: () => {
       if (!env.MTK_ENCRYPTION_KEY) {
         throw new ServiceError(503, "Credenciais de Marketing indisponíveis no momento.");
       }
-      return new MarketingPasswordService(db, new EncryptionService(env.MTK_ENCRYPTION_KEY));
+      return new MarketingPasswordService(db, new EncryptionService(env.MTK_ENCRYPTION_KEY), audit);
     },
   };
 }
@@ -127,6 +130,17 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/dashboard",
     handle(VIEWER, async (c, s, org) => ok(c, await s.dashboard.getDashboard(org))),
   );
+  app.get(
+    "/marketing/birthdays",
+    handle(VIEWER, async (c, s, org) => {
+      const { month } = parseWithZod(marketingMonthlyBirthdaysQuerySchema, c.req.query());
+      return ok(c, await s.dashboard.getMonthlyBirthdays(org, month));
+    }),
+  );
+  app.get(
+    "/marketing/stock",
+    handle(VIEWER, async (c, s, org) => ok(c, await s.dashboard.getMarketingStock(org))),
+  );
 
   // Controle mensal de uso de IA.
   app.get(
@@ -144,7 +158,11 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/ai-usage-controls",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(createMarketingAiUsageControlBodySchema, await readJson(c));
-      return ok(c, await s.controls.createForUser(org, body.userId, body.competence), 201);
+      return ok(
+        c,
+        await s.controls.createForUser(org, body.userId, body.competence, c.get("auth").userId),
+        201,
+      );
     }),
   );
   app.get(
@@ -177,7 +195,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingAiUsageControlIdParamsSchema, c.req.param());
       const body = parseWithZod(updateMarketingAiUsageControlBodySchema, await readJson(c));
-      return ok(c, await s.controls.updateAnswers(org, id, body));
+      return ok(c, await s.controls.updateAnswers(org, id, body, c.get("auth").userId));
     }),
   );
 
@@ -194,7 +212,11 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/passwords/import",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(importMarketingPasswordsBodySchema, await readJson(c));
-      return ok(c, await s.passwords().importLegacyRecords(org, body.records), 201);
+      return ok(
+        c,
+        await s.passwords().importLegacyRecords(org, body.records, c.get("auth").userId),
+        201,
+      );
     }),
   );
   app.get(
@@ -208,7 +230,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/passwords",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(createMarketingPasswordBodySchema, await readJson(c));
-      return ok(c, await s.passwords().create(org, body), 201);
+      return ok(c, await s.passwords().create(org, body, c.get("auth").userId), 201);
     }),
   );
   app.patch(
@@ -216,7 +238,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, c.req.param());
       const body = parseWithZod(updateMarketingPasswordBodySchema, await readJson(c));
-      return ok(c, await s.passwords().update(org, id, body));
+      return ok(c, await s.passwords().update(org, id, body, c.get("auth").userId));
     }),
   );
   app.post(
@@ -224,7 +246,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, c.req.param());
       const body = parseWithZod(marketingPasswordConfirmationSchema, await readJson(c));
-      return ok(c, await s.passwords().reveal(org, id, body.confirmed));
+      return ok(c, await s.passwords().reveal(org, id, body.confirmed, c.get("auth").userId));
     }),
   );
   app.post(
@@ -232,7 +254,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, c.req.param());
       const body = parseWithZod(marketingPasswordConfirmationSchema, await readJson(c));
-      return ok(c, await s.passwords().export(org, id, body.confirmed));
+      return ok(c, await s.passwords().export(org, id, body.confirmed, c.get("auth").userId));
     }),
   );
 
@@ -245,7 +267,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/events",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(createMarketingEventBodySchema, await readJson(c));
-      return ok(c, await s.events.createEvent(org, body), 201);
+      return ok(c, await s.events.createEvent(org, body, c.get("auth").userId), 201);
     }),
   );
   app.put(
@@ -253,7 +275,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingEventIdParamsSchema, c.req.param());
       const body = parseWithZod(updateMarketingEventBodySchema, await readJson(c));
-      const event = await s.events.updateEvent(org, id, body);
+      const event = await s.events.updateEvent(org, id, body, c.get("auth").userId);
       if (!event) throw new ServiceError(404, "Evento não encontrado.");
       return ok(c, event);
     }),
@@ -270,7 +292,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { eventId } = parseWithZod(marketingEventEditionParamsSchema, c.req.param());
       const body = parseWithZod(marketingEventEditionBodySchema, await readJson(c));
-      return ok(c, await s.editions.createEdition(org, eventId, body), 201);
+      return ok(c, await s.editions.createEdition(org, eventId, body, c.get("auth").userId), 201);
     }),
   );
   app.put(
@@ -281,7 +303,13 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
         c.req.param(),
       );
       const body = parseWithZod(marketingEventEditionBodySchema, await readJson(c));
-      const edition = await s.editions.updateEdition(org, eventId, editionId, body);
+      const edition = await s.editions.updateEdition(
+        org,
+        eventId,
+        editionId,
+        body,
+        c.get("auth").userId,
+      );
       if (!edition) throw new ServiceError(404, "Edição não encontrada.");
       return ok(c, edition);
     }),
@@ -294,7 +322,11 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
         c.req.param(),
       );
       const body = parseWithZod(marketingEventEditionFeedbackBodySchema, await readJson(c));
-      return ok(c, await s.editions.createEditionFeedback(org, eventId, editionId, body), 201);
+      return ok(
+        c,
+        await s.editions.createEditionFeedback(org, eventId, editionId, body, c.get("auth").userId),
+        201,
+      );
     }),
   );
   app.get(

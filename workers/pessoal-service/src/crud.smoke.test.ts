@@ -3,6 +3,10 @@
 // schema do Worker ("Unknown argument"), coluna ausente, valor que não persiste.
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { pessoalReportingCatalog } from "@workspace/pessoal-service/src/reporting/pessoalReportingCatalog.js";
+import {
+  OBLIGATION_AUDIT_REFERRING,
+  OBLIGATION_UPDATE_ACTION,
+} from "@workspace/pessoal-service/src/services/obligationHistoryService.js";
 import { serializeError } from "@workspace/shared/http";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -33,12 +37,22 @@ function canonicalJson(value: unknown): string {
 }
 
 describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
+  // Captura o que o Worker manda ao audit-service, para o histórico ler a gravação real.
+  const auditEvents: Array<Record<string, unknown>> = [];
+  const auditService = {
+    fetch: async (request: Request) => {
+      auditEvents.push((await request.json()) as Record<string, unknown>);
+      return new Response(null, { status: 201 });
+    },
+  };
   const env = () =>
     smokeEnv<PessoalWorkerEnv>({
       PESSOAL_PASSWORD_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
       PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION: "v1",
       REPORTS_INTERNAL_TOKEN: REPORTS_TOKEN,
       REPORTS_GRANT_SECRET: GRANT_SECRET,
+      AUDIT_SERVICE: auditService as unknown as PessoalWorkerEnv["AUDIT_SERVICE"],
+      AUDIT_SERVICE_TOKEN: "crud-smoke-audit-token",
     });
   const app = () => {
     const instance = createPessoalWorkerApp({ env: env() });
@@ -284,6 +298,63 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
       "POST idempotente",
     ).data;
     expect(again.created).toBe(false);
+
+    const portfolio = expectOk(
+      await call(
+        "GET",
+        `/pessoal/obrigations/portfolio?competence=${competence}&item=va&state=done&pageSize=10`,
+      ),
+      "GET carteira",
+    ).data;
+    expect(portfolio.total).toBeGreaterThanOrEqual(1);
+    expect(portfolio.items).toContainEqual(
+      expect.objectContaining({ id, client: expect.objectContaining({ id: clientId }) }),
+    );
+    const pendingVa = expectOk(
+      await call(
+        "GET",
+        `/pessoal/obrigations/portfolio?competence=${competence}&item=va&state=pending`,
+      ),
+      "GET carteira pendente",
+    ).data;
+    expect(pendingVa.items.map((row: { id: string }) => row.id)).not.toContain(id);
+
+    // Faz o papel do audit-service: grava em audit_requests o que o PATCH enviou.
+    const updates = auditEvents.filter(
+      (event) => event.referringId === id && event.action === OBLIGATION_UPDATE_ACTION,
+    );
+    expect(updates).toHaveLength(Object.keys(fields).length);
+    for (const event of updates) {
+      expect(event).toMatchObject({
+        action: OBLIGATION_UPDATE_ACTION,
+        referring: OBLIGATION_AUDIT_REFERRING,
+        userId: state.ownerId,
+      });
+      await smokeInsert("audit_requests", {
+        request_id: event.requestId,
+        user_id: event.userId,
+        method: event.method,
+        path: event.path,
+        outcome: event.outcome,
+        service_source: event.serviceSource,
+        action: event.action,
+        referring: event.referring,
+        referring_id: event.referringId,
+        changes_json: event.changes,
+      });
+    }
+    const history = expectOk(
+      await call("GET", `/pessoal/obrigations/${id}/history?pageSize=100`),
+      "GET histórico",
+    ).data;
+    expect(history).toMatchObject({ obligation_id: id, competence });
+    expect(history.items).toContainEqual(
+      expect.objectContaining({
+        actor: expect.objectContaining({ id: state.ownerId }),
+        changes: [{ field: "va", from: false, to: true }],
+      }),
+    );
+    expect((await call("GET", `/pessoal/obrigations/${randomUUID()}/history`)).status).toBe(404);
 
     const next = "2026-10";
     const generated = expectOk(
@@ -549,14 +620,26 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
       await call("GET", "/internal/reporting/catalog", undefined, grantHeaders({})),
       "GET catalog",
     );
-    for (const source of pessoalReportingCatalog.sources) {
-      const fields = source.fields.map((field) => field.key).slice(0, 25);
+    // O extract aceita até 25 campos; fontes maiores são extraídas em lotes.
+    const batches = pessoalReportingCatalog.sources.flatMap((source) => {
+      const keys = source.fields.map((field) => field.key);
+      return Array.from({ length: Math.ceil(keys.length / 25) }, (_, index) => ({
+        source,
+        fields: keys.slice(index * 25, index * 25 + 25),
+      }));
+    });
+    for (const { source, fields } of batches) {
       const body = { source: source.key, fields, limit: 50 };
       const data = expectOk(
         await call("POST", "/internal/reporting/extract", body, grantHeaders(body)),
         `extract ${source.key}`,
       ).data;
       expect(Array.isArray(data.rows), source.key).toBe(true);
+      if (source.key === "pessoal.payroll" && fields.includes("client_name")) {
+        // client_name sai de client_id: Payroll não tem relação com Client no schema canônico.
+        expect(data.rows.length).toBeGreaterThan(0);
+        for (const row of data.rows) expect(typeof row.client_name).toBe("string");
+      }
     }
   });
 });

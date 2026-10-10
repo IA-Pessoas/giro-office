@@ -83,6 +83,9 @@ function readWorkspaceSource(relativePath) {
 }
 
 const contabilServiceSources = {
+  permissions: readWorkspaceSource(
+    "../../../../services/contabil-service/src/constants/permissions.ts",
+  ),
   authMiddleware: readWorkspaceSource(
     "../../../../services/contabil-service/src/middlewares/isAuthenticated.ts",
   ),
@@ -275,6 +278,41 @@ await (async () => {
     assert.match(source, /NOT_RECEIVED/);
   });
 
+  await runTest("triagem contábil configura movimento padrão e atribui o movimento do mês (#1691)", () => {
+    const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    const panel = readWorkspaceSource("./components/TriageMovementPanel.tsx");
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+
+    assert.equal(CONTABIL_ENDPOINTS.triageConfig, "/triagem/config");
+    assert.equal(CONTABIL_ENDPOINTS.triageMonthlyById("m1"), "/triagem/monthly/m1");
+    assert.match(labels, /\["NOT_PRESENT", "Não possui"\]/);
+    assert.match(source, /<TriageMovementPanel/);
+    assert.match(source, /Desativado no movimento padrão/);
+    assert.match(source, /canEdit && !isDisabled\(field\)/);
+    for (const text of [
+      "Movimento padrão do cliente",
+      "Movimento enviado",
+      "Responsável",
+      "Justificativa",
+      "Data de download",
+      "Data de baixa",
+      "Observação",
+    ])
+      assert.ok(panel.includes(text), text);
+    assert.match(panel, /saveMovementConfig/);
+    assert.match(panel, /updateMonthly/);
+  });
+
+  await runTest("triagem fiscal configura documentos especiais e faturamento do shared (#1693)", () => {
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+    const section = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    assert.match(labels, /from "@workspace\/shared\/triagem\/documents"/);
+    assert.match(labels, /TRIAGE_FISCAL_CONFIGURABLE_FIELDS\.map/);
+    assert.match(section, /<FiscalSpecialDocumentsPanel/);
+    assert.match(section, /Faturamento não se aplica a este cliente/);
+    assert.equal(CONTABIL_ENDPOINTS.triageConfig, "/triagem/config");
+  });
+
   await runTest("triagem fiscal apresenta os 14 campos e controla revisão e entrega", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
     const pageSource = readWorkspaceSource("../../pages/triagem.tsx");
@@ -318,7 +356,8 @@ await (async () => {
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
-    assert.match(contabilServiceSources.authMiddleware, /const CONTABIL_WRITE_PERMISSION = 2;/);
+    assert.match(contabilServiceSources.permissions, /const CONTABIL_WRITE_PERMISSION = 2;/);
+    assert.match(contabilServiceSources.authMiddleware, /import \{ CONTABIL_WRITE_PERMISSION \} from "\.\.\/constants\/permissions\.js"/);
     assert.match(contabilServiceSources.authMiddleware, /requireContabilWritePermission/);
 
     assert.equal(

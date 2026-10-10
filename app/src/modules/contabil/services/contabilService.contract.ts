@@ -9,6 +9,11 @@ import type {
 } from "../types";
 
 export const CONTABIL_ENDPOINTS = {
+  noah: "/contabil/noah",
+  noahCsv: (id: string) => `/contabil/noah/${id}/csv`,
+  contingency: "/contabil/contingency",
+  contingencyReview: (id: string) => `/contabil/contingency/${id}/review`,
+  contingencyExport: (id: string) => `/contabil/contingency/${id}/export`,
   controls: "/contabil/controls",
   controlsList: "/contabil/controls/list",
   controlsHistory: "/contabil/controls/history",
@@ -27,7 +32,11 @@ export const CONTABIL_ENDPOINTS = {
   triageEditability: "/triagem/editability",
   triageMonthlyItem: (monthlyId: string) => `/triagem/monthly/${monthlyId}/item`,
   triageMonthlyItems: (monthlyId: string) => `/triagem/monthly/${monthlyId}/items`,
+  triageMonthlyById: (monthlyId: string) => `/triagem/monthly/${monthlyId}`,
+  triageConfig: "/triagem/config",
+  triageFiscalSettings: "/triagem/fiscal-settings",
   triageStatements: "/triagem/statements",
+  triageStatementHistory: "/triagem/statements/history",
   triageClosing: "/triagem/closing",
 } as const;
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { MarketingEditionLists, MarketingEventEditionReport as EditionReport } from "../types/marketingEventEdition";
+import { printMarketingReport } from "../utils/printMarketingReport";
 import { marketingPrimaryButtonClass, marketingSecondaryButtonClass } from "./marketingButtonStyles";
 
 function formatAmount(amount: string): string {
@@ -62,12 +63,7 @@ function PlanningSection({ title, values }: { title: string; values: MarketingEd
 }
 
 function printReport() {
-  const report = document.getElementById("marketing-event-edition-report");
-  for (let element = report; element; element = element.parentElement) element.scrollTop = 0;
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-  window.scrollTo(0, 0);
-  window.print();
+  printMarketingReport("marketing-event-edition-report");
 }
 
 export function MarketingEventEditionReport({
@@ -81,7 +77,7 @@ export function MarketingEventEditionReport({
   return (
     <article
       aria-label={`Relatório da edição ${edition.name}`}
-      className="marketing-event-edition-report space-y-6 text-gray-900 dark:text-slate-100"
+      className="marketing-event-edition-report marketing-print-report space-y-6 text-gray-900 dark:text-slate-100"
       id="marketing-event-edition-report"
     >
       <div className="hide-on-print flex flex-wrap justify-between gap-2">

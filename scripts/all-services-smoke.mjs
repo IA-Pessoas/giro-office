@@ -162,6 +162,10 @@ const env = {
   marketingEventsSmokeEnabled:
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "true" ||
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "1",
+  // Opt in only when the smoke organization has a "Marketing" department.
+  marketingStockSmokeEnabled:
+    process.env.MARKETING_STOCK_SMOKE_ENABLED === "true" ||
+    process.env.MARKETING_STOCK_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -353,6 +357,8 @@ const executed = [];
 const skipped = [];
 const actionExecutionRank = {
   marketingDashboard: 1050,
+  marketingBirthdays: 1050,
+  marketingStock: 1050,
   marketingEventsList: 1051,
   marketingEventsCreate: 1052,
   marketingEventsUpdate: 1053,
@@ -774,6 +780,7 @@ async function httpRequest(op, options) {
     query,
     json,
     form,
+    raw,
     headers: optionHeaders = {},
     expectedStatus: optionExpectedStatus,
     expectEnvelope: optionExpectEnvelope,
@@ -807,7 +814,9 @@ async function httpRequest(op, options) {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   };
 
-  if (json !== undefined) {
+  if (raw !== undefined) {
+    fetchOptions.body = raw;
+  } else if (json !== undefined) {
     requestHeaders.set("content-type", "application/json");
     fetchOptions.body = JSON.stringify(json);
   } else if (form) {
@@ -1664,6 +1673,17 @@ async function platformHttpRequest(op, options = {}) {
 const handlers = {
   async marketingDashboard(op) {
     await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async marketingStock(op) {
+    await httpRequest(op, { expectedStatus: op.expectedStatus });
+  },
+
+  async marketingBirthdays(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      query: { month: isBadExpectation(op) ? 13 : 5 },
+    });
   },
 
   async marketingEventsList(op) {
@@ -4302,7 +4322,7 @@ const handlers = {
         name: uniqueText("Smoke Client"),
         organization_id: requireState("session").organization_id,
         status: "Ativo",
-        cpf_cnpj: uniqueDigits(14),
+        cpf_cnpj: uniqueCnpj("primary-client"),
         prospecting_status: "Lead",
         type: "PJ",
         type_registration: "Novo",
@@ -5467,6 +5487,100 @@ const handlers = {
     });
   },
 
+  async contabilNoahCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      query: { filename: "noah-synthetic.zip" },
+      headers: { "content-type": "application/zip" },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/noah/synthetic.zip")),
+    });
+    if (!isBadExpectation(op)) {
+      if (response.body?.data?.row_count !== 1)
+        throw new Error("Noah deve extrair um pagamento sintético.");
+      state.contabilNoahId = response.body.data.id;
+    }
+  },
+
+  async contabilNoahDownload(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/noah/${requireState("contabilNoahId")}/csv`,
+      expectedStatus: [200],
+      expectEnvelope: false,
+    });
+    if (
+      !isBadExpectation(op) &&
+      !response.text.includes("Fornecedor Sintético;09/10/2026;100,00;comprovante.html")
+    ) {
+      throw new Error("CSV Noah diverge do comprovante sintético.");
+    }
+  },
+
+  async contabilContingencySimulate(op) {
+    let company = { name: "Smoke Client", cpf_cnpj: uniqueCnpj("primary-client") };
+    if (!isBadExpectation(op)) {
+      const response = await httpRequest(op, {
+        method: "GET",
+        path: `/client/${requireState("primaryClientId")}`,
+        expectedStatus: [200],
+      });
+      company = response.body.data;
+    }
+    const response = await httpRequest(op, {
+      query: {
+        client_id: requireState("primaryClientId"),
+        company_name: company.company_name?.trim() || company.name,
+        cnpj: company.cpf_cnpj,
+        period_start: "2026-01",
+        period_end: "2026-06",
+        regime: "Simples Nacional",
+        annex: "III",
+        filename: "synthetic.xls",
+      },
+      headers: { "content-type": "application/vnd.ms-excel" },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/contingency/synthetic.xls")),
+    });
+    if (
+      !isBadExpectation(op) &&
+      (response.body?.data?.minimum?.totalCents !== 398200 ||
+        response.body?.data?.maximum?.totalCents !== 955680)
+    )
+      throw new Error("Simulação de Contingência diverge do XLS sintético.");
+    if (!isBadExpectation(op)) {
+      state.contabilContingencyId = response.body.data.id;
+      state.contabilContingencyHash = response.body.data.content_hash;
+    }
+  },
+
+  async contabilContingencyReview(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/contingency/${requireState("contabilContingencyId")}/review`,
+      json: { content_hash: requireState("contabilContingencyHash") },
+    });
+    if (
+      !isBadExpectation(op) &&
+      (!response.body.data.reviewed_by ||
+        !response.body.data.reviewed_at ||
+        response.body.data.reviewed_hash !== state.contabilContingencyHash)
+    ) {
+      throw new Error("Conferência de Contingência sem ator, instante ou hash correspondente.");
+    }
+  },
+
+  async contabilContingencyExport(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/contingency/${requireState("contabilContingencyId")}/export`,
+      query: { content_hash: requireState("contabilContingencyHash") },
+      expectEnvelope: false,
+    });
+    if (
+      !isBadExpectation(op) &&
+      (!response.text.includes("Simulação legada de Contingência") ||
+        !response.text.includes(state.contabilContingencyHash))
+    ) {
+      throw new Error("Conclusão imprimível não identifica a simulação e a conferência.");
+    }
+  },
+
   async contabilControlCreate(op) {
     const competence = "2026-09";
     state.contabilControlCompetence = competence;
@@ -6246,11 +6360,25 @@ const handlers = {
     });
   },
 
+  async pessoalObligationPortfolio(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: requireState("pessoalCompetence"), state: "pending" },
+    });
+  },
+
   async pessoalObligationPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/pessoal/obrigations/${requireState("pessoalObligationId")}`,
       json: { payroll: true },
+    });
+  },
+
+  async pessoalObligationHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/obrigations/${requireState("pessoalObligationId")}/history`,
     });
   },
 
@@ -8363,6 +8491,9 @@ function matchesFilter(op) {
 function disabledConditionReason(condition) {
   if (condition === "marketingEventsSmokeEnabled" && !env.marketingEventsSmokeEnabled) {
     return "MARKETING_EVENTS_SMOKE_ENABLED is false";
+  }
+  if (condition === "marketingStockSmokeEnabled" && !env.marketingStockSmokeEnabled) {
+    return "MARKETING_STOCK_SMOKE_ENABLED is false";
   }
   if (condition === "platformImpersonationSmokeEnabled") {
     if (!env.platformImpersonationSmokeEnabled) {
