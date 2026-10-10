@@ -367,7 +367,14 @@ export class TriageDocumentsService {
             type: "FISCAL",
             archived_at: null,
           },
-          select: { id: true, checklist: true, item_notes: true },
+          select: {
+            id: true,
+            checklist: true,
+            item_notes: true,
+            billing_amount: true,
+            justification: true,
+            notes: true,
+          },
           take: 1,
         },
         triageCompetences: {
@@ -449,6 +456,9 @@ export class TriageDocumentsService {
                 id: monthly.id,
                 checklist: asChecklist(monthly.checklist, TRIAGE_FISCAL_CHECKLIST_FIELDS),
                 item_notes: asItemNotes(monthly.item_notes, TRIAGE_FISCAL_CHECKLIST_FIELDS),
+                billing_amount: monthly.billing_amount ?? null,
+                justification: monthly.justification ?? null,
+                notes: monthly.notes ?? null,
               }
             : null,
         };

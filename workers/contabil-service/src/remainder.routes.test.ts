@@ -1032,6 +1032,67 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("extrai a grade Contábil da Triagem com justificativa do catálogo da organização", async () => {
+    const prisma = {
+      triageMonthly: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "1",
+            client_id: CLIENT,
+            competence: "2026-09",
+            justification: "SEM_MOVIMENTO",
+            checklist: { triaged_transactions: "PENDING", bank_reconciliation: "concluido" },
+          },
+        ]),
+      },
+      triageCatalogItem: {
+        findMany: vi.fn().mockResolvedValue([{ code: "SEM_MOVIMENTO", label: "Sem movimento" }]),
+      },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.triage_accounting_documents",
+      fields: ["competence", "triaged_transactions", "bank_reconciliation", "justification"],
+      limit: 10,
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", body)),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          {
+            competence: "2026-09",
+            triaged_transactions: "Pendente",
+            bank_reconciliation: "Concluído",
+            justification: "Sem movimento",
+          },
+        ],
+      },
+    });
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
+    expect(prisma.triageCatalogItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, kind: "JUSTIFICATION", code: { in: ["SEM_MOVIMENTO"] } },
+      }),
+    );
+  });
+
   it("usa a permissão efetiva do módulo contábil como o gateway Node encaminha", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });

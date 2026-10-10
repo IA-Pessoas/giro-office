@@ -1234,7 +1234,14 @@ export function createDocumentsService(
           regime: true,
           triageMonthlys: {
             where: monthlyScope,
-            select: { id: true, checklist: true, item_notes: true },
+            select: {
+              id: true,
+              checklist: true,
+              item_notes: true,
+              billing_amount: true,
+              justification: true,
+              notes: true,
+            },
             take: 1,
           },
           triageCompetences: {
@@ -1318,6 +1325,9 @@ export function createDocumentsService(
                   id: monthly.id,
                   checklist: checklist(monthly.checklist, fiscalFields),
                   item_notes: itemNotes(monthly.item_notes, fiscalFields),
+                  billing_amount: monthly.billing_amount ?? null,
+                  justification: monthly.justification ?? null,
+                  notes: monthly.notes ?? null,
                 }
               : null,
           };

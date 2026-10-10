@@ -47,6 +47,7 @@ export const CONTABIL_TRIAGE_REPORTING_SOURCES = [
   "contabil.triage_accounting_metric",
   "contabil.triage_sgq",
   "contabil.triage_fiscal_special_documents",
+  "contabil.triage_accounting_documents",
 ] as const;
 export type ContabilTriageReportingSource = (typeof CONTABIL_TRIAGE_REPORTING_SOURCES)[number];
 
@@ -149,6 +150,36 @@ export const contabilTriageReportingCatalog = {
         field("billing_status", "Situação do faturamento", "string", stringOperators),
         field("billing_amount", "Faturamento", "string", stringOperators),
         field("delivery_method", "Meio de envio", "string", stringOperators),
+        field("responsible_name", "Responsável", "string", stringOperators),
+        ...clientFields,
+      ],
+    },
+    {
+      key: "contabil.triage_accounting_documents",
+      label: "Documentos Contábeis da Triagem por competência",
+      module: "triagem",
+      minimum_permission: 1,
+      keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
+      fields: [
+        field("competence", "Competência", "string", competenceOperators),
+        // Uma coluna por item do checklist Contábil, com o estado dele: a grade do painel.
+        field("financial_transactions", "Movimentações financeiras", "string", stringOperators),
+        field("triaged_transactions", "Movimentações triadas", "string", stringOperators),
+        field("inventory_control", "Controle de estoque", "string", stringOperators),
+        field("accounts_payable_report", "Relatório de contas a pagar", "string", stringOperators),
+        field(
+          "accounts_receivable_report",
+          "Relatório de contas a receber",
+          "string",
+          stringOperators,
+        ),
+        field("card_statements", "Faturas de cartão", "string", stringOperators),
+        field("loan_agreements", "Contratos de empréstimo", "string", stringOperators),
+        field("bank_reconciliation", "Conciliação bancária", "string", stringOperators),
+        field("bank_investments", "Investimentos bancários", "string", stringOperators),
+        field("card_sales_report", "Relatório de vendas de cartão", "string", stringOperators),
+        field("justification", "Justificativa", "string", stringOperators),
+        field("notes", "Observação", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
         ...clientFields,
       ],

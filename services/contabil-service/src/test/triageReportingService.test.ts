@@ -784,3 +784,169 @@ describe("extractTriageReportingPage: documentos fiscais especiais", () => {
     expect(result.rows).toEqual([{ name: "Alfa", sped_fiscal: "Pendente" }]);
   });
 });
+
+describe("extractTriageReportingPage: grade Contábil do painel", () => {
+  const routines = [
+    {
+      id: "1",
+      client_id: CLIENT_A,
+      competence: "2026-09",
+      type: "CONTABIL",
+      responsible_id: USER_ANA,
+      justification: "SEM_MOVIMENTO",
+      notes: "Aguardando extrato de setembro",
+      triad_moviment: true,
+      checklist: {
+        financial_transactions: "COMPLETED",
+        triaged_transactions: "PENDING",
+        bank_reconciliation: "atenção",
+        card_statements: "nao possui",
+      },
+    },
+    {
+      id: "2",
+      client_id: CLIENT_B,
+      competence: "2026-09",
+      type: "CONTABIL",
+      responsible_id: USER_BRUNO,
+      justification: null,
+      notes: null,
+      triad_moviment: false,
+      checklist: { triaged_transactions: "COMPLETED", bank_reconciliation: "COMPLETED" },
+    },
+  ];
+
+  const withRegime = [
+    { ...clientRows[0], regime: "Simples Nacional" },
+    { ...clientRows[1], regime: "Lucro Presumido" },
+  ];
+
+  it("mostra o estado de cada item, a justificativa do catálogo e a observação", async () => {
+    const prisma = delegates(routines);
+    prisma.clients.findMany.mockResolvedValue(withRegime);
+    prisma.catalogItems.findMany.mockResolvedValue([
+      { code: "SEM_MOVIMENTO", label: "Sem movimento no mês" },
+    ]);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.triage_accounting_documents",
+        organizationId: ORG,
+        fields: [
+          "company_name",
+          "regime",
+          "responsible_name",
+          "competence",
+          "financial_transactions",
+          "triaged_transactions",
+          "bank_reconciliation",
+          "card_statements",
+          "inventory_control",
+          "justification",
+          "notes",
+        ],
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          company_name: "Alfa Comércio Ltda",
+          regime: "Simples Nacional",
+          responsible_name: "Ana Souza",
+          competence: "2026-09",
+          financial_transactions: "Concluído",
+          triaged_transactions: "Pendente",
+          bank_reconciliation: "Atenção",
+          card_statements: "Não possui",
+          inventory_control: "Não aplicável",
+          justification: "Sem movimento no mês",
+          notes: "Aguardando extrato de setembro",
+        },
+      ],
+      reachedLimit: true,
+    });
+    expect(prisma.monthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
+    expect(prisma.catalogItems.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, kind: "JUSTIFICATION", code: { in: ["SEM_MOVIMENTO"] } },
+      }),
+    );
+  });
+
+  it("filtra por competência, responsável, estado do item e justificativa, e totaliza", async () => {
+    const database = {
+      client: { findMany: vi.fn().mockResolvedValue(withRegime) },
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            [...routines, { ...routines[0], id: "3", competence: "2026-10" }].slice(
+              skip,
+              skip + take,
+            ),
+          ),
+      },
+      triageCatalogItem: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ code: "SEM_MOVIMENTO", label: "Sem movimento no mês" }]),
+      },
+      user: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: USER_ANA, name: "Ana Souza" },
+          { id: USER_BRUNO, name: "Bruno Lima" },
+        ]),
+      },
+      $transaction: vi.fn(),
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    const filters = [
+      { field: "competence", operator: "eq", parameter: "competencia", value: "2026-09" },
+      { field: "responsible_name", operator: "eq", parameter: "responsavel", value: "Ana Souza" },
+      { field: "regime", operator: "eq", parameter: "regime", value: "Simples Nacional" },
+      { field: "triaged_transactions", operator: "eq", parameter: "estado", value: "Pendente" },
+      {
+        field: "justification",
+        operator: "eq",
+        parameter: "justificativa",
+        value: "Sem movimento no mês",
+      },
+    ];
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.triage_accounting_documents",
+      fields: ["name"],
+      limit: 50,
+      query: { filters },
+    });
+    expect(listed.rows).toEqual([{ name: "Alfa" }]);
+
+    // O total sai do mesmo conjunto filtrado que a tabela e o CSV usam.
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.triage_accounting_documents",
+      fields: ["triaged_transactions"],
+      limit: 50,
+      query: {
+        filters: [filters[0]],
+        group_by: ["triaged_transactions"],
+        aggregations: [{ field: "triaged_transactions", function: "count", alias: "empresas" }],
+      },
+    });
+    expect(totals.rows).toEqual(
+      expect.arrayContaining([
+        { triaged_transactions: "Pendente", empresas: 1 },
+        { triaged_transactions: "Concluído", empresas: 1 },
+      ]),
+    );
+    expect(totals.rows).toHaveLength(2);
+  });
+});

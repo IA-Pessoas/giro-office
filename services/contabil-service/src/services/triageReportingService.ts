@@ -98,12 +98,31 @@ const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
       values: fiscalSpecialDocuments,
     },
   },
+  "contabil.triage_accounting_documents": {
+    delegate: "monthly",
+    where: { type: "CONTABIL", archived_at: null },
+    columns: { competence: "competence", justification: "justification", notes: "notes" },
+    responsibleColumns: ["responsible_id", "competence", "type"],
+    derived: {
+      columns: ["checklist"],
+      fields: TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
+      values: (row) => statusLabels(row.checklist, TRIAGE_ACCOUNTING_CHECKLIST_FIELDS),
+    },
+  },
 };
 
 /** Estado de cada item pedido; item ausente do checklist não fazia parte da rotina. */
 function checklistStatuses(checklist: unknown, fields: readonly string[]): TriageDocumentStatus[] {
   const items = jsonObject(checklist);
   return fields.map((field) => normalizeTriageDocumentStatus(items[field]) ?? "NOT_APPLICABLE");
+}
+
+/** Rótulo do estado de cada item pedido, como a tela mostra. */
+function statusLabels(checklist: unknown, fields: readonly string[]): Row {
+  const statuses = checklistStatuses(checklist, fields);
+  return Object.fromEntries(
+    fields.map((field, index) => [field, TRIAGE_DOCUMENT_STATUS_LABELS[statuses[index]]]),
+  );
 }
 
 function jsonObject(value: unknown): Row {
@@ -115,16 +134,10 @@ function jsonObject(value: unknown): Row {
  * situação do faturamento, que é valor e não item (só sai da rotina com `required: false`).
  */
 function fiscalSpecialDocuments(row: Row): Row {
-  const statuses = checklistStatuses(row.checklist, TRIAGE_FISCAL_SPECIAL_FIELDS);
   const billingOff = jsonObject(jsonObject(row.item_notes).billing_amount).required === false;
   const billed = typeof row.billing_amount === "string" && row.billing_amount.trim() !== "";
   return {
-    ...Object.fromEntries(
-      TRIAGE_FISCAL_SPECIAL_FIELDS.map((field, index) => [
-        field,
-        TRIAGE_DOCUMENT_STATUS_LABELS[statuses[index]],
-      ]),
-    ),
+    ...statusLabels(row.checklist, TRIAGE_FISCAL_SPECIAL_FIELDS),
     billing_status: billingOff ? "Não aplicável" : billed ? "Informado" : "Pendente",
   };
 }
@@ -416,19 +429,31 @@ export async function extractTriageReportingPage(
   const cloudsByClient = byClient(clouds);
   const responsiblesByClient = byClient(responsibles);
   const configByClient = byClient(configs);
-  // A configuração guarda o código do catálogo; relatório mostra o rótulo, como a tela.
-  const deliveryCodes = [
-    ...new Set(configs.map((config) => config.delivery_method).filter((code) => code != null)),
-  ];
-  const deliveryLabels = new Map(
-    (deliveryCodes.length
+  // Meio de envio e justificativa guardam o código do catálogo da organização; o relatório
+  // mostra o rótulo, como a tela. Código sem item no catálogo sai como está.
+  const catalogLabels = async (
+    kind: "DELIVERY_METHOD" | "JUSTIFICATION",
+    values: readonly unknown[],
+  ) => {
+    const codes = [...new Set(values.filter((code) => code != null))];
+    const items = codes.length
       ? await prisma.catalogItems.findMany({
-          where: { ...organization, kind: "DELIVERY_METHOD", code: { in: deliveryCodes } },
+          where: { ...organization, kind, code: { in: codes } },
           select: { code: true, label: true },
         })
-      : []
-    ).map((item) => [item.code, item.label]),
-  );
+      : [];
+    return new Map(items.map((item) => [item.code, item.label]));
+  };
+  const [deliveryLabels, justificationLabels] = await Promise.all([
+    catalogLabels(
+      "DELIVERY_METHOD",
+      configs.map((config) => config.delivery_method),
+    ),
+    catalogLabels(
+      "JUSTIFICATION",
+      wanted("justification") ? rows.map((row) => row.justification) : [],
+    ),
+  ]);
 
   return {
     rows: rows.map((row) => {
@@ -440,6 +465,7 @@ export async function extractTriageReportingPage(
         if (field in derivedValues) return derivedValues[field];
         if (field in base.columns) {
           const column = row[base.columns[field]];
+          if (field === "justification") return justificationLabels.get(column) ?? column;
           return field === "type" ? (serviceLabels[String(column)] ?? column) : column;
         }
         if (field === "delivery_method") {
