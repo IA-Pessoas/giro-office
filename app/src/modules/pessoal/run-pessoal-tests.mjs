@@ -11,6 +11,7 @@ import {
   buildPessoalLddListParams,
   buildPessoalGroupPayload,
   buildPessoalObligationParams,
+  buildPessoalObligationPortfolioParams,
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
   buildPessoalUnionPayload,
@@ -27,6 +28,11 @@ import {
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 import { PESSOAL_GROUP_POLICY_LABELS } from "./types/groups.ts";
 import { formatPessoalObligationGenerationSummary } from "./utils/obligationGenerationSummary.ts";
+import {
+  formatObligationHistoryValue,
+  obligationItemState,
+  obligationItemValue,
+} from "./utils/obligationPortfolio.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
   cancelUnionDeletion,
@@ -282,8 +288,8 @@ runTest("prioritized unclear fields expose shared contextual help", () => {
   assert.match(tracking, /Período/);
   assert.match(tracking, /Saldo/);
   assert.match(obligations, /FieldHelp/);
-  assert.match(obligations, /Contribuição assistencial/);
-  assert.match(obligations, /BSF/);
+  assert.match(obligations, /assistance_fee: "Indica/);
+  assert.match(obligations, /bsf: "Indica/);
   assert.match(payroll, /FieldHelp/);
   assert.match(payroll, /Tipo de adiantamento/);
   assert.match(payroll, /Onvio/);
@@ -840,6 +846,89 @@ runTest("password UI keeps secrets behind detail and explicit reveal", () => {
   assert.match(passwords, /getSecretText\(detail/);
   assert.match(passwords, /type="password"/);
   assert.doesNotMatch(passwords, /password\.senha_main|password\.senha_secondary/);
+});
+
+runTest("obligation portfolio sends only server-side filters and maps item states", () => {
+  assert.equal(PESSOAL_ENDPOINTS.obligationPortfolio, "/pessoal/obrigations/portfolio");
+  assert.deepEqual(
+    buildPessoalObligationPortfolioParams({ competence: "2026-09", page: 1, pageSize: 25 }),
+    { competence: "2026-09", page: 1, pageSize: 25 },
+  );
+  assert.deepEqual(
+    buildPessoalObligationPortfolioParams({
+      competence: "2026-09",
+      responsavel_id: "user-1",
+      group_id: "group-1",
+      item: "va",
+      state: "none",
+      page: 2,
+      pageSize: 25,
+    }),
+    {
+      competence: "2026-09",
+      responsavel_id: "user-1",
+      group_id: "group-1",
+      item: "va",
+      state: "none",
+      page: 2,
+      pageSize: 25,
+    },
+  );
+  assert.equal(
+    buildPessoalObligationPortfolioParams({
+      competence: "2026-09",
+      state: "done",
+      page: 1,
+      pageSize: 25,
+    }).state,
+    undefined,
+  );
+  assert.equal(
+    buildPessoalObligationPortfolioParams({
+      competence: "2026-09",
+      state: "pending",
+      page: 1,
+      pageSize: 25,
+    }).state,
+    "pending",
+  );
+  for (const value of [false, true, null]) {
+    assert.equal(obligationItemValue(obligationItemState(value)), value);
+  }
+  assert.equal(obligationItemState(null), "none");
+});
+
+runTest("portfolio edits share the individual obligation PATCH and invalidate both views", () => {
+  const hooks = readFileSync("src/modules/pessoal/hooks/usePessoalObligations.ts", "utf8");
+
+  assert.match(
+    hooks,
+    /useUpdatePessoalPortfolioObligationMutation[\s\S]*?pessoalService\.updateObligationField\(id, payload\)[\s\S]*?pessoalQueryKey\("obligations"\)/,
+  );
+  assert.match(hooks, /pessoalQueryKey\("obligations", "portfolio",/);
+});
+
+runTest("obligation history formats item states and responsible names", () => {
+  assert.equal(
+    PESSOAL_ENDPOINTS.obligationHistory("ob-1"),
+    "/pessoal/obrigations/ob-1/history",
+  );
+  const names = new Map([["user-1", "Ana"]]);
+  assert.equal(formatObligationHistoryValue("va", false, names), "Pendente");
+  assert.equal(formatObligationHistoryValue("va", true, names), "Concluído");
+  assert.equal(formatObligationHistoryValue("va", null, names), "Não possui");
+  assert.equal(formatObligationHistoryValue("responsavel_id", "user-1", names), "Ana");
+  assert.equal(formatObligationHistoryValue("responsavel_id", null, names), "Sem responsável");
+});
+
+runTest("ficha edits refresh ficha, portfolio and history under one prefix", () => {
+  const hooks = readFileSync("src/modules/pessoal/hooks/usePessoalObligations.ts", "utf8");
+
+  assert.match(
+    hooks,
+    /useUpdatePessoalObligationMutation\([\s\S]*?invalidateQueries\(\{ queryKey: pessoalQueryKey\("obligations"\) \}\)/,
+  );
+  assert.match(hooks, /pessoalQueryKey\("obligations", "history"/);
 });
 
 console.log("pessoal contract tests passed");

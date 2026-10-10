@@ -6360,11 +6360,25 @@ const handlers = {
     });
   },
 
+  async pessoalObligationPortfolio(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: requireState("pessoalCompetence"), state: "pending" },
+    });
+  },
+
   async pessoalObligationPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/pessoal/obrigations/${requireState("pessoalObligationId")}`,
       json: { payroll: true },
+    });
+  },
+
+  async pessoalObligationHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/obrigations/${requireState("pessoalObligationId")}/history`,
     });
   },
 
