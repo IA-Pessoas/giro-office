@@ -7,6 +7,7 @@ import {
   type TriagemExternalLinkService,
   type TriagemOverviewService,
   type TriagemPrisma,
+  type TriagemSolicitationService,
   type TriagemUrgentRequestService,
   type TriagemWorkerEnv,
 } from "./app.js";
@@ -250,6 +251,53 @@ describe("triagem Worker", () => {
       expect.objectContaining({ organizationId: ORGANIZATION_ID }),
     );
     expect(audit.reconcile).toHaveBeenCalled();
+  });
+});
+
+describe("triagem Worker — solicitações", () => {
+  it("cria, lista, consulta e fecha solicitações pelo serviço escopado", async () => {
+    const solicitations: TriagemSolicitationService = {
+      list: vi.fn(async () => []),
+      get: vi.fn(async () => ({ id: ITEM_ID }) as never),
+      create: vi.fn(async () => ({ id: ITEM_ID }) as never),
+      close: vi.fn(async () => ({ id: ITEM_ID, status: "CLOSED" }) as never),
+    };
+    const app = createTriagemWorkerApp({ env: env(), solicitationService: solicitations });
+    const body = {
+      client_id: ITEM_ID,
+      competence: "2026-09",
+      category_id: ITEM_ID,
+      description: "Conferir notas.",
+      responsible_id: USER_ID,
+    };
+
+    const created = await app.request("https://triagem.test/triagem/solicitations", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const listed = await app.request("https://triagem.test/triagem/solicitations?status=OPEN", {
+      headers: headers("1"),
+    });
+    const detail = await app.request(`https://triagem.test/triagem/solicitations/${ITEM_ID}`, {
+      headers: headers("1"),
+    });
+    const closed = await app.request(
+      `https://triagem.test/triagem/solicitations/${ITEM_ID}/close`,
+      { method: "PATCH", headers: headers() },
+    );
+
+    expect([created.status, listed.status, detail.status, closed.status]).toEqual([
+      201, 200, 200, 200,
+    ]);
+    const scope = expect.objectContaining({ userId: USER_ID, organizationId: ORGANIZATION_ID });
+    expect(solicitations.create).toHaveBeenCalledWith(body, scope);
+    expect(solicitations.list).toHaveBeenCalledWith(
+      { status: "OPEN", clientId: undefined, competence: undefined },
+      scope,
+    );
+    expect(solicitations.get).toHaveBeenCalledWith(ITEM_ID, scope);
+    expect(solicitations.close).toHaveBeenCalledWith(ITEM_ID, scope);
   });
 });
 

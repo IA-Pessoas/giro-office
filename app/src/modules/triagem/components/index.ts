@@ -4,3 +4,4 @@ export { TriageUrgentRequestsSection } from "./TriageUrgentRequestsSection";
 export { TriageCatalogSection } from "./TriageCatalogSection";
 export { TriageOverviewPanel } from "./TriageOverviewPanel";
 export { TriageAuditTimeline } from "./TriageAuditTimeline";
+export { TriageSolicitationsSection } from "./TriageSolicitationsSection";

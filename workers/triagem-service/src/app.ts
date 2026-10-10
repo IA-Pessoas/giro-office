@@ -31,6 +31,11 @@ import {
 } from "@workspace/triagem-service/src/schemas/triageExternalLinks.schemas.js";
 import { listTriageOverviewQuerySchema } from "@workspace/triagem-service/src/schemas/triageOverview.schemas.js";
 import {
+  createTriageSolicitationBodySchema,
+  listTriageSolicitationQuerySchema,
+  triageSolicitationIdParamsSchema,
+} from "@workspace/triagem-service/src/schemas/triageSolicitation.schemas.js";
+import {
   closeTriageUrgentRequestBodySchema,
   createTriageUrgentRequestBodySchema,
   listTriageUrgentRequestQuerySchema,
@@ -42,6 +47,7 @@ import { TriageCatalogService } from "@workspace/triagem-service/src/services/tr
 import { TriageCompetenceService } from "@workspace/triagem-service/src/services/triageCompetenceService.js";
 import { TriageExternalLinkService } from "@workspace/triagem-service/src/services/triageExternalLinkService.js";
 import { TriageOverviewService } from "@workspace/triagem-service/src/services/triageOverviewService.js";
+import { TriageSolicitationService } from "@workspace/triagem-service/src/services/triageSolicitationService.js";
 import { TriageUrgentRequestService } from "@workspace/triagem-service/src/services/triageUrgentRequestService.js";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -69,6 +75,10 @@ export type TriagemUrgentRequestService = Pick<
   TriageUrgentRequestService,
   "list" | "create" | "update" | "close" | "reopen"
 >;
+export type TriagemSolicitationService = Pick<
+  TriageSolicitationService,
+  "list" | "get" | "create" | "close"
+>;
 export type TriagemAuditService = Pick<TriageAuditService, "listTimeline" | "reconcile">;
 type TriagemOptions = {
   env?: TriagemWorkerEnv;
@@ -78,6 +88,7 @@ type TriagemOptions = {
   externalLinkService?: TriagemExternalLinkService;
   competenceService?: TriagemCompetenceService;
   urgentRequestService?: TriagemUrgentRequestService;
+  solicitationService?: TriagemSolicitationService;
   auditService?: TriagemAuditService;
 };
 type TriagemWorkerContext = {
@@ -107,6 +118,7 @@ const newCatalog = (prisma: never) => new TriageCatalogService(prisma);
 const newOverview = (prisma: never) => new TriageOverviewService(prisma);
 const newExternalLink = (prisma: never) => new TriageExternalLinkService(prisma);
 const newUrgentRequest = (prisma: never) => new TriageUrgentRequestService(prisma);
+const newSolicitation = (prisma: never) => new TriageSolicitationService(prisma);
 const newAuditTimeline = (prisma: never) => new TriageAuditService(prisma);
 const newAuditReconcile = (prisma: never, env: TriagemWorkerEnv) =>
   new TriageAuditService(prisma, createTriageAuditDispatcher(env));
@@ -346,6 +358,35 @@ export function createTriagemWorkerApp(options: TriagemOptions = {}) {
     run(c, options.urgentRequestService, newUrgentRequest, async (service) => {
       const { id } = parseWithZod(triageUrgentRequestIdParamsSchema, { id: c.req.param("id") });
       return c.json(createSuccessResponse(await service.reopen(id, auth(c))));
+    }),
+  );
+  app.get("/triagem/solicitations", (c) =>
+    run(c, options.solicitationService, newSolicitation, async (service) => {
+      const query = parseWithZod(listTriageSolicitationQuerySchema, c.req.query());
+      const input = {
+        status: query.status,
+        clientId: query.client_id,
+        competence: query.competence,
+      };
+      return c.json(createSuccessResponse(await service.list(input, auth(c))));
+    }),
+  );
+  app.post("/triagem/solicitations", (c) =>
+    run(c, options.solicitationService, newSolicitation, async (service) => {
+      const body = parseWithZod(createTriageSolicitationBodySchema, await jsonBody(c));
+      return c.json(createSuccessResponse(await service.create(body, auth(c))), 201);
+    }),
+  );
+  app.get("/triagem/solicitations/:id", (c) =>
+    run(c, options.solicitationService, newSolicitation, async (service) => {
+      const { id } = parseWithZod(triageSolicitationIdParamsSchema, { id: c.req.param("id") });
+      return c.json(createSuccessResponse(await service.get(id, auth(c))));
+    }),
+  );
+  app.patch("/triagem/solicitations/:id/close", (c) =>
+    run(c, options.solicitationService, newSolicitation, async (service) => {
+      const { id } = parseWithZod(triageSolicitationIdParamsSchema, { id: c.req.param("id") });
+      return c.json(createSuccessResponse(await service.close(id, auth(c))));
     }),
   );
   app.post("/internal/triagem/audit/reconcile", (c) => {

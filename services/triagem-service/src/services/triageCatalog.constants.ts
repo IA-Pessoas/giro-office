@@ -3,6 +3,7 @@ export const TRIAGE_CATALOG_KINDS = [
   "LINK_TYPE",
   "DELIVERY_METHOD",
   "STATE_SITE",
+  "REQUEST_CATEGORY",
 ] as const;
 
 export const TRIAGE_CATALOG_CODE_MAX_LENGTH = 100;
