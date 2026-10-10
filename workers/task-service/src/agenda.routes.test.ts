@@ -109,6 +109,12 @@ describe("agenda compartilhada por departamento (#1727)", () => {
 
   it("valida módulo, mês e estado", async () => {
     const { send } = setup();
+    const put = (body: Record<string, unknown>) =>
+      send("PUT", "/task/agenda", { body: { module: "contabil", agenda_id: "evt-1", ...body } });
+
+    // Sem campo para mudar não há edição; data nula não vira 1970.
+    expect((await put({})).status).toBe(400);
+    expect((await put({ date: null })).status).toBe(400);
 
     expect((await send("GET", "/task/agenda?module=wiki&month=2026-12")).status).toBe(400);
     expect((await send("GET", "/task/agenda?module=contabil&month=2026-13")).status).toBe(400);

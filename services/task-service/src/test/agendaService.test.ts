@@ -40,6 +40,7 @@ describe("AgendaService", () => {
     expect(prisma.department.findMany).toHaveBeenCalledWith({
       where: { organization_id: ORG },
       select: { id: true, name: true },
+      orderBy: { name: "asc" },
     });
     expect(prisma.agenda.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
