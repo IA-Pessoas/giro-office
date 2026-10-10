@@ -94,7 +94,7 @@ As rotas internas ficam montadas diretamente no servico sob `/internal` e exigem
 - `POST /internal/reconciliation/client-pf-status/run`
 - `POST /internal/reconciliation/client-pf-documents/run`
 - `GET /internal/reporting/catalog` e `POST /internal/reporting/extract` (fontes `regularize.licenses`,
-  `regularize.processes`, `regularize.municipal_taxes`, `regularize.clients` e `regularize.client_groups`, somente reports-service, fora do gateway; exigem token e grant de relatório)
+  `regularize.processes`, `regularize.municipal_taxes`, `regularize.clients`, `regularize.client_groups`, `regularize.clients_pf` e `regularize.partners`, somente reports-service, fora do gateway; exigem token e grant de relatório)
 
 ## Reconciliacao agendada
 

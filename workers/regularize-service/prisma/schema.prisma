@@ -88,6 +88,8 @@ model Client {
   regime          String?
   size            String?
   responsible     String?
+  email           String?
+  number          String?
   coringa_status  String?
   licitacao       Boolean?
   contabil        Boolean?

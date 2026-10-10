@@ -35,6 +35,8 @@ describe("RegularizePortfolioAdapter", () => {
     expect(adapter.sources.map((source) => source.key)).toEqual([
       "regularize.clients",
       "regularize.client_groups",
+      "regularize.clients_pf",
+      "regularize.partners",
     ]);
     expect(adapter.sources.every((source) => source.module === "regularize")).toBe(true);
     // Integração sozinha não libera a carteira; Regularize sozinho libera.
@@ -102,7 +104,12 @@ describe("RegularizePortfolioAdapter", () => {
     const keys = (modules: Record<string, number>) =>
       catalog.getAuthorizedCatalog({ modules } as never).sources.map((source) => source.key);
 
-    expect(keys({ regularize: 1 })).toEqual(["regularize.clients", "regularize.client_groups"]);
+    expect(keys({ regularize: 1 })).toEqual([
+      "regularize.clients",
+      "regularize.client_groups",
+      "regularize.clients_pf",
+      "regularize.partners",
+    ]);
     expect(keys({ integracao: 3 })).toEqual(["integracao.clients", "integracao.client_groups"]);
   });
 
