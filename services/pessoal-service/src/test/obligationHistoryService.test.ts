@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   listObligationHistory,
   OBLIGATION_AUDIT_REFERRING,
+  OBLIGATION_UPDATE_ACTION,
   obligationFieldChange,
 } from "../services/obligationHistoryService.js";
 import { clientId, organizationId, recordId, userId } from "./pessoalCoreTestUtils.js";
@@ -17,7 +18,7 @@ function prismaMock(obligation: { id: string; client_id: string; competence: str
           id: "audit-1",
           user_id: userId,
           created_at: new Date("2026-09-10T12:00:00.000Z"),
-          action: "Atualizacao",
+          action: OBLIGATION_UPDATE_ACTION,
           changes_json: { va: { from: false, to: true } },
         },
       ]),

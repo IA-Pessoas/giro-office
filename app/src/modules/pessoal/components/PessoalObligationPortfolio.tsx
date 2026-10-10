@@ -29,6 +29,8 @@ import { PessoalObligationHistory } from "./PessoalObligationHistory";
 
 const PAGE_SIZE = 25;
 const STATES = Object.keys(PESSOAL_OBLIGATION_STATE_LABELS) as PessoalObligationItemState[];
+// Cliente, grupo e responsável, os oito itens e o botão de histórico.
+const TABLE_COLUMN_COUNT = 3 + PESSOAL_OBLIGATION_ITEMS.length + 1;
 
 interface PessoalObligationPortfolioProps {
   competence: string;
@@ -237,7 +239,7 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
                 </tr>
                 {historyId === row.id ? (
                   <tr>
-                    <td colSpan={PESSOAL_OBLIGATION_ITEMS.length + 4} className="bg-gray-50 px-3 py-3 dark:bg-gray-900/30">
+                    <td colSpan={TABLE_COLUMN_COUNT} className="bg-gray-50 px-3 py-3 dark:bg-gray-900/30">
                       <PessoalObligationHistory obligationId={row.id} />
                     </td>
                   </tr>
