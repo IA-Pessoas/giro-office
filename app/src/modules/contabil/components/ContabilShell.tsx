@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   Calculator,
+  CalendarDays,
   CheckSquare,
   FileText,
   ReceiptText,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useContabilControlPortfolio } from "../hooks";
+import { ContabilAgendaSection } from "./ContabilAgendaSection";
 import { ContabilControlSection } from "./ContabilControlSection";
 import { ContabilContingencySection } from "./ContabilContingencySection";
 import { CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
@@ -22,7 +24,14 @@ import { ContabilStateBox } from "./ContabilStateBox";
 import { TriageDocumentsSection } from "./TriageDocumentsSection";
 import { ContabilNoahSection } from "./ContabilNoahSection";
 
-type ContabilTabId = "control" | "responsible" | "relationship" | "documents" | "noah" | "contingency";
+type ContabilTabId =
+  | "control"
+  | "responsible"
+  | "relationship"
+  | "documents"
+  | "noah"
+  | "contingency"
+  | "agenda";
 
 interface ContabilShellProps {
   clientId?: string;
@@ -66,6 +75,7 @@ export function ContabilShell({
     { id: "documents", label: "Documentos", icon: FileText },
     { id: "noah", label: "Noah", icon: FileText },
     { id: "contingency", label: "Contingência", icon: Calculator },
+    { id: "agenda", label: "Agenda", icon: CalendarDays },
   ];
 
   return (
@@ -196,6 +206,14 @@ function ContabilActiveTabPanel({
     return (
       <div role="tabpanel" id="contabil-panel-noah" aria-labelledby="contabil-tab-noah">
         <ContabilNoahSection canEdit={canEdit} />
+      </div>
+    );
+  }
+  // A agenda é do departamento, não de uma empresa.
+  if (activeTab === "agenda") {
+    return (
+      <div role="tabpanel" id="contabil-panel-agenda" aria-labelledby="contabil-tab-agenda">
+        <ContabilAgendaSection canEdit={canEdit} />
       </div>
     );
   }
