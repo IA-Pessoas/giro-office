@@ -7,6 +7,8 @@ import {
   withReportingSnapshot,
 } from "@workspace/shared";
 
+import { extractTriageReportingPage, isTriageReportingSource } from "./triageReportingService.js";
+
 type ReportingDelegate = {
   findMany(input: {
     where: { organization_id: string };
@@ -23,6 +25,9 @@ export class InternalReportingService {
       controlContabil: ReportingDelegate;
       responsibleContabil: ReportingDelegate;
       relationshipContabil: ReportingDelegate;
+      client: ReportingDelegate;
+      clientClouds: ReportingDelegate;
+      triageMonthly: ReportingDelegate;
     },
     private readonly inSnapshot = false,
   ) {}
@@ -48,6 +53,16 @@ export class InternalReportingService {
     const allowedFields = getContabilReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
+    }
+    if (isTriageReportingSource(input.source)) {
+      return extractTriageReportingPage(
+        {
+          clients: this.prisma.client,
+          clouds: this.prisma.clientClouds,
+          monthly: this.prisma.triageMonthly,
+        },
+        { ...input, source: input.source },
+      );
     }
 
     const delegate =

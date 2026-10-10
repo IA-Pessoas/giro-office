@@ -39,6 +39,26 @@ describe("createWorkerSourceCatalog", () => {
   });
 
   it.each([
+    "contabil.triage_clouds",
+    "contabil.triage_movement",
+  ])("registra %s só para quem acessa a Triagem", (source) => {
+    const catalog = createWorkerSourceCatalog(
+      parseReportsServiceEnv({
+        DATABASE_URL: "postgresql://reports:reports@localhost:5432/reports",
+        JWT_SECRET: "test-jwt-secret",
+      }),
+    );
+    const scope = (modules: Record<string, number>) => ({
+      organization_id: "10000000-0000-0000-0000-000000000001",
+      modules,
+      grant: { sources: { [source]: ["legal_name"] }, relations: [] },
+    });
+
+    expect(catalog.findAdapterForSources([source], scope({ triagem: 1 }))).toBeDefined();
+    expect(catalog.findAdapterForSources([source], scope({ contabil: 3 }))).toBeUndefined();
+  });
+
+  it.each([
     "certificado.pf",
     "certificado.pj",
   ])("registra %s para execução assíncrona", (source) => {
