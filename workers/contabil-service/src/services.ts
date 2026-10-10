@@ -2035,6 +2035,9 @@ export function createReportingService(
       client: ReportingDelegate;
       clientCloud: ReportingDelegate;
       triageMonthly: ReportingDelegate;
+      triageResponsible: ReportingDelegate;
+      triageCompetence: ReportingDelegate;
+      user: ReportingDelegate;
     };
     source: string;
     organizationId: string;
@@ -2052,6 +2055,9 @@ export function createReportingService(
           clouds: input.prisma.clientCloud,
           monthly: input.prisma.triageMonthly,
           responsibles: input.prisma.responsibleContabil,
+          assignments: input.prisma.triageResponsible,
+          competences: input.prisma.triageCompetence,
+          users: input.prisma.user,
         },
         { ...input, source: input.source },
       );

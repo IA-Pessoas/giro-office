@@ -41,6 +41,8 @@ describe("createWorkerSourceCatalog", () => {
   it.each([
     "contabil.triage_clouds",
     "contabil.triage_movement",
+    "contabil.triage_responsibles",
+    "contabil.triage_competence_responsibles",
   ])("registra %s só para quem acessa a Triagem", (source) => {
     const catalog = createWorkerSourceCatalog(
       parseReportsServiceEnv({

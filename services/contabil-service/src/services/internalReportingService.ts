@@ -28,6 +28,9 @@ export class InternalReportingService {
       client: ReportingDelegate;
       clientClouds: ReportingDelegate;
       triageMonthly: ReportingDelegate;
+      triageResponsible: ReportingDelegate;
+      triageCompetence: ReportingDelegate;
+      user: ReportingDelegate;
     },
     private readonly inSnapshot = false,
   ) {}
@@ -61,6 +64,9 @@ export class InternalReportingService {
           clouds: this.prisma.clientClouds,
           monthly: this.prisma.triageMonthly,
           responsibles: this.prisma.responsibleContabil,
+          assignments: this.prisma.triageResponsible,
+          competences: this.prisma.triageCompetence,
+          users: this.prisma.user,
         },
         { ...input, source: input.source },
       );

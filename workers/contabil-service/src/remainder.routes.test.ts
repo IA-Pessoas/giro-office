@@ -826,9 +826,75 @@ describe("contabil Worker remainder routes", () => {
     });
     expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+        where: {
+          organization_id: ORG,
+          type: "CONTABIL",
+          archived_at: null,
+          client: { deletion_date: null },
+        },
       }),
     );
+  });
+
+  it("extrai os clientes atribuídos a um responsável da Triagem na organização do grant", async () => {
+    const assignments = [
+      { id: "1", client_id: CLIENT, type: "FISCAL", user_id: USER },
+      { id: "2", client_id: CLIENT, type: "CONTABIL", user_id: "other-user" },
+    ];
+    const prisma = {
+      triageResponsible: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            assignments.slice(skip, skip + take),
+          ),
+      },
+      client: {
+        findMany: vi.fn().mockResolvedValue([{ id: CLIENT, name: "Alfa", regime: "Simples" }]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: USER, name: "Ana Souza" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.triage_responsibles",
+      fields: ["name", "regime", "type"],
+      limit: 10,
+      query: {
+        filters: [
+          {
+            field: "responsible_name",
+            operator: "eq",
+            parameter: "responsavel",
+            value: "Ana Souza",
+          },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: ["name", "regime", "type", "responsible_name"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { rows: [{ name: "Alfa", regime: "Simples", type: "Fiscal" }], reachedLimit: false },
+    });
+    for (const delegate of [prisma.triageResponsible, prisma.client, prisma.user]) {
+      expect(delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+      );
+    }
   });
 
   it("usa a permissão efetiva do módulo contábil como o gateway Node encaminha", async () => {
