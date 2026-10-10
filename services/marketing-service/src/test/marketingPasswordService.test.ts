@@ -187,37 +187,49 @@ describe("MarketingPasswordService", () => {
   it("imports verifiable Office ciphertext and encrypts all quarantined payloads", async () => {
     const prisma = createPrisma();
     const encryption = new EncryptionService(encryptionKey);
-    const service = new MarketingPasswordService(
-      prisma as never,
-      encryption,
-      vi.fn(async () => {}),
-    );
+    const audit = vi.fn(async () => {});
+    const service = new MarketingPasswordService(prisma as never, encryption, audit);
     const validSecret = "verified-secret";
     const duplicatedSecret = "duplicate-secret";
-    const result = await service.importLegacyRecords(organizationId, [
-      {
-        organization_id: organizationId,
-        local: "Instagram",
-        user: "acme@example.com",
-        password: encryption.encrypt(validSecret),
-        notes: "Conta oficial",
-      },
-      { organization_id: null, local: "Facebook", user: "acme", password: "plain-secret" },
-      {
-        organization_id: organizationId,
-        local: "LinkedIn",
-        user: "acme",
-        password: encryption.encrypt(duplicatedSecret),
-      },
-      {
-        organization_id: organizationId,
-        local: "LinkedIn",
-        user: "acme",
-        password: encryption.encrypt(duplicatedSecret),
-      },
-    ]);
+    const result = await service.importLegacyRecords(
+      organizationId,
+      [
+        {
+          organization_id: organizationId,
+          local: "Instagram",
+          user: "acme@example.com",
+          password: encryption.encrypt(validSecret),
+          notes: "Conta oficial",
+        },
+        { organization_id: null, local: "Facebook", user: "acme", password: "plain-secret" },
+        {
+          organization_id: organizationId,
+          local: "LinkedIn",
+          user: "acme",
+          password: encryption.encrypt(duplicatedSecret),
+        },
+        {
+          organization_id: organizationId,
+          local: "LinkedIn",
+          user: "acme",
+          password: encryption.encrypt(duplicatedSecret),
+        },
+      ],
+      actorUserId,
+    );
 
     expect(result).toEqual({ imported: 1, quarantined: 3 });
+    expect(audit).toHaveBeenCalledTimes(1);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId,
+        userId: actorUserId,
+        action: "Importação",
+        referring: "marketing.passwords",
+        referringId: "credential-1",
+      }),
+    );
+    expect(JSON.stringify(audit.mock.calls)).not.toContain(validSecret);
     const importedCiphertext = prisma.passwordMkt.create.mock.calls[0]?.[0].data.password as string;
     expect(encryption.decrypt(importedCiphertext)).toBe(validSecret);
     const quarantine = prisma.marketingPasswordImportReconciliation.createMany.mock.calls[0]?.[0]
@@ -243,27 +255,31 @@ describe("MarketingPasswordService", () => {
       vi.fn(async () => {}),
     );
     const noteSecret = "note-secret";
-    const result = await service.importLegacyRecords(organizationId, [
-      {
-        organization_id: organizationId,
-        local: "Instagram",
-        user: "acme",
-        password: encryption.encrypt(noteSecret),
-        notes: `Do not share ${noteSecret}`,
-      },
-      {
-        organization_id: organizationId,
-        local: "Facebook",
-        user: "acme",
-        password: "not-office-ciphertext",
-      },
-      {
-        organization_id: "another-organization",
-        local: "LinkedIn",
-        user: "acme",
-        password: encryption.encrypt("other-tenant-secret"),
-      },
-    ]);
+    const result = await service.importLegacyRecords(
+      organizationId,
+      [
+        {
+          organization_id: organizationId,
+          local: "Instagram",
+          user: "acme",
+          password: encryption.encrypt(noteSecret),
+          notes: `Do not share ${noteSecret}`,
+        },
+        {
+          organization_id: organizationId,
+          local: "Facebook",
+          user: "acme",
+          password: "not-office-ciphertext",
+        },
+        {
+          organization_id: "another-organization",
+          local: "LinkedIn",
+          user: "acme",
+          password: encryption.encrypt("other-tenant-secret"),
+        },
+      ],
+      actorUserId,
+    );
 
     expect(result).toEqual({ imported: 0, quarantined: 3 });
     const quarantine = prisma.marketingPasswordImportReconciliation.createMany.mock.calls[0]?.[0]
@@ -301,5 +317,62 @@ describe("MarketingPasswordService", () => {
         changes: { notes: { from: null, to: "Conta oficial" } },
       }),
     );
+  });
+
+  it("refuses a new password that the kept notes already contain", async () => {
+    const prisma = createPrisma();
+    const encryption = new EncryptionService(encryptionKey);
+    const audit = vi.fn(async () => {});
+    const service = new MarketingPasswordService(prisma as never, encryption, audit);
+    prisma.passwordMkt.findFirst.mockResolvedValueOnce({
+      id: "credential-1",
+      local: "Instagram",
+      user: "acme",
+      notes: "Próxima senha: next-secret",
+      password: encryption.encrypt("old-secret"),
+    } as never);
+
+    await expect(
+      service.update(organizationId, "credential-1", { password: "next-secret" }, actorUserId),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prisma.passwordMkt.update).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("redacts legacy notes holding the secret from the update response", async () => {
+    const prisma = createPrisma();
+    const encryption = new EncryptionService(encryptionKey);
+    const encrypted = encryption.encrypt("kept-secret");
+    const service = new MarketingPasswordService(
+      prisma as never,
+      encryption,
+      vi.fn(async () => {}),
+    );
+    prisma.passwordMkt.findFirst
+      .mockResolvedValueOnce({
+        id: "credential-1",
+        local: "Instagram",
+        user: "acme",
+        notes: "senha kept-secret",
+        password: encrypted,
+      } as never)
+      .mockResolvedValueOnce(null);
+    prisma.passwordMkt.update.mockResolvedValueOnce({
+      id: "credential-1",
+      local: "Instagram novo",
+      user: "acme",
+      notes: "senha kept-secret",
+      password: encrypted,
+    } as never);
+
+    const updated = await service.update(
+      organizationId,
+      "credential-1",
+      { local: "Instagram novo" },
+      actorUserId,
+    );
+
+    expect(JSON.stringify(updated)).not.toContain("kept-secret");
+    expect(updated.notes).toBeNull();
   });
 });

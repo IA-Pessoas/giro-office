@@ -1,4 +1,4 @@
-import { type EncryptionService, ServiceError } from "@workspace/shared";
+import { type EncryptionService, error as logError, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { AUDITED_TRANSACTION, changedFields, type MarketingAudit } from "../integrations/audit.js";
 
@@ -121,7 +121,7 @@ export class MarketingPasswordService {
     await this.assertIdentityAvailable(input.local, input.user);
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const record = toMetadata(
+        const record = this.safeMetadata(
           (await tx.passwordMkt.create({
             data: {
               organization_id: organizationId,
@@ -131,7 +131,7 @@ export class MarketingPasswordService {
               notes: input.notes?.trim() || null,
             },
             select: { ...METADATA_SELECT },
-          })) as PasswordMetadata,
+          })) as PasswordRecord,
         );
         await this.audit({
           organizationId,
@@ -139,11 +139,15 @@ export class MarketingPasswordService {
           action: "Cadastro",
           referring: PASSWORD_REFERRING,
           referringId: record.id,
-          changes: { ...changedFields({}, auditedIdentity(record)), password: SECRET_CHANGED },
+          changes: {
+            ...changedFields({}, auditedIdentity(record)),
+            password: { from: null, to: "[definida]" },
+          },
         });
         return record;
       }, AUDITED_TRANSACTION);
     } catch (error: unknown) {
+      logError("Falha ao gravar credencial de Marketing.", { err: error });
       if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Já existe uma credencial para este local e usuário.");
       }
@@ -174,11 +178,14 @@ export class MarketingPasswordService {
         throw new ServiceError(422, "A credencial não pode ser validada com a chave do Office.");
       }
       this.assertNotesDoNotContainSecret(input.notes, input.password ?? currentSecret);
+    } else if (input.password !== undefined) {
+      // A nova senha não pode passar a constar da observação que fica.
+      this.assertNotesDoNotContainSecret(existing.notes, input.password);
     }
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const record = toMetadata(
+        const record = this.safeMetadata(
           (await tx.passwordMkt.update({
             where: { id, organization_id: organizationId },
             data: {
@@ -190,7 +197,7 @@ export class MarketingPasswordService {
               ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
             },
             select: { ...METADATA_SELECT },
-          })) as PasswordMetadata,
+          })) as PasswordRecord,
         );
         // Observação legada pode conter a senha: a trilha usa a versão já redigida.
         const changes: Record<string, unknown> = changedFields(
@@ -211,6 +218,7 @@ export class MarketingPasswordService {
         return record;
       }, AUDITED_TRANSACTION);
     } catch (error: unknown) {
+      logError("Falha ao gravar credencial de Marketing.", { err: error });
       if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Já existe uma credencial para este local e usuário.");
       }
@@ -274,6 +282,7 @@ export class MarketingPasswordService {
   async importLegacyRecords(
     organizationId: string,
     values: unknown[],
+    actorUserId: string,
   ): Promise<{ imported: number; quarantined: number }> {
     const candidates: ImportCandidate[] = [];
     const quarantined: Array<{ source: unknown; reason: string }> = [];
@@ -346,16 +355,29 @@ export class MarketingPasswordService {
       }
 
       try {
-        await this.prisma.passwordMkt.create({
-          data: {
-            organization_id: organizationId,
-            local: candidate.local,
-            user: candidate.user,
-            password: this.encryption.encrypt(candidate.plaintext),
-            notes: candidate.notes,
-          },
-          select: { id: true },
-        });
+        await this.prisma.$transaction(async (tx) => {
+          const { id } = await tx.passwordMkt.create({
+            data: {
+              organization_id: organizationId,
+              local: candidate.local,
+              user: candidate.user,
+              password: this.encryption.encrypt(candidate.plaintext),
+              notes: candidate.notes,
+            },
+            select: { id: true },
+          });
+          await this.audit({
+            organizationId,
+            userId: actorUserId,
+            action: "Importação",
+            referring: PASSWORD_REFERRING,
+            referringId: id,
+            changes: {
+              ...changedFields({}, auditedIdentity(candidate)),
+              password: { from: null, to: "[definida]" },
+            },
+          });
+        }, AUDITED_TRANSACTION);
         imported.push(candidate);
       } catch (error: unknown) {
         if (!isUniqueConstraintError(error)) throw error;

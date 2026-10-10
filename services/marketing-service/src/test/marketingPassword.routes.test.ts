@@ -174,7 +174,7 @@ describe("Marketing password routes", () => {
       .set(gatewayHeaders(2));
 
     expect(imported.status).toBe(201);
-    expect(service.importLegacyRecords).toHaveBeenCalledWith(organizationId, records);
+    expect(service.importLegacyRecords).toHaveBeenCalledWith(organizationId, records, userId);
     expect(reconciliation.status).toBe(200);
     expect(service.listImportReconciliation).toHaveBeenCalledWith(organizationId);
   });

@@ -143,13 +143,14 @@ export function createMarketingPasswordRoutes(
     withLoggedError(
       "Falha ao importar credenciais legadas de Marketing.",
       async (request, response) => {
-        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { organization_id: organizationId, user_id: userId } =
+          requireAuthenticatedRequestContext(request);
         const body = parseWithZod(importMarketingPasswordsBodySchema, request.body);
         response
           .status(201)
           .json(
             createSuccessResponse(
-              await passwordService.importLegacyRecords(organizationId, body.records),
+              await passwordService.importLegacyRecords(organizationId, body.records, userId),
             ),
           );
       },
