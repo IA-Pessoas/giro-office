@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ChevronDown,
   Copy,
+  ExternalLink,
   Eye,
   EyeOff,
   KeyRound,
@@ -35,6 +36,11 @@ import type {
   PessoalPasswordPayload,
   PessoalPasswordUpdatePayload,
 } from "../types/passwords";
+import {
+  isPessoalPasswordKnownService,
+  PESSOAL_PASSWORD_SERVICE_OPTIONS,
+  pessoalPasswordPortalUrl,
+} from "../utils/passwordPortals";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
   pessoalPrimaryButtonClassName,
@@ -84,28 +90,11 @@ const secretFields = [
 
 const PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION = "__custom_service__";
 
-const pessoalPasswordServiceOptions = [
-  "Portal eSocial",
-  "Gov.br",
-  "Cefaz",
-  "Feira Legal",
-  "Prefeitura",
-  "Bem Mais",
-  "BSF",
-  "Onvio",
-] as const;
-
 function normalizeSearch(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-}
-
-function isPessoalPasswordKnownService(value: string): boolean {
-  return pessoalPasswordServiceOptions.includes(
-    value as (typeof pessoalPasswordServiceOptions)[number],
-  );
 }
 
 function buildPasswordFormValues(
@@ -243,6 +232,7 @@ export function PessoalPasswordsSection({
   const selectedPassword =
     passwords.find((password) => password.id === selectedPasswordId) ?? null;
   const detail = detailQuery.data;
+  const portalUrl = detail ? pessoalPasswordPortalUrl(detail.service_name) : null;
   const hasSecretFields = detail ? hasPessoalPasswordSecretFields(detail) : false;
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
@@ -641,6 +631,17 @@ export function PessoalPasswordsSection({
                       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Responsável: {getResponsibleName(detail)}
                       </p>
+                      {portalUrl ? (
+                        <a
+                          href={portalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-blue-700 underline underline-offset-2 dark:text-blue-300"
+                        >
+                          <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          Abrir portal (nova aba)
+                        </a>
+                      ) : null}
                     </div>
 
                     {canEdit ? (
@@ -819,7 +820,7 @@ export function PessoalPasswordsSection({
                       className={`${pessoalTextFieldClassName} appearance-none pr-12`}
                     >
                       <option value="">Selecione</option>
-                      {pessoalPasswordServiceOptions.map((serviceName) => (
+                      {PESSOAL_PASSWORD_SERVICE_OPTIONS.map((serviceName) => (
                         <option key={serviceName} value={serviceName}>
                           {serviceName}
                         </option>

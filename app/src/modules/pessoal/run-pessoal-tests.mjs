@@ -43,6 +43,11 @@ import {
   validateLddPdfFile,
 } from "./utils/lddImportPreview.ts";
 import { buildLddSheet } from "./utils/lddSheet.ts";
+import {
+  PESSOAL_PASSWORD_PORTALS,
+  PESSOAL_PASSWORD_SERVICE_OPTIONS,
+  pessoalPasswordPortalUrl,
+} from "./utils/passwordPortals.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
   cancelUnionDeletion,
@@ -1100,6 +1105,33 @@ runTest("LDD sheet prints without a competence filter and the manual form offers
   assert.match(styles, /\.print-report \*/);
   // PGFN manual: inscrição e situação são texto livre, como na ficha.
   assert.match(tracking, /isPgfnDetail \? \(field\.name === "registration_status" \? "Inscrição" : "Situação"\)/);
+});
+
+runTest("password vault offers Empregador Web and portal shortcuts carry no credentials", () => {
+  assert.ok(PESSOAL_PASSWORD_SERVICE_OPTIONS.includes("Empregador Web"));
+  assert.equal(
+    pessoalPasswordPortalUrl("Empregador Web"),
+    "https://sd.mte.gov.br/sdweb/empregadorweb/index.jsf",
+  );
+  // Nome personalizado segue permitido e não ganha atalho.
+  assert.equal(pessoalPasswordPortalUrl("Portal do sindicato"), null);
+  assert.equal(pessoalPasswordPortalUrl("Onvio"), null);
+
+  for (const [service, url] of Object.entries(PESSOAL_PASSWORD_PORTALS)) {
+    const parsed = new URL(url);
+    assert.equal(parsed.protocol, "https:", service);
+    assert.deepEqual([parsed.username, parsed.password, parsed.search, parsed.hash], ["", "", "", ""]);
+    assert.ok(PESSOAL_PASSWORD_SERVICE_OPTIONS.includes(service), service);
+  }
+
+  const section = readFileSync(
+    new URL("./components/PessoalPasswordsSection.tsx", import.meta.url),
+    "utf8",
+  );
+  // O atalho é o endereço fixo do catálogo: nada do acesso (login, senha) entra no href.
+  assert.match(section, /const portalUrl = detail \? pessoalPasswordPortalUrl\(detail\.service_name\) : null;/);
+  assert.match(section, /href=\{portalUrl\}\s+target="_blank"\s+rel="noopener noreferrer"/);
+  assert.doesNotMatch(section, /href=\{[^}]*(login_|senha_)/);
 });
 
 console.log("pessoal contract tests passed");
