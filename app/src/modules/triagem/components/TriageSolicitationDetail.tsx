@@ -10,6 +10,7 @@ import {
 
 import { useTriageNoteCounts } from "../hooks";
 import type { TriageNoteCountsInput, TriageSolicitation } from "../services";
+import { triageUserLabel } from "./triagem.helpers";
 import { TRIAGE_FIELD_CLASSNAME, TRIAGE_PRIMARY_BUTTON_CLASSNAME } from "./triagem.styles";
 
 const MAX_NOTE_COUNT = 1_000_000;
@@ -111,7 +112,7 @@ export function TriageSolicitationDetail({
         )}
         {query.data?.updated_at ? (
           <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-            Atualizado por {query.data.updated_by?.name || query.data.updated_by?.full_name || "usuário"} em{" "}
+            Atualizado por {triageUserLabel(query.data.updated_by)} em{" "}
             {new Date(query.data.updated_at).toLocaleString("pt-BR")}
           </p>
         ) : null}
