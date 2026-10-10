@@ -23,6 +23,7 @@ import type {
   RegularizeDashboard,
   RegularizeGuidance,
   RegularizeGroupMap,
+  RegularizeGroupMapTreeNode,
   RegularizeGuidanceListFilters,
   RegularizeId,
   RegularizeLicenseDetail,
@@ -42,6 +43,7 @@ import type {
   RegularizePasswordListItem,
   RegularizeProcessDetail,
   RegularizeProcessListFilters,
+  RegularizeSavedGroupMap,
   RegularizeProcessListItem,
   RegularizeSitePasswordDetail,
   RegularizeSitePasswordListFilters,
@@ -274,6 +276,23 @@ export const regularizeService = {
     const response = await api.get(REGULARIZE_ENDPOINTS.groupMap(groupId));
 
     return unwrapRegularizeEnvelope<RegularizeGroupMap>(response.data);
+  },
+
+  async getSavedGroupMap(groupId: RegularizeId): Promise<RegularizeSavedGroupMap | null> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.groupMapSaved(groupId));
+
+    return unwrapRegularizeEnvelope<RegularizeSavedGroupMap | null>(response.data);
+  },
+
+  async saveGroupMap(
+    groupId: RegularizeId,
+    tree: RegularizeGroupMapTreeNode,
+  ): Promise<RegularizeSavedGroupMap> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.groupMapSaved(groupId), { tree });
+
+    return unwrapRegularizeEnvelope<RegularizeSavedGroupMap>(response.data);
   },
 
   async deletePartner(id: RegularizeId): Promise<{ ok: true }> {

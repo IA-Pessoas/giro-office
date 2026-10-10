@@ -4230,6 +4230,22 @@ const handlers = {
     });
   },
 
+  // O grupo é o criado pelo próprio smoke: a versão salva some junto com ele.
+  async regularizeGroupMapSave(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/regularize/groups/${requireState("clientGroupId")}/map/saved`,
+      json: { tree: { id: "raiz", lines: ["QA_ smoke mapa de grupo"], children: [] } },
+    });
+  },
+
+  async regularizeGroupMapSaved(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/regularize/groups/${requireState("clientGroupId")}/map/saved`,
+    });
+  },
+
   async clientRegimesList(op) {
     await httpRequest(op, { expectedStatus: [200], path: "/client/regimes" });
   },

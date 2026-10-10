@@ -2923,7 +2923,7 @@ export function RegularizePage() {
         // Mesma origem canônica dos grupos da Integração; edição exige Regularize nível 2 (#1742).
         <div className="space-y-4">
           <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
-          <RegularizeGroupMap />
+          <RegularizeGroupMap canEdit={regularizeAccess.canEdit} />
         </div>
       ) : null}
 

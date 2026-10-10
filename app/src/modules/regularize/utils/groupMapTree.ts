@@ -1,13 +1,9 @@
-import type { RegularizeGroupMap } from "../types";
+import type { RegularizeGroupMap, RegularizeGroupMapTreeNode } from "../types";
 
-// Árvore do mapa de grupo (#1748): grupo → cidade → sócio → empresa → dados da empresa, como
-// o mapas/mapa.php do legado montava para o gráfico.
+// Árvore do mapa de grupo (#1748, #1749): grupo → cidade → sócio → empresa → dados da empresa,
+// como o mapas/mapa.php do legado montava para o gráfico, e as edições que ele permitia.
 
-export type GroupMapNode = {
-  id: string;
-  lines: string[];
-  children: GroupMapNode[];
-};
+export type GroupMapNode = RegularizeGroupMapTreeNode;
 
 export type GroupMapBox = {
   node: GroupMapNode;
@@ -26,6 +22,10 @@ export type GroupMapLayout = {
 
 const MISSING = "não informado";
 const MAX_LINE_LENGTH = 50;
+// Mesmos tetos da API (GROUP_MAP_TREE_LIMITS).
+const MAX_LINES = 20;
+export const GROUP_MAP_MAX_NODES = 2_000;
+export const GROUP_MAP_MAX_DEPTH = 12;
 
 // Medidas do desenho em px; a largura do texto é estimada pela quantidade de caracteres.
 export const GROUP_MAP_METRICS = {
@@ -40,7 +40,33 @@ export const GROUP_MAP_METRICS = {
   paddingY: 8,
   columnGap: 48,
   rowGap: 12,
+  // Moldura da imagem: margem em volta e faixa do título.
+  margin: 16,
+  titleHeight: 40,
+  titleFontSize: 18,
 } as const;
+
+// Cores do seletor do legado.
+export const GROUP_MAP_COLORS = [
+  { value: "#ffffff", label: "Branco" },
+  { value: "#000000", label: "Preto" },
+  { value: "#ff0000", label: "Vermelho" },
+  { value: "#00ff00", label: "Verde" },
+  { value: "#0000ff", label: "Azul" },
+  { value: "#ffff00", label: "Amarelo" },
+  { value: "#ff00ff", label: "Rosa" },
+  { value: "#00ffff", label: "Ciano" },
+] as const;
+
+export const GROUP_MAP_DEFAULT_COLOR = "#ffffff";
+
+// Texto preto em fundo claro e branco em fundo escuro, pela mesma luminância do legado.
+export function groupMapTextColor(background: string): "#000000" | "#ffffff" {
+  const rgb = Number.parseInt(background.slice(1), 16);
+  const luminance =
+    (0.299 * ((rgb >> 16) & 0xff) + 0.587 * ((rgb >> 8) & 0xff) + 0.114 * (rgb & 0xff)) / 255;
+  return luminance > 0.5 ? "#000000" : "#ffffff";
+}
 
 // Cópia do formatCPF_CNPJ de @shared/utils/formatters: este arquivo roda direto no Node nos
 // testes do módulo, onde o alias @shared não resolve.
@@ -53,11 +79,23 @@ function formatDocument(document: string | null): string {
   return document?.trim() || MISSING;
 }
 
-// Quebra em palavras para caber na caixa, como o Painel::quebrarTexto do legado.
+// Caracteres de controle e metades soltas de emoji: a API recusa, e o SVG serializado deixaria
+// de ser XML válido na hora de gerar o PNG.
+const UNSAFE_TEXT =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: é o que se quer tirar do texto
+  /[\u0000-\u001f\u007f]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+
+// Quebra em palavras para caber na caixa, como o Painel::quebrarTexto do legado. Palavra maior
+// que a caixa (um link, por exemplo) é cortada em pedaços.
 export function wrapGroupMapLine(text: string, maxLength = MAX_LINE_LENGTH): string[] {
   const lines: string[] = [];
   let current = "";
-  for (const word of text.split(/\s+/).filter(Boolean)) {
+  const words = text
+    .replace(UNSAFE_TEXT, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .flatMap((word) => word.match(new RegExp(`.{1,${maxLength}}`, "gu")) ?? []);
+  for (const word of words) {
     if (current && current.length + 1 + word.length > maxLength) {
       lines.push(current);
       current = word;
@@ -69,8 +107,23 @@ export function wrapGroupMapLine(text: string, maxLength = MAX_LINE_LENGTH): str
   return lines.length ? lines : [""];
 }
 
+// Texto digitado na edição → linhas do item: uma por linha digitada, quebradas na largura da
+// caixa. Linha em branco some; devolve vazio quando não sobra texto.
+export function groupMapLinesFromText(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => wrapGroupMapLine(line))
+    .slice(0, MAX_LINES);
+}
+
 function node(id: string, texts: string[], children: GroupMapNode[] = []): GroupMapNode {
-  return { id, lines: texts.flatMap((text) => wrapGroupMapLine(text)), children };
+  return {
+    id,
+    lines: texts.flatMap((text) => wrapGroupMapLine(text)).slice(0, MAX_LINES),
+    children,
+  };
 }
 
 export function buildGroupMapTree(map: RegularizeGroupMap): GroupMapNode {
@@ -105,6 +158,73 @@ export function buildGroupMapTree(map: RegularizeGroupMap): GroupMapNode {
       ),
     ),
   );
+}
+
+export function findGroupMapNode(root: GroupMapNode, id: string): GroupMapNode | null {
+  if (root.id === id) return root;
+  for (const child of root.children) {
+    const found = findGroupMapNode(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Nível do item na árvore (a raiz é 1), ou 0 quando o item não está nela.
+export function groupMapNodeDepth(root: GroupMapNode, id: string): number {
+  if (root.id === id) return 1;
+  for (const child of root.children) {
+    const depth = groupMapNodeDepth(child, id);
+    if (depth > 0) return depth + 1;
+  }
+  return 0;
+}
+
+export function countGroupMapNodes(root: GroupMapNode): number {
+  return 1 + root.children.reduce((total, child) => total + countGroupMapNodes(child), 0);
+}
+
+// As edições devolvem uma árvore nova: a que está na tela só muda quando a edição é aplicada.
+function mapGroupMapNode(
+  root: GroupMapNode,
+  id: string,
+  change: (target: GroupMapNode) => GroupMapNode,
+): GroupMapNode {
+  if (root.id === id) return change(root);
+  return { ...root, children: root.children.map((child) => mapGroupMapNode(child, id, change)) };
+}
+
+export function updateGroupMapNode(
+  root: GroupMapNode,
+  id: string,
+  patch: { lines: string[]; color: string },
+): GroupMapNode {
+  return mapGroupMapNode(root, id, (target) => ({ ...target, ...patch }));
+}
+
+export function addGroupMapChild(
+  root: GroupMapNode,
+  parentId: string,
+  lines: string[],
+): GroupMapNode {
+  // O id novo não pode repetir nenhum da árvore, nem o de um item removido antes.
+  let suffix = 1;
+  while (findGroupMapNode(root, `${parentId}/extra:${suffix}`)) suffix++;
+  const child: GroupMapNode = { id: `${parentId}/extra:${suffix}`, lines, children: [] };
+  return mapGroupMapNode(root, parentId, (target) => ({
+    ...target,
+    children: [...target.children, child],
+  }));
+}
+
+// Remove o item e tudo abaixo dele. A raiz (o grupo) não sai.
+export function removeGroupMapNode(root: GroupMapNode, id: string): GroupMapNode {
+  if (root.id === id) return root;
+  return {
+    ...root,
+    children: root.children
+      .filter((child) => child.id !== id)
+      .map((child) => removeGroupMapNode(child, id)),
+  };
 }
 
 // Árvore da esquerda para a direita: cada nível numa coluna, folhas empilhadas e o pai

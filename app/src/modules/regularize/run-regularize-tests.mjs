@@ -1897,6 +1897,105 @@ await runTest("group map screen reads the generated map through the Regularize c
   ]);
 
   assert.match(contractSource, /\/regularize\/groups\/\$\{groupId\}\/map/);
-  assert.match(pageSource, /<RegularizeGroupMap \/>/);
+  assert.match(pageSource, /<RegularizeGroupMap canEdit=\{regularizeAccess\.canEdit\} \/>/);
   assert.match(componentSource, /useRegularizeGroupMap\(groupId\)/);
+});
+
+await runTest("group map edits change text, colour and items without touching the rest (#1749)", async () => {
+  const {
+    addGroupMapChild,
+    countGroupMapNodes,
+    findGroupMapNode,
+    GROUP_MAP_COLORS,
+    groupMapLinesFromText,
+    groupMapNodeDepth,
+    groupMapTextColor,
+    removeGroupMapNode,
+    updateGroupMapNode,
+  } = await import("./utils/groupMapTree.ts");
+  const tree = {
+    id: "raiz",
+    lines: ["Grupo"],
+    children: [
+      { id: "a", lines: ["A"], children: [{ id: "a1", lines: ["A1"], children: [] }] },
+      { id: "b", lines: ["B"], children: [] },
+    ],
+  };
+  const original = JSON.stringify(tree);
+
+  const edited = updateGroupMapNode(tree, "a", { lines: ["A novo"], color: "#ff0000" });
+  assert.deepEqual(findGroupMapNode(edited, "a"), {
+    id: "a",
+    lines: ["A novo"],
+    color: "#ff0000",
+    children: [{ id: "a1", lines: ["A1"], children: [] }],
+  });
+  assert.deepEqual(findGroupMapNode(edited, "b"), tree.children[1]);
+
+  const withChild = addGroupMapChild(tree, "b", ["Anotação"]);
+  assert.deepEqual(findGroupMapNode(withChild, "b").children, [
+    { id: "b/extra:1", lines: ["Anotação"], children: [] },
+  ]);
+  // O segundo item novo no mesmo lugar ganha outro id.
+  assert.equal(
+    findGroupMapNode(addGroupMapChild(withChild, "b", ["Outra"]), "b").children[1].id,
+    "b/extra:2",
+  );
+
+  // Remover leva junto o que está abaixo; o grupo (raiz) não sai.
+  const removed = removeGroupMapNode(tree, "a");
+  assert.equal(countGroupMapNodes(removed), 2);
+  assert.equal(findGroupMapNode(removed, "a1"), null);
+  assert.equal(removeGroupMapNode(tree, "raiz"), tree);
+
+  // Nenhuma edição mexe na árvore de origem.
+  assert.equal(JSON.stringify(tree), original);
+
+  assert.deepEqual(groupMapLinesFromText("  Linha um \n\n linha dois  "), ["Linha um", "linha dois"]);
+  assert.deepEqual(groupMapLinesFromText(" \n "), []);
+  assert.equal(groupMapLinesFromText("a\n".repeat(30)).length, 20);
+  // O que a API recusaria não sai da tela: palavra maior que a linha é cortada e caractere de
+  // controle vira espaço.
+  const longWord = groupMapLinesFromText("x".repeat(120));
+  assert.deepEqual(longWord.map((line) => line.length), [50, 50, 20]);
+  assert.deepEqual(groupMapLinesFromText("a\u0001b\u0000c"), ["a b c"]);
+  assert.equal(groupMapNodeDepth(tree, "raiz"), 1);
+  assert.equal(groupMapNodeDepth(tree, "a1"), 3);
+  assert.equal(groupMapNodeDepth(tree, "não existe"), 0);
+
+  // Texto legível sobre qualquer cor do seletor, como no legado.
+  assert.equal(GROUP_MAP_COLORS.length, 8);
+  assert.equal(groupMapTextColor("#ffffff"), "#000000");
+  assert.equal(groupMapTextColor("#ffff00"), "#000000");
+  assert.equal(groupMapTextColor("#000000"), "#ffffff");
+  assert.equal(groupMapTextColor("#0000ff"), "#ffffff");
+});
+
+await runTest("group map PNG comes from the on-screen SVG and saving is explicit (#1749)", async () => {
+  const [contractSource, componentSource, exportSource, hooksSource] = await Promise.all([
+    readModuleSource("services/regularizeService.contract.ts"),
+    readModuleSource("components/RegularizeGroupMap.tsx"),
+    readModuleSource("utils/groupMapExport.ts"),
+    readModuleSource("hooks/useRegularizePeople.ts"),
+  ]);
+  const { groupMapFileName } = await import("./utils/groupMapExport.ts");
+
+  assert.match(contractSource, /\/regularize\/groups\/\$\{groupId\}\/map\/saved/);
+  // O PNG é o SVG da tela serializado, sem o destaque do item selecionado.
+  assert.match(componentSource, /downloadGroupMapPng\(svgRef\.current, title\)/);
+  assert.match(exportSource, /querySelectorAll\("\[data-export-skip\]"\)/);
+  assert.match(componentSource, /data-export-skip=""/);
+  // O desenho não depende de classes para cor: elas não iriam para o arquivo.
+  assert.doesNotMatch(componentSource, /className="(?:fill|stroke)-/);
+  // Só o botão Salvar grava; gerar de novo e descartar mexem apenas no rascunho.
+  assert.equal(componentSource.match(/saveMutation\.mutateAsync/g)?.length, 1);
+  // O rascunho só nasce com as consultas terminadas, e descartá-lo com alterações pede
+  // confirmação.
+  assert.match(componentSource, /savedQuery\.isSuccess && !savedQuery\.isFetching/);
+  assert.match(componentSource, /if \(current\?\.dirty\) setPending\(\{ kind: "group"/);
+  assert.match(componentSource, /if \(current\?\.dirty\) setPending\(\{ kind: "regenerate" \}\)/);
+  assert.match(hooksSource, /regularizeService\.saveGroupMap\(groupId, tree\)/);
+
+  assert.equal(groupMapFileName("Mapa do grupo São João & Cia"), "mapa-do-grupo-sao-joao-cia.png");
+  assert.equal(groupMapFileName("///"), "mapa-do-grupo.png");
 });

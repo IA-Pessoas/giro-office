@@ -1845,6 +1845,22 @@ const baseManifest = [
     auth: "bearer",
   }),
   op({
+    service: "regularize-service",
+    method: "PUT",
+    path: "/regularize/groups/{id}/map/saved",
+    action: "regularizeGroupMapSave",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "regularize-service",
+    method: "GET",
+    path: "/regularize/groups/{id}/map/saved",
+    action: "regularizeGroupMapSaved",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
     service: "client-service",
     method: "POST",
     path: "/client/regimes",

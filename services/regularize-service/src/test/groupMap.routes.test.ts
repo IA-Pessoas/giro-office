@@ -49,4 +49,47 @@ describe("group map routes", () => {
     expect(response.status).toBe(400);
     expect(generate).not.toHaveBeenCalled();
   });
+
+  it("lê a versão salva com permissão de leitura, inclusive quando não existe", async () => {
+    const getSaved = vi.spyOn(GroupMapService.prototype, "getSaved").mockResolvedValue(null);
+
+    const response = await request(createTestApp({} as PrismaClient))
+      .get(`/regularize/groups/${GROUP_ID}/map/saved`)
+      .set(gatewayHeaders({ permission: 1 }));
+
+    expect(response.status).toBe(200);
+    expect(getSaved).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID, groupId: GROUP_ID });
+    expect(response.body).toEqual({ success: true, data: null });
+  });
+
+  it("salva o mapa editado só com permissão de escrita", async () => {
+    const tree = { id: "raiz", lines: ["Grupo Um"], color: "#ffff00", children: [] };
+    const save = vi.spyOn(GroupMapService.prototype, "save").mockResolvedValue({
+      tree,
+      updated_at: new Date("2026-10-10T12:00:00.000Z"),
+      updated_by_user_id: "user-1",
+    });
+    const app = createTestApp({} as PrismaClient);
+    const put = (permission: number, body: unknown) =>
+      request(app)
+        .put(`/regularize/groups/${GROUP_ID}/map/saved`)
+        .set(gatewayHeaders({ permission }))
+        .send(body as object);
+
+    const statuses = [
+      (await put(1, { tree })).status,
+      (await put(2, { tree })).status,
+      (await put(2, { tree: { ...tree, color: "red" } })).status,
+      (await put(2, {})).status,
+    ];
+
+    expect(statuses).toEqual([403, 200, 400, 400]);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: "user-1",
+      groupId: GROUP_ID,
+      tree,
+    });
+  });
 });
