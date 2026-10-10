@@ -537,7 +537,7 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
     const body = {
       client_id: fixtures.clientA,
       bidding: false,
-      chart_accounts: `${runId}-plano`,
+      chart_accounts: "Não",
       tool: `${runId}-tool`,
       system: `${runId}-system`,
       note: `${runId}`,

@@ -45,6 +45,21 @@ const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermi
 const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermission);
 const marketingModulePolicy = createModulePolicy("marketing", moduleAccessPermission);
 const marketingEditPolicy = createModulePolicy("marketing", moduleEditPermission);
+const departmentAdminPolicy: AuthPolicy = {
+  anyOf: [createModulePolicy("rh", 3), createModulePolicy("ti", 3)],
+};
+const departmentMarketingReadPolicy: AuthPolicy = {
+  anyOf: [tiModulePolicy, marketingModulePolicy],
+};
+const departmentMarketingColorEditPolicy: AuthPolicy = {
+  anyOf: [departmentAdminPolicy, createModulePolicy("marketing", 3)],
+};
+const userListPolicy: AuthPolicy = {
+  anyOf: [userManagementPolicy, marketingModulePolicy],
+};
+const userPhotoEditPolicy: AuthPolicy = {
+  anyOf: [userManagementPolicy, marketingEditPolicy],
+};
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
@@ -134,6 +149,12 @@ const integracaoResponsibleTaskPolicy: AuthPolicy = createModulePolicy("integrac
 const integracaoClientPolicy = createModulePolicy("integracao", moduleAccessPermission);
 /** Mutações do cadastro de clientes exigem edição; o client-service ainda cobra 3 para desativar. */
 const integracaoClientEditPolicy = createModulePolicy("integracao", moduleEditPermission);
+const clientInstagramProfileReadPolicy: AuthPolicy = {
+  anyOf: [integracaoClientPolicy, marketingModulePolicy],
+};
+const clientInstagramProfileEditPolicy: AuthPolicy = {
+  anyOf: [integracaoClientEditPolicy, marketingEditPolicy],
+};
 
 const clientListPolicy: AuthPolicy = {
   anyOf: [
@@ -169,6 +190,8 @@ const integracaoClientPath =
   /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
+  ["GET /department/list", departmentMarketingReadPolicy],
+  ["PUT /department", departmentMarketingColorEditPolicy],
   ["GET /dashboard/stats", authenticatedPolicy],
   ["GET /client/list", clientListPolicy],
   ["GET /client/coringa/list", clientListPolicy],
@@ -183,7 +206,7 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["POST /rh/messages", rhModulePolicy],
   ["POST /user/session/refresh", authenticatedPolicy],
   ["DELETE /user/session", authenticatedPolicy],
-  ["GET /user", userManagementPolicy],
+  ["GET /user", userListPolicy],
   ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],
   ["POST /platform/session/refresh", platformOnlyPolicy],
@@ -206,6 +229,16 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/client\/[^/]+\/licitacao\/history\/?$/, policy: clientListPolicy },
   { method: "GET", path: clientCatalogsPath, policy: clientCatalogsReadPolicy },
   { method: "ANY", path: clientCatalogsPath, policy: clientCatalogsEditPolicy },
+  {
+    method: "GET",
+    path: /^\/client\/instagram-profiles\/report\/?$/,
+    policy: clientInstagramProfileReadPolicy,
+  },
+  {
+    method: "PATCH",
+    path: /^\/client\/[^/]+\/integration\/?$/,
+    policy: clientInstagramProfileEditPolicy,
+  },
   { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },
   { method: "ANY", path: integracaoClientPath, policy: integracaoClientEditPolicy },
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
@@ -301,10 +334,10 @@ const routePolicyMatchers: Array<{
     path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
     policy: userManagementPolicy,
   },
-  { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
-  { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userListPolicy },
+  { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userPhotoEditPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/password-reset$/, policy: userManagementPolicy },
-  { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userPhotoEditPolicy },
   { method: "GET", path: /^\/task\/financeiro\/queue$/, policy: financeiroTaskViewPolicy },
   {
     method: "GET",

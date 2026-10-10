@@ -7,6 +7,8 @@ import { MarketingAiUsageControls } from "@modules/marketing/components/Marketin
 import { MarketingInstagramProfiles } from "@modules/marketing/components/MarketingInstagramProfiles";
 import { MarketingPasswords } from "@modules/marketing/components/MarketingPasswords";
 import { MarketingEvents } from "@modules/marketing/components/MarketingEvents";
+import { MarketingUsers } from "@modules/marketing/components/MarketingUsers";
+import { MarketingDepartments } from "@modules/marketing/components/MarketingDepartments";
 
 export default function MarketingPage() {
   return (
@@ -22,10 +24,12 @@ export default function MarketingPage() {
           </p>
         </header>
         <MarketingCanonicalQueries />
+        <MarketingDepartments />
         <MarketingDashboard />
         <MarketingEvents />
         <MarketingAiUsageControls />
         <MarketingInstagramProfiles />
+        <MarketingUsers />
         <MarketingPasswords />
       </main>
     </>

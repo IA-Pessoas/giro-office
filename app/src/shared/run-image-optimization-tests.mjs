@@ -83,6 +83,8 @@ await runTest("dynamic img usages are intentional", async () => {
     "src/modules/ti/components/TiRequestsTab.tsx",
     // Logo é um caminho ou URL informado pelo usuário, como os avatares e anexos acima.
     "src/modules/marketing/components/MarketingEvents.tsx",
+    // Foto é uma URL dinâmica fornecida pelo serviço de usuários.
+    "src/modules/marketing/components/MarketingUsers.tsx",
   ];
 
   const tsxFiles = await collectFiles(appSrc, [".tsx"]);

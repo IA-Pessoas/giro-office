@@ -32,6 +32,14 @@ const USER_PUBLIC_SELECT = {
   version: true,
 } as const;
 
+const MARKETING_USER_PROFILE_SELECT = {
+  id: true,
+  name: true,
+  status: true,
+  photo_url: true,
+  department: { select: { name: true } },
+} as const;
+
 const USER_CREATE_SELECT = {
   ...USER_PUBLIC_SELECT,
   organization_id: true,
@@ -109,6 +117,9 @@ interface DepartmentAccessContext {
 }
 
 type UserPublicRow = Prisma.UserGetPayload<{ select: typeof USER_PUBLIC_SELECT }>;
+type MarketingUserProfileRow = Prisma.UserGetPayload<{
+  select: typeof MARKETING_USER_PROFILE_SELECT;
+}>;
 type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }>;
 type UserSessionRow = UserPublicRow & { modules: ModulePermissions; task_completion: boolean };
 
@@ -292,6 +303,27 @@ class UserManagementService {
       prismaClient.user.findMany({
         where,
         select: USER_PUBLIC_SELECT,
+        skip,
+        take,
+        orderBy: { name: "asc" },
+      }),
+      prismaClient.user.count({ where }),
+    ]);
+
+    return { users, total, skip, take };
+  }
+
+  async listMarketingProfiles({ skip = 0, take = 20, organizationId }: ListUsersParams): Promise<{
+    users: MarketingUserProfileRow[];
+    total: number;
+    skip: number;
+    take: number;
+  }> {
+    const where = organizationUsersWhere(organizationId);
+    const [users, total] = await Promise.all([
+      prismaClient.user.findMany({
+        where,
+        select: MARKETING_USER_PROFILE_SELECT,
         skip,
         take,
         orderBy: { name: "asc" },

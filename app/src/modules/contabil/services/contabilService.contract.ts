@@ -11,6 +11,7 @@ import type {
 export const CONTABIL_ENDPOINTS = {
   controls: "/contabil/controls",
   controlsList: "/contabil/controls/list",
+  controlsHistory: "/contabil/controls/history",
   controlById: (controlId: string) => `/contabil/controls/${controlId}`,
   controlItems: (controlId: string) => `/contabil/controls/${controlId}/items`,
   controlsYear: "/contabil/controls/year",
@@ -21,6 +22,7 @@ export const CONTABIL_ENDPOINTS = {
   relationships: "/contabil/relationships",
   relationshipById: (relationshipId: string) => `/contabil/relationships/${relationshipId}`,
   relationshipByClient: (clientId: string) => `/contabil/relationships/client/${clientId}`,
+  relationshipHistory: (clientId: string) => `/contabil/relationships/client/${clientId}/history`,
   triageMonthly: "/triagem/monthly",
   triageEditability: "/triagem/editability",
   triageMonthlyItem: (monthlyId: string) => `/triagem/monthly/${monthlyId}/item`,

@@ -5545,6 +5545,17 @@ const handlers = {
     });
   },
 
+  async contabilControlHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+        pageSize: "5",
+      },
+    });
+  },
+
   async contabilControlPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -5955,7 +5966,7 @@ const handlers = {
       json: {
         client_id: requireState("primaryClientId"),
         bidding: false,
-        chart_accounts: uniqueText("Smoke chart"),
+        chart_accounts: "Não",
         tool: "Ferramenta smoke",
         system: "Sistema smoke",
         note: uniqueText("Smoke relationship note"),
@@ -5981,6 +5992,14 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/contabil/relationships/client/${requireState("primaryClientId")}`,
+    });
+  },
+
+  async contabilRelationshipHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/client/${requireState("primaryClientId")}/history`,
+      query: { pageSize: "5" },
     });
   },
 
