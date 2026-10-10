@@ -53,6 +53,13 @@ const rawClientServiceEnvSchema = z
     historyStorageBucket: z.string().optional().default("ClientHistory"),
     historyStorageDir: z.string().optional().default(".data/client-history-uploads"),
     internalServiceToken: z.string().optional(),
+    auditEnabled: z
+      .string()
+      .optional()
+      .default("true")
+      .transform((value) => value === "true" || value === "1"),
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
+    auditServiceToken: z.string().default("audit-service-token"),
     reportsInternalToken: z.string().optional(),
     reportsGrantSecret: z.string().optional(),
     cnpjLookupApiUrl: z.string().trim().optional().default(""),
@@ -114,6 +121,12 @@ const clientServiceEnvSchema = rawClientServiceEnvSchema.transform((env) => {
   validateProductionInternalServiceToken({
     nodeEnv: rest.nodeEnv,
     serviceName: "client-service",
+    envName: "AUDIT_SERVICE_TOKEN",
+    token: rest.auditServiceToken,
+  });
+  validateProductionInternalServiceToken({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "client-service",
     envName: "REPORTS_INTERNAL_TOKEN",
     token: rest.reportsInternalToken,
   });
@@ -162,6 +175,9 @@ export function parseClientServiceEnv(
     internalServiceToken:
       source.CLIENT_SERVICE_INTERNAL_TOKEN ||
       (source.NODE_ENV === "production" ? undefined : source.AUDIT_SERVICE_TOKEN),
+    auditEnabled: source.AUDIT_ENABLED,
+    auditServiceUrl: source.AUDIT_SERVICE_URL,
+    auditServiceToken: source.AUDIT_SERVICE_TOKEN,
     reportsInternalToken: source.REPORTS_INTERNAL_TOKEN,
     reportsGrantSecret: source.REPORTS_GRANT_SECRET,
     cnpjLookupApiUrl: source.CNPJ_LOOKUP_API_URL,

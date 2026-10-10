@@ -12,6 +12,7 @@ describe("client-service env", () => {
         CLIENT_HISTORY_STORAGE_MODE: "local",
         CLIENT_SERVICE_INTERNAL_TOKEN: "a".repeat(32),
         REPORTS_INTERNAL_TOKEN: "b".repeat(32),
+        AUDIT_SERVICE_TOKEN: "c".repeat(32),
         SERVICE_ALLOWED_ORIGINS: "https://app.example.com",
       }),
     ).toThrow(/REPORTS_GRANT_SECRET/);

@@ -84,13 +84,19 @@ export function createMarketingAiUsageControlRoutes(
     requireMarketingPermission(MarketingPermissionLevel.Editor),
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { organization_id: organizationId, user_id: userId } =
+          requireAuthenticatedRequestContext(request);
         const body = parseWithZod(createMarketingAiUsageControlBodySchema, request.body);
         response
           .status(201)
           .json(
             createSuccessResponse(
-              await controlService.createForUser(organizationId, body.userId, body.competence),
+              await controlService.createForUser(
+                organizationId,
+                body.userId,
+                body.competence,
+                userId,
+              ),
             ),
           );
       } catch (error: unknown) {
@@ -183,11 +189,14 @@ export function createMarketingAiUsageControlRoutes(
     requireMarketingPermission(MarketingPermissionLevel.Editor),
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { organization_id: organizationId, user_id: userId } =
+          requireAuthenticatedRequestContext(request);
         const { id } = parseWithZod(marketingAiUsageControlIdParamsSchema, request.params);
         const body = parseWithZod(updateMarketingAiUsageControlBodySchema, request.body);
         response.json(
-          createSuccessResponse(await controlService.updateAnswers(organizationId, id, body)),
+          createSuccessResponse(
+            await controlService.updateAnswers(organizationId, id, body, userId),
+          ),
         );
       } catch (error: unknown) {
         logError("Falha ao salvar respostas do controle de IA.", { err: error });

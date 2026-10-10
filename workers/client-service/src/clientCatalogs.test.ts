@@ -204,6 +204,50 @@ describe("client regime selection", () => {
     ]);
   });
 
+  it("audits an Instagram profile change with actor, organization, client and previous value", async () => {
+    const { prisma, service, events } = setup({});
+    prisma.client.findFirst.mockResolvedValueOnce({
+      id: "client-1",
+      regime: null,
+      segment: null,
+      instagram: "@antigo",
+    });
+    await service.updateIntegration("client-1", ORG, { instagram: "@novo" }, editor);
+    expect(events).toEqual([
+      {
+        organizationId: ORG,
+        userId: "user-1",
+        permission: 2,
+        action: "update",
+        referring: "clients",
+        referringId: "client-1",
+        changes: { instagram: { from: "@antigo", to: "@novo" } },
+      },
+    ]);
+  });
+
+  it("leaves no trail for a denied Instagram change", async () => {
+    const { prisma, service, events } = setup({});
+    await expect(
+      service.updateIntegration("client-1", ORG, { instagram: "@novo" }, viewer),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prisma.client.update).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+
+  it("leaves no trail for an Instagram change on a client of another organization", async () => {
+    const { prisma, service, events } = setup({});
+    prisma.client.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      service.updateIntegration("client-1", ORG, { instagram: "@novo" }, editor),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.client.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "client-1", organization_id: ORG } }),
+    );
+    expect(prisma.client.update).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+
   it("rejects a regime outside the organization catalog", async () => {
     const { prisma, service } = setup({ regime: null });
     await expect(

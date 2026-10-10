@@ -79,7 +79,8 @@ export function createMarketingApp({
   const app = express();
   const auth = createIsAuthenticatedMiddleware(env);
   const service = dashboardService ?? (prisma ? new MarketingDashboardService(prisma) : null);
-  const controls = controlService ?? (prisma ? new MarketingAiUsageControlService(prisma) : null);
+  const controls =
+    controlService ?? (prisma ? new MarketingAiUsageControlService(prisma, audit) : null);
   const passwords =
     passwordService ??
     (prisma
