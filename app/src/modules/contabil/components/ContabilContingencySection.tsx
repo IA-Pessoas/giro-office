@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+import { isAxiosError } from "axios";
 import { Calculator, Download } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Input } from "@shared/ui/newLayout/input";
@@ -82,6 +83,12 @@ function ContingencyForm({
       anchor.download = `contingencia-${result.id}.html`;
       anchor.click();
       URL.revokeObjectURL(url);
+    },
+    onError: (error) => {
+      if (isAxiosError(error) && error.response?.status === 409) {
+        review.reset();
+        simulation.reset();
+      }
     },
   });
   const busy = simulation.isPending || review.isPending || download.isPending;
