@@ -8,7 +8,8 @@ export type RegularizeTabId =
   | "sites"
   | "taxes"
   | "groups"
-  | "bidders";
+  | "bidders"
+  | "catalogs";
 
 export interface RegularizeQueryPolicy {
   dashboard: boolean;

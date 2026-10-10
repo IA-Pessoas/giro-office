@@ -1,14 +1,18 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useMemo, useState } from "react";
 
 import { clientService } from "../services/clientService";
 import type { ClientGroup } from "../types";
-import { useClients } from "../hooks/useClients";
+import { CLIENT_GROUPS_QUERY_KEY, useClientGroups, useClients } from "../hooks/useClients";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
-import { clientTextFieldClassName } from "../form/clientFormControls";
+import {
+  clientPrimaryButtonClassName,
+  clientSecondaryButtonClassName,
+  clientTextFieldClassName,
+} from "../form/clientFormControls";
+import { ClientListState, clientListClassName } from "./ClientListState";
 
-const secondaryButtonClassName =
-  "rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
+const secondaryButtonClassName = `${clientSecondaryButtonClassName} px-4 py-2.5 text-sm`;
 
 interface ClientGroupsPanelProps {
   canEdit: boolean;
@@ -16,7 +20,7 @@ interface ClientGroupsPanelProps {
 
 export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
   const queryClient = useQueryClient();
-  const groupsQuery = useQuery({ queryKey: ["client-groups"], queryFn: clientService.listGroups });
+  const groupsQuery = useClientGroups();
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const allGroups = groupsQuery.data ?? [];
   const groups = allGroups.filter(
@@ -55,7 +59,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
       const group = await clientService.createGroup(newGroupName.trim());
       selectGroup(group);
       setNewGroupName("");
-      await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
+      await queryClient.invalidateQueries({ queryKey: CLIENT_GROUPS_QUERY_KEY });
     } catch {
       setError("Não foi possível criar o grupo. Confira o nome e tente novamente.");
     } finally {
@@ -69,7 +73,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
     setError("");
     try {
       await clientService.updateGroup(selectedGroup.id, { name: groupName.trim() });
-      await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
+      await queryClient.invalidateQueries({ queryKey: CLIENT_GROUPS_QUERY_KEY });
     } catch {
       setError("Não foi possível renomear o grupo. Confira o nome e tente novamente.");
     } finally {
@@ -83,7 +87,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
     setError("");
     try {
       await clientService.updateGroup(selectedGroup.id, { status: !selectedGroup.status });
-      await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
+      await queryClient.invalidateQueries({ queryKey: CLIENT_GROUPS_QUERY_KEY });
     } catch {
       setError("Não foi possível alterar o status do grupo. Tente novamente.");
     } finally {
@@ -97,7 +101,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
     setError("");
     try {
       await clientService.replaceGroupClients(selectedGroup.id, selectedClientIds);
-      await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
+      await queryClient.invalidateQueries({ queryKey: CLIENT_GROUPS_QUERY_KEY });
     } catch {
       setError("Não foi possível salvar as empresas do grupo. Atualize a lista e tente novamente.");
     } finally {
@@ -136,7 +140,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
           <button
             type="submit"
             disabled={isSaving || !newGroupName.trim()}
-            className="self-end rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`self-end ${clientPrimaryButtonClassName}`}
           >
             Criar grupo
           </button>
@@ -168,22 +172,14 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
               <option value="inactive">Inativos</option>
             </ClientNativeSelect>
           </div>
-          {groupsQuery.isLoading ? (
-            <p
-              role="status"
-              className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-slate-950/40 dark:text-slate-400"
-            >
-              Carregando grupos…
-            </p>
-          ) : groupsQuery.error ? (
-            <p
-              role="alert"
-              className="rounded-xl bg-rose-50 px-3 py-4 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
-            >
-              Não foi possível carregar os grupos. Tente novamente.
-            </p>
-          ) : groups.length ? (
-            <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+          <ClientListState
+            query={groupsQuery}
+            isEmpty={!groups.length}
+            loading="Carregando grupos…"
+            error="Não foi possível carregar os grupos. Tente novamente."
+            empty="Nenhum grupo cadastrado. Crie um grupo para começar."
+          >
+            <ul className={clientListClassName}>
               {groups.map((group) => (
                 <li key={group.id}>
                   <button
@@ -207,11 +203,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-400">
-              Nenhum grupo cadastrado. Crie um grupo para começar.
-            </p>
-          )}
+          </ClientListState>
         </div>
 
         <div>
@@ -349,7 +341,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                   type="button"
                   onClick={() => void saveClients()}
                   disabled={isSaving}
-                  className="rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={clientPrimaryButtonClassName}
                 >
                   {isSaving ? "Salvando…" : "Substituir clientes do grupo"}
                 </button>

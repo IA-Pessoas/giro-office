@@ -4,13 +4,11 @@ import { formatDateTime } from "@shared/utils/dateFormat";
 
 import { useClientLicitacaoBidders, useClientLicitacaoHistory } from "../hooks/useClients";
 import { licitacaoLabel } from "../utils/regularizeForm";
+import { ClientListState, clientListClassName } from "./ClientListState";
 
 const panelClassName =
   "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6";
-const emptyClassName =
-  "rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-400";
-const errorClassName =
-  "rounded-xl bg-rose-50 px-3 py-4 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200";
+const listClassName = `${clientListClassName} text-sm`;
 
 // Histórico da resposta de licitação na ficha Regularize (#1743).
 export function ClientLicitacaoHistoryPanel({ clientId }: { clientId: string }) {
@@ -21,16 +19,14 @@ export function ClientLicitacaoHistoryPanel({ clientId }: { clientId: string }) 
     <section className={panelClassName}>
       <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Histórico de licitação</h2>
       <div className="mt-4">
-        {historyQuery.isLoading ? (
-          <p role="status" className={emptyClassName}>
-            Carregando histórico…
-          </p>
-        ) : historyQuery.error ? (
-          <p role="alert" className={errorClassName}>
-            Não foi possível carregar o histórico de licitação.
-          </p>
-        ) : rows.length ? (
-          <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 text-sm dark:divide-slate-700 dark:border-slate-700">
+        <ClientListState
+          query={historyQuery}
+          isEmpty={!rows.length}
+          loading="Carregando histórico…"
+          error="Não foi possível carregar o histórico de licitação."
+          empty="Nenhuma alteração de licitação registrada."
+        >
+          <ul className={listClassName}>
             {rows.map((row) => (
               <li key={row.id} className="flex flex-col gap-1 px-3 py-3 sm:flex-row sm:justify-between">
                 <span className="text-slate-800 dark:text-slate-100">
@@ -42,9 +38,7 @@ export function ClientLicitacaoHistoryPanel({ clientId }: { clientId: string }) 
               </li>
             ))}
           </ul>
-        ) : (
-          <p className={emptyClassName}>Nenhuma alteração de licitação registrada.</p>
-        )}
+        </ClientListState>
       </div>
     </section>
   );
@@ -64,16 +58,14 @@ export function ClientLicitacaoBiddersPanel() {
         </p>
       </div>
       <div className="mt-4">
-        {biddersQuery.isLoading ? (
-          <p role="status" className={emptyClassName}>
-            Carregando licitantes…
-          </p>
-        ) : biddersQuery.error ? (
-          <p role="alert" className={errorClassName}>
-            Não foi possível carregar os licitantes.
-          </p>
-        ) : bidders.length ? (
-          <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 text-sm dark:divide-slate-700 dark:border-slate-700">
+        <ClientListState
+          query={biddersQuery}
+          isEmpty={!bidders.length}
+          loading="Carregando licitantes…"
+          error="Não foi possível carregar os licitantes."
+          empty="Nenhum cliente licitante."
+        >
+          <ul className={listClassName}>
             {bidders.map((client) => (
               <li key={client.id} className="flex flex-col gap-1 px-3 py-3 sm:flex-row sm:justify-between">
                 <Link
@@ -88,9 +80,7 @@ export function ClientLicitacaoBiddersPanel() {
               </li>
             ))}
           </ul>
-        ) : (
-          <p className={emptyClassName}>Nenhum cliente licitante.</p>
-        )}
+        </ClientListState>
       </div>
     </section>
   );

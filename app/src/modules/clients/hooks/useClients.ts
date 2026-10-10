@@ -16,6 +16,7 @@ import type {
   ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
+  ClientGroup,
   ClientLicitacaoBidder,
   ClientLicitacaoHistoryItem,
   ClientRegime,
@@ -39,6 +40,11 @@ export const CLIENTS_QUERY_KEY = ["clients"] as const;
 export const CLIENT_REGIMES_QUERY_KEY = ["client-regimes"] as const;
 
 export const CLIENT_SEGMENTS_QUERY_KEY = ["client-segments"] as const;
+export const CLIENT_GROUPS_QUERY_KEY = ["client-groups"] as const;
+
+export function useClientGroups(): UseQueryResult<ClientGroup[], Error> {
+  return useFetch(CLIENT_GROUPS_QUERY_KEY, clientService.listGroups);
+}
 
 export function useClientRegimes(): UseQueryResult<ClientRegime[], Error> {
   return useFetch(CLIENT_REGIMES_QUERY_KEY, clientService.listRegimes, { staleTime: 60_000 });

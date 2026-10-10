@@ -1318,6 +1318,9 @@ runTest("licitação keeps Não informado, Sim and Não distinct and shows histo
   const regularize = readFileSync("src/modules/regularize/components/RegularizePage.tsx", "utf8");
   assert.match(regularize, /\{ id: "bidders", label: "Licitantes"/);
   assert.match(regularize, /activeTab === "bidders" \? <ClientLicitacaoBiddersPanel \/>/);
+  // Quem só tem Regularize também mantém regimes e segmentos usados na ficha.
+  assert.match(regularize, /\{ id: "catalogs", label: "Catálogos"/);
+  assert.match(regularize, /<ClientCatalogPanel kind="segment" canEdit=\{regularizeAccess\.canEdit\} \/>/);
 });
 
 runTest("client groups let users manage names and multiple client memberships", () => {

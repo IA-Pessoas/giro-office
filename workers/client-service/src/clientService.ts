@@ -499,7 +499,7 @@ function assertValidClientDocument(value: unknown, type: unknown): string {
   return normalized;
 }
 
-function isClientDocumentUniqueConstraintError(error: unknown): boolean {
+function isUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
@@ -542,25 +542,26 @@ function changedFields(
   );
 }
 
-function catalogDisplayName(name: string): string {
+function collapseWhitespace(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
 function normalizeCatalogName(name: string): string {
-  return catalogDisplayName(name)
+  return collapseWhitespace(name)
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase("pt-BR");
 }
 
-// Grupos canônicos são da Integração e também são geridos pelo Regularize (#1742).
-// Mesma regra de clientGroupsReadPolicy/EditPolicy em services/gateway/src/security/policies.ts.
-const GROUP_MODULES = ["integracao", "regularize"] as const;
+// Catálogos da ficha (regimes, segmentos) e grupos canônicos são da Integração e também são
+// geridos pelo Regularize, que no legado mantinha tb_regularize.regimes (#1740, #1741, #1742).
+// Mesma regra de clientCatalogsReadPolicy/EditPolicy em services/gateway/src/security/policies.ts.
+const CLIENT_CATALOG_MODULES = ["integracao", "regularize"] as const;
 
-function requireGroupPermission(auth: ClientAuthorization, minimum: number): void {
+function requireClientCatalogPermission(auth: ClientAuthorization, minimum: number): void {
   if (auth.isOwner) return;
-  if (!GROUP_MODULES.some((module) => (auth.modules?.[module] ?? 0) >= minimum)) {
-    throw new ServiceError(403, "Usuário não possui permissão para grupos de empresas.");
+  if (!CLIENT_CATALOG_MODULES.some((module) => (auth.modules?.[module] ?? 0) >= minimum)) {
+    throw new ServiceError(403, "Usuário não possui permissão para os catálogos de clientes.");
   }
 }
 
@@ -646,7 +647,7 @@ export class ClientService implements ClientWorkerService {
     current: unknown,
   ): Promise<string | null | undefined> {
     if (value === undefined) return undefined;
-    const name = typeof value === "string" ? catalogDisplayName(value) : "";
+    const name = typeof value === "string" ? collapseWhitespace(value) : "";
     if (!name) return null;
     const normalized = normalizeCatalogName(name);
     // Mesmo valor gravado (até em caixa ou espaços diferentes) volta como está.
@@ -681,22 +682,33 @@ export class ClientService implements ClientWorkerService {
     return changes;
   }
 
-  private async auditClientChanges(
-    clientId: string,
+  private async emitAudit(
+    referring: ClientAuditEvent["referring"],
+    action: ClientAuditEvent["action"],
+    referringId: string,
     organizationId: string,
     authorization: Pick<ClientAuthorization, "userId" | "permission">,
-    changes: Record<string, { from: unknown; to: unknown }>,
+    changes: ClientAuditEvent["changes"],
   ): Promise<void> {
     if (Object.keys(changes).length === 0) return;
     await this.audit?.({
       organizationId,
       userId: authorization.userId,
       permission: authorization.permission ?? null,
-      action: "update",
-      referring: "clients",
-      referringId: clientId,
+      action,
+      referring,
+      referringId,
       changes,
     });
+  }
+
+  private auditClientChanges(
+    clientId: string,
+    organizationId: string,
+    authorization: Pick<ClientAuthorization, "userId" | "permission">,
+    changes: ClientAuditEvent["changes"],
+  ): Promise<void> {
+    return this.emitAudit("clients", "update", clientId, organizationId, authorization, changes);
   }
 
   private async listCatalog(
@@ -738,7 +750,7 @@ export class ClientService implements ClientWorkerService {
     try {
       return await write();
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error))
+      if (isUniqueConstraintError(error))
         throw new ServiceError(409, `${CATALOGS[kind].label} já cadastrado.`, error);
       throw error;
     }
@@ -750,9 +762,9 @@ export class ClientService implements ClientWorkerService {
     input: CatalogItemInput,
     authorization: ClientAuthorization,
   ): Promise<unknown> {
-    requirePermission(authorization, 2);
+    requireClientCatalogPermission(authorization, 2);
     const { config, delegate } = this.catalog(kind);
-    const name = catalogDisplayName(input.name ?? "");
+    const name = collapseWhitespace(input.name ?? "");
     const normalized = normalizeCatalogName(name);
     await this.assertCatalogNameFree(kind, organizationId, normalized);
     const fields = { name, ...(input.type !== undefined ? { type: input.type } : {}) };
@@ -762,17 +774,14 @@ export class ClientService implements ClientWorkerService {
         select: config.select,
       }),
     );
-    await this.audit?.({
+    await this.emitAudit(
+      config.referring,
+      "create",
+      String(row.id),
       organizationId,
-      userId: authorization.userId,
-      permission: authorization.permission ?? null,
-      action: "create",
-      referring: config.referring,
-      referringId: String(row.id),
-      changes: Object.fromEntries(
-        Object.entries(fields).map(([key, to]) => [key, { from: null, to }]),
-      ),
-    });
+      authorization,
+      Object.fromEntries(Object.entries(fields).map(([key, to]) => [key, { from: null, to }])),
+    );
     return row;
   }
 
@@ -783,7 +792,7 @@ export class ClientService implements ClientWorkerService {
     input: CatalogItemInput,
     authorization: ClientAuthorization,
   ): Promise<unknown> {
-    requirePermission(authorization, 2);
+    requireClientCatalogPermission(authorization, 2);
     const { config, delegate } = this.catalog(kind);
     const existing = await delegate.findFirst({
       where: { id, organization_id: organizationId },
@@ -792,7 +801,7 @@ export class ClientService implements ClientWorkerService {
     if (!existing) throw new ServiceError(404, `${config.label} não encontrado.`);
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) {
-      data.name = catalogDisplayName(input.name);
+      data.name = collapseWhitespace(input.name);
       data.normalized_name = normalizeCatalogName(input.name);
       await this.assertCatalogNameFree(kind, organizationId, String(data.normalized_name), id);
     }
@@ -801,18 +810,14 @@ export class ClientService implements ClientWorkerService {
     const row = await this.writeCatalogItem(kind, () =>
       delegate.update({ where: { id }, data, select: config.select }),
     );
-    const changes = changedFields(existing, data, ["name", "type"]);
-    if (Object.keys(changes).length > 0) {
-      await this.audit?.({
-        organizationId,
-        userId: authorization.userId,
-        permission: authorization.permission ?? null,
-        action: "update",
-        referring: config.referring,
-        referringId: id,
-        changes,
-      });
-    }
+    await this.emitAudit(
+      config.referring,
+      "update",
+      id,
+      organizationId,
+      authorization,
+      changedFields(existing, data, ["name", "type"]),
+    );
     return row;
   }
 
@@ -858,23 +863,14 @@ export class ClientService implements ClientWorkerService {
     return this.updateCatalogItem("segment", id, organizationId, input, authorization);
   }
 
-  private async auditGroup(
+  private auditGroup(
     organizationId: string,
     authorization: ClientAuthorization,
-    action: "create" | "update",
+    action: ClientAuditEvent["action"],
     groupId: string,
-    changes: Record<string, { from: unknown; to: unknown }>,
+    changes: ClientAuditEvent["changes"],
   ): Promise<void> {
-    if (Object.keys(changes).length === 0) return;
-    await this.audit?.({
-      organizationId,
-      userId: authorization.userId,
-      permission: authorization.permission ?? null,
-      action,
-      referring: "clients.group",
-      referringId: groupId,
-      changes,
-    });
+    return this.emitAudit("clients.group", action, groupId, organizationId, authorization, changes);
   }
 
   private async assertGroupNameFree(
@@ -894,7 +890,7 @@ export class ClientService implements ClientWorkerService {
   }
 
   async listGroups(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
-    requireGroupPermission(authorization, 1);
+    requireClientCatalogPermission(authorization, 1);
     const groups = await this.prisma.group.findMany({
       where: { organization_id: organizationId },
       orderBy: { name: "asc" },
@@ -908,8 +904,8 @@ export class ClientService implements ClientWorkerService {
     name: string,
     authorization: ClientAuthorization,
   ): Promise<unknown> {
-    requireGroupPermission(authorization, 2);
-    const trimmed = catalogDisplayName(name);
+    requireClientCatalogPermission(authorization, 2);
+    const trimmed = collapseWhitespace(name);
     await this.assertGroupNameFree(organizationId, trimmed);
     const group = await this.prisma.group.create({
       data: { name: trimmed, organization_id: organizationId },
@@ -928,7 +924,7 @@ export class ClientService implements ClientWorkerService {
     input: { name?: string; status?: boolean },
     authorization: ClientAuthorization,
   ): Promise<unknown> {
-    requireGroupPermission(authorization, 2);
+    requireClientCatalogPermission(authorization, 2);
     const existing = await this.prisma.group.findFirst({
       where: { id, organization_id: organizationId },
       select: { id: true, name: true, status: true },
@@ -936,7 +932,7 @@ export class ClientService implements ClientWorkerService {
     if (!existing) throw new ServiceError(404, "Grupo não encontrado.");
     const data: { name?: string; status?: boolean } = {};
     if (input.name !== undefined) {
-      data.name = catalogDisplayName(input.name);
+      data.name = collapseWhitespace(input.name);
       await this.assertGroupNameFree(organizationId, data.name, id);
     }
     if (input.status !== undefined) data.status = input.status;
@@ -961,7 +957,7 @@ export class ClientService implements ClientWorkerService {
     clientIds: readonly string[],
     authorization: ClientAuthorization,
   ): Promise<unknown> {
-    requireGroupPermission(authorization, 2);
+    requireClientCatalogPermission(authorization, 2);
     const wanted = [...new Set(clientIds)];
     const result = await this.prisma.$transaction(async (transaction) => {
       const group = await transaction.group.findFirst({
@@ -1104,7 +1100,7 @@ export class ClientService implements ClientWorkerService {
       });
       return toPublic(row, organization);
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
@@ -1142,7 +1138,7 @@ export class ClientService implements ClientWorkerService {
       await this.auditClientChanges(id, organizationId, authorization, changes);
       return toPublic(row, await this.organization(organizationId));
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
@@ -1226,7 +1222,7 @@ export class ClientService implements ClientWorkerService {
         select: { id: true, name: true, cpf_cnpj: true },
       });
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
@@ -1293,7 +1289,7 @@ export class ClientService implements ClientWorkerService {
       }
       return row;
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
@@ -1590,12 +1586,20 @@ export class ClientService implements ClientWorkerService {
     if (data.cpf_responsible !== undefined)
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
     // Não informado (null), Sim e Não são valores distintos; toda troca entra no histórico.
-    const previousLicitacao = existing.licitacao ?? null;
     const nextLicitacao = data.licitacao === undefined ? undefined : (data.licitacao ?? null);
-    const licitacaoChanged = nextLicitacao !== undefined && nextLicitacao !== previousLicitacao;
-    if (licitacaoChanged) changes.licitacao = { from: previousLicitacao, to: nextLicitacao };
     try {
       const row = await this.db.$transaction(async (transaction) => {
+        // Anterior lido na mesma transação do update, não no carregamento da ficha.
+        const current =
+          nextLicitacao === undefined
+            ? undefined
+            : await transaction.client.findFirst({
+                where: { id: clientId, organization_id: organizationId },
+                select: { licitacao: true },
+              });
+        const previousLicitacao = current?.licitacao ?? null;
+        const licitacaoChanged = nextLicitacao !== undefined && nextLicitacao !== previousLicitacao;
+        if (licitacaoChanged) changes.licitacao = { from: previousLicitacao, to: nextLicitacao };
         const updated = await transaction.client.update({
           where: { id: clientId },
           data,
@@ -1617,7 +1621,7 @@ export class ClientService implements ClientWorkerService {
       await this.auditClientChanges(clientId, organizationId, { userId }, changes);
       return row;
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
