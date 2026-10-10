@@ -206,7 +206,7 @@ async function runBrowserProof() {
       "https://drive.example.test/cliente",
     );
     await page.getByRole("button", { name: "Editar Google Drive" }).click();
-    await page.getByLabel("Link da nuvem Google Drive").fill("https://drive.example.test/novo");
+    await page.getByLabel("Link da nuvem em edição").fill("https://drive.example.test/novo");
     await page.getByRole("button", { name: "Salvar", exact: true }).click();
     await expect(page.getByRole("link", { name: "Google Drive" })).toHaveAttribute(
       "href",
