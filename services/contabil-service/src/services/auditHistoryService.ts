@@ -1,9 +1,6 @@
 // Histórico de campos lido da auditoria (`audit_requests`), que guarda cada alteração com
 // valor anterior e novo e não tem prazo de retenção. Usado pelo serviço Node e pelo Worker.
 
-export const AUDIT_CREATE_ACTION = "Cadastro";
-export const AUDIT_UPDATE_ACTION = "Atualização";
-
 type AuditRow = {
   id: string;
   user_id: string | null;
@@ -41,8 +38,8 @@ function fieldChanges<F extends string>(changes: unknown, fields: readonly F[]) 
         from: record[field]?.from ?? null,
         to: record[field]?.to ?? null,
       }))
-      // No cadastro, campo ainda vazio chega como `undefined → null`: não é alteração.
-      .filter((change) => change.from !== change.to)
+      // Vazio é vazio: `undefined`, `null` e "" não contam como alteração entre si.
+      .filter((change) => (change.from ?? "") !== (change.to ?? ""))
   );
 }
 
@@ -80,12 +77,16 @@ export async function listAuditFieldHistory<F extends string>(
 
   return {
     total,
-    items: rows.map((row) => ({
-      id: row.id,
-      at: new Date(row.created_at).toISOString(),
-      actor: row.user_id ? { id: row.user_id, name: names.get(row.user_id) ?? null } : null,
-      action: row.action,
-      changes: fieldChanges(row.changes_json, query.fields),
-    })),
+    // ponytail: evento sem campo acompanhado (ex.: só client_id) sai da página mas conta no
+    // total; filtrar no SQL exige filtro por chave JSON, que vale se isso aparecer em volume.
+    items: rows
+      .map((row) => ({
+        id: row.id,
+        at: new Date(row.created_at).toISOString(),
+        actor: row.user_id ? { id: row.user_id, name: names.get(row.user_id) ?? null } : null,
+        action: row.action,
+        changes: fieldChanges(row.changes_json, query.fields),
+      }))
+      .filter((item) => item.changes.length > 0),
   };
 }

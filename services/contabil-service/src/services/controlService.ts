@@ -9,6 +9,7 @@ import {
 import prismaClient from "../integrations/prisma.js";
 import {
   CONTROL_AUDIT_ACTIONS,
+  CONTROL_AUDIT_REFERRING,
   CONTROL_HISTORY_FIELDS,
   type ControlHistoryInput,
   type ControlHistoryPrisma,
@@ -251,7 +252,7 @@ export class ControlService {
         organizationId: data.organizationId,
         permission: data.permission ?? null,
         action: "Cadastro",
-        referring: "contabil.control",
+        referring: CONTROL_AUDIT_REFERRING,
         referringId: control.id,
         changes: "{}",
       });
@@ -386,7 +387,7 @@ export class ControlService {
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
         action: CONTROL_AUDIT_ACTIONS.updateField,
-        referring: "contabil.control",
+        referring: CONTROL_AUDIT_REFERRING,
         referringId: id,
         oldData: exists as unknown as Record<string, unknown>,
         updatedData: updated as unknown as Record<string, unknown>,
@@ -421,7 +422,7 @@ export class ControlService {
       organizationId: auth.organizationId,
       permission: auth.permission ?? null,
       action: CONTROL_AUDIT_ACTIONS.completeAll,
-      referring: "contabil.control",
+      referring: CONTROL_AUDIT_REFERRING,
       referringId: id,
       oldData: current as unknown as Record<string, unknown>,
       updatedData: updated as unknown as Record<string, unknown>,
@@ -476,7 +477,7 @@ export class ControlService {
       organizationId: data.organizationId,
       permission: data.permission ?? null,
       action: "Arquivar competência contábil",
-      referring: "contabil.control",
+      referring: CONTROL_AUDIT_REFERRING,
       referringId: current.id,
       oldData: current as unknown as Record<string, unknown>,
       updatedData: { ...result, archived_at: archivedAt.toISOString() },
@@ -526,7 +527,7 @@ export class ControlService {
       organizationId: data.organizationId,
       permission: data.permission ?? null,
       action: "Restaurar competência contábil",
-      referring: "contabil.control",
+      referring: CONTROL_AUDIT_REFERRING,
       referringId: data.clientId,
       changes: JSON.stringify({ competence: data.competence, ...result }),
     });

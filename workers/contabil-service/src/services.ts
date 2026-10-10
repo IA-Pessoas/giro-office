@@ -9,8 +9,11 @@ import {
 import {
   AUDIT_CREATE_ACTION,
   AUDIT_UPDATE_ACTION,
-} from "../../../services/contabil-service/src/services/auditHistoryService.js";
-import { CONTROL_AUDIT_ACTIONS } from "../../../services/contabil-service/src/services/controlHistoryService.js";
+} from "../../../services/contabil-service/src/services/auditActions.js";
+import {
+  CONTROL_AUDIT_ACTIONS,
+  CONTROL_AUDIT_REFERRING,
+} from "../../../services/contabil-service/src/services/controlHistoryService.js";
 import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
@@ -346,7 +349,13 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         const control = await prisma.controlContabil.create({
           data: { ...identity, ...DEFAULT_CONTROL_DATA },
         });
-        await auditCreate(audit, auth, "contabil.control", String(control.id), "Cadastro");
+        await auditCreate(
+          audit,
+          auth,
+          CONTROL_AUDIT_REFERRING,
+          String(control.id),
+          AUDIT_CREATE_ACTION,
+        );
         return { control, created: true };
       } catch (error) {
         if (isUniqueViolation(error))
@@ -435,7 +444,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
           organizationId: auth.organizationId,
           permission: auth.permission ?? null,
           action: CONTROL_AUDIT_ACTIONS.updateField,
-          referring: "contabil.control",
+          referring: CONTROL_AUDIT_REFERRING,
           referringId: id,
           oldData: current,
           updatedData: updated,
@@ -461,7 +470,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
         action: CONTROL_AUDIT_ACTIONS.completeAll,
-        referring: "contabil.control",
+        referring: CONTROL_AUDIT_REFERRING,
         referringId: id,
         oldData: current,
         updatedData: updated,
@@ -511,7 +520,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
         action: "Arquivar competência contábil",
-        referring: "contabil.control",
+        referring: CONTROL_AUDIT_REFERRING,
         referringId: String(current.id),
         oldData: current,
         updatedData: { ...counts, archived_at: archivedAt.toISOString() },
@@ -557,7 +566,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
       await auditCreate(
         audit,
         auth,
-        "contabil.control",
+        CONTROL_AUDIT_REFERRING,
         String(input.clientId),
         "Restaurar competência contábil",
       );

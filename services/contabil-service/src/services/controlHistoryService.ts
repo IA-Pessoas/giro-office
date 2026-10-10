@@ -1,6 +1,6 @@
 // Histórico do Controle Contábil (#1722).
+import { AUDIT_UPDATE_ACTION } from "./auditActions.js";
 import {
-  AUDIT_UPDATE_ACTION,
   type AuditHistoryPage,
   type AuditHistoryPrisma,
   listAuditFieldHistory,
