@@ -86,7 +86,7 @@ export function lddImportDraftTotal(rows: LddImportDraftRow[]): number {
   return cents / 100;
 }
 
-const toCents = (value: number) => Math.round(value * 100);
+export const toCents = (value: number) => Math.round(value * 100);
 
 /** Linhas sem erro, no formato da confirmação. */
 export function buildLddImportRows(rows: LddImportDraftRow[]): PessoalLddImportRow[] {

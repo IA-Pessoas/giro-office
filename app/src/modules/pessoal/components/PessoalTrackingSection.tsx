@@ -533,7 +533,7 @@ export function PessoalTrackingSection({
                 <>
                   <PessoalLddSheet
                     client={selectedClient}
-                    ldd={lddQuery.isSuccess ? lddRows : null}
+                    ldd={lddQuery.isSuccess && !lddQuery.isFetching ? lddRows : null}
                   />
                   {canEdit ? (
                     <button
@@ -737,9 +737,14 @@ export function PessoalTrackingSection({
               <div className="grid gap-3 sm:grid-cols-2">
                 {lddFields.map((field) => {
                   const fieldValue = lddFormValues[field.name];
-                  const fieldOptions = "options" in field ? field.options : null;
+                  // PGFN (dívida ativa) guarda inscrição e situação em texto livre, como no legado.
+                  const isPgfnDetail =
+                    lddFormValues.type === "PGFN" &&
+                    (field.name === "registration_status" || field.name === "status");
+                  const label = isPgfnDetail ? (field.name === "registration_status" ? "Inscrição" : "Situação") : field.label;
+                  const fieldOptions = !isPgfnDetail && "options" in field ? field.options : null;
                   const isMoney = "money" in field && field.money;
-                  const helpText = "help" in field ? field.help : undefined;
+                  const helpText = !isPgfnDetail && "help" in field ? field.help : undefined;
                   const customOption =
                     fieldOptions &&
                     fieldValue &&
@@ -753,8 +758,8 @@ export function PessoalTrackingSection({
                       className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
                     >
                       <span className="inline-flex items-center gap-1">
-                        <span>{field.label}</span>
-                        {helpText ? <FieldHelp label={field.label} description={helpText} /> : null}
+                        <span>{label}</span>
+                        {helpText ? <FieldHelp label={label} description={helpText} /> : null}
                       </span>
                       {fieldOptions ? (
                         <div className="relative">

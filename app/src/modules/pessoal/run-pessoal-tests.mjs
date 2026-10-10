@@ -1074,17 +1074,14 @@ runTest("LDD sheet separates previdenciário and PGFN with subtotals and total",
     ["4", "5"],
   );
   assert.equal(sheet.pgfn.subtotal, 75.5);
-  assert.deepEqual(
-    sheet.other.rows.map((row) => row.id),
-    ["6"],
-  );
-  assert.equal(sheet.other.subtotal, 10);
-  assert.equal(sheet.total, 85.8);
+  // FGTS, IRRF e ISS não entram na ficha nem no total, como na ficha antiga.
+  assert.equal(sheet.excluded, 1);
+  assert.equal(sheet.total, 75.8);
 
   const empty = buildLddSheet([]);
   assert.deepEqual(
-    [empty.previdenciario.rows, empty.pgfn.rows, empty.other.rows, empty.total],
-    [[], [], [], 0],
+    [empty.previdenciario.rows, empty.pgfn.rows, empty.excluded, empty.total],
+    [[], [], 0, 0],
   );
 });
 
@@ -1101,6 +1098,8 @@ runTest("LDD sheet prints without a competence filter and the manual form offers
   assert.doesNotMatch(sheet, /Competência/);
   assert.match(tracking, /lddTypeOptions = \["INSS", "PGFN", "FGTS", "IRRF", "ISS"\]/);
   assert.match(styles, /\.print-report \*/);
+  // PGFN manual: inscrição e situação são texto livre, como na ficha.
+  assert.match(tracking, /isPgfnDetail \? \(field\.name === "registration_status" \? "Inscrição" : "Situação"\)/);
 });
 
 console.log("pessoal contract tests passed");

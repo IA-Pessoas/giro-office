@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Printer } from "lucide-react";
 
 import { Dialog } from "@shared/components";
-import { formatCivilDate } from "@shared/utils/dateFormat";
+import { formatCivilDate, formatDateTime } from "@shared/utils/dateFormat";
 import { formatBrlAmount, formatCpfCnpjInput } from "@shared/utils/inputFormatting";
 import { printReport } from "@shared/utils/printReport";
 
@@ -38,13 +38,6 @@ const pgfnColumns: SheetColumn[] = [
   { label: "Situação", value: (row) => row.status || "-" },
   balanceColumn,
 ];
-const otherColumns: SheetColumn[] = [
-  { label: "Tipo", value: (row) => row.type },
-  periodColumn,
-  dueDateColumn,
-  balanceColumn,
-];
-
 function SheetSection({
   columns,
   emptyMessage,
@@ -62,7 +55,7 @@ function SheetSection({
       {section.rows.length === 0 ? (
         <p className="text-sm text-gray-600 dark:text-slate-300">{emptyMessage}</p>
       ) : (
-        <table className="w-full text-left text-sm">
+        <table aria-label={title} className="w-full text-left text-sm">
           <thead className="border-b border-gray-300 dark:border-slate-600">
             <tr>
               {columns.map((column, index) => (
@@ -125,10 +118,11 @@ export function PessoalLddSheet({
       <button
         type="button"
         onClick={() => {
-          setIssuedAt(new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }));
+          setIssuedAt(formatDateTime(new Date()));
           setOpen(true);
         }}
         disabled={!ldd}
+        title={ldd ? undefined : "Aguardando a lista de LDD do cliente."}
         className={pessoalSecondaryButtonClassName}
       >
         <Printer className="h-4 w-4" />
@@ -190,15 +184,6 @@ export function PessoalLddSheet({
             section={sheet.pgfn}
             title="Discriminação dos débitos do INSS - Dívida ativa (PGFN)"
           />
-          {sheet.other.rows.length > 0 ? (
-            <SheetSection
-              columns={otherColumns}
-              emptyMessage=""
-              section={sheet.other}
-              title="Outros débitos acompanhados"
-            />
-          ) : null}
-
           <p className="flex justify-between border-t border-gray-300 pt-3 text-base font-semibold dark:border-slate-600">
             <span>Total geral</span>
             <span>{formatBrlAmount(sheet.total)}</span>
@@ -206,6 +191,11 @@ export function PessoalLddSheet({
           <p className="text-xs">
             Os valores poderão sofrer alterações devido à incidência de juros e multas diárias.
           </p>
+          {sheet.excluded > 0 ? (
+            <p className="hide-on-print text-xs text-gray-600 dark:text-slate-300">
+              {sheet.excluded} LDD de outros tipos (FGTS, IRRF, ISS) não entram nesta ficha.
+            </p>
+          ) : null}
         </article>
       </Dialog>
     </>
