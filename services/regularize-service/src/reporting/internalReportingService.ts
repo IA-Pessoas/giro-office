@@ -363,11 +363,50 @@ const PORTFOLIO_DEPARTMENT_FLAGS = new Set([
 
 const PORTFOLIO_DERIVED_FIELDS = new Set([
   "segment_type",
+  "dte_eligible",
+  "dte_missing_data",
   "has_passwords",
   "has_partners",
   "group_name",
   "group_active",
 ]);
+
+// Filtro DTE do legado (regularize/pages/relatorios/estados.php): cliente ativo ou em
+// inativação, segmento de comércio ou indústria e inscrição estadual diferente de ISENTO.
+const DTE_COLUMNS = ["status", "segment", "state", "state_registration"];
+const DTE_SEGMENT_TYPES: readonly unknown[] = ["comercio", "industria"];
+const DTE_STATUSES: readonly unknown[] = [
+  REGULARIZE_PORTFOLIO_LEGACY_STATUS.A,
+  REGULARIZE_PORTFOLIO_LEGACY_STATUS.P,
+];
+
+function blank(value: unknown): boolean {
+  return String(value ?? "").trim() === "";
+}
+
+function dteEligibility(
+  client: Record<string, unknown>,
+  segmentType: unknown,
+): { dte_eligible: boolean; dte_missing_data: string | null } {
+  const exempt =
+    String(client.state_registration ?? "")
+      .trim()
+      .toUpperCase() === "ISENTO";
+  // Sem inscrição o PHP listava o cliente (vazio é diferente de ISENTO); sem segmento não
+  // dá para dizer o tipo e o cliente fica fora. Os dois casos saem sinalizados.
+  const missing = [
+    blank(client.segment) ? "Segmento" : null,
+    blank(client.state_registration) ? "Inscrição estadual" : null,
+    blank(client.state) ? "UF" : null,
+  ].filter((item) => item !== null);
+  return {
+    dte_eligible:
+      DTE_STATUSES.includes(portfolioStatus(client.status)) &&
+      DTE_SEGMENT_TYPES.includes(segmentType) &&
+      !exempt,
+    dte_missing_data: missing.join("; ") || null,
+  };
+}
 
 const PF_DERIVED_FIELDS = new Set(["birth_month", "has_company", "has_active_company"]);
 
@@ -466,7 +505,9 @@ export class RegularizePortfolioReportingService {
       return this.loadPartnerPage(organizationId, fields, limit, cursor);
     }
     const columns = new Set(fields.filter((field) => !PORTFOLIO_DERIVED_FIELDS.has(field)));
+    const dte = fields.includes("dte_eligible") || fields.includes("dte_missing_data");
     if (fields.includes("segment_type")) columns.add("segment");
+    if (dte) for (const column of DTE_COLUMNS) columns.add(column);
     const select = Object.fromEntries(["id", ...columns].map((field) => [field, true]));
     const paging = portfolioPaging(limit, cursor);
     const grouped = source === REGULARIZE_CLIENT_GROUPS_REPORTING_SOURCE;
@@ -492,7 +533,8 @@ export class RegularizePortfolioReportingService {
     const page = found.slice(0, limit);
     const clients = page.map((row) => (grouped ? row.client : row) as Record<string, unknown>);
 
-    const segmentTypes = fields.includes("segment_type") ? await loadSegmentTypes() : undefined;
+    const segmentTypes =
+      dte || fields.includes("segment_type") ? await loadSegmentTypes() : undefined;
     const withPasswords = fields.includes("has_passwords")
       ? new Set(
           (
@@ -528,13 +570,19 @@ export class RegularizePortfolioReportingService {
     const rows = page.map((row, index) => {
       const client = clients[index] ?? {};
       const group = (row.group ?? {}) as { name?: unknown; status?: unknown };
+      const segmentType =
+        segmentTypes?.get(
+          String(client.segment ?? "")
+            .trim()
+            .toLocaleLowerCase("pt-BR"),
+        ) ?? null;
       const derived: Record<string, unknown> = {
         group_name: group.name,
         group_active: group.status,
         has_passwords: withPasswords?.has(client.id),
         has_partners: withPartners?.has(client.id),
-        segment_type:
-          segmentTypes?.get(String(client.segment ?? "").toLocaleLowerCase("pt-BR")) ?? null,
+        segment_type: segmentType,
+        ...(dte ? dteEligibility(client, segmentType) : {}),
         status: portfolioStatus(client.status),
       };
       return Object.fromEntries(
