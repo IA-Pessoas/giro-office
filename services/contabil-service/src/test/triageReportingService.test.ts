@@ -1,0 +1,240 @@
+import "./envBootstrap.js";
+
+import { describe, expect, it, vi } from "vitest";
+
+import { InternalReportingService } from "../services/internalReportingService.js";
+import { extractTriageReportingPage } from "../services/triageReportingService.js";
+
+const ORG = "00000000-0000-4000-8000-000000000001";
+const CLIENT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const CLIENT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+const clientRows = [
+  {
+    id: CLIENT_A,
+    name: "Alfa",
+    company_name: "Alfa Comércio Ltda",
+    cpf_cnpj: "11222333000181",
+    status: "Ativo",
+    competence_entry: new Date("2024-03-01T00:00:00.000Z"),
+    contabil: true,
+    fiscal: null,
+  },
+  {
+    id: CLIENT_B,
+    name: "Beta",
+    company_name: null,
+    cpf_cnpj: "52998224725",
+    status: "Inativo",
+    competence_entry: null,
+    contabil: false,
+    fiscal: true,
+  },
+];
+
+function delegates(monthly: readonly Record<string, unknown>[] = []) {
+  return {
+    clients: { findMany: vi.fn().mockResolvedValue(clientRows) },
+    clouds: {
+      findMany: vi.fn().mockResolvedValue([
+        { client_id: CLIENT_A, type: "Drive", link: "https://drive.test/a" },
+        { client_id: CLIENT_A, type: "OneDrive", link: "https://one.test/a" },
+      ]),
+    },
+    monthly: { findMany: vi.fn().mockResolvedValue(monthly) },
+    responsibles: {
+      findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT_A, customer_with_movement: true }]),
+    },
+  };
+}
+
+describe("extractTriageReportingPage", () => {
+  it("lista cada cliente da organização com Clouds, serviços e movimento, mesmo sem Cloud", async () => {
+    const prisma = delegates();
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.triage_clouds",
+        organizationId: ORG,
+        fields: [
+          "company_name",
+          "name",
+          "cpf_cnpj",
+          "status",
+          "competence_entry",
+          "contabil",
+          "fiscal",
+          "cloud_types",
+          "clouds",
+          "customer_with_movement",
+        ],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          company_name: "Alfa Comércio Ltda",
+          name: "Alfa",
+          cpf_cnpj: "11222333000181",
+          status: "Ativo",
+          competence_entry: new Date("2024-03-01T00:00:00.000Z"),
+          contabil: true,
+          fiscal: false,
+          cloud_types: "Drive, OneDrive",
+          clouds: "Drive: https://drive.test/a; OneDrive: https://one.test/a",
+          customer_with_movement: true,
+        },
+        {
+          company_name: null,
+          name: "Beta",
+          cpf_cnpj: "52998224725",
+          status: "Inativo",
+          competence_entry: null,
+          contabil: false,
+          fiscal: true,
+          cloud_types: "",
+          clouds: "",
+          customer_with_movement: false,
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(prisma.clients.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, deletion_date: null },
+        orderBy: { id: "asc" },
+        skip: 0,
+        take: 11,
+      }),
+    );
+    const related = { organization_id: ORG, client_id: { in: [CLIENT_A, CLIENT_B] } };
+    expect(prisma.clouds.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: related }),
+    );
+    expect(prisma.responsibles.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: related }),
+    );
+    expect(prisma.monthly.findMany).not.toHaveBeenCalled();
+  });
+
+  it("lista o movimento Contábil por competência sem rotinas arquivadas nem fiscais", async () => {
+    const prisma = delegates([
+      { id: "1", client_id: CLIENT_A, competence: "2026-09", triad_moviment: true },
+      { id: "2", client_id: CLIENT_B, competence: "2026-09", triad_moviment: false },
+      { id: "3", client_id: CLIENT_A, competence: "2026-10", triad_moviment: false },
+    ]);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.triage_movement",
+        organizationId: ORG,
+        fields: ["competence", "sends_movement"],
+        limit: 2,
+        offset: 4,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        { competence: "2026-09", sends_movement: true },
+        { competence: "2026-09", sends_movement: false },
+      ],
+      reachedLimit: true,
+    });
+    expect(prisma.monthly.findMany).toHaveBeenCalledWith({
+      where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      select: { id: true, client_id: true, competence: true, triad_moviment: true },
+      orderBy: { id: "asc" },
+      skip: 4,
+      take: 3,
+    });
+    // Sem campo de cliente pedido, não consulta clientes, Clouds nem responsáveis.
+    expect(prisma.clients.findMany).not.toHaveBeenCalled();
+    expect(prisma.clouds.findMany).not.toHaveBeenCalled();
+    expect(prisma.responsibles.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("InternalReportingService com as áreas da Triagem", () => {
+  function database() {
+    const prisma = {
+      controlContabil: { findMany: vi.fn() },
+      relationshipContabil: { findMany: vi.fn() },
+      responsibleContabil: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ client_id: CLIENT_A, customer_with_movement: true }]),
+      },
+      client: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take?: number }) =>
+            clientRows.slice(skip, take === undefined ? undefined : skip + take),
+          ),
+      },
+      clientClouds: { findMany: vi.fn().mockResolvedValue([]) },
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            [
+              { id: "1", client_id: CLIENT_A, competence: "2026-09", triad_moviment: true },
+              { id: "2", client_id: CLIENT_B, competence: "2026-09", triad_moviment: true },
+              { id: "3", client_id: CLIENT_A, competence: "2026-10", triad_moviment: false },
+            ].slice(skip, skip + take),
+          ),
+      },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(prisma),
+    );
+    return prisma;
+  }
+
+  it("aplica os filtros de competência, serviço e cliente ao movimento enviado", async () => {
+    const result = await new InternalReportingService(database() as never).extract({
+      organizationId: ORG,
+      source: "contabil.triage_movement",
+      fields: ["company_name", "competence"],
+      limit: 50,
+      query: {
+        filters: [
+          { field: "competence", operator: "eq", parameter: "competencia", value: "2026-09" },
+          { field: "contabil", operator: "eq", parameter: "servico", value: true },
+          { field: "sends_movement", operator: "eq", parameter: "envia", value: true },
+        ],
+      },
+    });
+
+    expect(result.rows).toEqual([{ company_name: "Alfa Comércio Ltda", competence: "2026-09" }]);
+  });
+
+  it("lista clientes do Contábil sem movimento, como o relatório legado", async () => {
+    const result = await new InternalReportingService(database() as never).extract({
+      organizationId: ORG,
+      source: "contabil.triage_clouds",
+      fields: ["name"],
+      limit: 50,
+      query: {
+        filters: [
+          { field: "customer_with_movement", operator: "eq", parameter: "movimento", value: false },
+        ],
+      },
+    });
+
+    expect(result.rows).toEqual([{ name: "Beta" }]);
+  });
+
+  it("recusa campo fora do catálogo das áreas da Triagem", async () => {
+    const prisma = { client: { findMany: vi.fn() } };
+
+    await expect(
+      new InternalReportingService(prisma as never).extract({
+        organizationId: ORG,
+        source: "contabil.triage_clouds",
+        fields: ["organization_id"],
+        limit: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prisma.client.findMany).not.toHaveBeenCalled();
+  });
+});

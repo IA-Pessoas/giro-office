@@ -55,15 +55,19 @@ async function signJwt(claims: Record<string, unknown>): Promise<string> {
 async function signedReportingHeaders(
   body: Record<string, unknown>,
   operation: "extract" = "extract",
+  granted: { source: string; fields: readonly string[] } = {
+    source: "contabil.control",
+    fields: ["competence"],
+  },
 ): Promise<HeadersInit> {
   const requestId = "report-request";
   const grant = {
     version: 1,
     audience: "contabil-service",
     operation,
-    source: operation === "catalog" ? "contabil.catalog" : "contabil.control",
+    source: operation === "catalog" ? "contabil.catalog" : granted.source,
     organization_id: ORG,
-    fields: operation === "catalog" ? [] : ["competence"],
+    fields: operation === "catalog" ? [] : granted.fields,
     request_id: requestId,
     issued_at: Math.floor(Date.now() / 1000) - 1,
     expires_at: Math.floor(Date.now() / 1000) + 30,
@@ -764,6 +768,67 @@ describe("contabil Worker remainder routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { rows: [], reachedLimit: false },
     });
+  });
+
+  it("extrai o movimento Contábil da Triagem filtrado por competência e envio", async () => {
+    const monthly = [
+      { id: "1", client_id: CLIENT, competence: "2026-09", triad_moviment: true },
+      { id: "2", client_id: CLIENT, competence: "2026-10", triad_moviment: true },
+      { id: "3", client_id: "other-client", competence: "2026-09", triad_moviment: false },
+    ];
+    const prisma = {
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            monthly.slice(skip, skip + take),
+          ),
+      },
+      clientCloud: { findMany: vi.fn() },
+      client: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ id: CLIENT, name: "Alfa", company_name: "Alfa Ltda" }]),
+      },
+      responsibleContabil: { findMany: vi.fn() },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.triage_movement",
+      fields: ["company_name", "competence"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "competence", operator: "eq", parameter: "competencia", value: "2026-09" },
+          { field: "sends_movement", operator: "eq", parameter: "envia", value: true },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: ["company_name", "competence", "sends_movement"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { rows: [{ company_name: "Alfa Ltda", competence: "2026-09" }], reachedLimit: false },
+    });
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
   });
 
   it("usa a permissão efetiva do módulo contábil como o gateway Node encaminha", async () => {

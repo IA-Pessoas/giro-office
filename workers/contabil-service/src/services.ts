@@ -21,6 +21,10 @@ import {
 import type { NoahServicePrisma } from "../../../services/contabil-service/src/services/noahService.js";
 import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
+import {
+  extractTriageReportingPage,
+  isTriageReportingSource,
+} from "../../../services/contabil-service/src/services/triageReportingService.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
   type TriageDocumentStatus,
@@ -2028,6 +2032,9 @@ export function createReportingService(
       controlContabil: ReportingDelegate;
       responsibleContabil: ReportingDelegate;
       relationshipContabil: ReportingDelegate;
+      client: ReportingDelegate;
+      clientCloud: ReportingDelegate;
+      triageMonthly: ReportingDelegate;
     };
     source: string;
     organizationId: string;
@@ -2038,6 +2045,17 @@ export function createReportingService(
     const allowed = getContabilReportingFields(input.source as never);
     if (input.fields.some((field) => !allowed.includes(field)))
       throw new ServiceError(403, "Campo não publicado para relatórios.");
+    if (isTriageReportingSource(input.source)) {
+      return extractTriageReportingPage(
+        {
+          clients: input.prisma.client,
+          clouds: input.prisma.clientCloud,
+          monthly: input.prisma.triageMonthly,
+          responsibles: input.prisma.responsibleContabil,
+        },
+        { ...input, source: input.source },
+      );
+    }
     const delegate =
       input.source === "contabil.control"
         ? input.prisma.controlContabil
