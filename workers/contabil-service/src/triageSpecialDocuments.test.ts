@@ -54,6 +54,7 @@ describe("documentos fiscais especiais (#1693)", () => {
       { field: "inbound_report", required: true, priority: "HIGH" },
       "nfce_documents",
       "model_21_invoice",
+      { field: "billing_amount", required: false },
     ]);
     expect(saved).toMatchObject({
       type: "FISCAL",
@@ -62,7 +63,8 @@ describe("documentos fiscais especiais (#1693)", () => {
     expect(log.logUpdateIfChanged).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "Configurar documentos fiscais especiais",
-        oldData: { active_items: ["sped_fiscal"] },
+        // Faturamento ausente da config antiga contava como aplicável.
+        oldData: { active_items: ["sped_fiscal", "billing_amount"] },
         updatedData: { active_items: ["nfce_documents", "model_21_invoice"] },
       }),
     );
@@ -85,22 +87,27 @@ describe("documentos fiscais especiais (#1693)", () => {
     ]);
   });
 
-  it("faturamento fora da configuração fica não aplicável na competência", async () => {
-    const database = prisma();
-    database.triageMonthly.findFirst.mockResolvedValue(null);
-    database.triageCompetence.findFirst.mockResolvedValue({
-      configuration_snapshot: { configs: [{ type: "FISCAL", active_items: ["sped_fiscal"] }] },
-    });
+  it("faturamento só sai da competência quando desligado de propósito", async () => {
+    const start = async (activeItems: unknown[]) => {
+      const database = prisma();
+      database.triageMonthly.findFirst.mockResolvedValue(null);
+      database.triageCompetence.findFirst.mockResolvedValue({
+        configuration_snapshot: { configs: [{ type: "FISCAL", active_items: activeItems }] },
+      });
+      const result = await createDocumentsService(database as never, audit()).getOrCreateMonthly(
+        { client_id: CLIENT, competence: "2026-09", type: "FISCAL" },
+        auth,
+      );
+      return result.item_notes as Record<string, Record<string, unknown>>;
+    };
 
-    const result = await createDocumentsService(database as never, audit()).getOrCreateMonthly(
-      { client_id: CLIENT, competence: "2026-09", type: "FISCAL" },
-      auth,
-    );
-
-    expect(result.item_notes).toMatchObject({
-      billing_amount: { required: false },
-      sped_fiscal: { required: true },
-    });
+    // Linha criada só por prioridade/meio de envio (#1692) e config migrada do legado.
+    expect((await start([])).billing_amount).not.toHaveProperty("required");
+    expect((await start(["sped_fiscal"])).billing_amount).not.toHaveProperty("required");
+    expect((await start(["sped_fiscal"])).sped_fiscal).toMatchObject({ required: true });
+    expect(
+      (await start(["sped_fiscal", { field: "billing_amount", required: false }])).billing_amount,
+    ).toMatchObject({ required: false });
   });
 
   it("lê os especiais da organização e exige acesso ao Fiscal", async () => {
@@ -116,7 +123,10 @@ describe("documentos fiscais especiais (#1693)", () => {
       where: { client_id: CLIENT, organization_id: ORG, type: "FISCAL" },
       select: { active_items: true },
     });
-    expect(config).toMatchObject({ configured: true, active_items: ["cte_as_issuer"] });
+    expect(config).toMatchObject({
+      configured: true,
+      active_items: ["cte_as_issuer", "billing_amount"],
+    });
     await expect(
       service.getConfig({ client_id: CLIENT, type: "FISCAL" }, { ...auth, modules: {} }),
     ).rejects.toMatchObject({ statusCode: 403 });

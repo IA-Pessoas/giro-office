@@ -823,6 +823,26 @@ function activeFields(value: unknown, fields: readonly string[]): string[] {
   );
 }
 
+/**
+ * Faturamento vale por padrão: só sai da rotina com `{ field: "billing_amount", required: false }`
+ * explícito. A migração do legado não grava o token, e a linha FISCAL criada só para
+ * prioridade/meio de envio (#1692) tem `active_items` vazio.
+ */
+const BILLING_FIELD = "billing_amount";
+
+function billingDisabled(value: unknown): boolean {
+  const configured = initialItems(value);
+  return BILLING_FIELD in configured && jsonObject(configured[BILLING_FIELD]).required === false;
+}
+
+/** Itens configuráveis ativos; na Fiscal, o faturamento conta salvo se desligado de propósito. */
+function activeConfigurable(value: unknown, type: "CONTABIL" | "FISCAL"): string[] {
+  const active = activeFields(value, configurableFields(type));
+  if (type === "CONTABIL" || active.includes(BILLING_FIELD) || billingDisabled(value))
+    return active;
+  return [...active, BILLING_FIELD];
+}
+
 /** Configuráveis por rotina: Contábil escolhe todos os itens; Fiscal, só os especiais. */
 function configurableFields(type: "CONTABIL" | "FISCAL"): readonly string[] {
   return type === "FISCAL" ? TRIAGE_FISCAL_CONFIGURABLE_FIELDS : triageDocumentFields;
@@ -848,7 +868,11 @@ function nextActiveItems(current: unknown, selected: string[], type: "CONTABIL" 
       ? { ...jsonObject(existing), required: true }
       : field;
   });
-  return [...kept, ...chosen];
+  // Faturamento desmarcado precisa ficar explícito: ausente significa "aplica".
+  const billingOff = selected.includes(BILLING_FIELD)
+    ? []
+    : [{ field: BILLING_FIELD, required: false }];
+  return [...kept, ...chosen, ...billingOff];
 }
 
 function dateOnly(value: unknown): Date | null | undefined {
@@ -1365,7 +1389,11 @@ export function createDocumentsService(
               }),
             );
             const notes = Object.fromEntries(
-              fields.map((field) => [field, configured[field] ?? unconfigured]),
+              fields.map((field) => [
+                field,
+                configured[field] ??
+                  (field === BILLING_FIELD ? { note: null, justification: null } : unconfigured),
+              ]),
             );
             const values = Object.values(notes) as JsonRecord[];
             await assertActiveCatalogItems(
@@ -1645,7 +1673,7 @@ export function createDocumentsService(
         client_id: input.client_id,
         type,
         configured: Boolean(config),
-        active_items: activeFields(config?.active_items, configurableFields(type)),
+        active_items: activeConfigurable(config?.active_items, type),
       };
     },
     async saveConfig(input, auth) {
@@ -1681,7 +1709,7 @@ export function createDocumentsService(
         referring: "triagem.configs",
         referringId: clientId,
         oldData: {
-          active_items: activeFields(changed.current?.active_items, configurableFields(type)),
+          active_items: activeConfigurable(changed.current?.active_items, type),
         },
         updatedData: { active_items: activeItems },
       });
