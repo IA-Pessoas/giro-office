@@ -28,16 +28,25 @@ describe("group map routes", () => {
     expect(response.body).toEqual({ success: true, data: map });
   });
 
-  it("recusa quem não tem acesso ao Regularize e id que não é de grupo", async () => {
+  it("recusa quem não tem acesso ao Regularize", async () => {
     const generate = vi.spyOn(GroupMapService.prototype, "generate");
-    const app = createTestApp({} as PrismaClient);
 
-    const denied = await request(app)
+    const response = await request(createTestApp({} as PrismaClient))
       .get(`/regularize/groups/${GROUP_ID}/map`)
       .set(gatewayHeaders({ permission: 0 }));
-    const invalid = await request(app).get("/regularize/groups/abc/map").set(gatewayHeaders());
 
-    expect([denied.status, invalid.status]).toEqual([403, 400]);
+    expect(response.status).toBe(403);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("recusa id que não é de grupo", async () => {
+    const generate = vi.spyOn(GroupMapService.prototype, "generate");
+
+    const response = await request(createTestApp({} as PrismaClient))
+      .get("/regularize/groups/abc/map")
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(400);
     expect(generate).not.toHaveBeenCalled();
   });
 });

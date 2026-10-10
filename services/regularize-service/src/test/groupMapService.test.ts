@@ -66,7 +66,9 @@ function createPrisma(members: Company[], bonds: Bond[], group: { name: string }
         // Empresas dos sócios com vínculo vigente.
         const ids = (args.where.pf_id as { in: string[] }).in;
         return bonds
-          .filter((bond) => ids.includes(bond.pf_id) && bond.exit === null)
+          .filter(
+            (bond) => ids.includes(bond.pf_id) && (bond.exit === null || bond.exit >= new Date()),
+          )
           .map((bond) => ({ pf_id: bond.pf_id, clientPJ: bond.pj }));
       }),
     },
@@ -87,6 +89,14 @@ describe("GroupMapService.generate", () => {
 
     const map = await serviceFor(prisma).generate({ organizationId: ORG, groupId: GROUP_ID });
 
+    // Toda consulta leva a organização de quem pediu.
+    expect(prisma.clientsGroup.findMany.mock.calls[0]?.[0].where).toEqual({
+      group_id: GROUP_ID,
+      organization_id: ORG,
+    });
+    for (const [args] of prisma.partners.findMany.mock.calls) {
+      expect(args.where).toMatchObject({ organization_id: ORG });
+    }
     expect(map).toEqual({
       group: { id: GROUP_ID, name: "Grupo Um" },
       cities: [
@@ -157,10 +167,31 @@ describe("GroupMapService.generate", () => {
     const map = await serviceFor(prisma).generate({ organizationId: ORG, groupId: GROUP_ID });
 
     expect(map.cities[0]?.partners[0]?.companies.map((item) => item.client_id)).toEqual(["alfa"]);
+    // Mesma regra de vínculo vigente do cadastro de sócios: sem saída ou com saída futura.
     expect(prisma.partners.findMany.mock.calls[1]?.[0].where).toMatchObject({
       organization_id: ORG,
-      exit: null,
+      OR: [{ exit: null }, { exit: { gte: expect.any(Date) } }],
     });
+  });
+
+  it("mantém a empresa de onde o sócio só sai no futuro", async () => {
+    const alfa = company("alfa");
+    const gama = company("gama");
+    const prisma = createPrisma(
+      [alfa],
+      [
+        { pj: alfa, pf_id: "pf-1", pf_name: "Ana", exit: null },
+        { pj: gama, pf_id: "pf-1", pf_name: "Ana", exit: new Date("2999-01-01") },
+      ],
+      { name: "Grupo Um" },
+    );
+
+    const map = await serviceFor(prisma).generate({ organizationId: ORG, groupId: GROUP_ID });
+
+    expect(map.cities[0]?.partners[0]?.companies.map((item) => item.client_id)).toEqual([
+      "alfa",
+      "gama",
+    ]);
   });
 
   it("separa por cidade, sem repetir o sócio na mesma cidade", async () => {

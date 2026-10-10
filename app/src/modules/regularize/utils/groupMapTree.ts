@@ -29,14 +29,21 @@ const MAX_LINE_LENGTH = 50;
 
 // Medidas do desenho em px; a largura do texto é estimada pela quantidade de caracteres.
 export const GROUP_MAP_METRICS = {
-  charWidth: 6.6,
+  fontSize: 12,
+  // Largura por caractere na fonte de 12px, com folga para razão social toda em maiúsculas.
+  charWidth: 7.6,
   lineHeight: 16,
+  // Quanto a primeira linha sobe para o texto ficar centrado na altura da linha.
+  baselineOffset: 4,
+  cornerRadius: 8,
   paddingX: 12,
   paddingY: 8,
   columnGap: 48,
   rowGap: 12,
 } as const;
 
+// Cópia do formatCPF_CNPJ de @shared/utils/formatters: este arquivo roda direto no Node nos
+// testes do módulo, onde o alias @shared não resolve.
 function formatDocument(document: string | null): string {
   const digits = (document ?? "").replace(/\D/g, "");
   if (digits.length === 14) {

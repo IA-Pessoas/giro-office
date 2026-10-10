@@ -166,7 +166,9 @@ export function useRegularizeGroupMap(
   return useFetch(
     regularizeQueryKeys.groupMap(groupId, scope),
     () => regularizeService.getGroupMap(groupId),
-    { enabled: Boolean(groupId) },
+    // Sem cache entre visitas: grupo, cidade e regime mudam em telas do cadastro de clientes,
+    // que não invalidam as chaves do Regularize.
+    { enabled: Boolean(groupId), staleTime: 0 },
   );
 }
 

@@ -1,6 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { currentPartnerBondWhere } from "./partnersService.js";
 
 // Mapa gerado de grupo (#1748), como o regularize/pages/mapas/mapa.php do legado (?grupo=id):
 // grupo → cidade das empresas do grupo → sócios dessas empresas → empresas de cada sócio com
@@ -46,18 +47,8 @@ const companySelect = {
   regime: true,
 } as const;
 
-type CompanyRow = {
-  id: string;
-  name: string;
-  company_name: string | null;
-  cpf_cnpj: string | null;
-  status: string;
-  city: string | null;
-  address: string | null;
-  number: string | null;
-  neighborhood: string | null;
-  regime: string | null;
-};
+export type GroupMapCompanyRow = Prisma.ClientGetPayload<{ select: typeof companySelect }>;
+type CompanyRow = GroupMapCompanyRow;
 
 // "Salvador" e " salvador " são a mesma cidade: o cadastro é digitado.
 function cityKey(city: string | null): string {
@@ -112,7 +103,11 @@ export class GroupMapService {
     const partnerIds = [...new Set(memberBonds.map((bond) => bond.pf_id))];
 
     const currentBonds = await this.prisma.partners.findMany({
-      where: { organization_id: input.organizationId, pf_id: { in: partnerIds }, exit: null },
+      where: {
+        organization_id: input.organizationId,
+        pf_id: { in: partnerIds },
+        ...currentPartnerBondWhere(),
+      },
       select: { pf_id: true, clientPJ: { select: companySelect } },
       orderBy: [{ entry: "asc" }, { id: "asc" }],
     });
@@ -125,22 +120,23 @@ export class GroupMapService {
       companiesByPartner.set(bond.pf_id, companies);
     }
 
-    const cities = new Map<string, GroupMapCity & { seen: Set<string> }>();
+    const cities = new Map<string, GroupMapCity>();
     for (const member of members) {
       const key = cityKey(member.client.city);
       let city = cities.get(key);
       if (!city) {
-        city = { name: (member.client.city ?? "").trim(), partners: [], seen: new Set() };
+        city = { name: (member.client.city ?? "").trim(), partners: [] };
         cities.set(key, city);
       }
       for (const bond of memberBonds) {
-        if (bond.pj_id !== member.client.id || city.seen.has(bond.pf_id)) continue;
+        if (bond.pj_id !== member.client.id) continue;
+        // O sócio aparece uma vez por cidade, mesmo sendo sócio de várias empresas do grupo.
+        if (city.partners.some((partner) => partner.pf_id === bond.pf_id)) continue;
         const companies = (companiesByPartner.get(bond.pf_id) ?? []).filter(
           (company) => cityKey(company.city) === key,
         );
         // Só entra o sócio com ao menos uma empresa vigente na cidade.
         if (companies.length === 0) continue;
-        city.seen.add(bond.pf_id);
         city.partners.push({
           pf_id: bond.pf_id,
           name: bond.clientPF.name,
@@ -151,7 +147,7 @@ export class GroupMapService {
 
     return {
       group,
-      cities: [...cities.values()].map(({ name, partners }) => ({ name, partners })),
+      cities: [...cities.values()],
     };
   }
 }

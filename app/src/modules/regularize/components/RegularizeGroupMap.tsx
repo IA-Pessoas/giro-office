@@ -1,5 +1,5 @@
 import { useClientGroups } from "@modules/clients/hooks/useClients";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useRegularizeGroupMap } from "../hooks/useRegularizePeople";
 import {
@@ -13,7 +13,8 @@ import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 const messageClassName = "mt-4 text-sm text-slate-600 dark:text-slate-400";
 
 function GroupMapDiagram({ layout, title }: { layout: GroupMapLayout; title: string }) {
-  const { lineHeight, paddingX, paddingY } = GROUP_MAP_METRICS;
+  const { baselineOffset, cornerRadius, fontSize, lineHeight, paddingX, paddingY } =
+    GROUP_MAP_METRICS;
 
   return (
     <svg
@@ -47,14 +48,13 @@ function GroupMapDiagram({ layout, title }: { layout: GroupMapLayout; title: str
             y={box.y}
             width={box.width}
             height={box.height}
-            rx={8}
+            rx={cornerRadius}
             className="fill-white stroke-slate-300 dark:fill-slate-800 dark:stroke-slate-600"
           />
-          <text x={box.x + paddingX} y={box.y + paddingY} fontSize={12} fill="currentColor">
+          <text x={box.x + paddingX} y={box.y + paddingY} fontSize={fontSize} fill="currentColor">
             {box.node.lines.map((line, index) => (
-              // As linhas de um nó não mudam de ordem.
-              // biome-ignore lint/suspicious/noArrayIndexKey: linha fixa dentro do nó
-              <tspan key={index} x={box.x + paddingX} dy={index === 0 ? lineHeight - 4 : lineHeight}>
+              // As linhas de um nó não mudam de ordem: o índice serve de chave.
+              <tspan key={index} x={box.x + paddingX} dy={index === 0 ? lineHeight - baselineOffset : lineHeight}>
                 {line}
               </tspan>
             ))}
@@ -71,6 +71,12 @@ export function RegularizeGroupMap() {
   const groupsQuery = useClientGroups();
   const [groupId, setGroupId] = useState("");
   const mapQuery = useRegularizeGroupMap(groupId);
+  const refetchMap = mapQuery.refetch;
+  const groupsUpdatedAt = groupsQuery.dataUpdatedAt;
+  // O painel de grupos logo acima recarrega a lista ao salvar: o mapa aberto acompanha.
+  useEffect(() => {
+    if (groupId) void refetchMap();
+  }, [groupsUpdatedAt, groupId, refetchMap]);
   const layout = useMemo(
     () => (mapQuery.data ? layoutGroupMapTree(buildGroupMapTree(mapQuery.data)) : null),
     [mapQuery.data],

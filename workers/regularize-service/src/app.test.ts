@@ -540,8 +540,9 @@ describe("regularize Worker", () => {
   });
 
   it("generates the group map scoped to the caller organization", async () => {
+    const GROUP_ID = "d0000000-0000-4000-8000-000000000001";
     const groupMap: RegularizeGroupMapService = {
-      generate: vi.fn(async () => ({ group: { id: LICENSE_ID, name: "Grupo" }, cities: [] })),
+      generate: vi.fn(async () => ({ group: { id: GROUP_ID, name: "Grupo" }, cities: [] })),
     };
     const app = createRegularizeWorkerApp({
       env: env(),
@@ -549,21 +550,21 @@ describe("regularize Worker", () => {
       groupMapService: groupMap,
     });
 
-    const ok = await app.request(`https://regularize.test/regularize/groups/${LICENSE_ID}/map`, {
+    const ok = await app.request(`https://regularize.test/regularize/groups/${GROUP_ID}/map`, {
       headers: headers(),
     });
     const invalid = await app.request("https://regularize.test/regularize/groups/abc/map", {
       headers: headers(),
     });
     const anonymous = await app.request(
-      `https://regularize.test/regularize/groups/${LICENSE_ID}/map`,
+      `https://regularize.test/regularize/groups/${GROUP_ID}/map`,
     );
 
     expect([ok.status, invalid.status, anonymous.status]).toEqual([200, 400, 401]);
     expect(groupMap.generate).toHaveBeenCalledTimes(1);
     expect(groupMap.generate).toHaveBeenCalledWith({
       organizationId: ORGANIZATION_ID,
-      groupId: LICENSE_ID,
+      groupId: GROUP_ID,
     });
   });
 
