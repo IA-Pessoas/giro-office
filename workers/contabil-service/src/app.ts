@@ -66,6 +66,7 @@ import {
   monthlySchema,
   monthlyUpdateSchema,
   statementArchiveSchema,
+  statementHistorySchema,
   statementSchema,
   triageConfigBodySchema,
   triageConfigQuerySchema,
@@ -641,6 +642,13 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const query = parseWithZod(monthlySchema, c.req.query());
     const data = await withDocuments(c, (service) =>
       service.listStatements(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/statements/history", async (c) => {
+    const query = parseWithZod(statementHistorySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.listStatementHistory(query, authContext(c.get("auth"))),
     );
     return c.json(createSuccessResponse(data));
   });

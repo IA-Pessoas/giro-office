@@ -32,6 +32,7 @@ import { ContabilStateBox } from "./ContabilStateBox";
 import { FiscalClientSettingsPanel } from "./FiscalClientSettingsPanel";
 import { FiscalSpecialDocumentsPanel } from "./FiscalSpecialDocumentsPanel";
 import { TriageMovementPanel } from "./TriageMovementPanel";
+import { TriageStatementHistoryPanel } from "./TriageStatementHistoryPanel";
 import { CONTABIL_DOCUMENTS, FISCAL_DOCUMENTS, STATUSES } from "./triageDocumentLabels";
 
 export { FISCAL_DOCUMENTS, STATUSES };
@@ -258,6 +259,9 @@ export function TriageDocumentsSection({
           record={record}
           justifications={justifications.data ?? []}
         />
+      ) : null}
+      {documentType === "CONTABIL" ? (
+        <TriageStatementHistoryPanel clientId={clientId} onOpenCompetence={setCompetence} />
       ) : null}
       {!record ? (
         <ContabilStateBox

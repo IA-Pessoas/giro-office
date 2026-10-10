@@ -205,6 +205,20 @@ export const statementSchema = z
     status: z.enum(triageDocumentStatuses),
   })
   .strict();
+export const statementHistorySchema = z
+  .object({
+    client_id: uuid("client_id"),
+    from: competence.optional(),
+    to: competence.optional(),
+    pending: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .optional(),
+  })
+  .strict()
+  .refine((query) => !query.from || !query.to || query.from <= query.to, {
+    message: "from deve ser anterior ou igual a to.",
+  });
 export const statementArchiveSchema = z
   .object({
     client_id: uuid("client_id"),

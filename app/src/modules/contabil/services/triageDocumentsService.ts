@@ -4,6 +4,7 @@ import type {
   ContabilCompetence,
   FiscalTriagePortfolio,
   TriageBankStatement,
+  TriageStatementHistory,
   TriageDocumentStatus,
   TriageDocumentItemNotes,
   TriageDocumentsMonthly,
@@ -142,6 +143,15 @@ export const triageDocumentsService = {
     const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageFiscalSettings, {
       client_id: clientId,
       ...settings,
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getStatementHistory(
+    clientId: string,
+    pendingOnly: boolean,
+  ): Promise<TriageStatementHistory> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageStatementHistory, {
+      params: { client_id: clientId, ...(pendingOnly ? { pending: "true" } : {}) },
     });
     return unwrapContabilEnvelope(response.data);
   },

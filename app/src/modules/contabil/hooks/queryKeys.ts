@@ -47,6 +47,12 @@ export function triageFiscalPortfolioQueryKey(competence: string) {
   return [...TRIAGE_FISCAL_PORTFOLIO_QUERY_KEY, competence] as const;
 }
 
+/** Histórico bancário do cliente; sem `pendingOnly`, é o prefixo das duas variações. */
+export function triageStatementHistoryQueryKey(clientId: string, pendingOnly?: boolean) {
+  const base = [...CONTABIL_QUERY_KEY, "triage", "statement-history", clientId] as const;
+  return pendingOnly === undefined ? base : ([...base, pendingOnly] as const);
+}
+
 export function triageStatementsQueryKey(clientId: string, competence: string) {
   return [...CONTABIL_QUERY_KEY, "triage", "statements", clientId, competence] as const;
 }

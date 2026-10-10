@@ -277,6 +277,18 @@ export interface FiscalTriagePortfolio {
   items: FiscalTriagePortfolioItem[];
 }
 
+/** Marcadores bancários do cliente agrupados por competência (mais recente primeiro). */
+export interface TriageStatementHistory {
+  client_id: string;
+  /** true quando o limite cortou as competências mais antigas. */
+  truncated: boolean;
+  competences: Array<{
+    competence: ContabilCompetence;
+    pending: number;
+    statements: Array<{ bank_id: string; status: TriageDocumentStatus }>;
+  }>;
+}
+
 export interface TriageBankStatement {
   id: string;
   bank_id: string;
