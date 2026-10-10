@@ -200,6 +200,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
         "/triagem/catalogs",
         "/triagem/external-links",
         "/triagem/urgent-requests",
+        "/triagem/solicitations",
       ],
       internalServiceToken: env.auditServiceToken,
       permissionModule: "triagem",
@@ -247,6 +248,18 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
         {
           methods: ["PATCH"],
           path: /^\/triagem\/urgent-requests\/[^/]+\/(?:close|reopen)\/?$/,
+        },
+        {
+          methods: ["GET", "POST"],
+          path: /^\/triagem\/solicitations\/?$/,
+        },
+        {
+          methods: ["GET"],
+          path: /^\/triagem\/solicitations\/[^/]+\/?$/,
+        },
+        {
+          methods: ["PATCH"],
+          path: /^\/triagem\/solicitations\/[^/]+\/close\/?$/,
         },
       ],
     },

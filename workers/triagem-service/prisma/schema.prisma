@@ -22,6 +22,7 @@ model Organization {
   triageCatalogSnapshots     TriageCompetenceCatalogSnapshot[]
   triageExternalLinks        TriageExternalLink[]
   triageUrgentRequests       TriageUrgentRequest[]
+  triageSolicitations        TriageSolicitation[]
   triageCompetenceHistories  TriageCompetenceHistory[]
   triageOutboxEvents         TriageOutboxEvent[]
 
@@ -42,6 +43,7 @@ model Client {
   triageCompetences   TriageCompetence[]
   triageExternalLinks TriageExternalLink[]
   triageUrgentRequests TriageUrgentRequest[]
+  triageSolicitations TriageSolicitation[]
 
   @@map("clients")
 }
@@ -58,6 +60,8 @@ model User {
   triageExternalLinksResponsible TriageExternalLink[] @relation("TriageExternalLinkResponsible")
   triageUrgentRequestsRequested TriageUrgentRequest[] @relation("TriageUrgentRequestRequester")
   triageUrgentRequestsResponsible TriageUrgentRequest[] @relation("TriageUrgentRequestResponsible")
+  triageSolicitationsRequested TriageSolicitation[] @relation("TriageSolicitationRequester")
+  triageSolicitationsResponsible TriageSolicitation[] @relation("TriageSolicitationResponsible")
   triageCompetenceHistories   TriageCompetenceHistory[]
 
   @@map("users")
@@ -75,6 +79,7 @@ model TriageCatalogItem {
   updated_at      DateTime @updatedAt
   organization    Organization @relation(fields: [organization_id], references: [id])
   snapshots       TriageCompetenceCatalogSnapshot[]
+  solicitations   TriageSolicitation[]
 
   @@unique([id, organization_id])
   @@unique([organization_id, kind, code])
@@ -249,6 +254,28 @@ model TriageUrgentRequest {
 
   @@unique([organization_id, dedupe_key])
   @@map("triagem.urgent_requests")
+}
+
+model TriageSolicitation {
+  id              String            @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      String
+  category_id     String
+  description     String
+  requester_id    String
+  responsible_id  String
+  status          String            @default("OPEN")
+  closed_at       DateTime?
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  organization    Organization      @relation(fields: [organization_id], references: [id])
+  client          Client            @relation(fields: [client_id], references: [id])
+  category        TriageCatalogItem @relation(fields: [category_id], references: [id])
+  requester       User              @relation("TriageSolicitationRequester", fields: [requester_id], references: [id])
+  responsible     User              @relation("TriageSolicitationResponsible", fields: [responsible_id], references: [id])
+
+  @@map("triagem.solicitations")
 }
 
 model TriageCompetenceHistory {
