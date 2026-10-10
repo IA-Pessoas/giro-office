@@ -39,6 +39,7 @@ export const PESSOAL_TABS: PessoalTab[] = [
   { id: "obligations", label: "Obrigações" },
   { id: "tracking", label: "Acompanhamentos" },
   { id: "passwords", label: "Senhas" },
+  { id: "agenda", label: "Agenda" },
 ];
 
 export function unwrapPessoalEnvelope<T>(body: unknown): T {

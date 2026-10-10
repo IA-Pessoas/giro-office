@@ -146,6 +146,7 @@ runTest("pessoal tabs stay stable for branch integration", () => {
       "obligations",
       "tracking",
       "passwords",
+      "agenda",
     ],
   );
 });
@@ -1223,6 +1224,34 @@ runTest("payroll sheet orders situations by registration date and prints through
   assert.match(sheet, /<PessoalPrintSheet/);
   assert.match(sheet, /id="pessoal-payroll-sheet"/);
   assert.match(sheet, /usePessoalSituations\(clientId, open\)/);
+});
+
+runTest("agenda do Pessoal é o recorte da agenda compartilhada, com geral e minha agenda (#1773)", () => {
+  const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+  const shell = read("./components/PessoalShell.tsx");
+  assert.equal(PESSOAL_TABS.find((tab) => tab.id === "agenda")?.label, "Agenda");
+  assert.match(
+    shell,
+    /<DepartmentAgendaSection module="pessoal" canEdit=\{access\.canEdit\} allowMine \/>/,
+  );
+
+  // Nenhuma segunda agenda dentro do Pessoal: o serviço do módulo não ganha rota nem cliente.
+  assert.doesNotMatch(read("./services/pessoalService.ts"), /agenda/i);
+  assert.equal(Object.keys(PESSOAL_ENDPOINTS).some((key) => /agenda/i.test(key)), false);
+
+  const section = read("../contabil/components/DepartmentAgendaSection.tsx");
+  assert.match(section, /agendaService\.list\(module, month, mine\)/);
+  assert.match(section, /departmentAgendaQueryKey\(module, month, mine\)/);
+  assert.match(section, /Agenda geral/);
+  assert.match(section, /Minha agenda/);
+  assert.match(section, /event\.client\?\.name/);
+  assert.match(section, /event\.participant\?\.name \?\? "Sem responsável"/);
+  assert.match(section, /event\.status \?\? "Sem estado"/);
+
+  const client = read("../../shared/services/agendaService.ts");
+  // `mine` só vai na consulta quando pedido; o usuário vem da sessão, nunca do cliente.
+  assert.match(client, /\.\.\.\(mine \? \{ mine: true \} : \{\}\)/);
+  assert.doesNotMatch(client, /user_id|participant_id/);
 });
 
 console.log("pessoal contract tests passed");

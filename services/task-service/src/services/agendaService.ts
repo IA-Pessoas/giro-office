@@ -34,7 +34,15 @@ const AGENDA_SELECT = {
   obs: true,
   location: true,
   department_control_id: true,
+  client: { select: { id: true, name: true } },
+  // Responsável do evento: o primeiro participante, como no `responsavel_id` do legado.
+  participant: { select: { id: true, name: true } },
 } as const;
+
+interface AgendaEventPerson {
+  id: string;
+  name: string;
+}
 
 export interface AgendaEventRow {
   id: string;
@@ -44,6 +52,8 @@ export interface AgendaEventRow {
   obs: string | null;
   location: string | null;
   department_control_id: string;
+  client: AgendaEventPerson | null;
+  participant: AgendaEventPerson | null;
 }
 
 /** Níveis do módulo (0 a 3) exigidos pela agenda; o owner entra com o maior. */
@@ -92,8 +102,11 @@ export class AgendaService {
     });
   }
 
-  /** `month` no formato AAAA-MM; o intervalo é o mês em UTC. */
-  async list(scope: AgendaScope, month: string): Promise<AgendaEventRow[]> {
+  /**
+   * `month` no formato AAAA-MM; o intervalo é o mês em UTC. Com `mine`, só os eventos do
+   * usuário atual e os sem responsável.
+   */
+  async list(scope: AgendaScope, month: string, mine = false): Promise<AgendaEventRow[]> {
     const [year, monthNumber] = month.split("-").map(Number);
     return this.prisma.agenda.findMany({
       where: {
@@ -103,6 +116,7 @@ export class AgendaService {
           gte: new Date(Date.UTC(year, monthNumber - 1, 1)),
           lt: new Date(Date.UTC(year, monthNumber, 1)),
         },
+        ...(mine ? { OR: [{ participant_id: scope.userId }, { participant_id: null }] } : {}),
       },
       select: AGENDA_SELECT,
       orderBy: [{ date: "asc" }, { id: "asc" }],

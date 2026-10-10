@@ -1078,7 +1078,7 @@ await (async () => {
       new URL("./components/DepartmentAgendaSection.tsx", import.meta.url),
       "utf8",
     );
-    assert.match(section, /agendaService\.list\(module, month\)/);
+    assert.match(section, /agendaService\.list\(module, month, mine\)/);
   });
 })();
 

@@ -177,6 +177,8 @@ describe("matriz de regressão das políticas modulares", () => {
 
     expect(canAccessRoute(authContext({ modules: { triagem: 1 } }), read)).toBe(true);
     expect(canAccessRoute(authContext({ modules: { contabil: 1 } }), read)).toBe(true);
+    // #1773: o Pessoal consulta o próprio recorte da agenda.
+    expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), read)).toBe(true);
     expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), read)).toBe(false);
 
     for (const method of ["POST", "PUT", "DELETE"]) {

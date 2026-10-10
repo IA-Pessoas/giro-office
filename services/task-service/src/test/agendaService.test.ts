@@ -132,6 +132,66 @@ describe("AgendaService", () => {
     expect(audit.createLog).not.toHaveBeenCalled();
   });
 
+  // O Pessoal consulta o recorte do seu departamento na mesma agenda (#1773).
+  describe("Pessoal", () => {
+    const PESSOAL = "dep-pessoal";
+    const pessoal = { ...editor, module: "pessoal" } as const;
+    const viewerPessoal = { ...pessoal, level: 1 } as const;
+
+    function setupPessoal() {
+      const context = setup();
+      context.prisma.department.findMany.mockResolvedValue([
+        { id: CONTABIL, name: "Contábil" },
+        { id: PESSOAL, name: "Departamento Pessoal" },
+      ]);
+      return context;
+    }
+
+    it("visão geral traz cliente e responsável de todos os eventos do departamento", async () => {
+      const { prisma, service } = setupPessoal();
+
+      await service.list(viewerPessoal, "2026-12");
+
+      const query = prisma.agenda.findMany.mock.calls[0][0];
+      expect(query.where).toMatchObject({
+        organization_id: ORG,
+        department_control_id: { in: [PESSOAL] },
+      });
+      expect(query.where).not.toHaveProperty("OR");
+      expect(query.select).toMatchObject({
+        client: { select: { id: true, name: true } },
+        participant: { select: { id: true, name: true } },
+      });
+    });
+
+    it("minha agenda traz os eventos do usuário atual e os sem responsável", async () => {
+      const { prisma, service } = setupPessoal();
+
+      await service.list(viewerPessoal, "2026-12", true);
+
+      expect(prisma.agenda.findMany.mock.calls[0][0].where).toMatchObject({
+        organization_id: ORG,
+        department_control_id: { in: [PESSOAL] },
+        OR: [{ participant_id: "user-1" }, { participant_id: null }],
+      });
+    });
+
+    it("acesso direto por ID fica na organização e no departamento do Pessoal", async () => {
+      const { prisma, service } = setupPessoal();
+
+      await service.update(pessoal, EVENT, { status: "Realizado" });
+
+      expect(prisma.agenda.updateMany).toHaveBeenCalledWith({
+        where: { id: EVENT, organization_id: ORG, department_control_id: { in: [PESSOAL] } },
+        data: { status: "Realizado" },
+      });
+      await expect(service.remove(viewerPessoal, EVENT)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(service.list({ ...pessoal, level: 0 }, "2026-12", true)).rejects.toMatchObject({
+        statusCode: 403,
+      });
+    });
+  });
+
   // A Triagem divide a agenda com o Regularize: mesma tabela, departamentos diferentes (#1699).
   describe("Triagem", () => {
     const TRIAGEM = "dep-triagem";

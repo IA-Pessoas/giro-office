@@ -28,23 +28,31 @@ import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 /** Nome do departamento nos textos da tela. */
 const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
   contabil: "Contábil",
+  pessoal: "Pessoal",
   triagem: "Triagem",
 };
 
 interface DepartmentAgendaSectionProps {
   module: AgendaModule;
   canEdit: boolean;
+  /** Oferece a alternância entre a agenda geral e a do usuário atual. */
+  allowMine?: boolean;
 }
 
 /** Visão de um departamento na agenda compartilhada: o serviço filtra pelo módulo pedido. */
-export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSectionProps) {
+export function DepartmentAgendaSection({
+  module,
+  canEdit,
+  allowMine = false,
+}: DepartmentAgendaSectionProps) {
   const departmentLabel = DEPARTMENT_LABEL[module];
   const [month, setMonth] = useState<ContabilCompetence>(getCurrentContabilCompetence);
+  const [mine, setMine] = useState(false);
   const [editing, setEditing] = useState<AgendaEvent | "new" | null>(null);
   const [removing, setRemoving] = useState<AgendaEvent | null>(null);
   const queryClient = useQueryClient();
-  const events = useFetch(departmentAgendaQueryKey(module, month), () =>
-    agendaService.list(module, month),
+  const events = useFetch(departmentAgendaQueryKey(module, month, mine), () =>
+    agendaService.list(module, month, mine),
   );
   const refresh = () => queryClient.invalidateQueries({ queryKey: departmentAgendaQueryKey(module) });
 
@@ -104,6 +112,18 @@ export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSec
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {allowMine &&
+            [false, true].map((option) => (
+              <button
+                key={String(option)}
+                type="button"
+                className={CONTABIL_OUTLINE_ACTION_CLASS}
+                aria-pressed={mine === option}
+                onClick={() => setMine(option)}
+              >
+                {option ? "Minha agenda" : "Agenda geral"}
+              </button>
+            ))}
           <ContabilCompetenceSelect value={month} onChange={setMonth} label="Mês da agenda" />
           {canEdit && (
             <button
@@ -218,6 +238,12 @@ export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSec
                 {event.obs && (
                   <p className="break-words text-sm text-gray-600 dark:text-slate-400">
                     {event.obs}
+                  </p>
+                )}
+                {(event.client || event.participant || allowMine) && (
+                  <p className="break-words text-xs text-gray-500 dark:text-slate-400">
+                    {event.client?.name && `Cliente: ${event.client.name} · `}
+                    Responsável: {event.participant?.name ?? "Sem responsável"}
                   </p>
                 )}
               </div>

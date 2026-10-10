@@ -90,8 +90,8 @@ runTest("agenda da Triagem usa a agenda compartilhada, com escrita só para quem
 
   const section = readSource("../contabil/components/DepartmentAgendaSection.tsx");
   // O departamento sai do módulo pedido: nenhum ID fixo e nenhuma cópia local de eventos.
-  assert.match(section, /agendaService\.list\(module, month\)/);
-  assert.match(section, /departmentAgendaQueryKey\(module, month\)/);
+  assert.match(section, /agendaService\.list\(module, month, mine\)/);
+  assert.match(section, /departmentAgendaQueryKey\(module, month, mine\)/);
   assert.doesNotMatch(section, /department_id|departamento\s*[:=]\s*\d/);
   assert.doesNotMatch(section, /canônic|snapshot|legados/i);
 });
