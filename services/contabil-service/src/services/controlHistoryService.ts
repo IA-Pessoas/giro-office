@@ -1,10 +1,11 @@
 // Histórico do Controle Contábil (#1722).
-import { AUDIT_UPDATE_ACTION } from "./auditActions.js";
+
 import {
   type AuditHistoryPage,
   type AuditHistoryPrisma,
   listAuditFieldHistory,
 } from "@workspace/shared/audit";
+import { AUDIT_UPDATE_ACTION } from "./auditActions.js";
 
 export const CONTROL_HISTORY_FIELDS = [
   "regenerate_accounting_entries",
