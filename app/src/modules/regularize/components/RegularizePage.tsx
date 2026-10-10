@@ -10,6 +10,7 @@ import {
   Download,
   Eye,
   FileKey2,
+  Gavel,
   Landmark,
   Network,
   Loader2,
@@ -29,6 +30,7 @@ import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientGroupsPanel } from "@modules/clients/components/ClientGroupsPanel";
+import { ClientLicitacaoBiddersPanel } from "@modules/clients/components/ClientLicitacaoPanels";
 import {
   ClientPickerModal,
   ClientSelectionField,
@@ -238,6 +240,7 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "sites", label: "Sites", icon: ShieldCheck },
   { id: "taxes", label: "Tributos", icon: Landmark },
   { id: "groups", label: "Grupos", icon: Network },
+  { id: "bidders", label: "Licitantes", icon: Gavel },
 ];
 
 function normalizeStatus(status: RegularizeStatus | null | undefined): string {
@@ -2916,6 +2919,8 @@ export function RegularizePage() {
         // Mesma origem canônica dos grupos da Integração; edição exige Regularize nível 2 (#1742).
         <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
       ) : null}
+
+      {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}
 
       {activeTab === "taxes" ? (
         <section className="space-y-4">

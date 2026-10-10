@@ -216,6 +216,22 @@ export interface ClientRegime {
   name: string;
 }
 
+export interface ClientLicitacaoHistoryItem {
+  id: string;
+  previous_value: boolean | null;
+  new_value: boolean | null;
+  created_at: string;
+  actor: { id: string; name: string | null };
+}
+
+export interface ClientLicitacaoBidder {
+  id: string;
+  name: string;
+  company_name: string | null;
+  cpf_cnpj: string;
+  status: string;
+}
+
 export interface ClientSegment {
   id: string;
   name: string;

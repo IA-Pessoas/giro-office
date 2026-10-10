@@ -40,6 +40,7 @@ import {
   isRegularizeCompanyClient,
   getRegularizeUnsupportedDateClearError,
   getRegularizeRegimeOptions,
+  licitacaoLabel,
   hasRegularizeChanges,
 } from "./utils/regularizeForm.ts";
 import { FISCAL_TAX_REGIME_OPTIONS } from "../fiscal/utils/fiscalTaxRegime.ts";
@@ -1301,6 +1302,22 @@ runTest("regularize keeps a legacy regime visible instead of dropping it", () =>
   ]) {
     assert.doesNotMatch(readFileSync(path, "utf8"), /CAEPF|E-SOCIAL/);
   }
+});
+
+runTest("licitação keeps Não informado, Sim and Não distinct and shows history and bidders", () => {
+  assert.equal(licitacaoLabel(null), "Não informado");
+  assert.equal(licitacaoLabel(undefined), "Não informado");
+  assert.equal(licitacaoLabel(true), "Sim");
+  assert.equal(licitacaoLabel(false), "Não");
+  const panels = readFileSync("src/modules/clients/components/ClientLicitacaoPanels.tsx", "utf8");
+  assert.match(panels, /row\.actor\.name/);
+  assert.match(panels, /formatDateTime\(row\.created_at\)/);
+  assert.match(panels, /licitacaoLabel\(row\.previous_value\)[\s\S]*?licitacaoLabel\(row\.new_value\)/);
+  const ficha = readFileSync("src/pages/clients/[id]/regularize.tsx", "utf8");
+  assert.match(ficha, /<ClientLicitacaoHistoryPanel clientId=\{clientId\} \/>/);
+  const regularize = readFileSync("src/modules/regularize/components/RegularizePage.tsx", "utf8");
+  assert.match(regularize, /\{ id: "bidders", label: "Licitantes"/);
+  assert.match(regularize, /activeTab === "bidders" \? <ClientLicitacaoBiddersPanel \/>/);
 });
 
 runTest("client groups let users manage names and multiple client memberships", () => {

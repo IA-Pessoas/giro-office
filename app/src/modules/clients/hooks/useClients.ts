@@ -16,6 +16,8 @@ import type {
   ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
+  ClientLicitacaoBidder,
+  ClientLicitacaoHistoryItem,
   ClientRegime,
   ClientSegment,
   ClientTerminationRecord,
@@ -40,6 +42,19 @@ export const CLIENT_SEGMENTS_QUERY_KEY = ["client-segments"] as const;
 
 export function useClientRegimes(): UseQueryResult<ClientRegime[], Error> {
   return useFetch(CLIENT_REGIMES_QUERY_KEY, clientService.listRegimes, { staleTime: 60_000 });
+}
+
+// Sob CLIENTS_QUERY_KEY: salvar o Regularize invalida histórico e licitantes junto (#1743).
+export function useClientLicitacaoHistory(
+  clientId: string,
+): UseQueryResult<ClientLicitacaoHistoryItem[], Error> {
+  return useFetch([...CLIENTS_QUERY_KEY, "licitacao-history", clientId], () =>
+    clientService.listLicitacaoHistory(clientId),
+  );
+}
+
+export function useClientLicitacaoBidders(): UseQueryResult<ClientLicitacaoBidder[], Error> {
+  return useFetch([...CLIENTS_QUERY_KEY, "licitacao-bidders"], clientService.listLicitacaoBidders);
 }
 
 export function useClientSegments(): UseQueryResult<ClientSegment[], Error> {

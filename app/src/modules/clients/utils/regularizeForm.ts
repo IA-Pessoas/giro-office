@@ -110,6 +110,13 @@ export function getRegularizeRegimeOptions(current: string, catalog: readonly st
   return buildClientRegimeOptions(catalog, current);
 }
 
+// Não informado (null), Sim e Não são respostas distintas (#1743).
+export function licitacaoLabel(value: boolean | null | undefined): string {
+  if (value === true) return "Sim";
+  if (value === false) return "Não";
+  return "Não informado";
+}
+
 export const REGULARIZE_SIZE_OPTIONS = ["DEMAIS", "EPP", "ME"] as const;
 
 export function createRegularizeInitialValues(client: Client): ClientRegularizeFormValues {
