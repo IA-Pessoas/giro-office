@@ -1,6 +1,9 @@
+import type { AuthContext } from "@workspace/shared";
+import type { NextFunction, Request, Response } from "express";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayEnv } from "../config/env.js";
+import { buildAuthorizeMiddleware } from "../middlewares/authorize.js";
 import { buildGatewayOpenApiSpec } from "../openapi/gatewaySpec.js";
 import { getRoutePolicy } from "../security/policies.js";
 import { isPublicRoute } from "../security/publicRoutes.js";
@@ -52,8 +55,174 @@ function createCoverageEnv(): GatewayEnv {
   };
 }
 
+function authorizeClientRequest(
+  method: string,
+  originalUrl: string,
+  modules: Record<string, number>,
+  body: unknown = {},
+): unknown {
+  let error: unknown;
+  const request = {
+    method,
+    originalUrl,
+    body,
+    auth: {
+      token: "test-token",
+      userId: "user-1",
+      organizationId: "org-1",
+      actorKind: "organization",
+      isPlatformAdmin: false,
+      claims: { user_id: "user-1", organization_id: "org-1", type: "user", modules },
+    } as AuthContext,
+  } as Request;
+  buildAuthorizeMiddleware("enforce")(
+    request,
+    {} as Response,
+    ((reason?: unknown) => {
+      error = reason;
+    }) as NextFunction,
+  );
+  return error;
+}
+
 it("classifies every documented gateway operation as public or policy-protected", () => {
   expect(getUnclassifiedGatewayOperations(createCoverageEnv())).toEqual([]);
+});
+
+describe("Marketing access to canonical Instagram profiles", () => {
+  it("allows Marketing viewers to query only the scoped profile report", () => {
+    expect(
+      authorizeClientRequest("GET", "/client/instagram-profiles/report", { marketing: 1 }),
+    ).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/client/client-1", { marketing: 1 })).toMatchObject({
+      statusCode: 403,
+    });
+    expect(authorizeClientRequest("GET", "/client/list", { marketing: 1 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it("allows Marketing editors to change only Instagram while Integration editors keep existing access", () => {
+    expect(
+      authorizeClientRequest(
+        "PATCH",
+        "/client/client-1/integration",
+        { marketing: 2 },
+        {
+          instagram: "@acme",
+        },
+      ),
+    ).toBeUndefined();
+    expect(
+      authorizeClientRequest(
+        "PATCH",
+        "/client/client-1/integration",
+        { marketing: 2 },
+        {
+          instagram: "@acme",
+          email: "contact@acme.com",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+    expect(
+      authorizeClientRequest(
+        "PATCH",
+        "/client/client-1/integration",
+        { integracao: 2 },
+        {
+          instagram: "@acme",
+          email: "contact@acme.com",
+        },
+      ),
+    ).toBeUndefined();
+    expect(
+      authorizeClientRequest(
+        "PATCH",
+        "/client/client-1/integration",
+        { marketing: 1 },
+        {
+          instagram: "@acme",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+  });
+});
+
+describe("Marketing access to organization user profiles", () => {
+  it("allows Marketing viewer to read only the user list and profile photo", () => {
+    expect(authorizeClientRequest("GET", "/user", { marketing: 1 })).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/user/user-1/photo", { marketing: 1 })).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/user/user-1", { marketing: 1 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it("allows Marketing editor to mutate only a user photo", () => {
+    expect(authorizeClientRequest("POST", "/user/user-1/photo", { marketing: 2 })).toBeUndefined();
+    expect(
+      authorizeClientRequest("DELETE", "/user/user-1/photo", { marketing: 2 }),
+    ).toBeUndefined();
+    expect(
+      authorizeClientRequest("PUT", "/user/user-2", { marketing: 2 }, { name: "New name" }),
+    ).toMatchObject({
+      statusCode: 403,
+    });
+    expect(
+      authorizeClientRequest("PUT", "/user/user-1", { marketing: 2 }, { name: "New name" }),
+    ).toMatchObject({ statusCode: 403 });
+    expect(
+      authorizeClientRequest("PUT", "/user/user-1", { marketing: 2 }, { password: "secret" }),
+    ).toBeUndefined();
+    expect(authorizeClientRequest("DELETE", "/user/user-1/photo", { marketing: 1 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+});
+
+describe("Marketing access to departments", () => {
+  it("allows Marketing viewers to query the organization department list", () => {
+    expect(authorizeClientRequest("GET", "/department/list", { marketing: 1 })).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/department/list", { marketing: 0 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it("allows Marketing level 3 to update only department color", () => {
+    expect(
+      authorizeClientRequest(
+        "PUT",
+        "/department",
+        { marketing: 3 },
+        {
+          dep_id: "department-1",
+          color: "#0F766E",
+        },
+      ),
+    ).toBeUndefined();
+    expect(
+      authorizeClientRequest(
+        "PUT",
+        "/department",
+        { marketing: 2 },
+        {
+          dep_id: "department-1",
+          color: "#0F766E",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+    expect(
+      authorizeClientRequest(
+        "PUT",
+        "/department",
+        { marketing: 3 },
+        {
+          dep_id: "department-1",
+          color: "#0F766E",
+          name: "Outro nome",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+  });
 });
 
 describe("platform default deny", () => {
