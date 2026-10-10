@@ -10,7 +10,8 @@ import type { MarketingWorkerEnv } from "./env.js";
 export function createMarketingWorkerAudit(env: MarketingWorkerEnv): MarketingAudit {
   return async (entry) => {
     try {
-      if (env.AUDIT_ENABLED === "false") throw new Error("auditoria desligada");
+      const enabled = env.AUDIT_ENABLED ?? "true";
+      if (enabled !== "true" && enabled !== "1") throw new Error("auditoria desligada");
       if (!env.AUDIT_SERVICE || !env.AUDIT_SERVICE_TOKEN) {
         throw new Error("binding AUDIT_SERVICE ou AUDIT_SERVICE_TOKEN ausente");
       }
