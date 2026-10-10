@@ -10,7 +10,9 @@ import {
   Download,
   Eye,
   FileKey2,
+  Gavel,
   Landmark,
+  Network,
   Loader2,
   Pencil,
   Plus,
@@ -18,6 +20,7 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  Tags,
   Trash2,
   UserRound,
   UsersRound,
@@ -27,6 +30,9 @@ import {
 import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
+import { ClientCatalogPanel } from "@modules/clients/components/ClientCatalogPanel";
+import { ClientGroupsPanel } from "@modules/clients/components/ClientGroupsPanel";
+import { ClientLicitacaoBiddersPanel } from "@modules/clients/components/ClientLicitacaoPanels";
 import {
   ClientPickerModal,
   ClientSelectionField,
@@ -235,6 +241,9 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "passwords", label: "Senhas", icon: FileKey2 },
   { id: "sites", label: "Sites", icon: ShieldCheck },
   { id: "taxes", label: "Tributos", icon: Landmark },
+  { id: "groups", label: "Grupos", icon: Network },
+  { id: "bidders", label: "Licitantes", icon: Gavel },
+  { id: "catalogs", label: "Catálogos", icon: Tags },
 ];
 
 function normalizeStatus(status: RegularizeStatus | null | undefined): string {
@@ -2906,6 +2915,21 @@ export function RegularizePage() {
               )}
             </Dialog>
           </div>
+        </section>
+      ) : null}
+
+      {activeTab === "groups" ? (
+        // Mesma origem canônica dos grupos da Integração; edição exige Regularize nível 2 (#1742).
+        <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
+      ) : null}
+
+      {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}
+
+      {activeTab === "catalogs" ? (
+        // Regimes e segmentos que a ficha Regularize usa; editar exige Regularize nível 2 (#1740, #1741).
+        <section className="space-y-4">
+          <ClientCatalogPanel kind="regime" canEdit={regularizeAccess.canEdit} />
+          <ClientCatalogPanel kind="segment" canEdit={regularizeAccess.canEdit} />
         </section>
       ) : null}
 

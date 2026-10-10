@@ -168,8 +168,26 @@ const clientListPolicy: AuthPolicy = {
   ],
 };
 
+// Catálogos da ficha (regimes, segmentos) e grupos canônicos: Integração ou Regularize
+// (#1740, #1741, #1742). Mesma regra de requireClientCatalogPermission no client-service Worker.
+// GET /client/regimes e /client/segments seguem a política exata de lista de clientes.
+const clientCatalogsPath =
+  /^\/client\/(?:groups(?:\/[^/]+(?:\/clients)?)?|regimes(?:\/[^/]+)?|segments(?:\/[^/]+)?)\/?$/;
+const clientCatalogsReadPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["integracao", "regularize"],
+    minPermission: moduleAccessPermission,
+  },
+};
+const clientCatalogsEditPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["integracao", "regularize"],
+    minPermission: moduleEditPermission,
+  },
+};
+
 const integracaoClientPath =
-  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/groups(?:\/[^/]+(?:\/clients)?)?|\/[^/]+)?\/?$/;
+  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /department/list", departmentMarketingReadPolicy],
@@ -178,6 +196,9 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /client/list", clientListPolicy],
   ["GET /client/coringa/list", clientListPolicy],
   ["GET /client/coringa/pdf", clientListPolicy],
+  // Ficha e Regularize leem o catálogo; criar e renomear seguem exigindo Integração.
+  ["GET /client/regimes", clientListPolicy],
+  ["GET /client/segments", clientListPolicy],
   ["GET /user/me", authenticatedPolicy],
   ["GET /rh/notifications", rhModulePolicy],
   ["PUT /rh/notifications/read", rhModulePolicy],
@@ -203,6 +224,11 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  // Lista de licitantes e histórico de licitação lidos pelo Regularize (#1743).
+  { method: "GET", path: /^\/client\/licitacao\/bidders\/?$/, policy: clientListPolicy },
+  { method: "GET", path: /^\/client\/[^/]+\/licitacao\/history\/?$/, policy: clientListPolicy },
+  { method: "GET", path: clientCatalogsPath, policy: clientCatalogsReadPolicy },
+  { method: "ANY", path: clientCatalogsPath, policy: clientCatalogsEditPolicy },
   {
     method: "GET",
     path: /^\/client\/instagram-profiles\/report\/?$/,

@@ -8,6 +8,7 @@ const CLIENT_ID = "b0000000-0000-4000-8000-000000000001";
 const HISTORY_ID = "d0000000-0000-4000-8000-000000000001";
 const PENDING_ID = "e0000000-0000-4000-8000-000000000001";
 const INTERNAL_TOKEN = "client-gateway-internal-token";
+const REGIME_ID = "f0000000-0000-4000-8000-000000000001";
 
 function env(): ClientWorkerEnv {
   return {
@@ -90,6 +91,23 @@ function service(): ClientWorkerService {
     applyCommercialProjection: vi.fn(async () => ({ applied: true })),
     reportingCatalog: vi.fn(async () => ({ sources: [], relations: [] })),
     extractReporting: vi.fn(async () => ({ rows: [], reachedLimit: false })),
+    listRegimes: vi.fn(async () => [{ id: REGIME_ID, name: "MEI" }]),
+    createRegime: vi.fn(async () => ({ id: REGIME_ID, name: "MEI" })),
+    updateRegime: vi.fn(async () => ({ id: REGIME_ID, name: "Imune" })),
+    listSegments: vi.fn(async () => [{ id: REGIME_ID, name: "Varejo", type: "comercio" }]),
+    createSegment: vi.fn(async () => ({ id: REGIME_ID, name: "Varejo", type: "comercio" })),
+    updateSegment: vi.fn(async () => ({ id: REGIME_ID, name: "Atacado", type: "comercio" })),
+    listGroups: vi.fn(async () => []),
+    createGroup: vi.fn(async () => ({ id: REGIME_ID, name: "Holding", status: true, clients: [] })),
+    updateGroup: vi.fn(async () => ({
+      id: REGIME_ID,
+      name: "Holding",
+      status: false,
+      clients: [],
+    })),
+    replaceGroupClients: vi.fn(async () => ({ id: REGIME_ID, clients: [{ id: CLIENT_ID }] })),
+    listLicitacaoHistory: vi.fn(async () => []),
+    listLicitacaoBidders: vi.fn(async () => []),
   };
 }
 
@@ -145,6 +163,176 @@ describe("client Worker", () => {
     );
     expect(create.status).toBe(403);
     expect(clientService.create).not.toHaveBeenCalled();
+  });
+
+  it("serves the regime catalog of the authenticated organization before /client/:id", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const json = { ...headers(), "content-type": "application/json" };
+
+    const list = await app.request("https://client.test/client/regimes", { headers: headers() });
+    const create = await app.request("https://client.test/client/regimes", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: " MEI " }),
+    });
+    const update = await app.request(`https://client.test/client/regimes/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({ name: "Imune" }),
+    });
+    const blank = await app.request("https://client.test/client/regimes", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: "  " }),
+    });
+
+    expect(list.status).toBe(200);
+    expect(clientService.listRegimes).toHaveBeenCalledWith(ORGANIZATION_ID, expect.anything());
+    expect(create.status).toBe(201);
+    expect(clientService.createRegime).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      "MEI",
+      expect.anything(),
+    );
+    expect(update.status).toBe(200);
+    expect(clientService.updateRegime).toHaveBeenCalledWith(
+      REGIME_ID,
+      ORGANIZATION_ID,
+      "Imune",
+      expect.anything(),
+    );
+    expect(blank.status).toBe(400);
+    expect(clientService.getById).not.toHaveBeenCalled();
+  });
+
+  it("serves typed segments and validates the legacy type", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const json = { ...headers(), "content-type": "application/json" };
+
+    const list = await app.request("https://client.test/client/segments", { headers: headers() });
+    const create = await app.request("https://client.test/client/segments", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: "Varejo", type: "comercio" }),
+    });
+    const invalidType = await app.request("https://client.test/client/segments", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: "Varejo", type: "agro" }),
+    });
+    const update = await app.request(`https://client.test/client/segments/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({ type: "industria" }),
+    });
+    const empty = await app.request(`https://client.test/client/segments/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({}),
+    });
+
+    expect(list.status).toBe(200);
+    expect(clientService.listSegments).toHaveBeenCalledWith(ORGANIZATION_ID, expect.anything());
+    expect(create.status).toBe(201);
+    expect(clientService.createSegment).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      { name: "Varejo", type: "comercio" },
+      expect.anything(),
+    );
+    expect(invalidType.status).toBe(400);
+    expect(update.status).toBe(200);
+    expect(clientService.updateSegment).toHaveBeenCalledWith(
+      REGIME_ID,
+      ORGANIZATION_ID,
+      { type: "industria" },
+      expect.anything(),
+    );
+    expect(empty.status).toBe(400);
+  });
+
+  it("serves canonical groups before /client/:id and validates the payloads", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const json = { ...headers(), "content-type": "application/json" };
+
+    const list = await app.request("https://client.test/client/groups", { headers: headers() });
+    const create = await app.request("https://client.test/client/groups", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: "Holding" }),
+    });
+    const inactivate = await app.request(`https://client.test/client/groups/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({ status: false }),
+    });
+    const emptyPatch = await app.request(`https://client.test/client/groups/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({}),
+    });
+    const members = await app.request(`https://client.test/client/groups/${REGIME_ID}/clients`, {
+      method: "PUT",
+      headers: json,
+      body: JSON.stringify({ client_ids: [CLIENT_ID] }),
+    });
+    const badMember = await app.request(`https://client.test/client/groups/${REGIME_ID}/clients`, {
+      method: "PUT",
+      headers: json,
+      body: JSON.stringify({ client_ids: ["nao-e-uuid"] }),
+    });
+
+    expect(list.status).toBe(200);
+    expect(clientService.listGroups).toHaveBeenCalledWith(ORGANIZATION_ID, expect.anything());
+    expect(create.status).toBe(201);
+    expect(inactivate.status).toBe(200);
+    expect(clientService.updateGroup).toHaveBeenCalledWith(
+      REGIME_ID,
+      ORGANIZATION_ID,
+      { status: false },
+      expect.anything(),
+    );
+    expect(emptyPatch.status).toBe(400);
+    expect(members.status).toBe(200);
+    expect(clientService.replaceGroupClients).toHaveBeenCalledWith(
+      REGIME_ID,
+      ORGANIZATION_ID,
+      [CLIENT_ID],
+      expect.anything(),
+    );
+    expect(badMember.status).toBe(400);
+    expect(clientService.getById).not.toHaveBeenCalled();
+  });
+
+  it("serves licitação bidders before /client/:id and the history per client", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+
+    const bidders = await app.request("https://client.test/client/licitacao/bidders", {
+      headers: headers(),
+    });
+    const history = await app.request(`https://client.test/client/${CLIENT_ID}/licitacao/history`, {
+      headers: headers(),
+    });
+    const badId = await app.request("https://client.test/client/nao-e-uuid/licitacao/history", {
+      headers: headers(),
+    });
+
+    expect(bidders.status).toBe(200);
+    expect(clientService.listLicitacaoBidders).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      expect.anything(),
+    );
+    expect(history.status).toBe(200);
+    expect(clientService.listLicitacaoHistory).toHaveBeenCalledWith(
+      CLIENT_ID,
+      ORGANIZATION_ID,
+      expect.anything(),
+    );
+    expect(badId.status).toBe(400);
+    expect(clientService.getById).not.toHaveBeenCalled();
   });
 
   it("preserves representative CRUD and validation behavior", async () => {

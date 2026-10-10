@@ -4202,6 +4202,63 @@ const handlers = {
     });
   },
 
+  async clientRegimesList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/regimes" });
+  },
+
+  async clientRegimeCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/client/regimes",
+      json: { name: uniqueText("Smoke Regime") },
+    });
+    if (!isBadExpectation(op)) {
+      state.clientRegimeId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async clientRegimePatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/regimes/${requireState("clientRegimeId")}`,
+      json: { name: uniqueText("Smoke Regime Updated") },
+    });
+  },
+
+  async clientSegmentsList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/segments" });
+  },
+
+  async clientSegmentCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/client/segments",
+      json: { name: uniqueText("Smoke Segmento"), type: "servico" },
+    });
+    if (!isBadExpectation(op)) {
+      state.clientSegmentId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async clientSegmentPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/segments/${requireState("clientSegmentId")}`,
+      json: { type: "comercio" },
+    });
+  },
+
+  async clientLicitacaoBidders(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/licitacao/bidders" });
+  },
+
+  async clientLicitacaoHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/${requireState("primaryClientId")}/licitacao/history`,
+    });
+  },
+
   async clientCoringaList(op) {
     await httpRequest(op, { expectedStatus: [200], query: { page: 1, limit: 5 } });
   },

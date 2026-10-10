@@ -75,6 +75,46 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/client\/regimes$/,
+    description: { action: "consultou", item: "a lista de regimes" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/regimes$/,
+    description: { action: "cadastrou", item: "um novo regime" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/client\/regimes\/[^/]+$/,
+    description: { action: "atualizou", item: "um regime" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/licitacao\/bidders$/,
+    description: { action: "consultou", item: "a lista de licitantes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/[^/]+\/licitacao\/history$/,
+    description: { action: "consultou", item: "o histórico de licitação de um cliente" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/segments$/,
+    description: { action: "consultou", item: "a lista de segmentos" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/segments$/,
+    description: { action: "cadastrou", item: "um novo segmento" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/client\/segments\/[^/]+$/,
+    description: { action: "atualizou", item: "um segmento" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/client\/coringa\/list$/,
     description: { action: "consultou", item: "a Lista Coringa de clientes" },
   },

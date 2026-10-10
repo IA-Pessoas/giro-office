@@ -160,6 +160,9 @@ model Organization {
   clientsGroups                 ClientsGroup[]
   documentsTermination          DocumentClientTermination[]
   groups                        Group[]
+  clientRegimes                 ClientRegime[]
+  clientSegments                ClientSegment[]
+  clientLicitacaoHistory        ClientLicitacaoHistory[]
   clientHistorys                ClientHistory[]
   clientHistorysPending         ClientHistoryPending[]
   pas                           PA[]
@@ -785,6 +788,7 @@ model Client {
   clouds                        ClientClouds[]
   organization                  Organization                @relation(fields: [organization_id], references: [id])
   groups                        ClientsGroup[]
+  licitacaoHistory              ClientLicitacaoHistory[]
   documentsTermination          DocumentClientTermination[]
   historys                      ClientHistory[]
   historysPe                    ClientHistoryPending[]
@@ -892,6 +896,53 @@ model Group {
   @@map("clients.group")
 }
 
+// Catálogo de regimes do cadastro de clientes por organização (tb_regularize.regimes no legado).
+// Client.regime guarda o nome; renomear aqui não reescreve clientes já gravados.
+model ClientRegime {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_regime_org_normalized_name")
+  @@map("clients.regimes")
+}
+
+// Segmentos do cliente por organização, com o tipo herdado de tb_integracao.segmentos (#1741).
+// Client.segment guarda o nome; renomear aqui não reescreve clientes já gravados.
+model ClientSegment {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  type            String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_segment_org_normalized_name")
+  @@map("clients.segments")
+}
+
+// Mudanças da resposta de licitação do cliente (#1743). NULL = não informado, distinto de Sim/Não.
+model ClientLicitacaoHistory {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  previous_value  Boolean?
+  new_value       Boolean?
+  actor_user_id   String
+  created_at      DateTime     @default(now())
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, client_id, created_at], map: "idx_client_licitacao_history_client")
+  @@map("clients.licitacao_history")
+}
+
 model ClientsGroup {
   id              String       @id @default(uuid())
   group_id        String
@@ -901,6 +952,8 @@ model ClientsGroup {
   group           Group        @relation(fields: [group_id], references: [id])
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  // Um cliente pode estar em vários grupos, mas o par cliente+grupo é único (#1742).
+  @@unique([group_id, client_id], map: "uq_clients_group_member")
   @@map("clients.clientsGroup")
 }
 

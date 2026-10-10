@@ -1,12 +1,13 @@
 import type {
   Client,
   ClientFormValues,
+  ClientSegment,
   ClientTaxRegime,
   CreateClientPayload,
   UpdateClientPayload,
 } from "../types";
 
-import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+import { CLIENT_SEGMENT_TYPE_LABELS, TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 import { normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
 
 import { normalizeDocumentValue } from "./documentValidation.ts";
@@ -19,12 +20,50 @@ function isClientTaxRegime(value: string | null | undefined): value is ClientTax
   return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime);
 }
 
-function normalizeTaxRegime(value: ClientTaxRegime | ""): ClientTaxRegime | null {
-  return value || null;
+function normalizeTaxRegime(value: string): string | null {
+  return value.trim() || null;
+}
+
+/**
+ * Opções do regime na ficha: regimes compartilhados, catálogo da organização e o valor já
+ * gravado, que continua selecionável mesmo fora do catálogo (#1740).
+ */
+export function buildClientRegimeOptions(
+  catalog: readonly string[],
+  storedRegime?: string | null,
+): string[] {
+  const options = [...new Set<string>([...CLIENT_TAX_REGIME_OPTIONS, ...catalog])];
+  return storedRegime && !options.includes(storedRegime) ? [...options, storedRegime] : options;
 }
 
 export function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
   return isClientTaxRegime(value) ? value : "";
+}
+
+/**
+ * Opções do segmento com o tipo legado no rótulo. Não há lista fixa: o catálogo da organização é
+ * a fonte, e o valor gravado fora dele continua visível para revisão (#1741).
+ */
+export function buildClientSegmentOptions(
+  catalog: readonly ClientSegment[],
+  storedSegment?: string | null,
+): Array<{ value: string; label: string }> {
+  const options = catalog.map((segment) => ({
+    value: segment.name,
+    label: `${segment.name} (${CLIENT_SEGMENT_TYPE_LABELS[segment.type] ?? segment.type})`,
+  }));
+  return storedSegment && !options.some((option) => option.value === storedSegment)
+    ? [...options, { value: storedSegment, label: `${storedSegment} (fora do catálogo)` }]
+    : options;
+}
+
+export function describeClientSegment(
+  segment: string | null | undefined,
+  catalog: readonly ClientSegment[],
+): string {
+  if (!segment) return "A definir";
+  const type = catalog.find((item) => item.name === segment)?.type;
+  return type ? `${segment} (${CLIENT_SEGMENT_TYPE_LABELS[type]})` : segment;
 }
 
 function normalizeClientDocumentValue(
@@ -42,7 +81,8 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
     fantasy_name: client?.fantasy_name ?? "",
     cpf_cnpj: client?.cpf_cnpj ?? "",
     status: client?.status ? mapClientStatusFromApi(client.status) : "Ativo",
-    regime: getClientTaxRegime(client?.regime),
+    regime: client?.regime ?? "",
+    segment: client?.segment ?? "",
     service_unique: client?.service_unique ?? false,
     address: client?.address ?? "",
     cep: client?.cep ?? "",
@@ -80,6 +120,7 @@ export function buildCreateClientPayload(
     cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
     regime: normalizeTaxRegime(values.regime),
+    segment: values.segment.trim() || null,
     service_unique: values.service_unique,
     address: normalizeOptionalAddress(values.address),
     cep: normalizeOptionalAddress(values.cep),
@@ -93,20 +134,15 @@ function normalizeOptionalAddress(value: string): string | null {
   return value.trim() || null;
 }
 
-export function buildUpdateClientPayload(
-  values: ClientFormValues,
-  currentRegime?: string | null,
-): UpdateClientPayload {
-  const regime = normalizeTaxRegime(values.regime);
-  const preservesLegacyRegime = regime === null && currentRegime && !isClientTaxRegime(currentRegime);
-
+export function buildUpdateClientPayload(values: ClientFormValues): UpdateClientPayload {
   return {
     name: getClientInternalName(values),
     company_name: values.company_name.trim() || null,
     fantasy_name: values.fantasy_name.trim() || null,
     cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
-    ...(preservesLegacyRegime ? {} : { regime }),
+    regime: normalizeTaxRegime(values.regime),
+    segment: values.segment.trim() || null,
     service_unique: values.service_unique,
     address: normalizeOptionalAddress(values.address),
     cep: normalizeOptionalAddress(values.cep),
