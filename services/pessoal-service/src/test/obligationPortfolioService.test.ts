@@ -18,7 +18,7 @@ describe("carteira de obrigacoes", () => {
   it("prende a consulta a organizacao e competencia com paginacao padrao", () => {
     const query = parse({});
 
-    expect(query).toMatchObject({ page: 1, page_size: 50 });
+    expect(query).toMatchObject({ page: 1, pageSize: 50 });
     expect(buildObligationPortfolioWhere(organizationId, query)).toEqual({
       organization_id: organizationId,
       competence: "2026-09",
@@ -43,6 +43,13 @@ describe("carteira de obrigacoes", () => {
     expect(where("none")).toMatchObject({ va: null });
   });
 
+  it("filtra obrigacoes sem responsavel", () => {
+    expect(
+      buildObligationPortfolioWhere(organizationId, parse({ responsavel_id: "none" })),
+    ).toMatchObject({ responsavel_id: null });
+    expect(() => parse({ responsavel_id: "nobody" })).toThrow();
+  });
+
   it("pendente sem item busca qualquer dos oito itens pendente", () => {
     const where = buildObligationPortfolioWhere(organizationId, parse({ state: "pending" }));
 
@@ -53,7 +60,7 @@ describe("carteira de obrigacoes", () => {
   it("rejeita estado concluido sem item, item invalido e pagina acima do limite", () => {
     expect(() => parse({ state: "done" })).toThrow();
     expect(() => parse({ item: "client_id", state: "pending" })).toThrow();
-    expect(() => parse({ page_size: "101" })).toThrow();
+    expect(() => parse({ pageSize: "101" })).toThrow();
     expect(() => parse({ organization_id: organizationId })).toThrow();
   });
 
@@ -68,10 +75,10 @@ describe("carteira de obrigacoes", () => {
     const result = await listObligationPortfolio(
       prisma,
       organizationId,
-      parse({ page: "2", page_size: "25" }),
+      parse({ page: "2", pageSize: "25" }),
     );
 
-    expect(result).toEqual({ items: [{ id: "1" }], total: 51, page: 2, page_size: 25 });
+    expect(result).toEqual({ items: [{ id: "1" }], total: 51, page: 2, pageSize: 25 });
     expect(prisma.obrigationsPessoal.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { organization_id: organizationId, competence: "2026-09" },

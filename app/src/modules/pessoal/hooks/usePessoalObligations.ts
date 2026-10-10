@@ -55,21 +55,16 @@ export function useCreatePessoalObligationMutation(): UseMutationResult<
   });
 }
 
+/** Edição pela ficha: mesmo PATCH da carteira; invalida ficha, carteira e histórico. */
 export function useUpdatePessoalObligationMutation(
   id: string,
-  clientId: string,
-  competence: string,
 ): UseMutationResult<PessoalObligation, Error, PessoalObligationUpdatePayload> {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (payload) => pessoalService.updateObligationField(id, payload),
     onSettled: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: obligationKey(clientId, competence) }),
-        queryClient.invalidateQueries({ queryKey: pessoalQueryKey("obligations", "portfolio") }),
-        queryClient.invalidateQueries({ queryKey: obligationHistoryKey(id) }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: pessoalQueryKey("obligations") });
     },
   });
 }
@@ -81,10 +76,11 @@ function obligationHistoryKey(id: string, page?: number) {
 export function usePessoalObligationHistory(
   id: string,
   page: number,
+  pageSize: number,
 ): UseQueryResult<PessoalObligationHistoryPage, Error> {
   return useFetch(
     obligationHistoryKey(id, page),
-    () => pessoalService.listObligationHistory(id, page),
+    () => pessoalService.listObligationHistory(id, page, pageSize),
     { enabled: id.length > 0 },
   );
 }

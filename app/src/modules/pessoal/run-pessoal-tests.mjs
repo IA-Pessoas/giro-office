@@ -288,8 +288,8 @@ runTest("prioritized unclear fields expose shared contextual help", () => {
   assert.match(tracking, /Período/);
   assert.match(tracking, /Saldo/);
   assert.match(obligations, /FieldHelp/);
-  assert.match(obligations, /Contribuição assistencial/);
-  assert.match(obligations, /BSF/);
+  assert.match(obligations, /assistance_fee: "Indica/);
+  assert.match(obligations, /bsf: "Indica/);
   assert.match(payroll, /FieldHelp/);
   assert.match(payroll, /Tipo de adiantamento/);
   assert.match(payroll, /Onvio/);
@@ -851,8 +851,8 @@ runTest("password UI keeps secrets behind detail and explicit reveal", () => {
 runTest("obligation portfolio sends only server-side filters and maps item states", () => {
   assert.equal(PESSOAL_ENDPOINTS.obligationPortfolio, "/pessoal/obrigations/portfolio");
   assert.deepEqual(
-    buildPessoalObligationPortfolioParams({ competence: "2026-09", page: 1, page_size: 25 }),
-    { competence: "2026-09", page: 1, page_size: 25 },
+    buildPessoalObligationPortfolioParams({ competence: "2026-09", page: 1, pageSize: 25 }),
+    { competence: "2026-09", page: 1, pageSize: 25 },
   );
   assert.deepEqual(
     buildPessoalObligationPortfolioParams({
@@ -862,7 +862,7 @@ runTest("obligation portfolio sends only server-side filters and maps item state
       item: "va",
       state: "none",
       page: 2,
-      page_size: 25,
+      pageSize: 25,
     }),
     {
       competence: "2026-09",
@@ -871,7 +871,7 @@ runTest("obligation portfolio sends only server-side filters and maps item state
       item: "va",
       state: "none",
       page: 2,
-      page_size: 25,
+      pageSize: 25,
     },
   );
   assert.equal(
@@ -879,7 +879,7 @@ runTest("obligation portfolio sends only server-side filters and maps item state
       competence: "2026-09",
       state: "done",
       page: 1,
-      page_size: 25,
+      pageSize: 25,
     }).state,
     undefined,
   );
@@ -888,7 +888,7 @@ runTest("obligation portfolio sends only server-side filters and maps item state
       competence: "2026-09",
       state: "pending",
       page: 1,
-      page_size: 25,
+      pageSize: 25,
     }).state,
     "pending",
   );
@@ -905,7 +905,7 @@ runTest("portfolio edits share the individual obligation PATCH and invalidate bo
     hooks,
     /useUpdatePessoalPortfolioObligationMutation[\s\S]*?pessoalService\.updateObligationField\(id, payload\)[\s\S]*?pessoalQueryKey\("obligations"\)/,
   );
-  assert.match(hooks, /pessoalQueryKey\("obligations", "portfolio"\)/);
+  assert.match(hooks, /pessoalQueryKey\("obligations", "portfolio",/);
 });
 
 runTest("obligation history formats item states and responsible names", () => {
@@ -921,13 +921,14 @@ runTest("obligation history formats item states and responsible names", () => {
   assert.equal(formatObligationHistoryValue("responsavel_id", null, names), "Sem responsável");
 });
 
-runTest("obligation edits refresh the item history", () => {
+runTest("ficha edits refresh ficha, portfolio and history under one prefix", () => {
   const hooks = readFileSync("src/modules/pessoal/hooks/usePessoalObligations.ts", "utf8");
 
   assert.match(
     hooks,
-    /useUpdatePessoalObligationMutation[\s\S]*?invalidateQueries\(\{ queryKey: obligationHistoryKey\(id\) \}\)/,
+    /useUpdatePessoalObligationMutation\([\s\S]*?invalidateQueries\(\{ queryKey: pessoalQueryKey\("obligations"\) \}\)/,
   );
+  assert.match(hooks, /pessoalQueryKey\("obligations", "history"/);
 });
 
 console.log("pessoal contract tests passed");
