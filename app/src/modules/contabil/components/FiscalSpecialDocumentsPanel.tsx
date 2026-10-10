@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
 
-import { triageFiscalSpecialConfigQueryKey } from "../hooks/queryKeys";
+import {
+  TRIAGE_FISCAL_PORTFOLIO_QUERY_KEY,
+  triageFiscalSpecialConfigQueryKey,
+} from "../hooks/queryKeys";
 import { getContabilErrorMessage, triageDocumentsService } from "../services";
 import type { TriageFiscalSpecialConfig } from "../types";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
@@ -19,6 +23,7 @@ export function FiscalSpecialDocumentsPanel({
   clientId: string;
   canEdit: boolean;
 }) {
+  const queryClient = useQueryClient();
   const config = useFetch(triageFiscalSpecialConfigQueryKey(clientId), () =>
     triageDocumentsService.getFiscalSpecialConfig(clientId),
   );
@@ -35,7 +40,10 @@ export function FiscalSpecialDocumentsPanel({
     setMessage(null);
     try {
       await triageDocumentsService.saveFiscalSpecialConfig(clientId, activeItems);
-      await config.refetch();
+      await Promise.all([
+        config.refetch(),
+        queryClient.invalidateQueries({ queryKey: TRIAGE_FISCAL_PORTFOLIO_QUERY_KEY }),
+      ]);
       setMessage({
         tone: "ok",
         text: "Documentos especiais salvos. Valem para as competências abertas a partir de agora.",
