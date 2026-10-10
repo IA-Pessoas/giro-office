@@ -1013,7 +1013,12 @@ describe("regularize Worker", () => {
       portfolioReportingService: portfolio,
     });
 
-    for (const source of ["regularize.clients", "regularize.client_groups"]) {
+    for (const source of [
+      "regularize.clients",
+      "regularize.client_groups",
+      "regularize.clients_pf",
+      "regularize.partners",
+    ]) {
       const body = { source, fields: ["name"], limit: 10 };
       const response = await app.request("https://regularize.test/internal/reporting/extract", {
         method: "POST",

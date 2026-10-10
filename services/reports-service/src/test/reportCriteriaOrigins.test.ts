@@ -74,7 +74,8 @@ for (const source of reportingSources.filter(
     source.key !== "rh.attendance" &&
     source.key !== "marketing.budgets" &&
     source.key !== "integracao.client_groups" &&
-    source.key !== "regularize.client_groups",
+    source.key !== "regularize.client_groups" &&
+    source.key !== "regularize.partners",
 )) {
   describe(source.key, () => {
     it("orders the entire authorized set before the output cap", async () => {
@@ -163,7 +164,8 @@ for (const source of reportingSources.filter(
                             ? Ti
                             : source.key === "regularize.municipal_taxes"
                               ? Municipal
-                              : source.key === "regularize.clients"
+                              : source.key === "regularize.clients" ||
+                                  source.key === "regularize.clients_pf"
                                 ? Portfolio
                                 : Regularize;
       const service = new Service(prisma as never);

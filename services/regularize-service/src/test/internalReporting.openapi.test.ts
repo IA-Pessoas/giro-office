@@ -59,6 +59,8 @@ describe("regularize internal reporting OpenAPI", () => {
       "regularize.municipal_taxes",
       "regularize.clients",
       "regularize.client_groups",
+      "regularize.clients_pf",
+      "regularize.partners",
     ]);
     expect(
       operation.post.requestBody.content["application/json"].schema.properties.limit.maximum,

@@ -2,7 +2,11 @@ import "./envBootstrap.js";
 
 import { createHash, createHmac } from "node:crypto";
 
-import { INTERNAL_SERVICE_TOKEN_HEADER, REQUEST_ID_HEADER } from "@workspace/shared";
+import {
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  REGULARIZE_PORTFOLIO_REPORTING_SOURCES,
+  REQUEST_ID_HEADER,
+} from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
@@ -47,7 +51,7 @@ function signedGrant(input: { body: unknown; expiresAt?: number }) {
 }
 
 describe("regularize portfolio internal reporting route", () => {
-  for (const source of ["regularize.clients", "regularize.client_groups"]) {
+  for (const source of REGULARIZE_PORTFOLIO_REPORTING_SOURCES) {
     it(`encaminha ${source} somente com a organização do grant`, async () => {
       const extract = vi.fn().mockResolvedValue({
         rows: [{ name: "Alfa", status: "Processo de Inativação" }],

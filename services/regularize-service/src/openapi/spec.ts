@@ -1497,7 +1497,7 @@ export function buildRegularizeServiceOpenApiSpec(
         post: {
           tags: ["Internal"],
           summary:
-            "Extrair licenças, processos, tributos municipais, carteira e grupos para o reports-service",
+            "Extrair licenças, processos, tributos municipais, carteira, grupos, PF e sócios para o reports-service",
           security: [{ internalToken: [] }],
           parameters: [
             {
@@ -1531,6 +1531,8 @@ export function buildRegularizeServiceOpenApiSpec(
                         "regularize.municipal_taxes",
                         "regularize.clients",
                         "regularize.client_groups",
+                        "regularize.clients_pf",
+                        "regularize.partners",
                       ],
                     },
                     fields: {
