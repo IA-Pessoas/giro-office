@@ -54,6 +54,7 @@ export const regularizeMunicipalTaxesReportingCatalog = {
         field("tlp_is_sent", "Envio TLP", "string", stringOperators),
         field("tlp_sent_date", "Data de envio TLP", "date", dateOperators),
         field("tlp_due_date", "Vencimento TLP", "date", dateOperators),
+        field("tlp_not_email", "TLP: não enviar por e-mail", "boolean", booleanOperators),
         field("tll_is_applicable", "TLL aplicável", "boolean", booleanOperators),
         field("tll_amount", "Valor TLL", "number", numberOperators),
         field("tll_notes", "Observação TLL", "string", stringOperators),
