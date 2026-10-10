@@ -277,6 +277,8 @@ model Organization {
   triageOutboxEvents            TriageOutboxEvent[]
   triageExternalLinks           TriageExternalLink[]
   triageUrgentRequests           TriageUrgentRequest[]
+  triageSolicitations            TriageSolicitation[]
+  triageNoteCounts               TriageNoteCount[]
 
   @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
@@ -425,6 +427,9 @@ model User {
   triageExternalLinks         TriageExternalLink[]       @relation("TriageExternalLinkResponsible")
   triageUrgentRequestsCreated TriageUrgentRequest[]      @relation("TriageUrgentRequestRequester")
   triageUrgentRequestsAssigned TriageUrgentRequest[]     @relation("TriageUrgentRequestResponsible")
+  triageSolicitationsCreated  TriageSolicitation[]       @relation("TriageSolicitationRequester")
+  triageSolicitationsAssigned TriageSolicitation[]       @relation("TriageSolicitationResponsible")
+  triageNoteCountsUpdated     TriageNoteCount[]
   financeiroCollectorAssignments DepartmentCollector[]
   taskOperationalNotifications TaskOperationalNotification[]
   department                  Department             @relation(fields: [department_id], references: [id])
@@ -826,6 +831,8 @@ model Client {
   triageCompetences             TriageCompetence[]
   triageExternalLinks           TriageExternalLink[]
   triageUrgentRequests           TriageUrgentRequest[]
+  triageSolicitations            TriageSolicitation[]
+  triageNoteCounts               TriageNoteCount[]
   commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
@@ -3448,6 +3455,7 @@ model TriageCatalogItem {
   updated_at      DateTime     @updatedAt
   organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
   snapshots       TriageCompetenceCatalogSnapshot[]
+  solicitations   TriageSolicitation[]
 
   @@unique([organization_id, kind, code], map: "uq_triagem_catalog_items_org_kind_code")
   @@unique([id, organization_id], map: "uq_triagem_catalog_items_id_organization_id")
@@ -3519,6 +3527,50 @@ model TriageUrgentRequest {
   @@index([organization_id, client_id, competence, status, created_at], map: "idx_triagem_urgent_requests_scope")
   @@index([organization_id, responsible_id, status], map: "idx_triagem_urgent_requests_responsible")
   @@map("triagem.urgent_requests")
+}
+
+model TriageSolicitation {
+  id              String            @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      String
+  category_id     String
+  description     String
+  requester_id    String
+  responsible_id  String
+  status          String            @default("OPEN")
+  closed_at       DateTime?
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  organization    Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  client          Client            @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  category        TriageCatalogItem @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  requester       User              @relation("TriageSolicitationRequester", fields: [requester_id], references: [id], onDelete: Restrict)
+  responsible     User              @relation("TriageSolicitationResponsible", fields: [responsible_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, client_id, competence, status], map: "idx_triagem_solicitations_scope")
+  @@index([organization_id, responsible_id, status, created_at], map: "idx_triagem_solicitations_responsible")
+  @@map("triagem.solicitations")
+}
+
+model TriageNoteCount {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      String
+  xml_inbound     Int          @default(0)
+  xml_outbound    Int          @default(0)
+  nfse_issued     Int          @default(0)
+  nfse_received   Int          @default(0)
+  updated_by_id   String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  client          Client       @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  updated_by      User         @relation(fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, client_id, competence], map: "uq_triagem_note_counts_scope")
+  @@map("triagem.note_counts")
 }
 
 model TriageCompetenceHistory {

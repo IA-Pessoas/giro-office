@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium, expect } from "@playwright/test";
 
+import { EMPTY_SOLICITATION_INDICATORS } from "./triagemSmokeFixtures.mjs";
+
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const port = process.env.TRIAGE_OVERVIEW_SMOKE_PORT ?? "3131";
 const baseUrl = configuredBaseUrl ?? `http://127.0.0.1:${port}`;
@@ -88,6 +90,9 @@ async function runBrowserProof() {
     if (request.method() === "GET" && apiPath === "/triagem/catalogs") return json(route, []);
     if (request.method() === "GET" && apiPath === "/triagem/overview") {
       return json(route, overviewFor(url));
+    }
+    if (request.method() === "GET" && apiPath === "/triagem/solicitations/indicators") {
+      return json(route, EMPTY_SOLICITATION_INDICATORS);
     }
     return json(route, []);
   });

@@ -60,6 +60,7 @@ const triagemServiceRoutes: Route[] = [
   "catalogs",
   "external-links",
   "urgent-requests",
+  "solicitations",
 ].map((path) => ({
   prefix: `/triagem/${path}`,
   binding: "TRIAGEM_SERVICE",

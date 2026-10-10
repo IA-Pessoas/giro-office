@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { chromium, expect } from "@playwright/test";
 
+import { EMPTY_SOLICITATION_INDICATORS } from "../triagem/triagemSmokeFixtures.mjs";
+
 const baseUrl = (process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3125").replace(/\/$/, "");
 const screenshotPath =
   process.env.TRIAGE_BROWSER_SCREENSHOT_PATH ??
@@ -313,6 +315,9 @@ await page.route("**/*", async (route) => {
     }
     recomputeSummary(fiscalFixture);
     return json(route, fiscalFixture);
+  }
+  if (request.method() === "GET" && apiPath === "/triagem/solicitations/indicators") {
+    return json(route, EMPTY_SOLICITATION_INDICATORS);
   }
   return json(route, []);
 });
