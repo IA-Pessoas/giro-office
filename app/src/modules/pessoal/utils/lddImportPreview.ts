@@ -115,7 +115,7 @@ export interface LddImportKeySummary {
  */
 export function summarizeLddImportByKey(
   rows: LddImportDraftRow[],
-  existingLdd: Pick<PessoalLdd, "type" | "period" | "due_date" | "balance_amount">[],
+  existingLdd: Pick<PessoalLdd, "id" | "type" | "period" | "due_date" | "balance_amount">[],
 ): LddImportKeySummary[] {
   const increases = new Map<string, number>();
   for (const row of buildLddImportRows(rows)) {
@@ -125,14 +125,16 @@ export function summarizeLddImportByKey(
 
   return [...increases].map(([key, increase]) => {
     const [period = "", due_date = ""] = key.split("|");
-    const existing = toCents(
-      existingLdd.find(
+    // Com mais de um LDD na mesma chave, o servidor acresce no de menor id.
+    const [target] = existingLdd
+      .filter(
         (ldd) =>
           ldd.type === LDD_IMPORT_TYPE &&
           ldd.period === period &&
           ldd.due_date?.slice(0, 10) === due_date,
-      )?.balance_amount ?? 0,
-    );
+      )
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    const existing = toCents(target?.balance_amount ?? 0);
     return {
       period,
       due_date,

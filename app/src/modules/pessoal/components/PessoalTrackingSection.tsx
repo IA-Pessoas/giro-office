@@ -513,7 +513,7 @@ export function PessoalTrackingSection({
             <PessoalLddImportPreview
               key={selectedClientId}
               clientId={selectedClientId}
-              existingLdd={lddRows}
+              existingLdd={lddQuery.isSuccess && !lddQuery.isFetching ? lddRows : null}
             />
           ) : null}
           {activeTrackingTab === "ldd" ? (

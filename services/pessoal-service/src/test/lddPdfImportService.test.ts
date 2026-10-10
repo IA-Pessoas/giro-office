@@ -217,6 +217,7 @@ describe("confirmLddImport", () => {
 
   function createStore() {
     return {
+      $executeRaw: vi.fn(async (..._query: unknown[]) => 1),
       lddImportPessoal: {
         findFirst: vi.fn(async (): Promise<{ created_at: Date } | null> => null),
         create: vi.fn(async ({ data }) => ({ id: "import-1", ...data })),
@@ -255,6 +256,13 @@ describe("confirmLddImport", () => {
         imported_by_id: userId,
       },
     });
+    // A trava por cliente vem antes de qualquer leitura.
+    expect(store.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      store.lddImportPessoal.findFirst.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(store.$executeRaw.mock.calls[0]?.[1]).toBe(
+      JSON.stringify(["pessoal.ldd_import", organizationId, clientId]),
+    );
     expect(store.lddPessoal.create).toHaveBeenCalledTimes(2);
     expect(store.lddPessoal.create).toHaveBeenNthCalledWith(
       1,
@@ -285,6 +293,7 @@ describe("confirmLddImport", () => {
 
     expect(store.lddPessoal.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
+        orderBy: { id: "asc" },
         where: {
           organization_id: organizationId,
           client_id: clientId,

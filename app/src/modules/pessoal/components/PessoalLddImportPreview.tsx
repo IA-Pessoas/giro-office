@@ -2,7 +2,8 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { AlertCircle, Check, FileUp, Loader2, Trash2, X } from "lucide-react";
 
 import { fileToBase64 } from "@shared/utils/fileToBase64";
-import { formatBrlDecimalInput } from "@shared/utils/inputFormatting";
+import { formatCivilDate } from "@shared/utils/dateFormat";
+import { formatBrlAmount, formatBrlDecimalInput } from "@shared/utils/inputFormatting";
 
 import {
   useConfirmPessoalLddImportMutation,
@@ -26,9 +27,6 @@ import {
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
 
-const formatBrl = (value: number) => formatBrlDecimalInput(value.toFixed(2)) || "R$ 0,00";
-const formatDay = (value: string) => value.slice(0, 10).split("-").reverse().join("/");
-
 /**
  * Envia o PDF LDD/INSS e mostra as linhas lidas para revisão. Nada é gravado até confirmar: as
  * edições ficam só na tela, e descartar a prévia não deixa rastro. A confirmação grava as linhas
@@ -39,21 +37,20 @@ export function PessoalLddImportPreview({
   existingLdd,
 }: {
   clientId: string;
-  /** LDD já cadastrados do cliente, para mostrar o saldo existente por chave. */
-  existingLdd: PessoalLdd[];
+  /** LDD já cadastrados do cliente, para o saldo existente por chave; `null` enquanto não há lista confiável. */
+  existingLdd: PessoalLdd[] | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const previewMutation = usePreviewPessoalLddImportMutation();
   const confirmMutation = useConfirmPessoalLddImportMutation();
-  const [file, setFile] = useState({ name: "", hash: "", alreadyImportedAt: "" });
+  const [pdf, setPdf] = useState({ name: "", hash: "", alreadyImportedAt: "" });
   const [rows, setRows] = useState<LddImportDraftRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const fileName = file.name;
 
   function discard() {
     setRows(null);
-    setFile({ name: "", hash: "", alreadyImportedAt: "" });
+    setPdf({ name: "", hash: "", alreadyImportedAt: "" });
     setError(null);
   }
 
@@ -64,15 +61,19 @@ export function PessoalLddImportPreview({
     try {
       const result = await confirmMutation.mutateAsync({
         client_id: clientId,
-        file_name: file.name,
-        file_hash: file.hash,
+        file_name: pdf.name,
+        file_hash: pdf.hash,
         rows: buildLddImportRows(rows),
       });
       discard();
       setSuccess(
-        `Importação concluída: ${result.rows_count} linha(s), ${formatBrl(result.total_amount)} acrescidos ao LDD.`,
+        `Importação concluída: ${result.rows_count} linha(s), ${formatBrlAmount(result.total_amount)} acrescidos ao LDD.`,
       );
     } catch (err) {
+      // 409: o arquivo já entrou (outra aba ou clique repetido); trava a confirmação.
+      if ((err as { response?: { status?: number } }).response?.status === 409) {
+        setPdf((current) => ({ ...current, alreadyImportedAt: new Date().toISOString() }));
+      }
       setError(getPessoalErrorMessage(err, "Não foi possível importar o LDD."));
     }
   }
@@ -97,7 +98,7 @@ export function PessoalLddImportPreview({
         file_name: file.name,
         content_base64: await fileToBase64(file),
       });
-      setFile({
+      setPdf({
         name: preview.file_name,
         hash: preview.file_hash,
         alreadyImportedAt: preview.already_imported_at ?? "",
@@ -122,11 +123,11 @@ export function PessoalLddImportPreview({
   }
 
   const rowsWithErrors = rows?.filter((row) => row.errors.length > 0).length ?? 0;
-  const keySummary = rows ? summarizeLddImportByKey(rows, existingLdd) : [];
+  const keySummary = rows && existingLdd ? summarizeLddImportByKey(rows, existingLdd) : [];
   const canConfirm =
     keySummary.length > 0 &&
     rowsWithErrors === 0 &&
-    !file.alreadyImportedAt &&
+    !pdf.alreadyImportedAt &&
     !confirmMutation.isPending;
 
   return (
@@ -182,7 +183,7 @@ export function PessoalLddImportPreview({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Prévia da importação: {fileName}
+                Prévia da importação: {pdf.name}
               </h4>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                 Débitos previdenciários lidos do PDF. Nada é gravado antes da confirmação.
@@ -214,17 +215,23 @@ export function PessoalLddImportPreview({
             </div>
           </div>
 
-          {file.alreadyImportedAt ? (
+          {pdf.alreadyImportedAt ? (
             <p
               role="alert"
               className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100"
             >
-              Este PDF já foi importado para este cliente em {formatDay(file.alreadyImportedAt)}.
+              Este PDF já foi importado para este cliente em{" "}
+              {formatCivilDate(pdf.alreadyImportedAt)}.
               Importar de novo não altera o saldo.
             </p>
           ) : rowsWithErrors > 0 ? (
             <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
               Corrija ou remova as linhas com erro para confirmar.
+            </p>
+          ) : !existingLdd ? (
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              Aguardando a lista de LDD do cliente para mostrar o saldo cadastrado. Use
+              &quot;Atualizar&quot; se ela não carregar.
             </p>
           ) : null}
 
@@ -326,7 +333,7 @@ export function PessoalLddImportPreview({
 
           <p className="mt-4 text-sm text-gray-700 dark:text-gray-300">
             {rows.length} linha(s), {rowsWithErrors} com erro. Total das linhas válidas:{" "}
-            <strong>{formatBrl(lddImportDraftTotal(rows))}</strong>
+            <strong>{formatBrlAmount(lddImportDraftTotal(rows))}</strong>
           </p>
 
           {keySummary.length > 0 ? (
@@ -348,10 +355,10 @@ export function PessoalLddImportPreview({
                   {keySummary.map((item) => (
                     <tr key={`${item.period}|${item.due_date}`}>
                       <td className="py-2 pr-3">{item.period}</td>
-                      <td className="py-2 pr-3">{formatDay(item.due_date)}</td>
-                      <td className="py-2 pr-3">{formatBrl(item.existing)}</td>
-                      <td className="py-2 pr-3">{formatBrl(item.increase)}</td>
-                      <td className="py-2 font-semibold">{formatBrl(item.total)}</td>
+                      <td className="py-2 pr-3">{formatCivilDate(item.due_date)}</td>
+                      <td className="py-2 pr-3">{formatBrlAmount(item.existing)}</td>
+                      <td className="py-2 pr-3">{formatBrlAmount(item.increase)}</td>
+                      <td className="py-2 font-semibold">{formatBrlAmount(item.total)}</td>
                     </tr>
                   ))}
                 </tbody>

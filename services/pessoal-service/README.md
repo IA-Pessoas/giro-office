@@ -32,7 +32,7 @@ Exemplos de paths publicos planejados:
 
 - `/pessoal/ldd`
 - `/pessoal/ldd/import/preview` (POST, edição de Pessoal): lê as linhas `CP-` de um PDF LDD/INSS em base64 (até 700 KB) e devolve a prévia, sem gravar
-- `/pessoal/ldd/import` (POST, edição de Pessoal): grava as linhas revisadas como LDD `INSS`, somando por competência e vencimento ao saldo existente; o mesmo PDF (hash) não é aplicado duas vezes ao cliente (409)
+- `/pessoal/ldd/import` (POST, edição de Pessoal): grava as linhas revisadas como LDD `INSS`, somando por competência e vencimento ao saldo existente; o mesmo PDF (hash) não é aplicado duas vezes ao cliente (409), mesmo que os LDD gravados sejam removidos depois; a correção de débito já gravado é pelo cadastro manual
 - `/pessoal/situations`
 - `/pessoal/unions`
 - `/pessoal/groups`

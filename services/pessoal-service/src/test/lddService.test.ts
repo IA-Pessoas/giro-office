@@ -26,6 +26,7 @@ function createPrismaMock() {
       create: vi.fn(async ({ data }) => ({ id: "import-1", ...data })),
     },
     $transaction: vi.fn(),
+    $executeRaw: vi.fn(async () => 1),
     lddPessoal: {
       create: vi.fn(async ({ data }) => ({ id: recordId, ...data })),
       findMany: vi.fn(async () => []),

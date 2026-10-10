@@ -1013,8 +1013,9 @@ runTest("LDD import shows existing balance and increase per key and sends only v
     draft(4, "03/2024", "", "9,00", ["Informe um vencimento válido."]),
   ];
   const existing = [
-    { type: "INSS", period: "01/2024", due_date: "2024-02-20T00:00:00.000Z", balance_amount: 100.1 },
-    { type: "FGTS", period: "02/2024", due_date: "2024-03-20T00:00:00.000Z", balance_amount: 50 },
+    { id: "b", type: "INSS", period: "01/2024", due_date: "2024-02-20T00:00:00.000Z", balance_amount: 7 },
+    { id: "a", type: "INSS", period: "01/2024", due_date: "2024-02-20T00:00:00.000Z", balance_amount: 100.1 },
+    { id: "c", type: "FGTS", period: "02/2024", due_date: "2024-03-20T00:00:00.000Z", balance_amount: 50 },
   ];
 
   assert.deepEqual(buildLddImportRows(rows), [

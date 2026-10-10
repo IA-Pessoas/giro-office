@@ -59,6 +59,7 @@ import {
   buildLddImportPreview,
   confirmLddImport,
   findLddImportDate,
+  LDD_IMPORT_AUDIT_REFERRING,
   type LddImportStore,
 } from "@workspace/pessoal-service/src/services/lddPdfImportService.js";
 import {
@@ -802,7 +803,7 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
         outcome: "success",
         serviceSource: "pessoal-service",
         action: "Cadastro",
-        referring: "pessoal.ldd_import",
+        referring: LDD_IMPORT_AUDIT_REFERRING,
         referringId: result.import_id,
         department: "pessoal",
       });

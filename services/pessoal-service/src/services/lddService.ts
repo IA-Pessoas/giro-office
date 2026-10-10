@@ -12,6 +12,7 @@ import {
   buildLddImportPreview,
   confirmLddImport,
   findLddImportDate,
+  LDD_IMPORT_AUDIT_REFERRING,
   type LddImportPreview,
   type LddImportResult,
 } from "./lddPdfImportService.js";
@@ -130,7 +131,7 @@ export class LddService {
         userId,
         permission: context.permission,
         action: "Cadastro",
-        referring: "pessoal.ldd_import",
+        referring: LDD_IMPORT_AUDIT_REFERRING,
         referringId: result.import_id,
         // Só metadados: nome do arquivo e conteúdo do PDF ficam fora da auditoria.
         changes: {

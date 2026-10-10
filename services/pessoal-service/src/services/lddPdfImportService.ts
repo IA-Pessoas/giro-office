@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 import { extractPdfText } from "@workspace/shared/pdf";
 
 import type { ConfirmLddImportBody } from "../schemas/ldd.schemas.js";
@@ -21,6 +21,7 @@ import { requireUserId } from "./pessoalServiceTypes.js";
 
 /** Tipo gravado pelo importador de PDF; PGFN segue pelo cadastro manual. */
 export const LDD_IMPORT_TYPE = "INSS";
+export const LDD_IMPORT_AUDIT_REFERRING = "pessoal.ldd_import";
 
 export const SIEF_LIMIT = "Débito com Exigibilidade Suspensa (SIEF)";
 const LINE_MARKER = "CP-";
@@ -65,6 +66,7 @@ type LddImportScope = { organization_id: string; client_id: string };
 
 /** O que a confirmação usa do Prisma (cliente ou transação), no serviço e no Worker. */
 export type LddImportStore = {
+  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
   lddImportPessoal: {
     findFirst(args: {
       where: LddImportScope & { file_hash: string };
@@ -83,6 +85,7 @@ export type LddImportStore = {
   lddPessoal: {
     findFirst(args: {
       where: LddImportScope & { type: string; period: string; due_date: { gte: Date; lt: Date } };
+      orderBy: { id: "asc" };
       select: { id: true; balance_amount: true };
     }): Promise<{ id: string; balance_amount: number | null } | null>;
     create(args: {
@@ -237,10 +240,13 @@ export async function findLddImportDate(
 
 /**
  * Grava a importação confirmada. Chame dentro de uma transação: o registro do arquivo e os
- * saldos entram juntos ou não entram. O índice único do arquivo decide a corrida entre duas
- * confirmações do mesmo PDF.
- * ponytail: dois PDFs diferentes confirmados ao mesmo tempo para a mesma chave nova podem criar
- * dois LDD; se acontecer, índice único em (cliente, tipo, competência, vencimento).
+ * saldos entram juntos ou não entram. As importações do mesmo cliente rodam uma por vez (trava
+ * de transação), então duas confirmações simultâneas não perdem acréscimo nem duplicam a chave;
+ * o índice único do arquivo continua sendo a garantia final contra o reenvio.
+ * Havendo mais de um LDD cadastrado à mão na mesma chave, o acréscimo vai no de menor id.
+ * O servidor confia no `file_hash` da prévia: quem confirma já pode cadastrar LDD à mão.
+ * ponytail: edição manual do mesmo LDD no meio da importação ainda pode se sobrepor; se
+ * acontecer, travar a linha (SELECT ... FOR UPDATE) ou versionar o saldo.
  */
 export async function confirmLddImport(
   store: LddImportStore,
@@ -249,6 +255,7 @@ export async function confirmLddImport(
 ): Promise<LddImportResult> {
   const userId = requireUserId(context);
   const scope = { organization_id: context.organizationId, client_id: body.client_id };
+  await store.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify(["pessoal.ldd_import", scope.organization_id, scope.client_id])}, 0))`;
   const imported = await findLddImportDate(store, {
     organizationId: context.organizationId,
     clientId: body.client_id,
@@ -277,6 +284,7 @@ export async function confirmLddImport(
       },
     });
   } catch (err: unknown) {
+    logError("Erro ao registrar arquivo de importação de LDD", { err });
     if ((err as { code?: unknown }).code === "P2002") throw new ServiceError(409, ALREADY_IMPORTED);
     throw err;
   }
@@ -292,6 +300,7 @@ export async function confirmLddImport(
         period,
         due_date: { gte: dayStart, lt: new Date(dayStart.getTime() + 24 * 60 * 60 * 1000) },
       },
+      orderBy: { id: "asc" },
       select: { id: true, balance_amount: true },
     });
     const balance = (toCents(existing?.balance_amount ?? 0) + cents) / 100;
