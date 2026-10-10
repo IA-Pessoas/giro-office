@@ -21,6 +21,10 @@ import type {
   RegularizeDteImport,
   RegularizeDteImportPayload,
   RegularizeDteImportsPage,
+  RegularizeDteNotice,
+  RegularizeDteNoticeListFilters,
+  RegularizeDteNoticeReadingPayload,
+  RegularizeDteNoticesPage,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
@@ -100,6 +104,29 @@ export function useRegularizeDteImports(): UseQueryResult<RegularizeDteImportsPa
   const scope = useRegularizeQueryScope();
 
   return useFetch(regularizeQueryKeys.dteImports(scope), () => regularizeService.listDteImports());
+}
+
+export function useRegularizeDteNotices(
+  filters: RegularizeDteNoticeListFilters,
+): UseQueryResult<RegularizeDteNoticesPage, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(regularizeQueryKeys.dteNotices(filters, scope), () =>
+    regularizeService.listDteNotices(filters),
+  );
+}
+
+export function useSetRegularizeDteNoticeReadingMutation(): UseMutationResult<
+  RegularizeDteNotice,
+  Error,
+  RegularizeDteNoticeReadingPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.setDteNoticeReading(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
 }
 
 export function useImportRegularizeDteMutation(): UseMutationResult<

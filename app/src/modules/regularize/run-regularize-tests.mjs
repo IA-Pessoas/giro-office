@@ -4,6 +4,7 @@ import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeDteNoticeListParams,
   buildRegularizeGuidanceListParams,
   buildRegularizeLicenseListParams,
   buildRegularizeMunicipalTaxesListParams,
@@ -223,6 +224,8 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
     "/regularize/municipal-taxes-detail",
     "/regularize/dte/import",
     "/regularize/dte/imports",
+    "/regularize/dte/notices",
+    "/regularize/dte/notices/reading",
     "/regularize/processes",
     "/regularize/process",
     "/regularize/process/send-to-fiscal",
@@ -956,6 +959,31 @@ await runTest("regularize process contract keeps canonical states and explicit F
   assert.match(pageSource, /Registrar retorno do Fiscal/);
   assert.match(pageSource, /Status financeiro/);
   assert.match(pageSource, /Aviso ao cliente/);
+});
+
+await runTest("regularize DTE notice filters cover whole days and omit empty filters (#1745)", () => {
+  const base = { from: "", to: "", tipo: "", search: "  ", reading: "Todos", page: 1, limit: 20 };
+
+  assert.deepEqual(buildRegularizeDteNoticeListParams(base), {
+    reading: "Todos",
+    page: 1,
+    limit: 20,
+  });
+
+  const params = buildRegularizeDteNoticeListParams({
+    ...base,
+    from: "2026-09-01",
+    to: "2026-09-30",
+    tipo: "badge badge-warning",
+    search: " intima ",
+    reading: "Pendente",
+  });
+  assert.equal(params.from, new Date(2026, 8, 1).toISOString());
+  assert.equal(params.to, new Date(2026, 8, 30, 23, 59, 59, 999).toISOString());
+  assert.deepEqual(
+    { tipo: params.tipo, search: params.search, reading: params.reading },
+    { tipo: "badge badge-warning", search: "intima", reading: "Pendente" },
+  );
 });
 
 await runTest("regularize municipal tax contract carries filters and unwraps a page", async () => {

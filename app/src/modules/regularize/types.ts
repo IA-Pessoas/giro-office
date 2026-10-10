@@ -688,6 +688,47 @@ export type RegularizeDteImport = {
   created_at: string;
 };
 
+export type RegularizeDteNoticeReadingFilter = "Todos" | "Pendente" | "Lido";
+
+// Datas no formato do <input type="date"> (aaaa-mm-dd); vazio = sem limite.
+export type RegularizeDteNoticeListFilters = {
+  from: string;
+  to: string;
+  tipo: string;
+  search: string;
+  reading: RegularizeDteNoticeReadingFilter;
+  page: number;
+  limit: number;
+};
+
+export type RegularizeDteNotice = {
+  id: RegularizeId;
+  tipo: string;
+  aviso: string;
+  cnpj_cpf: string;
+  destinatario: string;
+  remetente: string;
+  data_emissao: string | null;
+  assunto: string;
+  data_leitura: string | null;
+  data_ciencia: string | null;
+  pending_reading: boolean;
+  created_at: string;
+};
+
+export type RegularizeDteNoticesPage = {
+  data: RegularizeDteNotice[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};
+
+export type RegularizeDteNoticeReadingPayload = {
+  id: RegularizeId;
+  pending_reading: boolean;
+};
+
 export type RegularizeDteImportsPage = {
   data: RegularizeDteImport[];
   total: number;

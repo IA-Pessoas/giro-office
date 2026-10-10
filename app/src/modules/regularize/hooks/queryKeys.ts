@@ -3,6 +3,7 @@ import type {
   RegularizeGuidanceListFilters,
   RegularizeId,
   RegularizeLicenseListFilters,
+  RegularizeDteNoticeListFilters,
   RegularizeMunicipalTaxesListFilters,
   RegularizePartnerListFilters,
   RegularizePasswordListFilters,
@@ -71,6 +72,8 @@ export const regularizeQueryKeys = {
     [...regularizeQueryKeys.scopedRoot(scope), "operations"] as const,
   dteImports: (scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.operations(scope), "dte-imports"] as const,
+  dteNotices: (filters: RegularizeDteNoticeListFilters, scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.operations(scope), "dte-notices", filters] as const,
   municipalTaxes: (filters: RegularizeMunicipalTaxesListFilters, scope: RegularizeQueryScope) =>
     [
       ...regularizeQueryKeys.operations(scope),
