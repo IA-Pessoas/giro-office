@@ -1,36 +1,81 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import { AlertCircle, FileUp, Loader2, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, FileUp, Loader2, Trash2, X } from "lucide-react";
 
 import { fileToBase64 } from "@shared/utils/fileToBase64";
-import { formatBrlDecimalInput } from "@shared/utils/inputFormatting";
+import { formatCivilDate } from "@shared/utils/dateFormat";
+import { formatBrlAmount, formatBrlDecimalInput } from "@shared/utils/inputFormatting";
 
-import { usePreviewPessoalLddImportMutation } from "../hooks/usePessoalTracking";
+import {
+  useConfirmPessoalLddImportMutation,
+  usePreviewPessoalLddImportMutation,
+} from "../hooks/usePessoalTracking";
+import type { PessoalLdd } from "../types/tracking";
 import {
   buildLddImportDraftRows,
+  buildLddImportRows,
   editLddImportDraftRow,
   lddImportDraftTotal,
+  summarizeLddImportByKey,
   validateLddPdfFile,
   type LddImportDraftField,
   type LddImportDraftRow,
 } from "../utils/lddImportPreview";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
-import { pessoalSecondaryButtonClassName, pessoalTextFieldClassName } from "./pessoalFormControls";
+import {
+  pessoalPrimaryButtonClassName,
+  pessoalSecondaryButtonClassName,
+  pessoalTextFieldClassName,
+} from "./pessoalFormControls";
 
 /**
- * Envia o PDF LDD/INSS e mostra as linhas lidas para revisão. Nada é gravado: as edições ficam
- * só na tela, e descartar a prévia não deixa rastro.
+ * Envia o PDF LDD/INSS e mostra as linhas lidas para revisão. Nada é gravado até confirmar: as
+ * edições ficam só na tela, e descartar a prévia não deixa rastro. A confirmação grava as linhas
+ * sem erro; o servidor recusa o mesmo PDF pela segunda vez.
  */
-export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
+export function PessoalLddImportPreview({
+  clientId,
+  existingLdd,
+}: {
+  clientId: string;
+  /** LDD já cadastrados do cliente, para o saldo existente por chave; `null` enquanto não há lista confiável. */
+  existingLdd: PessoalLdd[] | null;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const previewMutation = usePreviewPessoalLddImportMutation();
-  const [fileName, setFileName] = useState("");
+  const confirmMutation = useConfirmPessoalLddImportMutation();
+  const [pdf, setPdf] = useState({ name: "", hash: "", alreadyImportedAt: "" });
   const [rows, setRows] = useState<LddImportDraftRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   function discard() {
     setRows(null);
-    setFileName("");
+    setPdf({ name: "", hash: "", alreadyImportedAt: "" });
     setError(null);
+  }
+
+  async function confirm() {
+    if (!rows) return;
+    setError(null);
+
+    try {
+      const result = await confirmMutation.mutateAsync({
+        client_id: clientId,
+        file_name: pdf.name,
+        file_hash: pdf.hash,
+        rows: buildLddImportRows(rows),
+      });
+      discard();
+      setSuccess(
+        `Importação concluída: ${result.rows_count} linha(s), ${formatBrlAmount(result.total_amount)} acrescidos ao LDD.`,
+      );
+    } catch (err) {
+      // 409: o arquivo já entrou (outra aba ou clique repetido); trava a confirmação.
+      if ((err as { response?: { status?: number } }).response?.status === 409) {
+        setPdf((current) => ({ ...current, alreadyImportedAt: new Date().toISOString() }));
+      }
+      setError(getPessoalErrorMessage(err, "Não foi possível importar o LDD."));
+    }
   }
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -40,6 +85,7 @@ export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
     if (!file) return;
 
     discard();
+    setSuccess(null);
     const invalid = validateLddPdfFile(file);
     if (invalid) {
       setError(invalid);
@@ -52,7 +98,11 @@ export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
         file_name: file.name,
         content_base64: await fileToBase64(file),
       });
-      setFileName(preview.file_name);
+      setPdf({
+        name: preview.file_name,
+        hash: preview.file_hash,
+        alreadyImportedAt: preview.already_imported_at ?? "",
+      });
       setRows(buildLddImportDraftRows(preview));
     } catch (err) {
       setError(getPessoalErrorMessage(err, "Não foi possível ler o PDF."));
@@ -73,6 +123,12 @@ export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
   }
 
   const rowsWithErrors = rows?.filter((row) => row.errors.length > 0).length ?? 0;
+  const keySummary = rows && existingLdd ? summarizeLddImportByKey(rows, existingLdd) : [];
+  const canConfirm =
+    keySummary.length > 0 &&
+    rowsWithErrors === 0 &&
+    !pdf.alreadyImportedAt &&
+    !confirmMutation.isPending;
 
   return (
     <div className="mb-6 space-y-3">
@@ -113,22 +169,71 @@ export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
         </p>
       ) : null}
 
+      {success ? (
+        <p
+          role="status"
+          className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-100"
+        >
+          {success}
+        </p>
+      ) : null}
+
       {rows ? (
         <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Prévia da importação: {fileName}
+                Prévia da importação: {pdf.name}
               </h4>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Débitos previdenciários lidos do PDF. Nada foi gravado.
+                Débitos previdenciários lidos do PDF. Nada é gravado antes da confirmação.
               </p>
             </div>
-            <button type="button" onClick={discard} className={pessoalSecondaryButtonClassName}>
-              <X className="h-4 w-4" />
-              Descartar prévia
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={discard}
+                disabled={confirmMutation.isPending}
+                className={pessoalSecondaryButtonClassName}
+              >
+                <X className="h-4 w-4" />
+                Descartar prévia
+              </button>
+              <button
+                type="button"
+                onClick={confirm}
+                disabled={!canConfirm}
+                className={pessoalPrimaryButtonClassName}
+              >
+                {confirmMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Confirmar importação
+              </button>
+            </div>
           </div>
+
+          {pdf.alreadyImportedAt ? (
+            <p
+              role="alert"
+              className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100"
+            >
+              Este PDF já foi importado para este cliente em{" "}
+              {formatCivilDate(pdf.alreadyImportedAt)}.
+              Importar de novo não altera o saldo.
+            </p>
+          ) : rowsWithErrors > 0 ? (
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              Corrija ou remova as linhas com erro para confirmar.
+            </p>
+          ) : !existingLdd ? (
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              Aguardando a lista de LDD do cliente para mostrar o saldo cadastrado. Use
+              &quot;Atualizar&quot; se ela não carregar.
+            </p>
+          ) : null}
 
           {rows.length === 0 ? (
             <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
@@ -228,8 +333,38 @@ export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
 
           <p className="mt-4 text-sm text-gray-700 dark:text-gray-300">
             {rows.length} linha(s), {rowsWithErrors} com erro. Total das linhas válidas:{" "}
-            <strong>{formatBrlDecimalInput(lddImportDraftTotal(rows).toFixed(2)) || "R$ 0,00"}</strong>
+            <strong>{formatBrlAmount(lddImportDraftTotal(rows))}</strong>
           </p>
+
+          {keySummary.length > 0 ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <caption className="pb-2 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                  O que será gravado, por competência e vencimento
+                </caption>
+                <thead className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                  <tr>
+                    <th className="py-2 pr-3 font-medium">Competência</th>
+                    <th className="py-2 pr-3 font-medium">Vencimento</th>
+                    <th className="py-2 pr-3 font-medium">Saldo cadastrado</th>
+                    <th className="py-2 pr-3 font-medium">Acréscimo</th>
+                    <th className="py-2 font-medium">Novo saldo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 text-gray-700 dark:divide-gray-700 dark:text-gray-300">
+                  {keySummary.map((item) => (
+                    <tr key={`${item.period}|${item.due_date}`}>
+                      <td className="py-2 pr-3">{item.period}</td>
+                      <td className="py-2 pr-3">{formatCivilDate(item.due_date)}</td>
+                      <td className="py-2 pr-3">{formatBrlAmount(item.existing)}</td>
+                      <td className="py-2 pr-3">{formatBrlAmount(item.increase)}</td>
+                      <td className="py-2 font-semibold">{formatBrlAmount(item.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

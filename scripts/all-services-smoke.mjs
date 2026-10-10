@@ -6191,6 +6191,19 @@ const handlers = {
     }
   },
 
+  async pessoalLddImportConfirm(op) {
+    // Hash novo a cada execução: o mesmo arquivo só pode ser importado uma vez por cliente.
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        file_name: "ldd.pdf",
+        file_hash: crypto.randomBytes(32).toString("hex"),
+        rows: [{ period: "01/2024", due_date: "2024-02-20", balance_amount: 0.01 }],
+      },
+    });
+  },
+
   async pessoalLddPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],

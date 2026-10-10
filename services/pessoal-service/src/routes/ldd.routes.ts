@@ -2,6 +2,7 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import { Router } from "express";
 
 import {
+  confirmLddImportBodySchema,
   createLddBodySchema,
   lddIdParamsSchema,
   listLddQuerySchema,
@@ -49,6 +50,19 @@ export function createLddRoutes(service: LddService): Router {
       response.status(200).json(createSuccessResponse(result));
     } catch (err: unknown) {
       logError("Erro ao gerar prévia de importação de LDD", { err });
+      next(err);
+    }
+  });
+
+  router.post("/import", async (request, response, next) => {
+    try {
+      const context = getPessoalRouteContext(request);
+      const body = parseWithZod(confirmLddImportBodySchema, request.body);
+      const result = await service.confirmImport(context, body);
+
+      response.status(201).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao confirmar importação de LDD", { err });
       next(err);
     }
   });
