@@ -53,7 +53,7 @@ function createMockPrisma(): TriageSolicitationPrisma {
       create: vi.fn(),
       update: vi.fn(),
     },
-    triageNoteCount: { findFirst: vi.fn(), upsert: vi.fn() },
+    triageNoteCount: { findFirst: vi.fn(), findMany: vi.fn(), upsert: vi.fn() },
   };
   return prisma as unknown as TriageSolicitationPrisma;
 }
@@ -342,5 +342,133 @@ describe("TriageSolicitationService — contadores de notas (#1697)", () => {
       statusCode: 403,
     });
     expect(prisma.triageNoteCount.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("TriageSolicitationService — indicadores (#1698)", () => {
+  const OTHER_CLIENT = "b0000000-0000-4000-8000-000000000002";
+  const OTHER_RESPONSIBLE = "c0000000-0000-4000-8000-000000000003";
+  const user = (id: string, name: string) => ({ id, name, full_name: null });
+  const row = (clientId: string, requesterId: string, responsibleId: string) => ({
+    client_id: clientId,
+    requester: user(requesterId, `Solicitante ${requesterId.slice(-1)}`),
+    responsible: user(responsibleId, `Responsável ${responsibleId.slice(-1)}`),
+  });
+
+  it("soma notas por responsável sem multiplicar pedidos repetidos do mesmo cliente", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageSolicitation.findMany).mockResolvedValue([
+      row(CLIENT_ID, USER_ID, RESPONSIBLE_ID),
+      row(CLIENT_ID, USER_ID, RESPONSIBLE_ID),
+      row(OTHER_CLIENT, RESPONSIBLE_ID, OTHER_RESPONSIBLE),
+    ] as never);
+    vi.mocked(prisma.triageNoteCount.findMany).mockResolvedValue([
+      { client_id: CLIENT_ID, xml_inbound: 3, xml_outbound: 5, nfse_issued: 2, nfse_received: 1 },
+      {
+        client_id: OTHER_CLIENT,
+        xml_inbound: 1,
+        xml_outbound: 0,
+        nfse_issued: 0,
+        nfse_received: 0,
+      },
+    ] as never);
+
+    const result = await new TriageSolicitationService(prisma).indicators(
+      { competence: COMPETENCE, status: "OPEN" },
+      auth(3),
+    );
+
+    expect(result.notes_by_responsible).toEqual([
+      {
+        user: user(RESPONSIBLE_ID, "Responsável 2"),
+        clients: 1,
+        xml_inbound: 3,
+        xml_outbound: 5,
+        nfse_issued: 2,
+        nfse_received: 1,
+        total: 11,
+      },
+      {
+        user: user(OTHER_RESPONSIBLE, "Responsável 3"),
+        clients: 1,
+        xml_inbound: 1,
+        xml_outbound: 0,
+        nfse_issued: 0,
+        nfse_received: 0,
+        total: 1,
+      },
+    ]);
+    expect(result.solicitations_by_requester).toEqual([
+      { user: user(USER_ID, "Solicitante 1"), total: 2 },
+      { user: user(RESPONSIBLE_ID, "Solicitante 2"), total: 1 },
+    ]);
+    expect(result.totals).toEqual({ solicitations: 3, clients: 2, notes: 12 });
+    expect(prisma.triageSolicitation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORGANIZATION_ID, competence: COMPETENCE, status: "OPEN" },
+      }),
+    );
+    expect(prisma.triageNoteCount.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: ORGANIZATION_ID,
+          competence: COMPETENCE,
+          client_id: { in: [CLIENT_ID, OTHER_CLIENT] },
+        },
+      }),
+    );
+  });
+
+  it("mesmo cliente com dois responsáveis conta para cada um, mas uma vez no total", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageSolicitation.findMany).mockResolvedValue([
+      row(CLIENT_ID, USER_ID, RESPONSIBLE_ID),
+      row(CLIENT_ID, USER_ID, OTHER_RESPONSIBLE),
+    ] as never);
+    vi.mocked(prisma.triageNoteCount.findMany).mockResolvedValue([
+      { client_id: CLIENT_ID, xml_inbound: 3, xml_outbound: 5, nfse_issued: 2, nfse_received: 1 },
+    ] as never);
+
+    const result = await new TriageSolicitationService(prisma).indicators(
+      { competence: COMPETENCE },
+      auth(3),
+    );
+
+    expect(result.notes_by_responsible.map((item) => [item.user.id, item.total])).toEqual([
+      [RESPONSIBLE_ID, 11],
+      [OTHER_RESPONSIBLE, 11],
+    ]);
+    expect(result.totals).toEqual({ solicitations: 2, clients: 1, notes: 11 });
+  });
+
+  it("operador comum vê só os indicadores dos pedidos sob sua responsabilidade", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageSolicitation.findMany).mockResolvedValue([]);
+
+    const result = await new TriageSolicitationService(prisma).indicators(
+      { competence: COMPETENCE },
+      auth(1),
+    );
+
+    expect(result.totals).toEqual({ solicitations: 0, clients: 0, notes: 0 });
+    expect(prisma.triageSolicitation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: ORGANIZATION_ID,
+          competence: COMPETENCE,
+          responsible_id: USER_ID,
+        },
+      }),
+    );
+    expect(prisma.triageNoteCount.findMany).not.toHaveBeenCalled();
+  });
+
+  it("recusa indicadores sem nível de leitura", async () => {
+    await expect(
+      new TriageSolicitationService(createMockPrisma()).indicators(
+        { competence: COMPETENCE },
+        auth(0),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
   });
 });

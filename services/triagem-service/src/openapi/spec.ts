@@ -172,6 +172,47 @@ const noteCounts = {
   },
 } as const;
 
+const solicitationIndicators = {
+  type: "object",
+  required: ["competence", "notes_by_responsible", "solicitations_by_requester", "totals"],
+  properties: {
+    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    notes_by_responsible: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          user: { $ref: "#/components/schemas/TriageUserRef" },
+          clients: { type: "integer", minimum: 0 },
+          xml_inbound: { type: "integer", minimum: 0 },
+          xml_outbound: { type: "integer", minimum: 0 },
+          nfse_issued: { type: "integer", minimum: 0 },
+          nfse_received: { type: "integer", minimum: 0 },
+          total: { type: "integer", minimum: 0 },
+        },
+      },
+    },
+    solicitations_by_requester: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          user: { $ref: "#/components/schemas/TriageUserRef" },
+          total: { type: "integer", minimum: 0 },
+        },
+      },
+    },
+    totals: {
+      type: "object",
+      properties: {
+        solicitations: { type: "integer", minimum: 0 },
+        clients: { type: "integer", minimum: 0 },
+        notes: { type: "integer", minimum: 0 },
+      },
+    },
+  },
+} as const;
+
 const userRef = {
   type: "object",
   properties: {
@@ -1084,6 +1125,33 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
           },
         },
       },
+      "/triagem/solicitations/indicators": {
+        get: {
+          tags: ["Solicitations"],
+          summary: "Indicadores das solicitações e notas na competência",
+          description:
+            "Notas por responsável (cada cliente conta uma vez por responsável, sem multiplicar pedidos repetidos) e pedidos por solicitante. Operador comum vê só os pedidos sob sua responsabilidade.",
+          security: bearer,
+          parameters: [
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+            { name: "status", in: "query", schema: { type: "string", enum: ["OPEN", "CLOSED"] } },
+          ],
+          responses: {
+            "200": {
+              description: "Indicadores",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageSolicitationIndicators" }),
+            },
+            "400": { description: "Filtros inválidos" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+      },
       "/triagem/solicitations/{id}": {
         get: {
           tags: ["Solicitations"],
@@ -1196,6 +1264,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
         TriageSolicitation: solicitation,
         TriageUserRef: userRef,
         TriageNoteCounts: noteCounts,
+        TriageSolicitationIndicators: solicitationIndicators,
         TriageOverviewItem: overviewItem,
         TriageOverviewIndicators: overviewIndicators,
       },

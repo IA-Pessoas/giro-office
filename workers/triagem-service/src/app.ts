@@ -34,6 +34,7 @@ import {
   createTriageSolicitationBodySchema,
   listTriageSolicitationQuerySchema,
   triageSolicitationIdParamsSchema,
+  triageSolicitationIndicatorsQuerySchema,
   updateTriageNoteCountsBodySchema,
 } from "@workspace/triagem-service/src/schemas/triageSolicitation.schemas.js";
 import {
@@ -78,7 +79,7 @@ export type TriagemUrgentRequestService = Pick<
 >;
 export type TriagemSolicitationService = Pick<
   TriageSolicitationService,
-  "list" | "get" | "create" | "close" | "getNoteCounts" | "updateNoteCounts"
+  "list" | "get" | "create" | "close" | "getNoteCounts" | "updateNoteCounts" | "indicators"
 >;
 export type TriagemAuditService = Pick<TriageAuditService, "listTimeline" | "reconcile">;
 type TriagemOptions = {
@@ -376,6 +377,13 @@ export function createTriagemWorkerApp(options: TriagemOptions = {}) {
     run(c, options.solicitationService, newSolicitation, async (service) => {
       const body = parseWithZod(createTriageSolicitationBodySchema, await jsonBody(c));
       return c.json(createSuccessResponse(await service.create(body, auth(c))), 201);
+    }),
+  );
+  // Antes de /:id, senão "indicators" cai na validação de UUID.
+  app.get("/triagem/solicitations/indicators", (c) =>
+    run(c, options.solicitationService, newSolicitation, async (service) => {
+      const query = parseWithZod(triageSolicitationIndicatorsQuerySchema, c.req.query());
+      return c.json(createSuccessResponse(await service.indicators(query, auth(c))));
     }),
   );
   app.get("/triagem/solicitations/:id", (c) =>

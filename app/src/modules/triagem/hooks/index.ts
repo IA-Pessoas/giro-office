@@ -23,4 +23,5 @@ export {
   useTriageSolicitations,
   triagemNoteCountsQueryKey,
   useTriageNoteCounts,
+  useTriageSolicitationIndicators,
 } from "./useTriageSolicitations";

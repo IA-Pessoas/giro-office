@@ -9,6 +9,8 @@ import { useAssignableUsers } from "@modules/rh";
 import { useTriageCatalogs, useTriageSolicitationMutations, useTriageSolicitations } from "../hooks";
 import type { TriageSolicitation, TriageSolicitationStatus } from "../services";
 import { TriageSolicitationDetail } from "./TriageSolicitationDetail";
+import { TriageSolicitationIndicators } from "./TriageSolicitationIndicators";
+import { triageUserLabel as userLabel } from "./triagem.helpers";
 
 import {
   TRIAGE_BUTTON_CLASSNAME as BUTTON_CLASSNAME,
@@ -21,9 +23,6 @@ const TABS: Array<{ value: TriageSolicitationStatus; label: string }> = [
   { value: "CLOSED", label: "Fechadas" },
 ];
 
-function userLabel(user: { name: string | null; full_name: string | null } | null): string {
-  return user?.name || user?.full_name || "Não identificado";
-}
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("pt-BR");
@@ -133,6 +132,8 @@ export function TriageSolicitationsSection({
           ))}
         </div>
       </div>
+
+      <TriageSolicitationIndicators status={status} />
 
       {canEdit && client ? (
         <form className="mt-4 grid gap-3 sm:grid-cols-3" onSubmit={createSolicitation} noValidate>

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+import { EMPTY_SOLICITATION_INDICATORS } from "../triagem/triagemSmokeFixtures.mjs";
 
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const port = process.env.TRIAGE_URGENT_REQUESTS_SMOKE_PORT ?? "3128";
@@ -134,6 +135,9 @@ async function runBrowserProof() {
     if (request.method() === "GET" && apiPath === "/triagem/monthly") return json(route, null);
     if (request.method() === "GET" && apiPath === "/triagem/statements") return json(route, []);
     if (request.method() === "GET" && apiPath === "/triagem/closing") return json(route, null);
+    if (request.method() === "GET" && apiPath === "/triagem/solicitations/indicators") {
+      return json(route, EMPTY_SOLICITATION_INDICATORS);
+    }
     return json(route, []);
   });
 

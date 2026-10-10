@@ -52,6 +52,7 @@ export {
   normalizeContabilCompetence,
   unwrapContabilEnvelope,
 } from "./services";
+export { getCurrentContabilCompetence } from "./components/contabilControlSection.helpers";
 export type {
   ContabilCompetence,
   FiscalTriagePortfolio,

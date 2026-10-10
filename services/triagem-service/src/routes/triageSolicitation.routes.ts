@@ -7,13 +7,14 @@ import {
   createTriageSolicitationBodySchema,
   listTriageSolicitationQuerySchema,
   triageSolicitationIdParamsSchema,
+  triageSolicitationIndicatorsQuerySchema,
   updateTriageNoteCountsBodySchema,
 } from "../schemas/triageSolicitation.schemas.js";
 import type { TriageSolicitationService } from "../services/triageSolicitationService.js";
 
 export type TriageSolicitationRouteDeps = Pick<
   TriageSolicitationService,
-  "list" | "get" | "create" | "close" | "getNoteCounts" | "updateNoteCounts"
+  "list" | "get" | "create" | "close" | "getNoteCounts" | "updateNoteCounts" | "indicators"
 >;
 
 function authContext(request: Request) {
@@ -59,6 +60,21 @@ export function createTriageSolicitationRoutes(
         response.status(201).json(createSuccessResponse(result));
       } catch (error: unknown) {
         logError("Erro ao criar solicitação da Triagem", { err: error });
+        next(error);
+      }
+    },
+  );
+
+  // Antes de /solicitations/:id, senão "indicators" cai na validação de UUID.
+  router.get(
+    "/solicitations/indicators",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(triageSolicitationIndicatorsQuerySchema, request.query);
+        response.json(createSuccessResponse(await service.indicators(query, authContext(request))));
+      } catch (error: unknown) {
+        logError("Erro ao consultar indicadores das solicitações da Triagem", { err: error });
         next(error);
       }
     },

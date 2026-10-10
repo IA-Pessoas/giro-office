@@ -49,6 +49,13 @@ export const updateTriageNoteCountsBodySchema = z
   })
   .strict();
 
+export const triageSolicitationIndicatorsQuerySchema = z
+  .object({
+    competence: competenceSchema,
+    status: z.enum(["OPEN", "CLOSED"]).optional(),
+  })
+  .strict();
+
 export const triageSolicitationIdParamsSchema = z
   .object({ id: z.string().uuid("Solicitação inválida.") })
   .strict();

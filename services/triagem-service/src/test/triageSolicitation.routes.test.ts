@@ -41,6 +41,7 @@ function setup() {
     close: vi.fn(async () => ({ id: SOLICITATION_ID, status: "CLOSED" })),
     getNoteCounts: vi.fn(async () => ({ xml_inbound: 0 })),
     updateNoteCounts: vi.fn(async () => ({ xml_inbound: 3 })),
+    indicators: vi.fn(async () => ({ totals: { solicitations: 0, clients: 0, notes: 0 } })),
   } as unknown as TriageSolicitationRouteDeps;
   const app = createTriagemApp({
     env,
@@ -103,6 +104,22 @@ describe("rotas de solicitações da Triagem", () => {
     );
     expect(deps.close).toHaveBeenCalledWith(SOLICITATION_ID, expect.anything());
     expect(deps.get).toHaveBeenCalledWith(SOLICITATION_ID, expect.anything());
+  });
+
+  it("indicadores exigem competência e não caem na rota de detalhe", async () => {
+    const { app, deps } = setup();
+
+    const ok = await request(app)
+      .get("/triagem/solicitations/indicators?competence=2026-09&status=OPEN")
+      .set(authHeaders);
+    const missing = await request(app).get("/triagem/solicitations/indicators").set(authHeaders);
+
+    expect([ok.status, missing.status]).toEqual([200, 400]);
+    expect(deps.indicators).toHaveBeenCalledWith(
+      { competence: "2026-09", status: "OPEN" },
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+    expect(deps.get).not.toHaveBeenCalled();
   });
 
   it("lê e grava contadores de notas pelo ID do pedido", async () => {

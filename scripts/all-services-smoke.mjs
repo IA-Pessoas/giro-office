@@ -5989,6 +5989,10 @@ const handlers = {
     });
   },
 
+  async triagemSolicitationIndicators(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { competence: "2026-09" } });
+  },
+
   async triagemSolicitationClose(op) {
     await httpRequest(op, {
       expectedStatus: [200],

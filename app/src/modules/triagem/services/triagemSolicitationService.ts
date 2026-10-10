@@ -44,6 +44,15 @@ export type TriageNoteCounts = TriageNoteCountsInput & {
   updated_by: UserRef | null;
 };
 
+export type TriageSolicitationIndicators = {
+  competence: string;
+  notes_by_responsible: Array<
+    TriageNoteCountsInput & { user: UserRef; clients: number; total: number }
+  >;
+  solicitations_by_requester: Array<{ user: UserRef; total: number }>;
+  totals: { solicitations: number; clients: number; notes: number };
+};
+
 const ENDPOINT = "/triagem/solicitations";
 
 function unwrap<T>(body: unknown): T {
@@ -67,6 +76,16 @@ export const triagemSolicitationService = {
   async close(id: string): Promise<TriageSolicitation> {
     const response = await setupAPIClient().patch(`${ENDPOINT}/${id}/close`);
     return unwrap<TriageSolicitation>(response.data);
+  },
+
+  async indicators(
+    competence: string,
+    status?: TriageSolicitationStatus,
+  ): Promise<TriageSolicitationIndicators> {
+    const response = await setupAPIClient().get(`${ENDPOINT}/indicators`, {
+      params: { competence, ...(status ? { status } : {}) },
+    });
+    return unwrap<TriageSolicitationIndicators>(response.data);
   },
 
   async getNoteCounts(id: string): Promise<TriageNoteCounts> {

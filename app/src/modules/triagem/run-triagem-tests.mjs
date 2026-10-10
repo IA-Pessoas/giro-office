@@ -76,6 +76,7 @@ runTest("detalhe usa checklist Fiscal da competência e contadores do cliente (#
   for (const label of ["XML entradas", "XML saídas", "NFSE prestadas", "NFSE tomadas"]) {
     assert.match(detail, new RegExp(label));
   }
+  assert.match(hooks, /invalidateQueries\(\{ queryKey: triagemSolicitationIndicatorsQueryKey\(\) \}\)/);
   // Cache por cliente+competência: pedidos da mesma competência compartilham o contador.
   assert.match(hooks, /\["triagem", "note-counts", clientId, competence\]/);
   assert.doesNotMatch(detail, /canônic|snapshot|legados/i);
