@@ -72,18 +72,20 @@ export function TriageDocumentsSection({
   canEdit,
   canEditClosing,
   documentType = "CONTABIL",
+  initialCompetence,
 }: {
   clientId: string;
   canEdit: boolean;
   canEditClosing: boolean;
   documentType?: TriageRoutineType;
+  initialCompetence?: ContabilCompetence;
 }) {
   const documents = documentType === "FISCAL" ? FISCAL_DOCUMENTS : CONTABIL_DOCUMENTS;
   const titleId = documentType === "FISCAL"
     ? "triage-fiscal-documents-title"
     : "triage-contabil-documents-title";
   const [competence, setCompetence] = useState<ContabilCompetence>(
-    getCurrentContabilCompetence(),
+    initialCompetence ?? getCurrentContabilCompetence(),
   );
   const [bankId, setBankId] = useState("");
   // O item fica guardado após fechar para o texto não sumir durante a animação de saída.

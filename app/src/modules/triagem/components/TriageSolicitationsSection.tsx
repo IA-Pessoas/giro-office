@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Check, ClipboardList, Loader2, Plus } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, ClipboardList, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { ConfirmationDialog } from "@shared/components";
 
@@ -8,6 +8,7 @@ import { useAssignableUsers } from "@modules/rh";
 
 import { useTriageCatalogs, useTriageSolicitationMutations, useTriageSolicitations } from "../hooks";
 import type { TriageSolicitation, TriageSolicitationStatus } from "../services";
+import { TriageSolicitationDetail } from "./TriageSolicitationDetail";
 
 const FIELD_CLASSNAME =
   "mt-1 block h-10 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800";
@@ -32,11 +33,16 @@ function formatDate(value: string): string {
 export function TriageSolicitationsSection({
   client,
   canEdit,
+  canViewFiscal,
+  canEditFiscal,
 }: {
   client: { id: string; name: string } | null;
   canEdit: boolean;
+  canViewFiscal: boolean;
+  canEditFiscal: boolean;
 }) {
   const [status, setStatus] = useState<TriageSolicitationStatus>("OPEN");
+  const [detailId, setDetailId] = useState<string | null>(null);
   const solicitationsQuery = useTriageSolicitations(status);
   const mutations = useTriageSolicitationMutations();
   const categoriesQuery = useTriageCatalogs("REQUEST_CATEGORY");
@@ -233,7 +239,8 @@ export function TriageSolicitationsSection({
       ) : (
         <ul className="mt-4 divide-y divide-gray-100 dark:divide-slate-800" aria-label="Solicitações">
           {solicitations.map((solicitation) => (
-            <li key={solicitation.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
+            <li key={solicitation.id} className="py-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
                   {solicitation.client.name} · {solicitation.competence} · {solicitation.category.label}
@@ -245,15 +252,39 @@ export function TriageSolicitationsSection({
                   {solicitation.closed_at ? ` · fechada em ${formatDate(solicitation.closed_at)}` : ""}
                 </p>
               </div>
-              {canEdit && solicitation.status === "OPEN" ? (
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   className={BUTTON_CLASSNAME}
-                  onClick={() => setPendingClose(solicitation)}
+                  aria-expanded={detailId === solicitation.id}
+                  onClick={() => setDetailId(detailId === solicitation.id ? null : solicitation.id)}
                 >
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                  Fechar
+                  {detailId === solicitation.id ? (
+                    <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  Detalhe
                 </button>
+                {canEdit && solicitation.status === "OPEN" ? (
+                  <button
+                    type="button"
+                    className={BUTTON_CLASSNAME}
+                    onClick={() => setPendingClose(solicitation)}
+                  >
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                    Fechar
+                  </button>
+                ) : null}
+              </div>
+              </div>
+              {detailId === solicitation.id ? (
+                <TriageSolicitationDetail
+                  solicitation={solicitation}
+                  canEdit={canEdit}
+                  canViewFiscal={canViewFiscal}
+                  canEditFiscal={canEditFiscal}
+                />
               ) : null}
             </li>
           ))}

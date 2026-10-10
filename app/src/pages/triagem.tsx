@@ -67,7 +67,12 @@ export default function TriagemPage() {
             </div>
           </header>
           <TriageOverviewPanel clientId={client?.id} />
-          <TriageSolicitationsSection client={client} canEdit={access.canEdit} />
+          <TriageSolicitationsSection
+            client={client}
+            canEdit={access.canEdit}
+            canViewFiscal={fiscalAccess.canView}
+            canEditFiscal={fiscalAccess.canEdit}
+          />
           {fiscalAccess.canView ? (
             <FiscalTriagePortfolioSection canStartCompetence={access.canEdit} />
           ) : null}
