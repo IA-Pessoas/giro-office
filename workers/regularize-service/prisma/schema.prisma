@@ -83,8 +83,45 @@ model Client {
   competence_output DateTime?
   deletion_date   DateTime?
   dteQueries      RegularizeDteQuery[]
+  // Carteira publicada nos relatórios do Regularize (#1750).
+  type            String    @default("PJ")
+  regime          String?
+  size            String?
+  responsible     String?
+  coringa_status  String?
+  licitacao       Boolean?
+  contabil        Boolean?
+  fiscal          Boolean?
+  pessoal         Boolean?
+  infoproduto     Boolean?
+  consultoria     Boolean?
+  castelo_med     Boolean?
+  tecnologia      Boolean?
+  groups          ClientsGroup[]
 
   @@map("clients")
+}
+
+// Recortes de grupos da carteira, somente leitura para relatórios (#1750).
+model Group {
+  id              String         @id @default(uuid())
+  name            String
+  status          Boolean        @default(true)
+  organization_id String
+  clients         ClientsGroup[]
+
+  @@map("clients.group")
+}
+
+model ClientsGroup {
+  id              String @id @default(uuid())
+  group_id        String
+  client_id       String
+  organization_id String
+  client          Client @relation(fields: [client_id], references: [id])
+  group           Group  @relation(fields: [group_id], references: [id])
+
+  @@map("clients.clientsGroup")
 }
 
 model ClientPF {
