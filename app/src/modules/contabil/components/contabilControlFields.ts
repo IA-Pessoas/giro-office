@@ -133,3 +133,7 @@ export const CONTABIL_CONTROL_NOTES_FIELD = CONTABIL_CONTROL_FIELDS.find(
   (field): field is ContabilControlFieldDefinition & { field: "notes"; kind: "notes" } =>
     field.field === "notes",
 );
+
+export function getContabilControlFieldLabel(field: string) {
+  return CONTABIL_CONTROL_FIELDS.find((definition) => definition.field === field)?.label ?? field;
+}

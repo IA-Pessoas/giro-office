@@ -1,5 +1,12 @@
 import { setupAPIClient } from '@shared/services/api';
-import type { UserItem, CreateUserData, AdminCreateUserData, UpdateUserData } from '../types';
+import type {
+  UserItem,
+  UserDirectoryProfile,
+  UserDirectoryProfilesPage,
+  CreateUserData,
+  AdminCreateUserData,
+  UpdateUserData,
+} from '../types';
 
 type UsersListEnvelope = {
   users?: UserItem[];
@@ -122,6 +129,27 @@ export const userService = {
     const api = setupAPIClient();
     const response = await api.get('/user', { params: filters });
     return extractUsersListPage(response.data);
+  },
+
+  listProfiles: async (filters?: UserListFilters): Promise<UserDirectoryProfilesPage> => {
+    const api = setupAPIClient();
+    const response = await api.get('/user', { params: filters });
+    const page = extractUsersListPage(response.data);
+    return { ...page, users: page.users as UserDirectoryProfile[] } as UserDirectoryProfilesPage;
+  },
+
+  uploadPhoto: async (id: string, file: File): Promise<void> => {
+    const api = setupAPIClient();
+    const formData = new FormData();
+    formData.append('file', file);
+    await api.post(`/user/${id}/photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  deletePhoto: async (id: string): Promise<void> => {
+    const api = setupAPIClient();
+    await api.delete(`/user/${id}/photo`);
   },
 
   getById: async (id: string): Promise<UserItem> => {
