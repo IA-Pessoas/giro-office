@@ -6,7 +6,7 @@ import {
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
-import { OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
+import { canonicalProcessStatus, OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
 import {
   getRegularizeLicenseReportingFields,
   type RegularizeLicenseReportingSource,
@@ -38,7 +38,7 @@ type ReportingFilter = Partial<typeof OPERATIONAL_PROCESS_FILTER>;
 type ReportingDelegate = {
   findMany(input: {
     where: { organization_id: string } & ReportingFilter;
-    select: Record<string, true>;
+    select: Record<string, unknown>;
     take: number;
     cursor?: { id: string };
     skip?: number;
@@ -74,6 +74,100 @@ async function loadReportingPage(
     rows: projectRows(pageRows, fields),
     reachedLimit,
     ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
+  };
+}
+
+// Relações saem com organization_id para descartar vínculo de outra organização.
+const PROCESS_RELATED = { select: { name: true, organization_id: true } };
+const PROCESS_RESPONSIBLES = ["responsible1", "responsible2", "responsible3"] as const;
+
+// Campos de processo montados na extração e o que cada um precisa ler; os demais são colunas.
+const PROCESS_DERIVED_FIELDS: Readonly<Record<string, Record<string, unknown>>> = {
+  client_name: {
+    clientPJ: { select: { name: true, company_name: true, organization_id: true } },
+    clientPF: PROCESS_RELATED,
+  },
+  responsible1_name: { responsible1: PROCESS_RELATED },
+  responsible_names: Object.fromEntries(PROCESS_RESPONSIBLES.map((key) => [key, PROCESS_RELATED])),
+  entry_month: { entry_date: true },
+  completion_month: { completion_date: true },
+  locked: { locking_type: true },
+};
+
+function reportingMonth(value: unknown): string | null {
+  return value instanceof Date ? value.toISOString().slice(0, 7) : null;
+}
+
+function sameOrganization(relation: unknown, organizationId: string): Record<string, unknown> {
+  const candidate = (relation ?? {}) as Record<string, unknown>;
+  return candidate.organization_id === organizationId ? candidate : {};
+}
+
+// O campo é texto livre no cadastro atual. A migração trouxe para ele a data de notificação
+// do legado (travamento_cliente_notificacao), que o PHP só gravava em travamento por cliente
+// e zerava nos demais casos (regularize/pages/processos/editar.php).
+function processLockingType(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  if (!text || text.startsWith("0000-00-00")) return null;
+  return /^\d{4}-\d{2}-\d{2}/u.test(text) ? "Cliente" : text;
+}
+
+async function loadProcessReportingPage(
+  delegate: ReportingDelegate,
+  organizationId: string,
+  fields: readonly string[],
+  limit: number,
+  cursor?: string,
+): Promise<ReportingPage> {
+  const select: Record<string, unknown> = { id: true };
+  for (const field of fields) {
+    Object.assign(select, PROCESS_DERIVED_FIELDS[field] ?? { [field]: true });
+  }
+  const found = await delegate.findMany({
+    where: { organization_id: organizationId, ...OPERATIONAL_PROCESS_FILTER },
+    select,
+    ...portfolioPaging(limit, cursor),
+  });
+  const rows = found.slice(0, limit).map((process) => {
+    const company = sameOrganization(process.clientPJ, organizationId);
+    const person = sameOrganization(process.clientPF, organizationId);
+    const responsibles = PROCESS_RESPONSIBLES.map(
+      (key) => sameOrganization(process[key], organizationId).name ?? null,
+    );
+    const lockingType = processLockingType(process.locking_type);
+    const derived: Record<string, unknown> = {
+      client_name: company.company_name || company.name || person.name || null,
+      responsible1_name: responsibles[0],
+      responsible_names: responsibles.filter((name) => name !== null).join(", ") || null,
+      entry_month: reportingMonth(process.entry_date),
+      completion_month: reportingMonth(process.completion_date),
+      locking_type: lockingType,
+      locked: lockingType !== null,
+      status: canonicalProcessStatus(process.status),
+    };
+    return Object.fromEntries(
+      fields
+        .map((field) => [field, field in derived ? derived[field] : process[field]])
+        .filter(([, value]) => value !== undefined),
+    );
+  });
+  return portfolioPage(found, limit, rows);
+}
+
+// Definições salvas antes da normalização filtram pelo alias; o valor é levado ao canônico.
+function canonicalProcessQuery(query: ReportingQuery): ReportingQuery {
+  return {
+    ...query,
+    filters: query.filters?.map((filter) =>
+      filter.field === "status"
+        ? {
+            ...filter,
+            value: Array.isArray(filter.value)
+              ? filter.value.map(canonicalProcessStatus)
+              : canonicalProcessStatus(filter.value),
+          }
+        : filter,
+    ),
   };
 }
 
@@ -123,12 +217,15 @@ export class RegularizeLicenseReportingService {
       throw new ServiceError(500, "Fonte interna de relatórios não configurada.");
     }
 
-    const filter = input.source === "regularize.licenses" ? {} : OPERATIONAL_PROCESS_FILTER;
     const loadPage = (fields: readonly string[], limit: number, cursor?: string) =>
-      loadReportingPage(delegate, input.organizationId, fields, limit, cursor, filter);
+      input.source === "regularize.licenses"
+        ? loadReportingPage(delegate, input.organizationId, fields, limit, cursor)
+        : loadProcessReportingPage(delegate, input.organizationId, fields, limit, cursor);
     if (input.query) {
+      const query =
+        input.source === "regularize.licenses" ? input.query : canonicalProcessQuery(input.query);
       return executeReportingQuery(
-        { ...input, query: input.query },
+        { ...input, query },
         { loadPage: (fields, limit, cursor) => loadPage(fields, limit, cursor) },
       );
     }
@@ -223,7 +320,7 @@ function portfolioStatus(status: unknown): unknown {
 function portfolioPaging(limit: number, cursor?: string) {
   return {
     ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
-    orderBy: { id: "asc" },
+    orderBy: { id: "asc" as const },
     take: limit + 1,
   };
 }

@@ -57,6 +57,14 @@ describe("RegularizeProcessAdapter", () => {
       "status",
       "locking_type",
       "urgency",
+      "locked",
+      "client_name",
+      "description",
+      "observation",
+      "responsible1_name",
+      "responsible_names",
+      "entry_month",
+      "completion_month",
     ]);
     expect(adapter.sources[0]?.keys).toBeUndefined();
     expect(regularizeProcessReportingCatalog.sources[0]?.keys.map((field) => field.key)).toEqual([
