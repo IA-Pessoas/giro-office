@@ -95,3 +95,17 @@ runTest("agenda da Triagem usa a agenda compartilhada, com escrita só para quem
   assert.doesNotMatch(section, /department_id|departamento\s*[:=]\s*\d/);
   assert.doesNotMatch(section, /canônic|snapshot|legados/i);
 });
+
+runTest("agenda: recorrência mensal é marcada no formulário e só vai na edição quando muda (#1700)", () => {
+  const section = readSource("../contabil/components/DepartmentAgendaSection.tsx");
+  assert.match(section, /name="recurrent"/);
+  assert.match(section, /defaultChecked=\{Boolean\(current\?\.recurring_agenda_id\)\}/);
+  assert.match(section, /recurrent: form\.get\("recurrent"\) === "on"/);
+  // Sem mudança no campo, a edição não mexe na série (o servidor trata ausente como "manter").
+  assert.match(
+    section,
+    /recurrent === Boolean\(editing\.recurring_agenda_id\) \? \{\} : \{ recurrent \}/,
+  );
+  // Remover uma ocorrência não encerra a série: o aviso diz como encerrar.
+  assert.match(section, /a repetição mensal continua/);
+});

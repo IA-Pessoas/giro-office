@@ -20,10 +20,13 @@ function setup() {
     },
     agenda: {
       findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue({ id: EVENT, recurring_agenda_id: null }),
       create: vi.fn(async ({ data }) => ({ id: EVENT, ...data })),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    // Sem regra de recorrência: a geração mensal tem testes próprios (agendaRecurrence).
+    recurringAgenda: { findMany: vi.fn().mockResolvedValue([]) },
   };
   const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
   return { prisma, audit, service: new AgendaService(prisma as never, audit as never) };
@@ -122,7 +125,7 @@ describe("AgendaService", () => {
 
   it("responde 404 para ID de outro departamento ou organização, sem trilha", async () => {
     const { prisma, audit, service } = setup();
-    prisma.agenda.updateMany.mockResolvedValue({ count: 0 });
+    prisma.agenda.findFirst.mockResolvedValue(null);
     prisma.agenda.deleteMany.mockResolvedValue({ count: 0 });
 
     await expect(service.update(editor, "alheio", event)).rejects.toMatchObject({
