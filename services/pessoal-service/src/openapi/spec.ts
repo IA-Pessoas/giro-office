@@ -890,6 +890,24 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           responses: mutationResponses,
         },
       },
+      "/pessoal/obrigations/portfolio": {
+        get: {
+          tags: ["Pessoal Obligations"],
+          security: bearerSecurity,
+          summary: "Carteira de obrigacoes da competencia com filtros e paginacao",
+          operationId: "listPessoalObligationPortfolio",
+          parameters: [
+            queryParam("competence"),
+            queryParam("responsavel_id", "uuid", false),
+            queryParam("group_id", "uuid", false),
+            queryParam("item", undefined, false),
+            queryParam("state", undefined, false),
+            queryParam("page", undefined, false),
+            queryParam("page_size", undefined, false),
+          ],
+          responses: readResponses,
+        },
+      },
       "/pessoal/obrigations/{id}": {
         patch: {
           tags: ["Pessoal Obligations"],

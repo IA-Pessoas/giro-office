@@ -22,9 +22,12 @@ import {
   createObligationBodySchema,
   detailObligationQuerySchema,
   generateObligationsParamsSchema,
+  type ListObligationPortfolioQuery,
+  listObligationPortfolioQuerySchema,
   obligationIdParamsSchema,
   updateObligationFieldBodySchema,
 } from "@workspace/pessoal-service/src/schemas/obligation.schemas.js";
+import { listObligationPortfolio } from "@workspace/pessoal-service/src/services/obligationPortfolio.js";
 import {
   createPasswordBodySchema,
   listPasswordsQuerySchema,
@@ -161,6 +164,10 @@ export type PessoalPayrollService = {
 };
 export type PessoalObligationService = {
   detail(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  listPortfolio(
+    context: { organizationId: string },
+    query: ListObligationPortfolioQuery,
+  ): Promise<unknown>;
   create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
   updateField(
     context: Record<string, unknown>,
@@ -1277,6 +1284,9 @@ function localObligationService(
         select,
       });
     },
+    async listPortfolio(context, query) {
+      return listObligationPortfolio(prisma, context.organizationId, query);
+    },
     async create(context, body) {
       const organizationId = String(context.organizationId);
       await ensureClient(organizationId, body.client_id);
@@ -1929,6 +1939,17 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       return c.json(
         createSuccessResponse(
           await service.detail({ organizationId: c.get("auth").organizationId }, query),
+        ),
+      );
+    }),
+  );
+  app.get("/pessoal/obrigations/portfolio", (c) =>
+    withObligationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const query = parseWithZod(listObligationPortfolioQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.listPortfolio({ organizationId: c.get("auth").organizationId }, query),
         ),
       );
     }),

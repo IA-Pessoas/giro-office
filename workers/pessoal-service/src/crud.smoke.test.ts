@@ -285,6 +285,26 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     ).data;
     expect(again.created).toBe(false);
 
+    const portfolio = expectOk(
+      await call(
+        "GET",
+        `/pessoal/obrigations/portfolio?competence=${competence}&item=va&state=done&page_size=10`,
+      ),
+      "GET carteira",
+    ).data;
+    expect(portfolio.total).toBeGreaterThanOrEqual(1);
+    expect(portfolio.items).toContainEqual(
+      expect.objectContaining({ id, client: expect.objectContaining({ id: clientId }) }),
+    );
+    const pendingVa = expectOk(
+      await call(
+        "GET",
+        `/pessoal/obrigations/portfolio?competence=${competence}&item=va&state=pending`,
+      ),
+      "GET carteira pendente",
+    ).data;
+    expect(pendingVa.items.map((row: { id: string }) => row.id)).not.toContain(id);
+
     const next = "2026-10";
     const generated = expectOk(
       await call("POST", `/pessoal/obrigations/competences/${next}/generate`),
