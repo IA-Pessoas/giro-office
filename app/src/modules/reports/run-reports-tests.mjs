@@ -257,11 +257,17 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
       label: "Folha",
       module: "pessoal",
       fields: [
+        "client_code",
         "client_name",
+        "client_document",
+        "client_status",
         "responsible_name",
         "union_name",
         "group_name",
         "group_state",
+        "previous",
+        "info",
+        "contact",
         "advance",
         "advance_type",
         "advance_amount",
@@ -294,6 +300,9 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
       fields: [
         "competence",
         "client_name",
+        "client_code",
+        "client_document",
+        "client_status",
         "responsible_name",
         "group_snapshot_name",
         "group_snapshot_policy",
@@ -306,6 +315,14 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
         "bsf",
         "va",
         "vt",
+        "advance_state",
+        "payroll_state",
+        "charges_state",
+        "assistance_fee_state",
+        "bem_mais_state",
+        "bsf_state",
+        "va_state",
+        "vt_state",
       ].map((key) => ({ key, label: key, selectable: true })),
     },
   ];
@@ -313,13 +330,37 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
   const presets = getPessoalReportPresets(sources);
   assert.deepEqual(
     presets.map((preset) => preset.id),
-    ["pessoal-ficha-completa", "pessoal-campos-status", "pessoal-obrigacoes-competencia"],
+    [
+      "pessoal-ficha-completa",
+      "pessoal-campos-status",
+      "pessoal-folha-por-grupo",
+      "pessoal-folha-por-sindicato",
+      "pessoal-folha-por-responsavel",
+      "pessoal-folha-por-situacao",
+      "pessoal-obrigacoes-competencia",
+      "pessoal-obrigacoes-responsavel",
+    ],
   );
+  const preset = (id) => presets.find((candidate) => candidate.id === id);
+  for (const [id, field] of [
+    ["pessoal-folha-por-grupo", "group_name"],
+    ["pessoal-folha-por-sindicato", "union_name"],
+    ["pessoal-folha-por-responsavel", "responsible_name"],
+    ["pessoal-folha-por-situacao", "client_status"],
+    ["pessoal-obrigacoes-competencia", "competence"],
+  ]) {
+    assert.deepEqual(preset(id).areas[0].filters, [{ field, operator: "eq", value: "" }], id);
+  }
+  const byResponsible = preset("pessoal-obrigacoes-responsavel").areas[0];
   assert.deepEqual(
-    presets[2].areas[0].filters,
-    [{ field: "competence", operator: "eq", value: "" }],
+    byResponsible.filters.map((filter) => filter.field),
+    ["competence", "responsible_name"],
   );
-  assert.equal(getPessoalReportPresets(sources.slice(0, 2)).length, 2);
+  assert.ok(byResponsible.fields.includes("payroll_state"));
+  assert.equal(getPessoalReportPresets(sources.slice(0, 2)).length, 6);
+  for (const field of ["client_code", "client_document", "client_status", "previous", "info", "contact"]) {
+    assert.ok(preset("pessoal-ficha-completa").areas[0].fields.includes(field), field);
+  }
 });
 
 runTest("offers a task count by current department only for an authorized report source", () => {

@@ -1,6 +1,6 @@
 import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
-import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+import { CLIENT_SEGMENT_TYPES, TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 
 import type { ClientServiceEnv } from "../config/env.js";
 
@@ -300,7 +300,8 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
       "/client/groups/{id}": {
         patch: {
           tags: ["Clients"],
-          summary: "Renomear grupo de clientes",
+          summary: "Renomear, ativar ou inativar grupo de clientes",
+          description: "Integração ou Regularize nível 2. Informe nome, status ou ambos.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
@@ -311,8 +312,10 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["name"],
-                  properties: { name: { type: "string", minLength: 1, maxLength: 120 } },
+                  properties: {
+                    name: { type: "string", minLength: 1, maxLength: 120 },
+                    status: { type: "boolean" },
+                  },
                   additionalProperties: false,
                 },
               },
@@ -324,6 +327,191 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             "403": { description: "Permissão insuficiente" },
             "404": { description: "Grupo não encontrado" },
             "409": { description: "Já existe grupo com o nome" },
+          },
+        },
+      },
+      "/client/regimes": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar o catálogo de regimes da organização",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Regimes da organização autenticada",
+              ...successEnvelopeContent(),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+        post: {
+          tags: ["Clients"],
+          summary: "Cadastrar regime",
+          description: "Integração ou Regularize nível 2.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", minLength: 1, maxLength: 80 } },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Regime criado", ...successEnvelopeContent() },
+            "400": { description: "Nome inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "409": { description: "Já existe regime com o nome" },
+          },
+        },
+      },
+      "/client/regimes/{id}": {
+        patch: {
+          tags: ["Clients"],
+          summary: "Renomear regime",
+          description: "Clientes guardam o nome do regime; renomear não altera fichas já gravadas.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", minLength: 1, maxLength: 80 } },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Regime atualizado", ...successEnvelopeContent() },
+            "400": { description: "Nome inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Regime não encontrado" },
+            "409": { description: "Já existe regime com o nome" },
+          },
+        },
+      },
+      "/client/licitacao/bidders": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar licitantes (licitação Sim, clientes ativos ou em inativação)",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Clientes licitantes da organização",
+              ...successEnvelopeContent(),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+      },
+      "/client/{id}/licitacao/history": {
+        get: {
+          tags: ["Clients"],
+          summary: "Histórico da resposta de licitação do cliente",
+          description:
+            "Cada troca entre Não informado (null), Sim e Não com ator, instante e valores anterior/novo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Histórico, do mais recente ao mais antigo",
+              ...successEnvelopeContent(),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Cliente não encontrado" },
+          },
+        },
+      },
+      "/client/segments": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar o catálogo de segmentos da organização",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Segmentos com tipo", ...successEnvelopeContent() },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+        post: {
+          tags: ["Clients"],
+          summary: "Cadastrar segmento com tipo (serviço, comércio ou indústria)",
+          description: "Integração ou Regularize nível 2.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "type"],
+                  properties: {
+                    name: { type: "string", minLength: 1, maxLength: 80 },
+                    type: { type: "string", enum: [...CLIENT_SEGMENT_TYPES] },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Segmento criado", ...successEnvelopeContent() },
+            "400": { description: "Nome ou tipo inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "409": { description: "Já existe segmento com o nome" },
+          },
+        },
+      },
+      "/client/segments/{id}": {
+        patch: {
+          tags: ["Clients"],
+          summary: "Renomear segmento ou mudar o tipo",
+          description:
+            "Clientes guardam o nome do segmento; renomear não altera fichas já gravadas.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", minLength: 1, maxLength: 80 },
+                    type: { type: "string", enum: [...CLIENT_SEGMENT_TYPES] },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Segmento atualizado", ...successEnvelopeContent() },
+            "400": { description: "Nome ou tipo inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Segmento não encontrado" },
+            "409": { description: "Já existe segmento com o nome" },
           },
         },
       },

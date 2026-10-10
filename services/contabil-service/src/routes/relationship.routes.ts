@@ -11,6 +11,7 @@ import { isAuthenticated, requireContabilWritePermission } from "../middlewares/
 import {
   createRelationshipBodySchema,
   relationshipClientIdParamsSchema,
+  relationshipHistoryQuerySchema,
   relationshipIdParamsSchema,
   updateRelationshipBodySchema,
 } from "../schemas/relationship.schemas.js";
@@ -18,8 +19,13 @@ import type { RelationshipService } from "../services/relationshipService.js";
 
 export type RelationshipRouteDeps = Pick<
   RelationshipService,
-  "create" | "update" | "getByClientId" | "delete"
+  "create" | "update" | "getByClientId" | "delete" | "history"
 >;
+
+function firstQueryString(value: unknown): string | undefined {
+  if (Array.isArray(value)) return firstQueryString(value[0]);
+  return typeof value === "string" ? value : undefined;
+}
 
 export function createRelationshipRoutes(
   service: RelationshipRouteDeps,
@@ -68,6 +74,33 @@ export function createRelationshipRoutes(
         res.json(createSuccessResponse(result));
       } catch (err) {
         logError("Erro ao atualizar relacionamento contábil", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/relationships/client/:clientId/history",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const params = parseWithZod(relationshipClientIdParamsSchema, req.params);
+        const query = parseWithZod(relationshipHistoryQuerySchema, {
+          page: firstQueryString(req.query.page),
+          pageSize: firstQueryString(req.query.pageSize),
+        });
+        const auth = requireAuthenticatedRequestContext(req);
+
+        const result = await service.history({
+          organizationId: auth.organization_id,
+          clientId: params.clientId,
+          page: query.page,
+          pageSize: query.pageSize,
+        });
+
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao buscar histórico do relacionamento contábil", { err });
         next(err);
       }
     },

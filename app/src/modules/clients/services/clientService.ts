@@ -2,6 +2,10 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   ClientGroup,
+  ClientLicitacaoBidder,
+  ClientLicitacaoHistoryItem,
+  ClientRegime,
+  ClientSegment,
   Client,
   ClientCompanyLookup,
   ClientFinanceRecord,
@@ -32,6 +36,8 @@ import type {
 } from "../types";
 import {
   CLIENT_GROUP_ENDPOINTS,
+  CLIENT_REGIME_ENDPOINTS,
+  CLIENT_SEGMENT_ENDPOINTS,
   buildClientListParams,
   CLIENT_ENDPOINTS,
   unwrapClientEnvelope,
@@ -52,9 +58,12 @@ export const clientService = {
     return unwrapClientEnvelope<ClientGroup>(response.data);
   },
 
-  async updateGroup(id: string, name: string): Promise<ClientGroup> {
+  async updateGroup(
+    id: string,
+    input: Partial<Pick<ClientGroup, "name" | "status">>,
+  ): Promise<ClientGroup> {
     const api = setupAPIClient();
-    const response = await api.patch(CLIENT_GROUP_ENDPOINTS.detail(id), { name });
+    const response = await api.patch(CLIENT_GROUP_ENDPOINTS.detail(id), input);
     return unwrapClientEnvelope<ClientGroup>(response.data);
   },
 
@@ -62,6 +71,49 @@ export const clientService = {
     const api = setupAPIClient();
     const response = await api.put(CLIENT_GROUP_ENDPOINTS.clients(id), { client_ids });
     return unwrapClientEnvelope<{ id: string; clients: { id: string }[] }>(response.data);
+  },
+
+  async listRegimes(): Promise<ClientRegime[]> {
+    const response = await setupAPIClient().get(CLIENT_REGIME_ENDPOINTS.list);
+    return unwrapClientEnvelope<ClientRegime[]>(response.data);
+  },
+
+  async createRegime(name: string): Promise<ClientRegime> {
+    const response = await setupAPIClient().post(CLIENT_REGIME_ENDPOINTS.create, { name });
+    return unwrapClientEnvelope<ClientRegime>(response.data);
+  },
+
+  async updateRegime(id: string, name: string): Promise<ClientRegime> {
+    const response = await setupAPIClient().patch(CLIENT_REGIME_ENDPOINTS.detail(id), { name });
+    return unwrapClientEnvelope<ClientRegime>(response.data);
+  },
+
+  async listLicitacaoHistory(clientId: string): Promise<ClientLicitacaoHistoryItem[]> {
+    const response = await setupAPIClient().get(CLIENT_ENDPOINTS.licitacaoHistory(clientId));
+    return unwrapClientEnvelope<ClientLicitacaoHistoryItem[]>(response.data);
+  },
+
+  async listLicitacaoBidders(): Promise<ClientLicitacaoBidder[]> {
+    const response = await setupAPIClient().get(CLIENT_ENDPOINTS.licitacaoBidders);
+    return unwrapClientEnvelope<ClientLicitacaoBidder[]>(response.data);
+  },
+
+  async listSegments(): Promise<ClientSegment[]> {
+    const response = await setupAPIClient().get(CLIENT_SEGMENT_ENDPOINTS.list);
+    return unwrapClientEnvelope<ClientSegment[]>(response.data);
+  },
+
+  async createSegment(input: Pick<ClientSegment, "name" | "type">): Promise<ClientSegment> {
+    const response = await setupAPIClient().post(CLIENT_SEGMENT_ENDPOINTS.create, input);
+    return unwrapClientEnvelope<ClientSegment>(response.data);
+  },
+
+  async updateSegment(
+    id: string,
+    input: Partial<Pick<ClientSegment, "name" | "type">>,
+  ): Promise<ClientSegment> {
+    const response = await setupAPIClient().patch(CLIENT_SEGMENT_ENDPOINTS.detail(id), input);
+    return unwrapClientEnvelope<ClientSegment>(response.data);
   },
 
   async listCoringa(filters: ClientCoringaFilters): Promise<ClientCoringaPage> {

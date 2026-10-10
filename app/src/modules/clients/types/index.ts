@@ -1,3 +1,5 @@
+import type { ClientSegmentType } from "@workspace/shared/regularize";
+
 export interface Client {
   id: string;
   dominio_code: string;
@@ -209,6 +211,33 @@ export interface ClientListFilters {
   legacyIntegrationStatusFilter?: boolean;
 }
 
+export interface ClientRegime {
+  id: string;
+  name: string;
+}
+
+export interface ClientLicitacaoHistoryItem {
+  id: string;
+  previous_value: boolean | null;
+  new_value: boolean | null;
+  created_at: string;
+  actor: { id: string; name: string | null };
+}
+
+export interface ClientLicitacaoBidder {
+  id: string;
+  name: string;
+  company_name: string | null;
+  cpf_cnpj: string;
+  status: string;
+}
+
+export interface ClientSegment {
+  id: string;
+  name: string;
+  type: ClientSegmentType;
+}
+
 export interface ClientFormValues {
   type?: "PJ" | "PF";
   name: string;
@@ -216,7 +245,10 @@ export interface ClientFormValues {
   fantasy_name: string;
   cpf_cnpj: string;
   status: string;
-  regime: ClientTaxRegime | "";
+  // Regime compartilhado, do catálogo da organização ou o valor já gravado (#1740).
+  regime: string;
+  // Segmento do catálogo da organização ou o valor já gravado (#1741).
+  segment: string;
   service_unique: boolean;
   address: string;
   cep: string;
@@ -371,7 +403,8 @@ export interface CreateClientPayload {
   cpf_cnpj: string;
   company_name?: string | null;
   fantasy_name?: string | null;
-  regime?: ClientTaxRegime | null;
+  regime?: string | null;
+  segment?: string | null;
   service_unique?: boolean;
   address?: string | null;
   cep?: string | null;
@@ -418,7 +451,8 @@ export interface UpdateClientPayload {
   cpf_cnpj?: string;
   company_name?: string | null;
   fantasy_name?: string | null;
-  regime?: ClientTaxRegime | null;
+  regime?: string | null;
+  segment?: string | null;
   service_unique?: boolean;
   address?: string | null;
   cep?: string | null;

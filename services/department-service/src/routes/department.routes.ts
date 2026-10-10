@@ -42,6 +42,17 @@ function requireDepartmentAdminAuthContext(req: Request): {
   return auth;
 }
 
+function requireMarketingDepartmentAuthContext(req: Request): {
+  user_id: string;
+  organization_id: string;
+} {
+  const auth = requireDepartmentAuthContext(req);
+  if (req.user_type !== "owner" && (req.modules?.marketing ?? 0) < 1) {
+    throw new ServiceError(403, "Usuário não tem permissão para consultar departamentos.");
+  }
+  return auth;
+}
+
 export function createDepartmentRoutes(service: DepartmentRouteDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
@@ -50,10 +61,13 @@ export function createDepartmentRoutes(service: DepartmentRouteDeps): ReturnType
       const parsedQuery = parseWithZod(listDepartmentsQuerySchema, {
         status: getSingleQueryValue(req.query.status),
         administrative: getSingleQueryValue(req.query.administrative),
+        marketing: getSingleQueryValue(req.query.marketing),
       });
       const { organization_id } = parsedQuery.administrative
         ? requireDepartmentAdminAuthContext(req)
-        : requireDepartmentAuthContext(req);
+        : parsedQuery.marketing
+          ? requireMarketingDepartmentAuthContext(req)
+          : requireDepartmentAuthContext(req);
       const status = parsedQuery.status;
       const result = await service.list(status, organization_id);
 
@@ -103,8 +117,22 @@ export function createDepartmentRoutes(service: DepartmentRouteDeps): ReturnType
 
   router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { user_id, organization_id } = requireDepartmentAdminAuthContext(req);
+      const auth = requireDepartmentAuthContext(req);
       const body = parseWithZod(updateDepartmentBodySchema, req.body);
+      const hasAdministrativePermission =
+        req.user_type === "owner" || (req.modules?.rh ?? 0) >= 3 || (req.modules?.ti ?? 0) >= 3;
+      const marketingColorOnly =
+        (req.modules?.marketing ?? 0) >= 3 &&
+        Object.keys(req.body as Record<string, unknown>).every(
+          (field) => field === "dep_id" || field === "color",
+        ) &&
+        body.color !== undefined;
+
+      if (!hasAdministrativePermission && !marketingColorOnly) {
+        throw new ServiceError(403, "Usuário não tem permissão para atualizar departamentos.");
+      }
+
+      const { user_id, organization_id } = auth;
       const { dep_id, name, color, status, solution } = body;
 
       const result = await service.update({
