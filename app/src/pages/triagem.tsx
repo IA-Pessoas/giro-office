@@ -6,7 +6,11 @@ import { ListChecks, Settings } from "lucide-react";
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { AccessDeniedPanel, FiscalTriagePortfolioSection, TriageDocumentsSection, useTriageEditability } from "@modules/contabil";
-import { TriageCompetenceSection, TriageOverviewPanel } from "@modules/triagem";
+import {
+  TriageCompetenceSection,
+  TriageOverviewPanel,
+  TriageSolicitationsSection,
+} from "@modules/triagem";
 
 export default function TriagemPage() {
   const { access, isLoading } = useModuleAccess("triagem");
@@ -63,6 +67,7 @@ export default function TriagemPage() {
             </div>
           </header>
           <TriageOverviewPanel clientId={client?.id} />
+          <TriageSolicitationsSection client={client} canEdit={access.canEdit} />
           {fiscalAccess.canView ? (
             <FiscalTriagePortfolioSection canStartCompetence={access.canEdit} />
           ) : null}

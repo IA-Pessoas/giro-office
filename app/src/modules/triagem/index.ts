@@ -4,6 +4,7 @@ export {
   TriageUrgentRequestsSection,
   TriageCatalogSection,
   TriageOverviewPanel,
+  TriageSolicitationsSection,
 } from "./components";
 export {
   triagemCompetencesQueryKey,

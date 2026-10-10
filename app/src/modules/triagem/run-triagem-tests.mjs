@@ -56,3 +56,12 @@ runTest("responsável da solicitação urgente começa vazio e é obrigatório (
   assert.match(source, /<option value="" disabled>\s*Selecione o responsável/);
   assert.match(source, /Selecione o responsável da solicitação\./);
 });
+
+runTest("solicitações ficam na Triagem, separadas das urgentes e sem reabertura (#1696)", () => {
+  const page = readSource("../../pages/triagem.tsx");
+  const source = readSource("./components/TriageSolicitationsSection.tsx");
+  assert.match(page, /<TriageSolicitationsSection/);
+  assert.match(source, /useTriageCatalogs\("REQUEST_CATEGORY"\)/);
+  assert.doesNotMatch(source, /reopen|Reabrir|UrgentRequest/);
+  assert.doesNotMatch(source, /canônic|snapshot|legados/i);
+});
