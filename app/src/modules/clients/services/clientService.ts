@@ -2,6 +2,8 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   ClientGroup,
+  ClientLicitacaoBidder,
+  ClientLicitacaoHistoryItem,
   ClientRegime,
   ClientSegment,
   Client,
@@ -84,6 +86,16 @@ export const clientService = {
   async updateRegime(id: string, name: string): Promise<ClientRegime> {
     const response = await setupAPIClient().patch(CLIENT_REGIME_ENDPOINTS.detail(id), { name });
     return unwrapClientEnvelope<ClientRegime>(response.data);
+  },
+
+  async listLicitacaoHistory(clientId: string): Promise<ClientLicitacaoHistoryItem[]> {
+    const response = await setupAPIClient().get(CLIENT_ENDPOINTS.licitacaoHistory(clientId));
+    return unwrapClientEnvelope<ClientLicitacaoHistoryItem[]>(response.data);
+  },
+
+  async listLicitacaoBidders(): Promise<ClientLicitacaoBidder[]> {
+    const response = await setupAPIClient().get(CLIENT_ENDPOINTS.licitacaoBidders);
+    return unwrapClientEnvelope<ClientLicitacaoBidder[]>(response.data);
   },
 
   async listSegments(): Promise<ClientSegment[]> {

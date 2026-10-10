@@ -23,6 +23,8 @@ export const CLIENT_ENDPOINTS = {
   createHistoryPending: (id: string) => `/client/${id}/histories/pending`,
   listHistoryPending: "/client/histories/pending",
   deleteHistoryPending: (pendingId: string) => `/client/histories/pending/${pendingId}`,
+  licitacaoHistory: (id: string) => `/client/${id}/licitacao/history`,
+  licitacaoBidders: "/client/licitacao/bidders",
 } as const;
 
 export const CLIENT_GROUP_ENDPOINTS = {

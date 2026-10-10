@@ -375,6 +375,28 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
     }),
   );
 
+  app.get("/client/licitacao/bidders", async (c) =>
+    withService(c, async (service) =>
+      c.json(
+        createSuccessResponse(await service.listLicitacaoBidders(organizationId(c), authz(c))),
+      ),
+    ),
+  );
+
+  app.get("/client/:id/licitacao/history", async (c) =>
+    withService(c, async (service) =>
+      c.json(
+        createSuccessResponse(
+          await service.listLicitacaoHistory(
+            pathParam(c, clientIdParamsSchema),
+            organizationId(c),
+            authz(c),
+          ),
+        ),
+      ),
+    ),
+  );
+
   app.post("/client", async (c) =>
     withService(c, async (service) => {
       const body = parse(createClientBodySchema, await jsonBody(c)) as Record<string, unknown>;

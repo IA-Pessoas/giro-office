@@ -90,6 +90,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/client\/licitacao\/bidders$/,
+    description: { action: "consultou", item: "a lista de licitantes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/[^/]+\/licitacao\/history$/,
+    description: { action: "consultou", item: "o histórico de licitação de um cliente" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/client\/segments$/,
     description: { action: "consultou", item: "a lista de segmentos" },
   },

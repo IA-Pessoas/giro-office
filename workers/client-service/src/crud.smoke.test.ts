@@ -235,6 +235,69 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     });
   });
 
+  it("licitação: três estados distintos, histórico com ator e lista de licitantes", async () => {
+    const client = expectOk(
+      await call("POST", "/client/integration", {
+        organization_id: requireSmokeState().organizationId,
+        type: "PJ",
+        name: `Smoke Licitante ${Date.now()}`,
+        cpf_cnpj: uniqueCnpj(),
+      }),
+      "POST /client/integration (licitação)",
+    ).data as { id: string };
+    expectOk(
+      await call("PATCH", `/client/${client.id}`, { status: "Ativo" }),
+      "PATCH status Ativo",
+    );
+    expect(
+      expectOk(await call("GET", `/client/${client.id}`), "GET licitação inicial").data.licitacao,
+    ).toBeNull();
+
+    for (const value of [true, false, true]) {
+      expectOk(
+        await call("PATCH", `/client/${client.id}/regularize`, {
+          licitacao: value,
+          tecnologia: false,
+          coringa_status: "Em análise",
+        }),
+        `PATCH regularize licitacao=${value}`,
+      );
+    }
+    const detail = expectOk(await call("GET", `/client/${client.id}`), "GET após licitação").data;
+    expect(detail).toMatchObject({
+      licitacao: true,
+      tecnologia: false,
+      coringa_status: "Em análise",
+    });
+
+    const history = expectOk(
+      await call("GET", `/client/${client.id}/licitacao/history`),
+      "GET /client/:id/licitacao/history",
+    ).data as {
+      previous_value: boolean | null;
+      new_value: boolean | null;
+      actor: { id: string };
+    }[];
+    expect(history.map((row) => [row.previous_value, row.new_value])).toEqual([
+      [false, true],
+      [true, false],
+      [null, true],
+    ]);
+    expect(history[0].actor.id).toBe(requireSmokeState().ownerId);
+
+    const bidders = expectOk(
+      await call("GET", "/client/licitacao/bidders"),
+      "GET /client/licitacao/bidders",
+    ).data as { id: string }[];
+    expect(bidders.map((row) => row.id)).toContain(client.id);
+    expectOk(await call("DELETE", `/client/${client.id}`), "DELETE inativa licitante");
+    const afterInactivation = expectOk(
+      await call("GET", "/client/licitacao/bidders"),
+      "GET licitantes após inativar",
+    ).data as { id: string }[];
+    expect(afterInactivation.map((row) => row.id)).not.toContain(client.id);
+  });
+
   it("integração: cria, lê, lista com filtros, atualiza, inativa e reativa", async () => {
     const cnpj = uniqueCnpj();
     const name = `Smoke Cliente ${Date.now()}`;

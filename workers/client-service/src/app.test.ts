@@ -106,6 +106,8 @@ function service(): ClientWorkerService {
       clients: [],
     })),
     replaceGroupClients: vi.fn(async () => ({ id: REGIME_ID, clients: [{ id: CLIENT_ID }] })),
+    listLicitacaoHistory: vi.fn(async () => []),
+    listLicitacaoBidders: vi.fn(async () => []),
   };
 }
 
@@ -301,6 +303,35 @@ describe("client Worker", () => {
       expect.anything(),
     );
     expect(badMember.status).toBe(400);
+    expect(clientService.getById).not.toHaveBeenCalled();
+  });
+
+  it("serves licitação bidders before /client/:id and the history per client", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+
+    const bidders = await app.request("https://client.test/client/licitacao/bidders", {
+      headers: headers(),
+    });
+    const history = await app.request(`https://client.test/client/${CLIENT_ID}/licitacao/history`, {
+      headers: headers(),
+    });
+    const badId = await app.request("https://client.test/client/nao-e-uuid/licitacao/history", {
+      headers: headers(),
+    });
+
+    expect(bidders.status).toBe(200);
+    expect(clientService.listLicitacaoBidders).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      expect.anything(),
+    );
+    expect(history.status).toBe(200);
+    expect(clientService.listLicitacaoHistory).toHaveBeenCalledWith(
+      CLIENT_ID,
+      ORGANIZATION_ID,
+      expect.anything(),
+    );
+    expect(badId.status).toBe(400);
     expect(clientService.getById).not.toHaveBeenCalled();
   });
 

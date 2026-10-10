@@ -7,7 +7,8 @@ export type RegularizeTabId =
   | "passwords"
   | "sites"
   | "taxes"
-  | "groups";
+  | "groups"
+  | "bidders";
 
 export interface RegularizeQueryPolicy {
   dashboard: boolean;

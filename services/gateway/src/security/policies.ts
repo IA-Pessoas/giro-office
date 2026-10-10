@@ -199,6 +199,9 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  // Lista de licitantes e histórico de licitação lidos pelo Regularize (#1743).
+  { method: "GET", path: /^\/client\/licitacao\/bidders\/?$/, policy: clientListPolicy },
+  { method: "GET", path: /^\/client\/[^/]+\/licitacao\/history\/?$/, policy: clientListPolicy },
   { method: "GET", path: clientGroupsPath, policy: clientGroupsReadPolicy },
   { method: "ANY", path: clientGroupsPath, policy: clientGroupsEditPolicy },
   { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },

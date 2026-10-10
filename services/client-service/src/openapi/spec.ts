@@ -402,6 +402,42 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/client/licitacao/bidders": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar licitantes (licitação Sim, clientes ativos ou em inativação)",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Clientes licitantes da organização",
+              ...successEnvelopeContent(),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+      },
+      "/client/{id}/licitacao/history": {
+        get: {
+          tags: ["Clients"],
+          summary: "Histórico da resposta de licitação do cliente",
+          description:
+            "Cada troca entre Não informado (null), Sim e Não com ator, instante e valores anterior/novo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Histórico, do mais recente ao mais antigo",
+              ...successEnvelopeContent(),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Cliente não encontrado" },
+          },
+        },
+      },
       "/client/segments": {
         get: {
           tags: ["Clients"],
