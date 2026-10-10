@@ -1767,7 +1767,8 @@ export function createDocumentsService(
         ...(typeof input.to === "string" ? { lte: input.to } : {}),
       };
       // ponytail: até 500 marcadores (anos de bancos de um cliente); paginar se passar disso.
-      const rows = await prisma.triageBankStatement.findMany({
+      const limit = 500;
+      const found = await prisma.triageBankStatement.findMany({
         where: {
           organization_id: auth.organizationId,
           client_id: clientId,
@@ -1777,22 +1778,25 @@ export function createDocumentsService(
             ? { status: { in: [...TRIAGE_PENDING_DOCUMENT_STATUSES] } }
             : {}),
         },
-        select: { competence: true, bank_id: true, status: true, updated_at: true },
+        select: { competence: true, bank_id: true, status: true },
         orderBy: [{ competence: "desc" }, { bank_id: "asc" }],
-        take: 500,
+        take: limit + 1,
       });
+      // Cortado no limite, faltam as competências mais antigas: a resposta avisa.
+      const truncated = found.length > limit;
+      const rows = found.slice(0, limit);
       // Agrupado por competência: cada banco aparece no período a que pertence.
       const pending = new Set<string>(TRIAGE_PENDING_DOCUMENT_STATUSES);
       const groups = new Map<string, JsonRecord[]>();
       for (const row of rows) {
         const key = String(row.competence);
-        groups.set(key, [
-          ...(groups.get(key) ?? []),
-          { bank_id: row.bank_id, status: row.status, updated_at: row.updated_at },
-        ]);
+        const group = groups.get(key) ?? [];
+        group.push({ bank_id: row.bank_id, status: row.status });
+        groups.set(key, group);
       }
       return {
         client_id: clientId,
+        truncated,
         competences: [...groups].map(([competenceKey, statements]) => ({
           competence: competenceKey,
           pending: statements.filter((item) => pending.has(String(item.status))).length,

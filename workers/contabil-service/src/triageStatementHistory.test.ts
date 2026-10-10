@@ -35,12 +35,13 @@ function prisma(rows: Row[]) {
           expect(orderBy).toEqual([{ competence: "desc" }, { bank_id: "asc" }]);
           return rows
             .filter((row) => matches(row, where))
-            .slice(0, take)
             .sort(
               (a, b) =>
                 String(b.competence).localeCompare(String(a.competence)) ||
                 String(a.bank_id).localeCompare(String(b.bank_id)),
-            );
+            )
+            .slice(0, take)
+            .map(({ competence, bank_id, status }) => ({ competence, bank_id, status }));
         },
       ),
       findFirst: vi.fn(
@@ -101,19 +102,20 @@ describe("pendências bancárias em várias competências (#1694)", () => {
 
     expect(history).toEqual({
       client_id: CLIENT,
+      truncated: false,
       competences: [
         {
           competence: "2026-08",
           pending: 1,
           statements: [
-            { bank_id: "bb", status: "COMPLETED", updated_at: expect.any(Date) },
-            { bank_id: "itau", status: "ATTENTION", updated_at: expect.any(Date) },
+            { bank_id: "bb", status: "COMPLETED" },
+            { bank_id: "itau", status: "ATTENTION" },
           ],
         },
         {
           competence: "2026-07",
           pending: 1,
-          statements: [{ bank_id: "itau", status: "PENDING", updated_at: expect.any(Date) }],
+          statements: [{ bank_id: "itau", status: "PENDING" }],
         },
       ],
     });
@@ -138,6 +140,27 @@ describe("pendências bancárias em várias competências (#1694)", () => {
       "2026-05",
     ]);
     expect(after.competences.map((group: Row) => group.competence)).toEqual(["2026-06"]);
+  });
+
+  it("avisa quando o limite corta as competências mais antigas", async () => {
+    const rows = Array.from({ length: 501 }, (_, index) =>
+      statement(
+        `20${String(10 + Math.floor(index / 12)).padStart(2, "0")}-${String((index % 12) + 1).padStart(2, "0")}`,
+        "itau",
+        "PENDING",
+      ),
+    );
+    const service = createDocumentsService(prisma(rows) as never, {
+      createLog: vi.fn(),
+      logUpdateIfChanged: vi.fn(),
+    });
+
+    const history = await service.listStatementHistory({ client_id: CLIENT }, auth);
+
+    expect(history.truncated).toBe(true);
+    expect(history.competences).toHaveLength(500);
+    // A mais antiga (2010-01) é a que fica de fora.
+    expect(history.competences.at(-1)).toMatchObject({ competence: "2010-02" });
   });
 
   it("recusa cliente de outra organização", async () => {

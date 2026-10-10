@@ -440,7 +440,16 @@ describe("contabil Worker remainder routes", () => {
       { headers: headers("2") },
     );
 
-    expect([anonymous.status, ok.status, inverted.status]).toEqual([401, 200, 400]);
+    const denied = await app.request(url, {
+      headers: {
+        ...headers("0"),
+        "x-auth-modules": JSON.stringify({ contabil: 0, triagem: 0, fiscal: 0 }),
+      },
+    });
+
+    expect([anonymous.status, ok.status, inverted.status, denied.status]).toEqual([
+      401, 200, 400, 403,
+    ]);
     expect(deps.triageDocumentsService.listStatementHistory).toHaveBeenCalledExactlyOnceWith(
       { client_id: CLIENT, from: "2026-01", to: "2026-09", pending: true },
       expect.objectContaining({ organizationId: ORG }),

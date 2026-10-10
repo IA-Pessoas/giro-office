@@ -148,15 +148,10 @@ export const triageDocumentsService = {
   },
   async getStatementHistory(
     clientId: string,
-    filters: { pending?: boolean; from?: ContabilCompetence; to?: ContabilCompetence } = {},
+    pendingOnly: boolean,
   ): Promise<TriageStatementHistory> {
     const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageStatementHistory, {
-      params: {
-        client_id: clientId,
-        ...(filters.pending ? { pending: "true" } : {}),
-        ...(filters.from ? { from: filters.from } : {}),
-        ...(filters.to ? { to: filters.to } : {}),
-      },
+      params: { client_id: clientId, ...(pendingOnly ? { pending: "true" } : {}) },
     });
     return unwrapContabilEnvelope(response.data);
   },

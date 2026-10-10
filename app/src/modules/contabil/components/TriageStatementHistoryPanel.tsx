@@ -6,9 +6,7 @@ import { triageStatementHistoryQueryKey } from "../hooks/queryKeys";
 import { getContabilErrorMessage, triageDocumentsService } from "../services";
 import type { ContabilCompetence } from "../types";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
-import { STATUSES } from "./triageDocumentLabels";
-
-const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<string, string>;
+import { STATUS_LABELS } from "./triageDocumentLabels";
 
 /**
  * Marcadores bancários do cliente em todas as competências, agrupados por período, para achar
@@ -23,7 +21,7 @@ export function TriageStatementHistoryPanel({
 }) {
   const [pendingOnly, setPendingOnly] = useState(true);
   const history = useFetch(triageStatementHistoryQueryKey(clientId, pendingOnly), () =>
-    triageDocumentsService.getStatementHistory(clientId, { pending: pendingOnly }),
+    triageDocumentsService.getStatementHistory(clientId, pendingOnly),
   );
   const competences = history.data?.competences ?? [];
 
@@ -56,6 +54,11 @@ export function TriageStatementHistoryPanel({
           {getContabilErrorMessage(history.error)}
         </p>
       ) : null}
+      {history.data?.truncated ? (
+        <p role="status" className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+          Lista limitada aos 500 extratos mais recentes; competências mais antigas não aparecem.
+        </p>
+      ) : null}
       {history.data && competences.length === 0 ? (
         <p className="mt-2 text-sm text-gray-600 dark:text-slate-400">
           {pendingOnly ? "Nenhuma pendência bancária." : "Nenhum extrato registrado."}
@@ -86,7 +89,7 @@ export function TriageStatementHistoryPanel({
                   key={statement.bank_id}
                   className="flex justify-between gap-2 py-1 text-gray-700 dark:text-slate-300"
                 >
-                  <span>{statement.bank_id}</span>
+                  <span>Banco {statement.bank_id}</span>
                   <span>{STATUS_LABELS[statement.status] ?? statement.status}</span>
                 </li>
               ))}
