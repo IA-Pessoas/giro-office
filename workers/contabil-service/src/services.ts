@@ -2035,6 +2035,7 @@ export function createReportingService(
       triageMonthly: ReportingDelegate;
       triageResponsible: ReportingDelegate;
       triageCompetence: ReportingDelegate;
+      triageConfig: ReportingDelegate;
       user: ReportingDelegate;
     };
     source: string;
@@ -2055,6 +2056,7 @@ export function createReportingService(
           responsibles: input.prisma.responsibleContabil,
           assignments: input.prisma.triageResponsible,
           competences: input.prisma.triageCompetence,
+          configs: input.prisma.triageConfig,
           users: input.prisma.user,
         },
         { ...input, source: input.source },

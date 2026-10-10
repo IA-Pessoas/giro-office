@@ -52,6 +52,7 @@ function delegates(monthly: readonly Record<string, unknown>[] = []) {
       findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT_A, customer_with_movement: true }]),
     },
     assignments: { findMany: vi.fn().mockResolvedValue([]) },
+    configs: { findMany: vi.fn().mockResolvedValue([]) },
     competences: { findMany: vi.fn().mockResolvedValue([]) },
     users: {
       findMany: vi.fn().mockResolvedValue([
@@ -612,5 +613,135 @@ describe("SGQ da Triagem", () => {
       { competence: "2025-12", not_sent: 3 },
       { competence: "2026-01", not_sent: 2 },
     ]);
+  });
+});
+
+describe("extractTriageReportingPage: documentos fiscais especiais", () => {
+  it("mostra o estado de cada documento no checklist Fiscal, com meio de envio e faturamento", async () => {
+    const prisma = delegates([
+      {
+        id: "1",
+        client_id: CLIENT_A,
+        competence: "2026-09",
+        billing_amount: "15000.00",
+        checklist: {
+          inbound_report: "COMPLETED",
+          nfce_documents: "COMPLETED",
+          sped_fiscal: "PENDING",
+          sped_contributions: "atenção",
+          nfse_received: "nao possui",
+          model_21_invoice: "NOT_APPLICABLE",
+          cte_as_issuer: "UNDER_REVIEW",
+          // services_provided_as_mei ausente: o cliente não tem o documento configurado.
+        },
+      },
+    ]);
+    prisma.configs.findMany.mockResolvedValue([{ client_id: CLIENT_A, delivery_method: "E-mail" }]);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.triage_fiscal_special_documents",
+        organizationId: ORG,
+        fields: [
+          "company_name",
+          "competence",
+          "nfce_documents",
+          "sped_fiscal",
+          "sped_contributions",
+          "nfse_received",
+          "model_21_invoice",
+          "cte_as_issuer",
+          "services_provided_as_mei",
+          "billing_amount",
+          "delivery_method",
+        ],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          company_name: "Alfa Comércio Ltda",
+          competence: "2026-09",
+          nfce_documents: "Concluído",
+          sped_fiscal: "Pendente",
+          sped_contributions: "Atenção",
+          nfse_received: "Não possui",
+          model_21_invoice: "Não aplicável",
+          cte_as_issuer: "Em revisão",
+          services_provided_as_mei: "Não aplicável",
+          billing_amount: "15000.00",
+          delivery_method: "E-mail",
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(prisma.monthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "FISCAL", archived_at: null },
+        select: {
+          id: true,
+          client_id: true,
+          competence: true,
+          billing_amount: true,
+          checklist: true,
+        },
+      }),
+    );
+    expect(prisma.configs.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, client_id: { in: [CLIENT_A] }, type: "FISCAL" },
+      }),
+    );
+    expect(prisma.clients.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, id: { in: [CLIENT_A] } } }),
+    );
+  });
+
+  it("seleciona por documento, cliente e competência como o relatório de envio legado", async () => {
+    const routines = [
+      {
+        id: "1",
+        client_id: CLIENT_A,
+        competence: "2026-09",
+        checklist: { sped_fiscal: "PENDING" },
+      },
+      { id: "2", client_id: CLIENT_B, competence: "2026-09", checklist: {} },
+      {
+        id: "3",
+        client_id: CLIENT_A,
+        competence: "2026-10",
+        checklist: { sped_fiscal: "COMPLETED" },
+      },
+    ];
+    const database = {
+      client: { findMany: vi.fn().mockResolvedValue(clientRows) },
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            routines.slice(skip, skip + take),
+          ),
+      },
+      $transaction: vi.fn(),
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+
+    const result = await new InternalReportingService(database as never).extract({
+      organizationId: ORG,
+      source: "contabil.triage_fiscal_special_documents",
+      fields: ["name", "sped_fiscal"],
+      limit: 50,
+      query: {
+        filters: [
+          { field: "competence", operator: "eq", parameter: "competencia", value: "2026-09" },
+          { field: "sped_fiscal", operator: "neq", parameter: "envia", value: "Não aplicável" },
+          { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+        ],
+      },
+    });
+
+    expect(result.rows).toEqual([{ name: "Alfa", sped_fiscal: "Pendente" }]);
   });
 });

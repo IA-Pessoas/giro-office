@@ -4,6 +4,8 @@ import {
   type ContabilTriageReportingSource,
   normalizeTriageDocumentStatus,
   TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
+  TRIAGE_DOCUMENT_STATUS_LABELS,
+  TRIAGE_FISCAL_SPECIAL_FIELDS,
   type TriageDocumentStatus,
 } from "@workspace/shared";
 
@@ -20,6 +22,7 @@ export type TriageReportingPrisma = {
   monthly: TriageReportingDelegate;
   responsibles: TriageReportingDelegate;
   assignments: TriageReportingDelegate;
+  configs: TriageReportingDelegate;
   competences: TriageReportingDelegate;
   users: TriageReportingDelegate;
 };
@@ -83,6 +86,17 @@ const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
       values: accountingMetric,
     },
   },
+  "contabil.triage_fiscal_special_documents": {
+    delegate: "monthly",
+    where: { type: "FISCAL", archived_at: null },
+    columns: { competence: "competence", billing_amount: "billing_amount" },
+    responsibleColumns: ["responsible_id", "competence", "type"],
+    derived: {
+      column: "checklist",
+      fields: TRIAGE_FISCAL_SPECIAL_FIELDS,
+      values: fiscalSpecialStatuses,
+    },
+  },
 };
 
 function accountingStatuses(checklist: unknown): TriageDocumentStatus[] {
@@ -112,6 +126,22 @@ function accountingMetric(checklist: unknown): Row {
 }
 
 const COMPETENCE = /^\d{4}-(0[1-9]|1[0-2])$/u;
+
+/**
+ * Estado de cada documento fiscal especial no checklist canônico da rotina. Documento que o
+ * cliente não tem configurado fica "Não aplicável", como na tela.
+ */
+function fiscalSpecialStatuses(checklist: unknown): Row {
+  const items = checklist && typeof checklist === "object" ? (checklist as Row) : {};
+  return Object.fromEntries(
+    TRIAGE_FISCAL_SPECIAL_FIELDS.map((field) => [
+      field,
+      TRIAGE_DOCUMENT_STATUS_LABELS[
+        normalizeTriageDocumentStatus(items[field]) ?? "NOT_APPLICABLE"
+      ],
+    ]),
+  );
+}
 
 /** Meses de `first` a `last` (YYYY-MM), inclusive, atravessando viradas de ano. */
 export function competencesBetween(first: string, last: string): string[] {
@@ -331,7 +361,7 @@ export async function extractTriageReportingPage(
   // Só a rotina mensal sem responsável próprio herda da competência ou da atribuição.
   const inherits =
     wantsResponsible && rows.some((row) => "responsible_id" in row && !row.responsible_id);
-  const [clients, clouds, responsibles, snapshots, assignments] = await Promise.all([
+  const [clients, clouds, responsibles, snapshots, assignments, configs] = await Promise.all([
     clientIsRow
       ? rows
       : rows.length && clientColumns.some(wanted)
@@ -356,6 +386,13 @@ export async function extractTriageReportingPage(
     related(prisma.assignments, inherits, {
       select: { client_id: true, type: true, user_id: true },
     }),
+    // Meio de envio é da configuração Fiscal do cliente.
+    related(
+      prisma.configs,
+      wanted("delivery_method"),
+      { select: { client_id: true, delivery_method: true } },
+      { type: "FISCAL" },
+    ),
   ]);
   const responsibleIdOf = (row: Row) =>
     row.user_id ?? row.responsible_id ?? inheritedResponsible(snapshots, assignments, row);
@@ -372,6 +409,7 @@ export async function extractTriageReportingPage(
   const clientById = new Map(clients.map((client) => [String(client.id), client]));
   const cloudsByClient = byClient(clouds);
   const responsiblesByClient = byClient(responsibles);
+  const configByClient = byClient(configs);
 
   return {
     rows: rows.map((row) => {
@@ -384,6 +422,9 @@ export async function extractTriageReportingPage(
         if (field in base.columns) {
           const column = row[base.columns[field]];
           return field === "type" ? (serviceLabels[String(column)] ?? column) : column;
+        }
+        if (field === "delivery_method") {
+          return configByClient.get(clientId)?.[0]?.delivery_method ?? null;
         }
         if (field === "responsible_name") return userNames.get(responsibleIdOf(row)) ?? null;
         if (clientFlags.has(field)) return client[field] === true;

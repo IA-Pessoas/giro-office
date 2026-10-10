@@ -968,6 +968,67 @@ describe("contabil Worker remainder routes", () => {
     vi.useRealTimers();
   });
 
+  it("extrai os documentos fiscais especiais da Triagem na organização do grant", async () => {
+    const prisma = {
+      triageMonthly: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "1",
+            client_id: CLIENT,
+            competence: "2026-09",
+            checklist: { sped_fiscal: "COMPLETED", nfce_documents: "nao possui" },
+          },
+        ]),
+      },
+      triageConfig: {
+        findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT, delivery_method: "Portal" }]),
+      },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.triage_fiscal_special_documents",
+      fields: ["competence", "sped_fiscal", "nfce_documents", "cte_as_issuer", "delivery_method"],
+      limit: 10,
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", body)),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          {
+            competence: "2026-09",
+            sped_fiscal: "Concluído",
+            nfce_documents: "Não possui",
+            cte_as_issuer: "Não aplicável",
+            delivery_method: "Portal",
+          },
+        ],
+      },
+    });
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "FISCAL", archived_at: null },
+      }),
+    );
+    expect(prisma.triageConfig.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, client_id: { in: [CLIENT] }, type: "FISCAL" },
+      }),
+    );
+  });
+
   it("usa a permissão efetiva do módulo contábil como o gateway Node encaminha", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });
