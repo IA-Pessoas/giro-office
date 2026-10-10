@@ -63,7 +63,7 @@ const userPhotoEditPolicy: AuthPolicy = {
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
-    modules: ["rh", "contabil", "financeiro", "triagem"],
+    modules: ["rh", "contabil", "financeiro", "pessoal", "triagem"],
     minPermission: moduleAccessPermission,
   },
 };

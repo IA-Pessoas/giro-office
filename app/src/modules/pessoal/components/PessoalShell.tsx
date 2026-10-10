@@ -140,7 +140,7 @@ export function PessoalShell() {
         />
       ) : activeTab === "agenda" ? (
         // Recorte do departamento na agenda compartilhada; o Pessoal não tem agenda própria.
-        <DepartmentAgendaSection module="pessoal" canEdit={access.canEdit} allowMine />
+        <DepartmentAgendaSection module="pessoal" canEdit={access.canEdit} assignable />
       ) : null}
     </div>
   );

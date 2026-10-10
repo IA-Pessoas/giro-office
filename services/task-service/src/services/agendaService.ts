@@ -7,7 +7,10 @@ import type { TaskAudit } from "../integrations/audit.js";
 import type prismaClient from "../prisma/index.js";
 import type { AGENDA_STATUSES } from "../schemas/agenda.schemas.js";
 
-export type AgendaPrisma = Pick<typeof prismaClient, "agenda" | "department">;
+export type AgendaPrisma = Pick<
+  typeof prismaClient,
+  "agenda" | "client" | "department" | "recurringAgenda" | "user"
+>;
 
 /** Quem pede e por qual módulo: a agenda é uma só, o departamento é o filtro. */
 export interface AgendaScope {
@@ -24,7 +27,13 @@ export interface AgendaEventInput {
   status?: (typeof AGENDA_STATUSES)[number];
   obs?: string | null;
   location?: string | null;
+  client_id?: string | null;
+  /** Responsável pelo evento; nulo deixa o evento na "minha agenda" de todos. */
+  participant_id?: string | null;
 }
+
+/** `recurrent` repete o evento todo mês; ausente na edição, não mexe na recorrência. */
+type AgendaRecurrenceInput = { recurrent?: boolean };
 
 const AGENDA_SELECT = {
   id: true,
@@ -37,6 +46,7 @@ const AGENDA_SELECT = {
   client: { select: { id: true, name: true } },
   // Responsável do evento: o primeiro participante, como no `responsavel_id` do legado.
   participant: { select: { id: true, name: true } },
+  recurring_agenda_id: true,
 } as const;
 
 interface AgendaEventRef {
@@ -54,12 +64,35 @@ export interface AgendaEventRow {
   department_control_id: string;
   client: AgendaEventRef | null;
   participant: AgendaEventRef | null;
+  /** Preenchido quando o evento é ocorrência de uma recorrência mensal. */
+  recurring_agenda_id: string | null;
 }
 
 /** Níveis do módulo (0 a 3) exigidos pela agenda; o owner entra com o maior. */
 export const AGENDA_LEVEL = { READ: 1, WRITE: 2, OWNER: 3 } as const;
 
 const NOT_FOUND = "Evento da agenda não encontrado.";
+
+const DEFAULT_STATUS = "Pendente" satisfies (typeof AGENDA_STATUSES)[number];
+const MONTHLY = "mensal";
+
+/** Competência (AAAA-MM) em UTC, o mesmo corte de mês usado na listagem. */
+const monthOf = (date: Date) => date.toISOString().slice(0, 7);
+
+/**
+ * Data da ocorrência de `month` (AAAA-MM) para a regra do dia `day`, ao meio-dia UTC.
+ * Mês curto usa o último dia; sábado e domingo vão para a sexta anterior ou, quando ela
+ * cairia no mês anterior, para a segunda seguinte.
+ */
+export function monthlyOccurrenceDate(day: number, month: string): Date {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  let target = Math.min(day, lastDay);
+  const weekday = new Date(Date.UTC(year, monthNumber - 1, target)).getUTCDay();
+  if (weekday === 6) target += target > 1 ? -1 : 2;
+  if (weekday === 0) target += target > 2 ? -2 : 1;
+  return new Date(Date.UTC(year, monthNumber - 1, target, 12));
+}
 
 export class AgendaService {
   constructor(
@@ -91,6 +124,30 @@ export class AgendaService {
     };
   }
 
+  /** Cliente e responsável informados precisam ser da organização; nulo só limpa o campo. */
+  private async assertAssignment(
+    scope: AgendaScope,
+    { client_id, participant_id }: Pick<AgendaEventInput, "client_id" | "participant_id">,
+  ): Promise<void> {
+    const organization_id = scope.organizationId;
+    if (
+      client_id &&
+      (await this.prisma.client.count({ where: { id: client_id, organization_id } })) === 0
+    ) {
+      throw new ServiceError(404, "Cliente não encontrado.");
+    }
+    if (!participant_id) return;
+    // Mesmo recorte do catálogo de responsáveis: ativo e da organização, direto ou pelo departamento.
+    const responsible = await this.prisma.user.count({
+      where: {
+        id: participant_id,
+        status: "active",
+        OR: [{ organization_id }, { organization_id: null, department: { organization_id } }],
+      },
+    });
+    if (responsible === 0) throw new ServiceError(404, "Responsável não encontrado.");
+  }
+
   private log(scope: AgendaScope, action: string, id: string, changes: Record<string, unknown>) {
     return this.audit.createLog({
       userId: scope.userId,
@@ -103,15 +160,68 @@ export class AgendaService {
   }
 
   /**
+   * Cria a ocorrência do mês corrente de cada regra mensal ainda não gerada nele.
+   * O índice único (regra, competência) descarta a repetição em leituras simultâneas, e o
+   * marcador avançado impede que uma ocorrência removida volte.
+   */
+  // ponytail: gera só o mês corrente, ao abrir a agenda. Mês que ninguém abriu fica sem
+  // ocorrência e mês futuro não é antecipado; se isso fizer falta, mover para um cron.
+  private async generateRecurring(organizationId: string, departmentIds: string[], now: Date) {
+    const month = monthOf(now);
+    const pending = { generated_through: { lt: month } };
+    const rules = await this.prisma.recurringAgenda.findMany({
+      where: {
+        organization_id: organizationId,
+        department_control_id: { in: departmentIds },
+        recurrence: MONTHLY,
+        ...pending,
+      },
+      select: {
+        id: true,
+        agenda: true,
+        day: true,
+        obs: true,
+        location: true,
+        client_id: true,
+        participant_id: true,
+        department_control_id: true,
+      },
+    });
+    if (rules.length === 0) return;
+    await this.prisma.agenda.createMany({
+      data: rules.map(({ id, day, ...rule }) => ({
+        ...rule,
+        date: monthlyOccurrenceDate(day, month),
+        status: DEFAULT_STATUS,
+        organization_id: organizationId,
+        recurring_agenda_id: id,
+        recurrence_month: month,
+      })),
+      skipDuplicates: true,
+    });
+    await this.prisma.recurringAgenda.updateMany({
+      where: { id: { in: rules.map((rule) => rule.id) }, ...pending },
+      data: { generated_through: month },
+    });
+  }
+
+  /**
    * `month` no formato AAAA-MM; o intervalo é o mês em UTC. Com `mine`, só os eventos do
    * usuário atual e os sem responsável.
    */
-  async list(scope: AgendaScope, month: string, mine = false): Promise<AgendaEventRow[]> {
+  async list(
+    scope: AgendaScope,
+    month: string,
+    mine = false,
+    now = new Date(),
+  ): Promise<AgendaEventRow[]> {
     const [year, monthNumber] = month.split("-").map(Number);
+    const departmentIds = await this.departmentIds(scope, AGENDA_LEVEL.READ);
+    await this.generateRecurring(scope.organizationId, departmentIds, now);
     return this.prisma.agenda.findMany({
       where: {
         organization_id: scope.organizationId,
-        department_control_id: { in: await this.departmentIds(scope, AGENDA_LEVEL.READ) },
+        department_control_id: { in: departmentIds },
         date: {
           gte: new Date(Date.UTC(year, monthNumber - 1, 1)),
           lt: new Date(Date.UTC(year, monthNumber, 1)),
@@ -125,37 +235,164 @@ export class AgendaService {
 
   async create(
     scope: AgendaScope,
-    input: AgendaEventInput & { department_id?: string },
+    input: AgendaEventInput & AgendaRecurrenceInput & { department_id?: string },
   ): Promise<AgendaEventRow> {
-    const { department_id, ...event } = input;
+    const { department_id, recurrent, ...event } = input;
     const departmentIds = await this.departmentIds(scope, AGENDA_LEVEL.WRITE);
     const departmentId = department_id ?? departmentIds[0];
     if (!departmentId || !departmentIds.includes(departmentId)) {
       throw new ServiceError(404, "Departamento não encontrado para este módulo.");
     }
-    const created = await this.prisma.agenda.create({
-      data: {
-        ...event,
-        status: event.status ?? "Pendente",
-        organization_id: scope.organizationId,
-        department_control_id: departmentId,
-      },
-      select: AGENDA_SELECT,
-    });
+    await this.assertAssignment(scope, event);
+    const data = {
+      ...event,
+      status: event.status ?? DEFAULT_STATUS,
+      organization_id: scope.organizationId,
+      department_control_id: departmentId,
+    };
+    const created = recurrent
+      ? await this.createRecurring(data)
+      : await this.prisma.agenda.create({ data, select: AGENDA_SELECT });
     await this.log(scope, "Cadastro", created.id, {});
     return created;
+  }
+
+  /** Regra e primeira ocorrência em uma gravação só: não fica regra sem evento. */
+  private async createRecurring(
+    event: AgendaEventInput & { organization_id: string; department_control_id: string },
+  ): Promise<AgendaEventRow> {
+    const month = monthOf(event.date);
+    const rule = await this.prisma.recurringAgenda.create({
+      data: {
+        agenda: event.agenda,
+        day: event.date.getUTCDate(),
+        recurrence: MONTHLY,
+        obs: event.obs,
+        location: event.location,
+        client_id: event.client_id,
+        participant_id: event.participant_id,
+        organization_id: event.organization_id,
+        department_control_id: event.department_control_id,
+        generated_through: month,
+        occurrences: { create: { ...event, recurrence_month: month } },
+      },
+      select: { occurrences: { select: AGENDA_SELECT } },
+    });
+    return rule.occurrences[0];
+  }
+
+  /**
+   * Mantém a regra coerente com a edição da ocorrência e devolve o vínculo a gravar nela.
+   * Só a ocorrência mais recente (a do marcador) altera a regra: editar uma antiga não muda
+   * as próximas. O estado nunca vai para a regra.
+   */
+  private async syncRecurrence(
+    scope: AgendaScope,
+    existing: {
+      agenda: string;
+      date: Date;
+      obs: string | null;
+      location: string | null;
+      client_id: string | null;
+      participant_id: string | null;
+      department_control_id: string;
+      recurring_agenda_id: string | null;
+      recurrence_month: string | null;
+    },
+    { agenda, date, obs, location, client_id, participant_id }: Partial<AgendaEventInput>,
+    recurrent: boolean | undefined,
+  ) {
+    const ruleId = existing.recurring_agenda_id;
+    if (ruleId && recurrent === false) {
+      await this.prisma.recurringAgenda.deleteMany({
+        where: { id: ruleId, organization_id: scope.organizationId },
+      });
+      return { recurring_agenda_id: null, recurrence_month: null };
+    }
+    if (ruleId) {
+      // Adiar a ocorrência para outro mês não muda o dia da regra: o mês de destino
+      // ainda recebe a própria ocorrência, e as duas não podem cair no mesmo dia.
+      const sameMonth = date && monthOf(date) === existing.recurrence_month;
+      const data = {
+        agenda,
+        obs,
+        location,
+        client_id,
+        participant_id,
+        day: sameMonth ? date.getUTCDate() : undefined,
+      };
+      if (Object.values(data).some((value) => value !== undefined)) {
+        await this.prisma.recurringAgenda.updateMany({
+          where: { id: ruleId, generated_through: existing.recurrence_month },
+          data,
+        });
+      }
+      return {};
+    }
+    if (!recurrent) return {};
+    const day = date ?? existing.date;
+    const month = monthOf(day);
+    const rule = await this.prisma.recurringAgenda.create({
+      data: {
+        agenda: agenda ?? existing.agenda,
+        day: day.getUTCDate(),
+        recurrence: MONTHLY,
+        obs: obs === undefined ? existing.obs : obs,
+        location: location === undefined ? existing.location : location,
+        client_id: client_id === undefined ? existing.client_id : client_id,
+        participant_id: participant_id === undefined ? existing.participant_id : participant_id,
+        organization_id: scope.organizationId,
+        department_control_id: existing.department_control_id,
+        generated_through: month,
+      },
+      select: { id: true },
+    });
+    return { recurring_agenda_id: rule.id, recurrence_month: month };
   }
 
   async update(
     scope: AgendaScope,
     id: string,
-    input: Partial<AgendaEventInput>,
+    input: Partial<AgendaEventInput> & AgendaRecurrenceInput,
   ): Promise<{ id: string }> {
-    const { count } = await this.prisma.agenda.updateMany({
-      where: await this.scopedWhere(scope, id),
-      data: input,
+    const where = await this.scopedWhere(scope, id);
+    const { recurrent, ...fields } = input;
+    const existing = await this.prisma.agenda.findFirst({
+      where,
+      select: {
+        agenda: true,
+        date: true,
+        obs: true,
+        location: true,
+        client_id: true,
+        participant_id: true,
+        department_control_id: true,
+        recurring_agenda_id: true,
+        recurrence_month: true,
+      },
     });
-    if (count === 0) throw new ServiceError(404, NOT_FOUND);
+    if (!existing) throw new ServiceError(404, NOT_FOUND);
+    await this.assertAssignment(scope, fields);
+    const link = await this.syncRecurrence(scope, existing, fields, recurrent);
+    const data = { ...fields, ...link };
+    // Pedido que não muda nada (recorrência já ligada, por exemplo) não grava.
+    if (Object.keys(data).length > 0) {
+      const newRuleId = link.recurring_agenda_id;
+      let count = 0;
+      try {
+        ({ count } = await this.prisma.agenda.updateMany({
+          // Regra nova só se liga a evento ainda sem regra: de duas edições simultâneas, uma perde.
+          where: newRuleId ? { ...where, recurring_agenda_id: null } : where,
+          data,
+        }));
+      } finally {
+        // Sem evento ligado, a regra recém-criada geraria ocorrências sem origem.
+        if (count === 0 && newRuleId) {
+          await this.prisma.recurringAgenda.deleteMany({ where: { id: newRuleId } });
+        }
+      }
+      if (count === 0) throw new ServiceError(404, NOT_FOUND);
+    }
     await this.log(scope, "Atualização", id, input);
     return { id };
   }

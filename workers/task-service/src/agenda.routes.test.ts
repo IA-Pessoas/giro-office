@@ -22,9 +22,18 @@ function setup() {
     },
     agenda: {
       findMany: vi.fn().mockResolvedValue([{ id: "evt-1", agenda: "Fechamento" }]),
+      findFirst: vi.fn().mockResolvedValue({ id: "evt-1", recurring_agenda_id: null }),
       create: vi.fn(async ({ data }) => ({ id: "evt-1", ...data })),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    client: { count: vi.fn().mockResolvedValue(1) },
+    user: { count: vi.fn().mockResolvedValue(1) },
+    recurringAgenda: {
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(async ({ data }) => ({
+        occurrences: [{ id: "evt-1", ...data.occurrences.create }],
+      })),
     },
   };
   const env = workerEnv({ AUDIT_SERVICE: recordingBinding() as never });
@@ -120,6 +129,53 @@ describe("agenda compartilhada por departamento (#1727)", () => {
       data: { status: "Realizado" },
     });
     expect(removed.status).toBe(404);
+  });
+
+  it("aceita a recorrência mensal na criação e na edição, e recusa valor que não é booleano (#1700)", async () => {
+    const { prisma, send } = setup();
+    const body = { module: "contabil", agenda: "Fechamento", date: "2026-12-31T12:00:00.000Z" };
+
+    const created = await send("POST", "/task/agenda", { body: { ...body, recurrent: true } });
+    const updated = await send("PUT", "/task/agenda", {
+      body: { module: "contabil", agenda_id: "evt-1", recurrent: false },
+    });
+    const invalid = await send("POST", "/task/agenda", { body: { ...body, recurrent: "sim" } });
+
+    expect(created.status).toBe(201);
+    expect(prisma.recurringAgenda.create.mock.calls[0][0].data).toMatchObject({
+      day: 31,
+      recurrence: "mensal",
+      organization_id: ORG,
+      department_control_id: CONTABIL,
+      generated_through: "2026-12",
+    });
+    expect(prisma.agenda.create).not.toHaveBeenCalled();
+    expect(updated.status).toBe(200);
+    expect(invalid.status).toBe(400);
+  });
+
+  it("aceita cliente e responsável e recusa o que não é desta organização (#1774)", async () => {
+    const { prisma, send } = setup();
+    const body = {
+      module: "contabil",
+      agenda: "Fechamento",
+      date: "2026-12-31T12:00:00.000Z",
+      client_id: "cli-1",
+      participant_id: "user-2",
+    };
+
+    expect((await send("POST", "/task/agenda", { body })).status).toBe(201);
+    expect(prisma.agenda.create.mock.calls[0][0].data).toMatchObject({
+      client_id: "cli-1",
+      participant_id: "user-2",
+    });
+
+    prisma.user.count.mockResolvedValue(0);
+    expect((await send("POST", "/task/agenda", { body })).status).toBe(404);
+    expect((await send("POST", "/task/agenda", { body: { ...body, client_id: "" } })).status).toBe(
+      400,
+    );
+    expect(prisma.agenda.create).toHaveBeenCalledTimes(1);
   });
 
   it("valida módulo, mês e estado", async () => {
