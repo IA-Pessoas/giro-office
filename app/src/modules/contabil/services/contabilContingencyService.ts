@@ -69,10 +69,9 @@ export const contabilContingencyService = {
     return unwrapContabilEnvelope(response.data);
   },
   async download(result: ContingencySimulation): Promise<Blob> {
-    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.contingencyExport(result.id), {
+    const response = await setupAPIClient().get<string>(CONTABIL_ENDPOINTS.contingencyExport(result.id), {
       params: { content_hash: result.content_hash },
-      responseType: "blob",
     });
-    return response.data;
+    return new Blob([response.data], { type: "text/html;charset=utf-8" });
   },
 };
