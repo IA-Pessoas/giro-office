@@ -58,7 +58,7 @@ export function createMarketingServices(prisma: unknown, env: MarketingWorkerEnv
       if (!env.MTK_ENCRYPTION_KEY) {
         throw new ServiceError(503, "Credenciais de Marketing indisponíveis no momento.");
       }
-      return new MarketingPasswordService(db, new EncryptionService(env.MTK_ENCRYPTION_KEY));
+      return new MarketingPasswordService(db, new EncryptionService(env.MTK_ENCRYPTION_KEY), audit);
     },
   };
 }
@@ -200,7 +200,11 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/passwords/import",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(importMarketingPasswordsBodySchema, await readJson(c));
-      return ok(c, await s.passwords().importLegacyRecords(org, body.records), 201);
+      return ok(
+        c,
+        await s.passwords().importLegacyRecords(org, body.records, c.get("auth").userId),
+        201,
+      );
     }),
   );
   app.get(
@@ -214,7 +218,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/passwords",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(createMarketingPasswordBodySchema, await readJson(c));
-      return ok(c, await s.passwords().create(org, body), 201);
+      return ok(c, await s.passwords().create(org, body, c.get("auth").userId), 201);
     }),
   );
   app.patch(
@@ -222,7 +226,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, c.req.param());
       const body = parseWithZod(updateMarketingPasswordBodySchema, await readJson(c));
-      return ok(c, await s.passwords().update(org, id, body));
+      return ok(c, await s.passwords().update(org, id, body, c.get("auth").userId));
     }),
   );
   app.post(
@@ -230,7 +234,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, c.req.param());
       const body = parseWithZod(marketingPasswordConfirmationSchema, await readJson(c));
-      return ok(c, await s.passwords().reveal(org, id, body.confirmed));
+      return ok(c, await s.passwords().reveal(org, id, body.confirmed, c.get("auth").userId));
     }),
   );
   app.post(
@@ -238,7 +242,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, c.req.param());
       const body = parseWithZod(marketingPasswordConfirmationSchema, await readJson(c));
-      return ok(c, await s.passwords().export(org, id, body.confirmed));
+      return ok(c, await s.passwords().export(org, id, body.confirmed, c.get("auth").userId));
     }),
   );
 

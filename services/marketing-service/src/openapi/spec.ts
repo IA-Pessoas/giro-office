@@ -274,20 +274,20 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         get: protectedOperation("Listar metadados de credenciais sem revelar os segredos."),
       },
       "/marketing/passwords": {
-        post: protectedOperation("Criar credencial criptografada para a organização autenticada."),
+        post: auditedOperation("Criar credencial criptografada para a organização autenticada."),
       },
       "/marketing/passwords/{id}": {
         get: protectedOperation("Consultar metadados de uma credencial."),
-        patch: protectedOperation("Editar metadados e, opcionalmente, substituir o segredo."),
+        patch: auditedOperation("Editar metadados e, opcionalmente, substituir o segredo."),
       },
       "/marketing/passwords/{id}/reveal": {
-        post: protectedOperation("Revelar uma credencial após confirmação explícita."),
+        post: auditedOperation("Revelar uma credencial após confirmação explícita."),
       },
       "/marketing/passwords/{id}/export": {
-        post: protectedOperation("Exportar uma credencial após confirmação explícita."),
+        post: auditedOperation("Exportar uma credencial após confirmação explícita."),
       },
       "/marketing/passwords/import": {
-        post: protectedOperation(
+        post: auditedOperation(
           "Importar segredos legados verificáveis e colocar casos inseguros em quarentena.",
         ),
       },
