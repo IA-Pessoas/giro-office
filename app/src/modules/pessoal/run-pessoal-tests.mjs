@@ -1116,6 +1116,12 @@ runTest("password vault offers Empregador Web and portal shortcuts carry no cred
   // Nome personalizado segue permitido e não ganha atalho.
   assert.equal(pessoalPasswordPortalUrl("Portal do sindicato"), null);
   assert.equal(pessoalPasswordPortalUrl("Onvio"), null);
+  // Caixa, acento, espaço e os nomes da tela antiga levam ao mesmo portal.
+  assert.equal(pessoalPasswordPortalUrl("  empregador web "), PESSOAL_PASSWORD_PORTALS["Empregador Web"]);
+  assert.equal(pessoalPasswordPortalUrl("eSocial"), PESSOAL_PASSWORD_PORTALS["Portal eSocial"]);
+  assert.equal(pessoalPasswordPortalUrl("Bem+(Mais)"), PESSOAL_PASSWORD_PORTALS["Bem Mais"]);
+  assert.equal(pessoalPasswordPortalUrl("Benefício Social Familiar"), PESSOAL_PASSWORD_PORTALS.BSF);
+  assert.equal(pessoalPasswordPortalUrl("Códigos de Acesso Gov"), PESSOAL_PASSWORD_PORTALS["Gov.br"]);
 
   for (const [service, url] of Object.entries(PESSOAL_PASSWORD_PORTALS)) {
     const parsed = new URL(url);
@@ -1129,7 +1135,9 @@ runTest("password vault offers Empregador Web and portal shortcuts carry no cred
     "utf8",
   );
   // O atalho é o endereço fixo do catálogo: nada do acesso (login, senha) entra no href.
-  assert.match(section, /const portalUrl = detail \? pessoalPasswordPortalUrl\(detail\.service_name\) : null;/);
+  // O atalho sai do nome que já vem na lista: ver o link não abre o detalhe (leitura auditada).
+  assert.match(section, /const portalUrl = pessoalPasswordPortalUrl\(password\.service_name\);/);
+  assert.doesNotMatch(section, /pessoalPasswordPortalUrl\(detail/);
   assert.match(section, /href=\{portalUrl\}\s+target="_blank"\s+rel="noopener noreferrer"/);
   assert.doesNotMatch(section, /href=\{[^}]*(login_|senha_)/);
 });

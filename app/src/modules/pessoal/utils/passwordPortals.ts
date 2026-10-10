@@ -32,9 +32,31 @@ export function isPessoalPasswordKnownService(value: string): value is PessoalPa
   return PESSOAL_PASSWORD_SERVICE_OPTIONS.includes(value as PessoalPasswordServiceOption);
 }
 
-/** Atalho do portal para um serviço pronto; nome personalizado não tem atalho. */
+const normalize = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+/** Nomes da tela antiga e variações comuns de digitação, já normalizados. */
+const PORTAL_ALIASES: Record<string, PessoalPasswordServiceOption> = {
+  esocial: "Portal eSocial",
+  "codigos de acesso gov": "Gov.br",
+  "codigo de acesso gov": "Gov.br",
+  "bem+": "Bem Mais",
+  "bem+(mais)": "Bem Mais",
+  "beneficio social familiar": "BSF",
+};
+
+/**
+ * Atalho do portal pelo nome do serviço, sem diferenciar caixa, acento ou espaço nas pontas.
+ * Nome personalizado que não corresponde a um portal conhecido não tem atalho.
+ */
 export function pessoalPasswordPortalUrl(serviceName: string): string | null {
-  return isPessoalPasswordKnownService(serviceName)
-    ? (PESSOAL_PASSWORD_PORTALS[serviceName] ?? null)
-    : null;
+  const wanted = normalize(serviceName);
+  const service =
+    PESSOAL_PASSWORD_SERVICE_OPTIONS.find((option) => normalize(option) === wanted) ??
+    PORTAL_ALIASES[wanted];
+  return service ? (PESSOAL_PASSWORD_PORTALS[service] ?? null) : null;
 }

@@ -232,7 +232,6 @@ export function PessoalPasswordsSection({
   const selectedPassword =
     passwords.find((password) => password.id === selectedPasswordId) ?? null;
   const detail = detailQuery.data;
-  const portalUrl = detail ? pessoalPasswordPortalUrl(detail.service_name) : null;
   const hasSecretFields = detail ? hasPessoalPasswordSecretFields(detail) : false;
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
@@ -574,26 +573,39 @@ export function PessoalPasswordsSection({
 
             {filteredPasswords.map((password) => {
               const isSelected = password.id === selectedPasswordId;
+              const portalUrl = pessoalPasswordPortalUrl(password.service_name);
 
               return (
-                <button
-                  key={password.id}
-                  type="button"
-                  onClick={() => setSelectedPasswordId(password.id)}
-                  className={cn(
-                    "w-full rounded-xl border p-4 text-left transition-colors",
-                    isSelected
-                      ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30"
-                      : "border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900/30 dark:hover:border-blue-800",
-                  )}
-                >
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {password.service_name}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Responsável: {getResponsibleName(password)}
-                  </p>
-                </button>
+                <div key={password.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPasswordId(password.id)}
+                    className={cn(
+                      "w-full rounded-xl border p-4 text-left transition-colors",
+                      isSelected
+                        ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30"
+                        : "border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900/30 dark:hover:border-blue-800",
+                    )}
+                  >
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {password.service_name}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      Responsável: {getResponsibleName(password)}
+                    </p>
+                  </button>
+                  {portalUrl ? (
+                    <a
+                      href={portalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-1 text-sm font-medium text-blue-700 underline underline-offset-2 dark:text-blue-300"
+                    >
+                      <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      Abrir portal {password.service_name} (nova aba)
+                    </a>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -631,17 +643,6 @@ export function PessoalPasswordsSection({
                       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Responsável: {getResponsibleName(detail)}
                       </p>
-                      {portalUrl ? (
-                        <a
-                          href={portalUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-blue-700 underline underline-offset-2 dark:text-blue-300"
-                        >
-                          <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
-                          Abrir portal (nova aba)
-                        </a>
-                      ) : null}
                     </div>
 
                     {canEdit ? (
