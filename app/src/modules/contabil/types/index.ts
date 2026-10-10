@@ -104,6 +104,27 @@ export interface ContabilHistoryEntry<F extends string> {
 
 export type ContabilControlHistoryEntry = ContabilHistoryEntry<ContabilControlField>;
 
+/** Evento do histórico documental da Triagem, lido da auditoria. */
+export interface TriageDocumentHistoryEntry extends ContabilHistoryEntry<string> {
+  object: {
+    /** `referring` da auditoria: rotina, extrato, fechamento, Cloud ou configuração. */
+    kind: string;
+    client_id: string | null;
+    client_name: string | null;
+    competence: ContabilCompetence | null;
+    routine_type: string | null;
+  };
+}
+
+export interface TriageDocumentHistoryPage {
+  client_id: string | null;
+  competence: ContabilCompetence | null;
+  page: number;
+  pageSize: number;
+  total: number;
+  items: TriageDocumentHistoryEntry[];
+}
+
 export type ContabilRelationshipHistoryField =
   | "bidding"
   | "chart_accounts"

@@ -573,6 +573,107 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("histórico documental: leitura por cliente, organização do token e visão geral só do administrador (#1706)", async () => {
+    const events = [
+      {
+        id: "event-1",
+        user_id: USER,
+        created_at: new Date("2026-09-11T10:00:00.000Z"),
+        action: "Atualizar pendência documental",
+        referring: "triagem.monthly",
+        referring_id: "monthly-1",
+        changes_json: {
+          checklist: { from: { sped_fiscal: "PENDING" }, to: { sped_fiscal: "COMPLETED" } },
+        },
+      },
+    ];
+    const none = { findMany: vi.fn().mockResolvedValue([]) };
+    const prisma = {
+      auditRequest: {
+        findMany: vi.fn().mockResolvedValue(events),
+        count: vi.fn().mockResolvedValue(21),
+      },
+      client: {
+        findFirst: vi.fn().mockResolvedValue({ id: CLIENT }),
+        findMany: vi.fn().mockResolvedValue([{ id: CLIENT, name: "Alfa", company_name: null }]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: USER, name: "Ana Souza" }]) },
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { id: "monthly-1", client_id: CLIENT, competence: "2026-09", type: "FISCAL" },
+          ]),
+      },
+      triageBankStatement: none,
+      triageClosing: none,
+      clientCloud: none,
+      controlContabil: none,
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const get = (query: string, init?: RequestInit) =>
+      app.request(`https://contabil.test/triagem/documents/history${query}`, init);
+    const withModules = (modules: Record<string, number>) => ({
+      headers: { ...headers("0"), "x-auth-modules": JSON.stringify(modules) },
+    });
+
+    const anonymous = await get(`?client_id=${CLIENT}`);
+    const denied = await get(`?client_id=${CLIENT}`, withModules({ contabil: 0, triagem: 0 }));
+    const invalid = await get("?client_id=abc", { headers: headers("2") });
+    // Sem cliente é a organização inteira: quem só lê ou edita não vê.
+    const reader = await get("", withModules({ contabil: 0, triagem: 1 }));
+    const editor = await get("?competence=2026-09", { headers: headers("2") });
+    expect([anonymous.status, denied.status, invalid.status, reader.status, editor.status]).toEqual(
+      [401, 403, 400, 403, 403],
+    );
+    expect(prisma.auditRequest.findMany).not.toHaveBeenCalled();
+
+    const page = await get(
+      `?client_id=${CLIENT}&competence=2026-09&page=2&pageSize=20`,
+      withModules({ contabil: 0, triagem: 1 }),
+    );
+    expect(page.status).toBe(200);
+    await expect(page.json()).resolves.toMatchObject({
+      data: {
+        client_id: CLIENT,
+        competence: "2026-09",
+        page: 2,
+        total: 21,
+        items: [
+          {
+            actor: { id: USER, name: "Ana Souza" },
+            at: "2026-09-11T10:00:00.000Z",
+            object: { kind: "triagem.monthly", client_name: "Alfa", competence: "2026-09" },
+            changes: [{ field: "checklist.sped_fiscal", from: "PENDING", to: "COMPLETED" }],
+          },
+        ],
+      },
+    });
+    expect(prisma.auditRequest.findMany).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: ORG,
+          OR: [{ referring: "triagem.monthly", referring_id: { in: ["monthly-1"] } }],
+        }),
+        skip: 20,
+        take: 20,
+      }),
+    );
+
+    // Administrador da Triagem, administrador do Contábil e dono da organização.
+    const admins = await Promise.all([
+      get("", withModules({ contabil: 0, triagem: 3 })),
+      get("", withModules({ contabil: 3, triagem: 0 })),
+      get("", { headers: { ...headers("0"), "x-auth-type": "owner", "x-auth-modules": "{}" } }),
+    ]);
+    expect(admins.map((response) => response.status)).toEqual([200, 200, 200]);
+    const recentWhere = prisma.auditRequest.findMany.mock.calls.at(-1)?.[0].where;
+    expect(recentWhere).toMatchObject({ organization_id: ORG });
+    // Sem recorte por objeto: nenhum dos ramos filtra `referring_id`.
+    expect(recentWhere.OR).toHaveLength(6);
+    for (const branch of recentWhere.OR) expect(branch).not.toHaveProperty("referring_id");
+  });
+
   it("nuvens do cliente validam link e usam a organização do token (#1695)", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });

@@ -10,6 +10,7 @@ export {
   ContabilStateBox,
   DepartmentAgendaSection,
   TriageDocumentsSection,
+  TriageDocumentHistorySection,
   FiscalTriagePortfolioSection,
 } from "./components";
 export {
