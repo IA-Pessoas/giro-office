@@ -3194,6 +3194,10 @@ model TriageConfig {
   client_id       String
   type            String
   active_items    Json
+  /// Prioridade Sim/Não do cliente na rotina (só FISCAL); não é urgência nem prioridade de item.
+  priority        Boolean      @default(false)
+  /// Meio de envio do cliente (código DELIVERY_METHOD do catálogo da triagem; só FISCAL).
+  delivery_method String?      @db.VarChar(100)
   updated_at      DateTime     @updatedAt
   organization_id String
   client          Client       @relation(fields: [client_id], references: [id])

@@ -12,6 +12,7 @@ const screenshotPath =
   "output/playwright/issue-1152-triagem-external-links.png";
 const clientId = "c1000000-0000-4000-8000-000000000001";
 const competence = "2026-09";
+const clouds = [];
 const linkTypeCode = "SMOKE_LINK_TYPE";
 const externalLinks = [];
 const user = {
@@ -138,6 +139,17 @@ async function runBrowserProof() {
       externalLinks[0].archived_at = "2026-09-18T02:00:00.000Z";
       return json(route, externalLinks[0]);
     }
+    if (request.method() === "GET" && apiPath === "/triagem/clouds") return json(route, clouds);
+    if (request.method() === "POST" && apiPath === "/triagem/clouds") {
+      const cloud = { id: `cloud-${clouds.length + 1}`, updated_at: "2026-09-30T12:00:00.000Z", ...request.postDataJSON() };
+      clouds.push(cloud);
+      return json(route, cloud);
+    }
+    if (request.method() === "PATCH" && apiPath.startsWith("/triagem/clouds/")) {
+      const cloud = clouds.find((item) => apiPath.endsWith(item.id));
+      Object.assign(cloud, request.postDataJSON());
+      return json(route, cloud);
+    }
     if (request.method() === "GET" && apiPath === "/triagem/editability") return json(route, { can_edit: true });
     if (request.method() === "GET" && apiPath === "/triagem/monthly") {
       return json(route, {
@@ -184,6 +196,24 @@ async function runBrowserProof() {
       .click();
     await expect(page.getByText("Nenhum link externo registrado para esta competência.")).toBeVisible();
     assert.ok(requests.some((request) => request.method === "PATCH" && request.path.endsWith("/archive")));
+
+    // #1695: a nuvem é do cliente e convive com os links da competência.
+    await page.getByLabel("Tipo da nova nuvem").fill("Google Drive");
+    await page.getByLabel("Link da nova nuvem").fill("https://drive.example.test/cliente");
+    await page.getByRole("button", { name: "Adicionar nuvem" }).click();
+    await expect(page.getByRole("link", { name: "Google Drive" })).toHaveAttribute(
+      "href",
+      "https://drive.example.test/cliente",
+    );
+    await page.getByRole("button", { name: "Editar Google Drive" }).click();
+    await page.getByLabel("Link da nuvem em edição").fill("https://drive.example.test/novo");
+    await page.getByRole("button", { name: "Salvar", exact: true }).click();
+    await expect(page.getByRole("link", { name: "Google Drive" })).toHaveAttribute(
+      "href",
+      "https://drive.example.test/novo",
+    );
+    assert.ok(requests.some((request) => request.method === "PATCH" && request.path.startsWith("/triagem/clouds/")));
+    await expect(page.getByRole("heading", { name: "Links externos" })).toBeVisible();
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
     console.log(JSON.stringify({ url: page.url(), requestCount: requests.length, screenshotPath }));

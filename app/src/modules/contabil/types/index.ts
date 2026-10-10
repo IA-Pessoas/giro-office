@@ -1,3 +1,5 @@
+import type { TriageFiscalConfigurableField } from "@workspace/shared/triagem/documents";
+
 export type ContabilCompetence = `${number}-${number}`;
 export type TriageRoutineType = "CONTABIL" | "FISCAL";
 
@@ -245,6 +247,46 @@ export interface TriageDocumentsMonthly {
   checklist: Record<string, TriageDocumentStatus>;
   item_notes: Record<string, TriageDocumentItemNotes>;
   summary: { applicable: number; completed: number; attention: number; pending: number; notApplicable: number; notPresent: number; percentage: number };
+  triad_moviment?: boolean;
+  notes?: string | null;
+  justification?: string | null;
+  responsible_id?: string | null;
+  download_date?: string | null;
+  settlement_date?: string | null;
+}
+
+/** Dados do movimento mensal atribuíveis fora do checklist (envio, observação, datas). */
+export type TriageMonthlyUpdate = Partial<{
+  triad_moviment: boolean;
+  notes: string | null;
+  justification: string | null;
+  responsible_id: string | null;
+  download_date: string | null;
+  settlement_date: string | null;
+}>;
+
+/** Documentos fiscais especiais aplicáveis ao cliente (`active_items` da config FISCAL). */
+export interface TriageFiscalSpecialConfig {
+  client_id: string;
+  type: "FISCAL";
+  configured: boolean;
+  active_items: TriageFiscalConfigurableField[];
+}
+
+/** Prioridade e meio de envio do cliente lidos pelo Fiscal. */
+export interface TriageFiscalSettings {
+  client_id: string;
+  priority: boolean;
+  delivery_method: string | null;
+}
+
+/** Movimento padrão do cliente: itens contábeis que entram em cada competência. */
+export interface TriageMovementConfig {
+  client_id: string;
+  type: "CONTABIL";
+  /** false enquanto o cliente nunca salvou um padrão: nada fica desativado. */
+  configured: boolean;
+  active_items: TriageDocumentField[];
 }
 
 export interface FiscalTriagePortfolioItem {
@@ -254,6 +296,10 @@ export interface FiscalTriagePortfolioItem {
   regime: string | null;
   responsible_id: string | null;
   responsible_name: string | null;
+  /** Prioridade Sim/Não do cliente no Fiscal (não é urgência nem prioridade de item). */
+  priority: boolean;
+  /** Código DELIVERY_METHOD do catálogo da triagem. */
+  delivery_method: string | null;
   can_edit: boolean;
   has_competence: boolean;
   planned_checklist: Record<TriageFiscalChecklistField, TriageDocumentStatus> | null;
@@ -263,6 +309,18 @@ export interface FiscalTriagePortfolioItem {
 export interface FiscalTriagePortfolio {
   competence: ContabilCompetence;
   items: FiscalTriagePortfolioItem[];
+}
+
+/** Marcadores bancários do cliente agrupados por competência (mais recente primeiro). */
+export interface TriageStatementHistory {
+  client_id: string;
+  /** true quando o limite cortou as competências mais antigas. */
+  truncated: boolean;
+  competences: Array<{
+    competence: ContabilCompetence;
+    pending: number;
+    statements: Array<{ bank_id: string; status: TriageDocumentStatus }>;
+  }>;
 }
 
 export interface TriageBankStatement {

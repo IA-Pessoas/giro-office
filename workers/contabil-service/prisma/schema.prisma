@@ -19,6 +19,8 @@ model Client {
   competence_output  DateTime?
   contabil           Boolean?
   fiscal             Boolean?
+  status             String
+  deletion_date      DateTime?
   organization_id    String
   controlContabil    ControlContabil[]
   triageClosings     TriageClosing[]
@@ -120,12 +122,26 @@ model ResponsibleContabil {
   @@map("contabil.responsibles")
 }
 
+model ClientCloud {
+  id              String   @id @default(uuid())
+  client_id       String
+  type            String
+  link            String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  organization_id String
+
+  @@map("clientes.clouds")
+}
+
 model TriageConfig {
   id              String   @id @default(uuid())
   client_id       String
   type            String
   active_items    Json
-  updated_at      DateTime
+  priority        Boolean  @default(false)
+  delivery_method String?  @db.VarChar(100)
+  updated_at      DateTime @updatedAt
   organization_id String
 
   @@unique([organization_id, client_id, type])
@@ -139,7 +155,13 @@ model TriageMonthly {
   type            String
   checklist       Json
   item_notes      Json     @default("{}")
+  download_date   DateTime?
+  settlement_date DateTime?
   billing_amount  String?
+  triad_moviment  Boolean  @default(false)
+  responsible_id  String?
+  notes           String?
+  justification   String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
   archived_at     DateTime?

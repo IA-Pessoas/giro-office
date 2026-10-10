@@ -16,3 +16,4 @@ export {
 export { triagemCatalogsQueryKey, useTriageCatalogMutations, useTriageCatalogs } from "./useTriageCatalogs";
 export { triagemOverviewQueryKey, useTriageOverview } from "./useTriageOverview";
 export { useTriageAudit } from "./useTriageAudit";
+export { triagemCloudsQueryKey, useTriageCloudMutations, useTriageClouds } from "./useTriageClouds";

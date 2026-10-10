@@ -6,6 +6,13 @@ import {
   ServiceError,
   serializeError,
 } from "@workspace/shared/http";
+import {
+  type ContabilTriagePortfolioFilterable,
+  type FiscalTriagePortfolioFilterable,
+  filterContabilTriagePortfolio,
+  filterFiscalTriagePortfolio,
+  fiscalTriagePortfolioFiltersFromQuery,
+} from "@workspace/shared/triagem";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
@@ -16,7 +23,6 @@ import {
   createControlBodySchema,
   createYearControlsBodySchema,
   detailControlQuerySchema,
-  listControlQuerySchema,
   updateControlFieldBodySchema,
 } from "../../../services/contabil-service/src/schemas/control.schemas.js";
 import {
@@ -59,14 +65,25 @@ import {
 import {
   closingQuerySchema,
   closingUpdateSchema,
+  cloudCreateSchema,
+  cloudIdSchema,
+  cloudListSchema,
+  cloudUpdateSchema,
+  contabilPortfolioSchema,
   documentItemSchema,
   documentsBulkSchema,
   editabilitySchema,
   fiscalPortfolioSchema,
+  fiscalSettingsBodySchema,
+  fiscalSettingsQuerySchema,
   monthlyIdSchema,
   monthlySchema,
+  monthlyUpdateSchema,
   statementArchiveSchema,
+  statementHistorySchema,
   statementSchema,
+  triageConfigBodySchema,
+  triageConfigQuerySchema,
 } from "./schemas.js";
 import {
   type AuthContext,
@@ -150,6 +167,11 @@ function withPrisma<T>(
   return withWorkerPrisma(env, PrismaClient, (client) =>
     callback(client as unknown as ContabilPrisma),
   );
+}
+
+/** Aplica um filtro da carteira sobre `items` da resposta, mantendo o resto (competência). */
+function filterItems<T>(data: Record<string, unknown>, filter: (items: T[]) => T[]) {
+  return { ...data, items: filter(Array.isArray(data.items) ? (data.items as T[]) : []) };
 }
 
 function executeAuthWrite(c: Context): void {
@@ -243,7 +265,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   });
 
   app.get("/contabil/controls/list", async (c) => {
-    const query = parseWithZod(listControlQuerySchema, c.req.query());
+    const query = parseWithZod(contabilPortfolioSchema, c.req.query());
     const auth = c.get("auth");
     const invoke = (service: ControlService) => service.list(query.competence, auth.organizationId);
     const data = options.controlService
@@ -251,7 +273,17 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       : await withPrisma(c, options, async (prisma) =>
           invoke(createControlService(prisma, createContabilAudit(options.env ?? c.env))),
         );
-    return c.json(createSuccessResponse(data));
+    return c.json(
+      createSuccessResponse(
+        filterItems<ContabilTriagePortfolioFilterable>(data, (items) =>
+          filterContabilTriagePortfolio(items, {
+            responsibleId: query.responsible_id,
+            regime: query.regime,
+            closingStatus: query.status,
+          }),
+        ),
+      ),
+    );
   });
 
   app.post("/contabil/controls/year", async (c) => {
@@ -570,7 +602,13 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const data = await withDocuments(c, (service) =>
       service.listFiscalPortfolio(query.competence, authContext(c.get("auth"))),
     );
-    return c.json(createSuccessResponse(data));
+    return c.json(
+      createSuccessResponse(
+        filterItems<FiscalTriagePortfolioFilterable>(data, (items) =>
+          filterFiscalTriagePortfolio(items, fiscalTriagePortfolioFiltersFromQuery(query)),
+        ),
+      ),
+    );
   });
   app.get("/triagem/editability", async (c) => {
     const query = parseWithZod(editabilitySchema, c.req.query());
@@ -601,6 +639,42 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     );
     return c.json(createSuccessResponse(data));
   });
+  app.patch("/triagem/monthly/:id", async (c) => {
+    const params = parseWithZod(monthlyIdSchema, { id: c.req.param("id") });
+    const body = parseWithZod(monthlyUpdateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.updateMonthly(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/fiscal-settings", async (c) => {
+    const query = parseWithZod(fiscalSettingsQuerySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.getFiscalSettings(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.put("/triagem/fiscal-settings", async (c) => {
+    const body = parseWithZod(fiscalSettingsBodySchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.saveFiscalSettings(body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/config", async (c) => {
+    const query = parseWithZod(triageConfigQuerySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.getConfig(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.put("/triagem/config", async (c) => {
+    const body = parseWithZod(triageConfigBodySchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.saveConfig(body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
   app.patch("/triagem/monthly/:id/items", async (c) => {
     const params = parseWithZod(monthlyIdSchema, { id: c.req.param("id") });
     const body = parseWithZod(documentsBulkSchema, await readJson(c));
@@ -613,6 +687,35 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const query = parseWithZod(monthlySchema, c.req.query());
     const data = await withDocuments(c, (service) =>
       service.listStatements(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/clouds", async (c) => {
+    const query = parseWithZod(cloudListSchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.listClouds(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.post("/triagem/clouds", async (c) => {
+    const body = parseWithZod(cloudCreateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.createCloud(body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+  app.patch("/triagem/clouds/:id", async (c) => {
+    const params = parseWithZod(cloudIdSchema, { id: c.req.param("id") });
+    const body = parseWithZod(cloudUpdateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.updateCloud(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/statements/history", async (c) => {
+    const query = parseWithZod(statementHistorySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.listStatementHistory(query, authContext(c.get("auth"))),
     );
     return c.json(createSuccessResponse(data));
   });
