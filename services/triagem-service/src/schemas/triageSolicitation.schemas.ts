@@ -8,9 +8,17 @@ export const createTriageSolicitationBodySchema = z
   .object({
     client_id: z.string().uuid("Cliente inválido."),
     competence: competenceSchema,
-    category_id: z.string().uuid("Categoria é obrigatória."),
-    description: z.string().trim().min(1).max(2000),
-    responsible_id: z.string().uuid("Responsável é obrigatório."),
+    category_id: z
+      .string({ required_error: "Categoria é obrigatória." })
+      .uuid("Categoria inválida."),
+    description: z
+      .string({ required_error: "Descrição é obrigatória." })
+      .trim()
+      .min(1, "Descrição é obrigatória.")
+      .max(2000, "A descrição deve ter no máximo 2.000 caracteres."),
+    responsible_id: z
+      .string({ required_error: "Responsável é obrigatório." })
+      .uuid("Responsável inválido."),
   })
   .strict();
 

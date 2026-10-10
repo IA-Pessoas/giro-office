@@ -234,6 +234,12 @@ describe("TriageSolicitationService", () => {
     await expect(
       new TriageSolicitationService(prisma).get(FIRST_ID, auth(3)),
     ).rejects.toMatchObject({ statusCode: 404 });
-    expect(prisma.$executeRaw).toHaveBeenCalled();
+    expect(prisma.triageSolicitation.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: FIRST_ID, organization_id: ORGANIZATION_ID } }),
+    );
+    const setConfig = vi
+      .mocked(prisma.$executeRaw)
+      .mock.calls.find(([sql]) => String(sql).includes("set_config"));
+    expect(setConfig?.slice(1)).toEqual([ORGANIZATION_ID]);
   });
 });

@@ -104,10 +104,8 @@ export class TriageSolicitationService {
     auth: TriageSolicitationAuthContext,
   ): Promise<TriageSolicitationDto> {
     requireLevel(auth, 2);
+    // Tamanho e obrigatoriedade já vêm do schema Zod da rota.
     const description = input.description.trim();
-    if (!description || description.length > 2000) {
-      throw new ServiceError(400, "A descrição deve conter entre 1 e 2.000 caracteres.");
-    }
 
     const created = await this.withOrganization(auth, async (transaction) => {
       await assertCompetenceWritable(
