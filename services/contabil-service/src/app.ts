@@ -65,7 +65,7 @@ export function createContabilApp(options: {
   env: ContabilServiceEnv;
   logger: Logger;
   controlRouteDeps?: ControlRouteDeps;
-  contingencyService?: Pick<ContingencyService, "simulate">;
+  contingencyService?: Pick<ContingencyService, "simulate" | "review" | "export">;
   responsibleRouteDeps?: ResponsibleRouteDeps;
   relationshipRouteDeps?: RelationshipRouteDeps;
   triageDocumentsRouteDeps?: TriageDocumentsRouteDeps;

@@ -1241,6 +1241,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/contabil\/contingency\/[^/]+\/review$/,
+    description: { action: "conferiu", item: "valores e parâmetros da Contingência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/contingency\/[^/]+\/export$/,
+    description: { action: "exportou", item: "uma conclusão revisada da Contingência" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/contabil\/contingency$/,
     description: { action: "simulou", item: "uma contingência contábil" },
   },

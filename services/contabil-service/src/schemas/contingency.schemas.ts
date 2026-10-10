@@ -5,6 +5,7 @@ import { z } from "zod";
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Período inválido; use AAAA-MM.");
 export const contingencyQuerySchema = z
   .object({
+    simulation_id: z.string().uuid("Simulação inválida.").optional(),
     client_id: z.string().uuid("Cliente inválido."),
     company_name: z.string().trim().min(1, "Informe a empresa.").max(200),
     cnpj: z.string().max(18).transform(normalizeCpfCnpj).refine(isValidCnpj, "CNPJ inválido."),
@@ -33,3 +34,12 @@ export const contingencyQuerySchema = z
   });
 
 export type ContingencyInput = z.infer<typeof contingencyQuerySchema>;
+
+export const contingencyIdParamsSchema = z
+  .object({ id: z.string().uuid("Simulação inválida.") })
+  .strict();
+export const contingencyReviewSchema = z
+  .object({
+    content_hash: z.string().regex(/^[a-f0-9]{64}$/, "Hash da simulação inválido."),
+  })
+  .strict();

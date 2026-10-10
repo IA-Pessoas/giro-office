@@ -5471,6 +5471,40 @@ const handlers = {
         response.body?.data?.maximum?.totalCents !== 955680)
     )
       throw new Error("Simulação de Contingência diverge do XLS sintético.");
+    if (!isBadExpectation(op)) {
+      state.contabilContingencyId = response.body.data.id;
+      state.contabilContingencyHash = response.body.data.content_hash;
+    }
+  },
+
+  async contabilContingencyReview(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/contingency/${requireState("contabilContingencyId")}/review`,
+      json: { content_hash: requireState("contabilContingencyHash") },
+    });
+    if (
+      !isBadExpectation(op) &&
+      (!response.body.data.reviewed_by ||
+        !response.body.data.reviewed_at ||
+        response.body.data.reviewed_hash !== state.contabilContingencyHash)
+    ) {
+      throw new Error("Conferência de Contingência sem ator, instante ou hash correspondente.");
+    }
+  },
+
+  async contabilContingencyExport(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/contingency/${requireState("contabilContingencyId")}/export`,
+      query: { content_hash: requireState("contabilContingencyHash") },
+      expectEnvelope: false,
+    });
+    if (
+      !isBadExpectation(op) &&
+      (!response.text.includes("Simulação legada de Contingência") ||
+        !response.text.includes(state.contabilContingencyHash))
+    ) {
+      throw new Error("Conclusão imprimível não identifica a simulação e a conferência.");
+    }
   },
 
   async contabilControlCreate(op) {

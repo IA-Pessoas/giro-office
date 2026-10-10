@@ -38,6 +38,7 @@ export type ContabilPrisma = {
   ): Promise<T | unknown[]>;
   client: Delegate & Pick<ContingencyPrisma["client"], "findFirst">;
   noahConversion: NoahServicePrisma["noahConversion"];
+  contingencyDraft: ContingencyPrisma["contingencyDraft"];
   controlContabil: Delegate;
   triageClosing: Delegate;
   relationshipContabil: Delegate;

@@ -37,6 +37,21 @@ model User {
   @@map("users")
 }
 
+model ContingencyDraft {
+  id              String   @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime @default(now())
+  snapshot        String
+  content_hash    String
+  reviewed_by     String?
+  reviewed_at     DateTime?
+  reviewed_hash   String?
+
+  @@index([organization_id, created_at])
+  @@map("contabil.contingency_drafts")
+}
+
 model NoahConversion {
   id              String   @id @default(uuid())
   organization_id String

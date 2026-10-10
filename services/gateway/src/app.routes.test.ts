@@ -2316,6 +2316,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/contabil/noah"]).toBeTruthy();
     expect(body.paths["/contabil/noah/{id}/csv"]).toBeTruthy();
     expect(body.paths["/contabil/contingency"]).toBeTruthy();
+    expect(body.paths["/contabil/contingency/{id}/review"]).toBeTruthy();
+    expect(body.paths["/contabil/contingency/{id}/export"]).toBeTruthy();
     expect(body.paths["/ti/requests/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/{id}/file"]).toBeTruthy();
@@ -5455,6 +5457,65 @@ it("preserves Contingency XLS bytes, query and organization through the gateway"
     expect(seenPath).toBe("/contabil/contingency?filename=balancete.xls");
     expect(organization).toBe("organization-a");
     expect(response.headers.get("cache-control")).toBe("no-store");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("preserves Contingency review body and printable HTML through the gateway", async () => {
+  const token = createToken({
+    user_id: "actor",
+    organization_id: "organization-a",
+    permission: 3,
+    modules: { contabil: 3 },
+  });
+  const hash = "a".repeat(64);
+  const html =
+    '<!doctype html><html lang="pt-BR"><body>Simulação legada de Contingência</body></html>';
+  let received = "";
+  let seenPath = "";
+  const upstream = createServer(async (request, response) => {
+    seenPath = request.url ?? "";
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    received = Buffer.concat(chunks).toString();
+    if (request.method === "POST") {
+      response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      response.end(JSON.stringify({ success: true, data: { reviewed_hash: hash } }));
+    } else {
+      response.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename=contingencia.html",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      });
+      response.end(html);
+    }
+  });
+  const contabilServiceUrl = await startServer(upstream);
+  const gateway = createServer(createApp(createEnv({ contabilServiceUrl }), createTestLogger()));
+  const url = await startServer(gateway);
+  try {
+    const reviewed = await fetch(`${url}/contabil/contingency/draft/review`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ content_hash: hash }),
+    });
+    expect(reviewed.status).toBe(200);
+    expect(JSON.parse(received)).toEqual({ content_hash: hash });
+    expect(seenPath).toBe("/contabil/contingency/draft/review");
+    const downloaded = await fetch(
+      `${url}/contabil/contingency/draft/export?content_hash=${hash}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    expect(downloaded.status).toBe(200);
+    expect(seenPath).toBe(`/contabil/contingency/draft/export?content_hash=${hash}`);
+    expect(downloaded.headers.get("content-type")).toContain("text/html");
+    expect(downloaded.headers.get("content-disposition")).toContain("attachment");
+    expect(downloaded.headers.get("cache-control")).toBe("no-store");
+    expect(downloaded.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(await downloaded.text()).toBe(html);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
