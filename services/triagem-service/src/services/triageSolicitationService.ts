@@ -37,7 +37,43 @@ export type TriageSolicitationPrisma = Pick<
   | "triageCatalogItem"
   | "triageCompetence"
   | "triageSolicitation"
+  | "triageNoteCount"
 >;
+
+const NOTE_COUNT_SELECT = {
+  xml_inbound: true,
+  xml_outbound: true,
+  nfse_issued: true,
+  nfse_received: true,
+  updated_at: true,
+  updated_by: { select: { id: true, name: true, full_name: true } },
+} as const;
+
+type NoteCountRecord = Prisma.TriageNoteCountGetPayload<{ select: typeof NOTE_COUNT_SELECT }>;
+
+export interface TriageNoteCountsInput {
+  xml_inbound: number;
+  xml_outbound: number;
+  nfse_issued: number;
+  nfse_received: number;
+}
+
+// Contadores são do cliente+competência: todo pedido da mesma competência vê a mesma linha.
+export type TriageNoteCountsDto = TriageNoteCountsInput & {
+  client_id: string;
+  competence: string;
+  updated_at: Date | null;
+  updated_by: NoteCountRecord["updated_by"] | null;
+};
+
+const EMPTY_NOTE_COUNTS = {
+  xml_inbound: 0,
+  xml_outbound: 0,
+  nfse_issued: 0,
+  nfse_received: 0,
+  updated_at: null,
+  updated_by: null,
+};
 
 export interface TriageSolicitationAuthContext {
   userId: string;
@@ -201,6 +237,61 @@ export class TriageSolicitationService {
       });
     });
     return toDto(updated);
+  }
+
+  async getNoteCounts(
+    id: string,
+    auth: TriageSolicitationAuthContext,
+  ): Promise<TriageNoteCountsDto> {
+    requireLevel(auth, 1);
+    const { client_id, competence } = await this.findVisible(id, auth);
+    const counts = await this.withOrganization(auth, (transaction) =>
+      transaction.triageNoteCount.findFirst({
+        where: { organization_id: auth.organizationId, client_id, competence },
+        select: NOTE_COUNT_SELECT,
+      }),
+    );
+    return { client_id, competence, ...(counts ?? EMPTY_NOTE_COUNTS) };
+  }
+
+  async updateNoteCounts(
+    id: string,
+    input: TriageNoteCountsInput,
+    auth: TriageSolicitationAuthContext,
+  ): Promise<TriageNoteCountsDto> {
+    requireLevel(auth, 2);
+    const { client_id, competence, status } = await this.findVisible(id, auth);
+    if (status === "CLOSED") {
+      throw new ServiceError(409, "Solicitação fechada não altera os contadores de notas.");
+    }
+    const counts = {
+      xml_inbound: input.xml_inbound,
+      xml_outbound: input.xml_outbound,
+      nfse_issued: input.nfse_issued,
+      nfse_received: input.nfse_received,
+    };
+    const saved = await this.withOrganization(auth, async (transaction) => {
+      await assertCompetenceWritable(transaction, auth.organizationId, client_id, competence);
+      return transaction.triageNoteCount.upsert({
+        where: {
+          organization_id_client_id_competence: {
+            organization_id: auth.organizationId,
+            client_id,
+            competence,
+          },
+        },
+        create: {
+          organization_id: auth.organizationId,
+          client_id,
+          competence,
+          ...counts,
+          updated_by_id: auth.userId,
+        },
+        update: { ...counts, updated_by_id: auth.userId },
+        select: NOTE_COUNT_SELECT,
+      });
+    });
+    return { client_id, competence, ...saved };
   }
 
   // Pedido de outro responsável responde 404 ao operador comum, como se não existisse.

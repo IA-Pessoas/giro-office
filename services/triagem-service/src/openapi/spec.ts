@@ -144,6 +144,34 @@ const solicitation = {
   },
 } as const;
 
+const noteCountProperty = { type: "integer", minimum: 0, maximum: 1_000_000 } as const;
+
+const noteCounts = {
+  type: "object",
+  required: [
+    "client_id",
+    "competence",
+    "xml_inbound",
+    "xml_outbound",
+    "nfse_issued",
+    "nfse_received",
+    "updated_at",
+    "updated_by",
+  ],
+  properties: {
+    client_id: { type: "string", format: "uuid" },
+    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    xml_inbound: noteCountProperty,
+    xml_outbound: noteCountProperty,
+    nfse_issued: noteCountProperty,
+    nfse_received: noteCountProperty,
+    updated_at: { type: ["string", "null"], format: "date-time" },
+    updated_by: {
+      oneOf: [{ $ref: "#/components/schemas/TriageUserRef" }, { type: "null" }],
+    },
+  },
+} as const;
+
 const userRef = {
   type: "object",
   properties: {
@@ -1096,6 +1124,64 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
           },
         },
       },
+      "/triagem/solicitations/{id}/note-counts": {
+        get: {
+          tags: ["Solicitations"],
+          summary: "Consultar contadores de notas do pedido",
+          description:
+            "Contadores do cliente e competência do pedido; todos os pedidos da mesma competência veem os mesmos valores.",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Contadores (zeros quando ainda não informados)",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageNoteCounts" }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação não encontrada" },
+          },
+        },
+        put: {
+          tags: ["Solicitations"],
+          summary: "Atualizar contadores de notas do pedido",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["xml_inbound", "xml_outbound", "nfse_issued", "nfse_received"],
+                  properties: {
+                    xml_inbound: noteCountProperty,
+                    xml_outbound: noteCountProperty,
+                    nfse_issued: noteCountProperty,
+                    nfse_received: noteCountProperty,
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Contadores atualizados",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageNoteCounts" }),
+            },
+            "400": { description: "Contador inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação não encontrada" },
+            "409": { description: "Solicitação fechada ou competência arquivada" },
+          },
+        },
+      },
     },
     components: {
       securitySchemes: {
@@ -1109,6 +1195,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
         TriageUrgentRequest: urgentRequest,
         TriageSolicitation: solicitation,
         TriageUserRef: userRef,
+        TriageNoteCounts: noteCounts,
         TriageOverviewItem: overviewItem,
         TriageOverviewIndicators: overviewIndicators,
       },

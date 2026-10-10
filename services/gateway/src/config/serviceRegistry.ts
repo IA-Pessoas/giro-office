@@ -261,6 +261,10 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
           methods: ["PATCH"],
           path: /^\/triagem\/solicitations\/[^/]+\/close\/?$/,
         },
+        {
+          methods: ["GET", "PUT"],
+          path: /^\/triagem\/solicitations\/[^/]+\/note-counts\/?$/,
+        },
       ],
     },
     {

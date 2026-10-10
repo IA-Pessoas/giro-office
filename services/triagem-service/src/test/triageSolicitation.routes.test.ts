@@ -39,6 +39,8 @@ function setup() {
     get: vi.fn(async () => ({ id: SOLICITATION_ID })),
     create: vi.fn(async () => ({ id: SOLICITATION_ID })),
     close: vi.fn(async () => ({ id: SOLICITATION_ID, status: "CLOSED" })),
+    getNoteCounts: vi.fn(async () => ({ xml_inbound: 0 })),
+    updateNoteCounts: vi.fn(async () => ({ xml_inbound: 3 })),
   } as unknown as TriageSolicitationRouteDeps;
   const app = createTriagemApp({
     env,
@@ -101,5 +103,23 @@ describe("rotas de solicitações da Triagem", () => {
     );
     expect(deps.close).toHaveBeenCalledWith(SOLICITATION_ID, expect.anything());
     expect(deps.get).toHaveBeenCalledWith(SOLICITATION_ID, expect.anything());
+  });
+
+  it("lê e grava contadores de notas pelo ID do pedido", async () => {
+    const { app, deps } = setup();
+    const counts = { xml_inbound: 3, xml_outbound: 5, nfse_issued: 2, nfse_received: 1 };
+    const path = `/triagem/solicitations/${SOLICITATION_ID}/note-counts`;
+
+    const read = await request(app).get(path).set(authHeaders);
+    const saved = await request(app).put(path).set(authHeaders).send(counts);
+    const negative = await request(app)
+      .put(path)
+      .set(authHeaders)
+      .send({ ...counts, nfse_received: -1 });
+
+    expect([read.status, saved.status, negative.status]).toEqual([200, 200, 400]);
+    expect(deps.getNoteCounts).toHaveBeenCalledWith(SOLICITATION_ID, expect.anything());
+    expect(deps.updateNoteCounts).toHaveBeenCalledTimes(1);
+    expect(deps.updateNoteCounts).toHaveBeenCalledWith(SOLICITATION_ID, counts, expect.anything());
   });
 });

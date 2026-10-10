@@ -1320,6 +1320,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "fechou", item: "uma solicitação da Triagem" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/triagem\/solicitations\/[^/]+\/note-counts\/?$/,
+    description: { action: "consultou", item: "os contadores de notas da Triagem" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/solicitations\/[^/]+\/note-counts\/?$/,
+    description: { action: "atualizou", item: "os contadores de notas da Triagem" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/contabil\/contingency\/[^/]+\/review$/,
     description: { action: "conferiu", item: "valores e parâmetros da Contingência" },

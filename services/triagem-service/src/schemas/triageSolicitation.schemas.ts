@@ -30,6 +30,25 @@ export const listTriageSolicitationQuerySchema = z
   })
   .strict();
 
+const noteCountSchema = (label: string) =>
+  z
+    .number({
+      required_error: `${label} é obrigatório.`,
+      invalid_type_error: `${label} deve ser um número.`,
+    })
+    .int(`${label} deve ser inteiro.`)
+    .min(0, `${label} não pode ser negativo.`)
+    .max(1_000_000, `${label} deve ser no máximo 1.000.000.`);
+
+export const updateTriageNoteCountsBodySchema = z
+  .object({
+    xml_inbound: noteCountSchema("XML de entrada"),
+    xml_outbound: noteCountSchema("XML de saída"),
+    nfse_issued: noteCountSchema("NFSE prestadas"),
+    nfse_received: noteCountSchema("NFSE tomadas"),
+  })
+  .strict();
+
 export const triageSolicitationIdParamsSchema = z
   .object({ id: z.string().uuid("Solicitação inválida.") })
   .strict();
