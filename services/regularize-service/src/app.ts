@@ -90,7 +90,8 @@ export function createApp({
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "regularize-service")));
-  app.use(express.json());
+  // 1mb como no gateway: a colagem de DTE (#1744) passa dos 100kb padrão.
+  app.use(express.json({ limit: "1mb" }));
   app.use(requestContext);
 
   app.get("/health", (_request, response) => {

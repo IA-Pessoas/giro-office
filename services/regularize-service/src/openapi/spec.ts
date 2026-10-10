@@ -602,6 +602,7 @@ export function buildRegularizeServiceOpenApiSpec(
       { name: "PF", description: "Clientes PF do regularize" },
       { name: "Partners", description: "Quadro societario" },
       { name: "MunicipalTaxes", description: "Tributos municipais" },
+      { name: "DTE", description: "Importação manual de avisos DTE" },
       { name: "Processes", description: "Processos de regularize" },
       { name: "Guidance", description: "Orientacoes procedurais" },
       { name: "Licenses", description: "Alvaras e licencas" },
@@ -858,6 +859,36 @@ export function buildRegularizeServiceOpenApiSpec(
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
           responses: { "200": { description: "Detalhe do socio", ...successEnvelopeContent() } },
+        },
+      },
+      "/regularize/dte/import": {
+        post: {
+          tags: ["DTE"],
+          summary: "Importar avisos DTE colados em HTML ou JSON",
+          description:
+            "Extrai a primeira tabela conforme o legado e ignora avisos repetidos. Leitor verificado apenas com casos sintéticos.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "201": { description: "Resumo da importação", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/imports": {
+        get: {
+          tags: ["DTE"],
+          summary: "Listar importações de DTE com recusas e duplicatas",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Página de importações", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/municipal-taxes": {

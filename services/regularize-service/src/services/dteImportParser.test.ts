@@ -192,7 +192,9 @@ describe("parseDteImport (JSON)", () => {
 });
 
 describe("dteDedupeKey", () => {
-  const base = parseDteImport("html", `<table>${fullRow}</table>`).notices[0]!.fields;
+  const [first] = parseDteImport("html", `<table>${fullRow}</table>`).notices;
+  if (!first) throw new Error("aviso sintético não foi lido");
+  const base = first.fields;
 
   it("usa só os nove campos do legado: registro não muda a chave", async () => {
     expect(await dteDedupeKey(base)).toBe(await dteDedupeKey({ ...base, registro: "x" }));
