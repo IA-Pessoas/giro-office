@@ -49,3 +49,5 @@ export const STATUSES: Array<[TriageDocumentStatus, string]> = [
   ["NOT_PRESENT", "Não possui"],
   ["NOT_APPLICABLE", "Não aplicável"],
 ];
+
+export const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<TriageDocumentStatus, string>;

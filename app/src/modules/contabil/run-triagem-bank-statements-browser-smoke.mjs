@@ -176,10 +176,10 @@ await page.route("**/*", async (route) => {
       return {
         competence: key,
         pending: group.filter((item) => PENDING_STATUSES.has(item.status)).length,
-        statements: group.map(({ bank_id, status }) => ({ bank_id, status, updated_at: "2026-09-30T12:00:00.000Z" })),
+        statements: group.map(({ bank_id, status }) => ({ bank_id, status })),
       };
     });
-    return json(route, { client_id: clientId, competences });
+    return json(route, { client_id: clientId, truncated: false, competences });
   }
   if (request.method() === "GET" && apiPath === "/triagem/statements") {
     const selected = new URL(request.url()).searchParams.get("competence");

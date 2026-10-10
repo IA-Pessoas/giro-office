@@ -26,10 +26,10 @@ import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { FISCAL_DOCUMENTS, STATUSES } from "./TriageDocumentsSection";
+import { STATUS_LABELS } from "./triageDocumentLabels";
 import { CONTABIL_OUTLINE_ACTION_CLASS, CONTABIL_TABLE_FILTER_CLASS } from "./contabilUiClasses";
 
 const PAGE_SIZE = 50;
-const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<TriageDocumentStatus, string>;
 
 
 function statusLabel(status: string) {
