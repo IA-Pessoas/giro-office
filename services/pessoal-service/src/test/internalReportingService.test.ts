@@ -325,12 +325,261 @@ describe("pessoal internal reporting service", () => {
     );
   });
 
-  it("rejeita campo sensível de payroll antes de consultar o banco", async () => {
+  it("resolve client_name de payroll por client_id, sem relação Prisma inexistente", async () => {
+    const payrollFindMany = vi.fn().mockResolvedValue([
+      { advance: true, client_id: "client-a" },
+      { advance: false, client_id: "client-b" },
+      { advance: false, client_id: "client-a" },
+    ]);
+    const clientFindMany = vi.fn().mockResolvedValue([
+      { id: "client-a", name: "Cliente A" },
+      { id: "client-b", name: "Cliente B" },
+    ]);
+    const service = new InternalReportingService({
+      payroll: { findMany: payrollFindMany },
+      client: { findMany: clientFindMany },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: ["client_name", "advance"],
+        limit: 3,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        { client_name: "Cliente A", advance: true },
+        { client_name: "Cliente B", advance: false },
+        { client_name: "Cliente A", advance: false },
+      ],
+      reachedLimit: false,
+    });
+    expect(payrollFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      select: { advance: true, client_id: true },
+      take: 4,
+    });
+    expect(clientFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId, id: { in: ["client-a", "client-b"] } },
+      select: { id: true, name: true, dominio_code: true, cpf_cnpj: true, status: true },
+    });
+  });
+
+  it("projeta campos legados da folha e identificação/situação do cliente", async () => {
+    const payrollFindMany = vi
+      .fn()
+      .mockResolvedValue([
+        { previous: true, info: "Fecha dia 20", contact: "Maria (RH)", client_id: "client-a" },
+      ]);
+    const clientFindMany = vi.fn().mockResolvedValue([
+      {
+        id: "client-a",
+        name: "Cliente A",
+        dominio_code: "123",
+        cpf_cnpj: "12.345.678/0001-90",
+        status: "Ativo",
+      },
+    ]);
+    const service = new InternalReportingService({
+      payroll: { findMany: payrollFindMany },
+      client: { findMany: clientFindMany },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: ["client_code", "client_document", "client_status", "previous", "info", "contact"],
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          client_code: "123",
+          client_document: "12.345.678/0001-90",
+          client_status: "Ativo",
+          previous: true,
+          info: "Fecha dia 20",
+          contact: "Maria (RH)",
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(payrollFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      select: { previous: true, info: true, contact: true, client_id: true },
+      take: 2,
+    });
+    expect(clientFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId, id: { in: ["client-a"] } },
+      select: { id: true, name: true, dominio_code: true, cpf_cnpj: true, status: true },
+    });
+  });
+
+  it("devolve client_name nulo quando o cliente não está na organização", async () => {
+    const service = new InternalReportingService({
+      payroll: { findMany: vi.fn().mockResolvedValue([{ client_id: "client-outra-org" }]) },
+      client: { findMany: vi.fn().mockResolvedValue([]) },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: ["client_name"],
+        limit: 1,
+      }),
+    ).resolves.toEqual({ rows: [{ client_name: null }], reachedLimit: false });
+  });
+
+  it("não consulta clientes quando client_name não foi pedido", async () => {
+    const payrollFindMany = vi.fn().mockResolvedValue([{ advance: true }]);
+    const clientFindMany = vi.fn();
+    const service = new InternalReportingService({
+      payroll: { findMany: payrollFindMany },
+      client: { findMany: clientFindMany },
+    } as never);
+
+    await service.extract({
+      organizationId,
+      source: "pessoal.payroll",
+      fields: ["advance"],
+      limit: 1,
+    });
+    expect(clientFindMany).not.toHaveBeenCalled();
+  });
+
+  it("deriva o estado de cada item da obrigação e identifica o cliente", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        payroll: true,
+        charges: false,
+        vt: null,
+        client: { dominio_code: "123", cpf_cnpj: "123.456.789-00", status: "Ativo" },
+      },
+    ]);
+    const service = new InternalReportingService({ obrigationsPessoal: { findMany } } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.obligations",
+        fields: [
+          "client_code",
+          "client_document",
+          "client_status",
+          "payroll_state",
+          "charges_state",
+          "vt_state",
+        ],
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          client_code: "123",
+          client_document: "123.456.789-00",
+          client_status: "Ativo",
+          payroll_state: "Concluído",
+          charges_state: "Pendente",
+          vt_state: "Não possui",
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      select: {
+        payroll: true,
+        charges: true,
+        vt: true,
+        client: { select: { name: true, dominio_code: true, cpf_cnpj: true, status: true } },
+      },
+      take: 2,
+    });
+  });
+
+  it("filtra obrigações pelo estado do item sem tocar no snapshot do grupo", async () => {
+    const records = [
+      { id: "o-1", payroll: false, group_snapshot_name: "Grupo A" },
+      { id: "o-2", payroll: true, group_snapshot_name: "Grupo A" },
+      { id: "o-3", payroll: null, group_snapshot_name: "Grupo B" },
+    ];
+    const findMany = vi.fn().mockResolvedValue(records);
+    const transaction = vi.fn(async (read: (client: unknown) => Promise<unknown>) =>
+      read({ obrigationsPessoal: { findMany } }),
+    );
+    const service = new InternalReportingService({ $transaction: transaction } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.obligations",
+        fields: ["group_snapshot_name", "payroll_state"],
+        limit: 10,
+        query: {
+          filters: [
+            {
+              field: "payroll_state",
+              operator: "in",
+              parameter: "state",
+              value: ["Pendente", "Não possui"],
+            },
+          ],
+        },
+      }),
+    ).resolves.toEqual({
+      rows: [
+        { group_snapshot_name: "Grupo A", payroll_state: "Pendente" },
+        { group_snapshot_name: "Grupo B", payroll_state: "Não possui" },
+      ],
+      reachedLimit: false,
+    });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: organizationId },
+        select: expect.objectContaining({ group_snapshot_name: true, payroll: true }),
+      }),
+    );
+  });
+
+  it("deriva o estado do grupo registrado mesmo quando é o único campo pedido", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      { group_snapshot_name: "Sem Movimento", group_snapshot_policy: "NO_OBLIGATIONS" },
+      { group_snapshot_name: "Grupo A", group_snapshot_policy: "DEFAULT" },
+    ]);
+    const service = new InternalReportingService({ obrigationsPessoal: { findMany } } as never);
+
+    const result = await service.extract({
+      organizationId,
+      source: "pessoal.obligations",
+      fields: ["group_snapshot_state"],
+      limit: 2,
+    });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { group_snapshot_name: true, group_snapshot_policy: true },
+      }),
+    );
+    expect(result.rows).toEqual([
+      { group_snapshot_state: "SEM_MOVIMENTO" },
+      { group_snapshot_state: "ATIVO" },
+    ]);
+  });
+
+  it("rejeita campo não publicado de payroll antes de consultar o banco", async () => {
     const findMany = vi.fn();
     const service = new InternalReportingService({ payroll: { findMany } } as never);
 
     await expect(
-      service.extract({ organizationId, source: "pessoal.payroll", fields: ["contact"], limit: 1 }),
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: ["organization_id"],
+        limit: 1,
+      }),
     ).rejects.toMatchObject({ statusCode: 403 });
     expect(findMany).not.toHaveBeenCalled();
   });
