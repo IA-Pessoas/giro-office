@@ -1,8 +1,7 @@
 // Histórico da Relação Contábil (#1723): campos do relacionamento do cliente, inclusive os
 // estados de licitação e plano de contas.
+import { AUDIT_CREATE_ACTION, AUDIT_UPDATE_ACTION } from "./auditActions.js";
 import {
-  AUDIT_CREATE_ACTION,
-  AUDIT_UPDATE_ACTION,
   type AuditHistoryPage,
   type AuditHistoryPrisma,
   listAuditFieldHistory,

@@ -61,6 +61,7 @@ describe("listRelationshipHistory (#1723)", () => {
           chart_accounts: { from: "Plano próprio", to: "Sim — Jonrick" },
           client_id: { from: "x", to: "y" },
           tool: { to: null },
+          system: { from: "", to: null },
         },
       },
     ]);

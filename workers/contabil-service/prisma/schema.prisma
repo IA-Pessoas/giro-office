@@ -37,7 +37,7 @@ model User {
   @@map("users")
 }
 
-// Só leitura: histórico do Controle Contábil (#1722).
+// Só leitura: históricos do Controle (#1722) e da Relação Contábil (#1723).
 model AuditRequest {
   id              String   @id @default(uuid())
   organization_id String?

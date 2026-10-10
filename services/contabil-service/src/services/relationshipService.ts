@@ -7,7 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
-import { AUDIT_CREATE_ACTION, AUDIT_UPDATE_ACTION } from "./auditHistoryService.js";
+import { AUDIT_CREATE_ACTION, AUDIT_UPDATE_ACTION } from "./auditActions.js";
 import {
   listRelationshipHistory,
   RELATIONSHIP_AUDIT_REFERRING,
