@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createMarketingApp } from "../app.js";
 import { getMarketingServiceEnv } from "../config/env.js";
+import { AUDIT_UNAVAILABLE_MESSAGE } from "../integrations/audit.js";
 import { buildMarketingServiceOpenApiSpec } from "../openapi/spec.js";
 import type { MarketingEventsProvider } from "../routes/marketingEvents.routes.js";
 
@@ -227,5 +228,32 @@ describe("Marketing events routes", () => {
       },
       userId,
     );
+  });
+
+  it("answers 503 with the audit message instead of a false success", async () => {
+    const created = { ...event };
+    const prisma = {
+      marketingEvent: { create: vi.fn(async () => created) },
+      $transaction: vi.fn((run: (tx: unknown) => unknown) => run(prisma)),
+    };
+    const app = createMarketingApp({
+      env: getMarketingServiceEnv(),
+      logger: createTestLogger(),
+      prisma: prisma as never,
+      audit: async () => {
+        throw new ServiceError(503, AUDIT_UNAVAILABLE_MESSAGE, undefined, undefined, {
+          expose: true,
+        });
+      },
+    });
+
+    const response = await request(app)
+      .post("/marketing/events")
+      .set(gatewayHeaders(2))
+      .send({ name: "Workshop", priority: "Média" });
+
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({ success: false, error: AUDIT_UNAVAILABLE_MESSAGE });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });

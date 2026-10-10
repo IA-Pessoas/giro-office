@@ -22,6 +22,9 @@ export type MarketingAudit = (entry: MarketingAuditEntry) => Promise<void>;
 
 export const AUDIT_UNAVAILABLE_MESSAGE = "Auditoria indisponível; a alteração não foi salva.";
 
+/** A transação espera a auditoria (timeout de 5 s), então precisa de folga além do padrão do Prisma. */
+export const AUDITED_TRANSACTION = { maxWait: 5_000, timeout: 15_000 } as const;
+
 export function marketingAuditPayload(entry: MarketingAuditEntry): CreateAuditRequestPayload {
   const now = new Date().toISOString();
   return {
@@ -68,7 +71,7 @@ export function createMarketingAudit(env: MarketingServiceEnv, logger: Logger): 
     try {
       await recorder.recordRequired(marketingAuditPayload(entry));
     } catch (error) {
-      throw new ServiceError(503, AUDIT_UNAVAILABLE_MESSAGE, error);
+      throw new ServiceError(503, AUDIT_UNAVAILABLE_MESSAGE, error, undefined, { expose: true });
     }
   };
 }

@@ -1,6 +1,6 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { changedFields, type MarketingAudit } from "../integrations/audit.js";
+import { AUDITED_TRANSACTION, changedFields, type MarketingAudit } from "../integrations/audit.js";
 import type { MarketingEvent, MarketingEventsProvider } from "../routes/marketingEvents.routes.js";
 import type {
   CreateMarketingEventInput,
@@ -124,7 +124,7 @@ export class MarketingEventsService implements MarketingEventsProvider {
           changes: changedFields({}, created),
         });
         return event;
-      });
+      }, AUDITED_TRANSACTION);
     } catch (error: unknown) {
       logError("Falha ao criar evento de Marketing.", { err: error });
       return duplicateNameError(error);
@@ -168,7 +168,7 @@ export class MarketingEventsService implements MarketingEventsProvider {
           });
         }
         return event;
-      });
+      }, AUDITED_TRANSACTION);
     } catch (error: unknown) {
       logError("Falha ao atualizar evento de Marketing.", { err: error });
       if (hasPrismaCode(error, "P2025")) return null;
