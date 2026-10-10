@@ -261,6 +261,8 @@ describe("triagem Worker — solicitações", () => {
       get: vi.fn(async () => ({ id: ITEM_ID }) as never),
       create: vi.fn(async () => ({ id: ITEM_ID }) as never),
       close: vi.fn(async () => ({ id: ITEM_ID, status: "CLOSED" }) as never),
+      getNoteCounts: vi.fn(async () => ({ xml_inbound: 0 }) as never),
+      updateNoteCounts: vi.fn(async () => ({ xml_inbound: 3 }) as never),
     };
     const app = createTriagemWorkerApp({ env: env(), solicitationService: solicitations });
     const body = {
@@ -298,6 +300,18 @@ describe("triagem Worker — solicitações", () => {
     );
     expect(solicitations.get).toHaveBeenCalledWith(ITEM_ID, scope);
     expect(solicitations.close).toHaveBeenCalledWith(ITEM_ID, scope);
+
+    const counts = { xml_inbound: 3, xml_outbound: 5, nfse_issued: 2, nfse_received: 1 };
+    const countsUrl = `https://triagem.test/triagem/solicitations/${ITEM_ID}/note-counts`;
+    const read = await app.request(countsUrl, { headers: headers("1") });
+    const saved = await app.request(countsUrl, {
+      method: "PUT",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(counts),
+    });
+    expect([read.status, saved.status]).toEqual([200, 200]);
+    expect(solicitations.getNoteCounts).toHaveBeenCalledWith(ITEM_ID, scope);
+    expect(solicitations.updateNoteCounts).toHaveBeenCalledWith(ITEM_ID, counts, scope);
   });
 });
 

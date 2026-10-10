@@ -5974,6 +5974,21 @@ const handlers = {
     });
   },
 
+  async triagemNoteCountsUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/solicitations/${requireState("triagemSolicitationId")}/note-counts`,
+      json: { xml_inbound: 3, xml_outbound: 5, nfse_issued: 2, nfse_received: 1 },
+    });
+  },
+
+  async triagemNoteCountsGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/solicitations/${requireState("triagemSolicitationId")}/note-counts`,
+    });
+  },
+
   async triagemSolicitationClose(op) {
     await httpRequest(op, {
       expectedStatus: [200],

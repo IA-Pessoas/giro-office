@@ -135,6 +135,18 @@ describe("activityCatalog", () => {
     ["POST", "/triagem/solicitations", "cadastrou", "uma solicitação da Triagem"],
     ["GET", "/triagem/solicitations/request-1", "consultou", "uma solicitação da Triagem"],
     ["PATCH", "/triagem/solicitations/request-1/close", "fechou", "uma solicitação da Triagem"],
+    [
+      "GET",
+      "/triagem/solicitations/request-1/note-counts",
+      "consultou",
+      "os contadores de notas da Triagem",
+    ],
+    [
+      "PUT",
+      "/triagem/solicitations/request-1/note-counts",
+      "atualizou",
+      "os contadores de notas da Triagem",
+    ],
     ["POST", "/reports/definitions/validate", "revisou", "a configuração de um relatório"],
     ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
     ["GET", "/reports/jobs/list", "consultou", "o histórico de relatórios"],

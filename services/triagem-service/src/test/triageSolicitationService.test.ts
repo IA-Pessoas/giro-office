@@ -53,6 +53,7 @@ function createMockPrisma(): TriageSolicitationPrisma {
       create: vi.fn(),
       update: vi.fn(),
     },
+    triageNoteCount: { findFirst: vi.fn(), upsert: vi.fn() },
   };
   return prisma as unknown as TriageSolicitationPrisma;
 }
@@ -241,5 +242,105 @@ describe("TriageSolicitationService", () => {
       .mocked(prisma.$executeRaw)
       .mock.calls.find(([sql]) => String(sql).includes("set_config"));
     expect(setConfig?.slice(1)).toEqual([ORGANIZATION_ID]);
+  });
+});
+
+describe("TriageSolicitationService — contadores de notas (#1697)", () => {
+  const counts = { xml_inbound: 3, xml_outbound: 5, nfse_issued: 2, nfse_received: 1 };
+  const stored = {
+    ...counts,
+    updated_at: NOW,
+    updated_by: { id: USER_ID, name: "Solicitante", full_name: null },
+  };
+
+  it("dois pedidos da mesma competência leem o mesmo contador do cliente", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageSolicitation.findFirst)
+      .mockResolvedValueOnce(record(FIRST_ID) as never)
+      .mockResolvedValueOnce(record(SECOND_ID) as never);
+    vi.mocked(prisma.triageNoteCount.findFirst).mockResolvedValue(stored as never);
+    const service = new TriageSolicitationService(prisma);
+
+    const first = await service.getNoteCounts(FIRST_ID, auth(3));
+    const second = await service.getNoteCounts(SECOND_ID, auth(3));
+
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({ client_id: CLIENT_ID, competence: COMPETENCE, ...counts });
+    for (const call of vi.mocked(prisma.triageNoteCount.findFirst).mock.calls) {
+      expect(call[0]).toMatchObject({
+        where: { organization_id: ORGANIZATION_ID, client_id: CLIENT_ID, competence: COMPETENCE },
+      });
+    }
+  });
+
+  it("competência sem contagem devolve zeros sem gravar", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageSolicitation.findFirst).mockResolvedValue(record(FIRST_ID) as never);
+    vi.mocked(prisma.triageNoteCount.findFirst).mockResolvedValue(null);
+
+    const result = await new TriageSolicitationService(prisma).getNoteCounts(FIRST_ID, auth(3));
+
+    expect(result).toMatchObject({
+      xml_inbound: 0,
+      xml_outbound: 0,
+      nfse_issued: 0,
+      nfse_received: 0,
+      updated_at: null,
+      updated_by: null,
+    });
+    expect(prisma.triageNoteCount.upsert).not.toHaveBeenCalled();
+  });
+
+  it("atualiza pelo ID do pedido com upsert único por cliente e competência", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageSolicitation.findFirst).mockResolvedValue(record(SECOND_ID) as never);
+    vi.mocked(prisma.triageNoteCount.upsert).mockResolvedValue(stored as never);
+
+    const result = await new TriageSolicitationService(prisma).updateNoteCounts(
+      SECOND_ID,
+      counts,
+      auth(3),
+    );
+
+    expect(result).toMatchObject({ client_id: CLIENT_ID, competence: COMPETENCE, ...counts });
+    expect(prisma.triageNoteCount.upsert).toHaveBeenCalledWith({
+      where: {
+        organization_id_client_id_competence: {
+          organization_id: ORGANIZATION_ID,
+          client_id: CLIENT_ID,
+          competence: COMPETENCE,
+        },
+      },
+      create: {
+        organization_id: ORGANIZATION_ID,
+        client_id: CLIENT_ID,
+        competence: COMPETENCE,
+        ...counts,
+        updated_by_id: USER_ID,
+      },
+      update: { ...counts, updated_by_id: USER_ID },
+      select: expect.any(Object),
+    });
+  });
+
+  it("não atualiza contador por pedido fechado, alheio ou sem escrita", async () => {
+    const prisma = createMockPrisma();
+    const service = new TriageSolicitationService(prisma);
+    vi.mocked(prisma.triageSolicitation.findFirst).mockResolvedValueOnce(
+      record(FIRST_ID, { status: "CLOSED", closed_at: NOW }) as never,
+    );
+    await expect(service.updateNoteCounts(FIRST_ID, counts, auth(3))).rejects.toMatchObject({
+      statusCode: 409,
+    });
+
+    vi.mocked(prisma.triageSolicitation.findFirst).mockResolvedValueOnce(record(FIRST_ID) as never);
+    await expect(service.updateNoteCounts(FIRST_ID, counts, auth(2))).rejects.toMatchObject({
+      statusCode: 404,
+    });
+
+    await expect(service.updateNoteCounts(FIRST_ID, counts, auth(1))).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    expect(prisma.triageNoteCount.upsert).not.toHaveBeenCalled();
   });
 });

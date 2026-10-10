@@ -21,4 +21,6 @@ export {
   triagemSolicitationsQueryKey,
   useTriageSolicitationMutations,
   useTriageSolicitations,
+  triagemNoteCountsQueryKey,
+  useTriageNoteCounts,
 } from "./useTriageSolicitations";

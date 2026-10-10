@@ -34,6 +34,7 @@ import {
   createTriageSolicitationBodySchema,
   listTriageSolicitationQuerySchema,
   triageSolicitationIdParamsSchema,
+  updateTriageNoteCountsBodySchema,
 } from "@workspace/triagem-service/src/schemas/triageSolicitation.schemas.js";
 import {
   closeTriageUrgentRequestBodySchema,
@@ -77,7 +78,7 @@ export type TriagemUrgentRequestService = Pick<
 >;
 export type TriagemSolicitationService = Pick<
   TriageSolicitationService,
-  "list" | "get" | "create" | "close"
+  "list" | "get" | "create" | "close" | "getNoteCounts" | "updateNoteCounts"
 >;
 export type TriagemAuditService = Pick<TriageAuditService, "listTimeline" | "reconcile">;
 type TriagemOptions = {
@@ -387,6 +388,19 @@ export function createTriagemWorkerApp(options: TriagemOptions = {}) {
     run(c, options.solicitationService, newSolicitation, async (service) => {
       const { id } = parseWithZod(triageSolicitationIdParamsSchema, { id: c.req.param("id") });
       return c.json(createSuccessResponse(await service.close(id, auth(c))));
+    }),
+  );
+  app.get("/triagem/solicitations/:id/note-counts", (c) =>
+    run(c, options.solicitationService, newSolicitation, async (service) => {
+      const { id } = parseWithZod(triageSolicitationIdParamsSchema, { id: c.req.param("id") });
+      return c.json(createSuccessResponse(await service.getNoteCounts(id, auth(c))));
+    }),
+  );
+  app.put("/triagem/solicitations/:id/note-counts", (c) =>
+    run(c, options.solicitationService, newSolicitation, async (service) => {
+      const { id } = parseWithZod(triageSolicitationIdParamsSchema, { id: c.req.param("id") });
+      const body = parseWithZod(updateTriageNoteCountsBodySchema, await jsonBody(c));
+      return c.json(createSuccessResponse(await service.updateNoteCounts(id, body, auth(c))));
     }),
   );
   app.post("/internal/triagem/audit/reconcile", (c) => {

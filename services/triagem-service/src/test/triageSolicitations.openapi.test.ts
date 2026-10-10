@@ -16,7 +16,12 @@ describe("contrato OpenAPI de solicitações da Triagem", () => {
     expect(paths["/triagem/solicitations/{id}"]?.get).toBeDefined();
     expect(paths["/triagem/solicitations/{id}/close"]?.patch).toBeDefined();
     expect(paths["/triagem/solicitations/{id}/reopen"]).toBeUndefined();
+    expect(paths["/triagem/solicitations/{id}/note-counts"]).toMatchObject({
+      get: expect.any(Object),
+      put: expect.any(Object),
+    });
     expect(spec.components?.schemas).toHaveProperty("TriageSolicitation");
+    expect(spec.components?.schemas).toHaveProperty("TriageNoteCounts");
     expect(JSON.stringify(spec)).toContain("REQUEST_CATEGORY");
   });
 });

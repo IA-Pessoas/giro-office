@@ -36,4 +36,6 @@ export type {
   TriageSolicitation,
   TriageSolicitationInput,
   TriageSolicitationStatus,
+  TriageNoteCounts,
+  TriageNoteCountsInput,
 } from "./triagemSolicitationService";

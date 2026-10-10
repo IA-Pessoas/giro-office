@@ -7,12 +7,13 @@ import {
   createTriageSolicitationBodySchema,
   listTriageSolicitationQuerySchema,
   triageSolicitationIdParamsSchema,
+  updateTriageNoteCountsBodySchema,
 } from "../schemas/triageSolicitation.schemas.js";
 import type { TriageSolicitationService } from "../services/triageSolicitationService.js";
 
 export type TriageSolicitationRouteDeps = Pick<
   TriageSolicitationService,
-  "list" | "get" | "create" | "close"
+  "list" | "get" | "create" | "close" | "getNoteCounts" | "updateNoteCounts"
 >;
 
 function authContext(request: Request) {
@@ -86,6 +87,36 @@ export function createTriageSolicitationRoutes(
         response.json(createSuccessResponse(await service.close(id, authContext(request))));
       } catch (error: unknown) {
         logError("Erro ao fechar solicitação da Triagem", { err: error });
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/solicitations/:id/note-counts",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { id } = parseWithZod(triageSolicitationIdParamsSchema, request.params);
+        response.json(createSuccessResponse(await service.getNoteCounts(id, authContext(request))));
+      } catch (error: unknown) {
+        logError("Erro ao consultar contadores de notas da Triagem", { err: error });
+        next(error);
+      }
+    },
+  );
+
+  router.put(
+    "/solicitations/:id/note-counts",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { id } = parseWithZod(triageSolicitationIdParamsSchema, request.params);
+        const body = parseWithZod(updateTriageNoteCountsBodySchema, request.body);
+        const result = await service.updateNoteCounts(id, body, authContext(request));
+        response.json(createSuccessResponse(result));
+      } catch (error: unknown) {
+        logError("Erro ao atualizar contadores de notas da Triagem", { err: error });
         next(error);
       }
     },

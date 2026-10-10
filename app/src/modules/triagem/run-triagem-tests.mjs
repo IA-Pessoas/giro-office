@@ -65,3 +65,18 @@ runTest("solicitações ficam na Triagem, separadas das urgentes e sem reabertur
   assert.doesNotMatch(source, /reopen|Reabrir|UrgentRequest/);
   assert.doesNotMatch(source, /canônic|snapshot|legados/i);
 });
+
+runTest("detalhe usa checklist Fiscal da competência e contadores do cliente (#1697)", () => {
+  const detail = readSource("./components/TriageSolicitationDetail.tsx");
+  const hooks = readSource("./hooks/useTriageSolicitations.ts");
+  assert.match(detail, /<TriageDocumentsSection[\s\S]*documentType="FISCAL"/);
+  assert.match(detail, /fixedCompetence=\{solicitation\.competence/);
+  const checklist = readSource("../contabil/components/TriageDocumentsSection.tsx");
+  assert.match(checklist, /fixedCompetence \? \(/);
+  for (const label of ["XML entradas", "XML saídas", "NFSE prestadas", "NFSE tomadas"]) {
+    assert.match(detail, new RegExp(label));
+  }
+  // Cache por cliente+competência: pedidos da mesma competência compartilham o contador.
+  assert.match(hooks, /\["triagem", "note-counts", clientId, competence\]/);
+  assert.doesNotMatch(detail, /canônic|snapshot|legados/i);
+});

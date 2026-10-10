@@ -3,6 +3,8 @@ import { useFetch } from "@shared/hooks";
 
 import {
   triagemSolicitationService,
+  type TriageNoteCountsInput,
+  type TriageSolicitation,
   type TriageSolicitationInput,
   type TriageSolicitationStatus,
 } from "../services/triagemSolicitationService";
@@ -15,6 +17,26 @@ export function useTriageSolicitations(status: TriageSolicitationStatus) {
   return useFetch(triagemSolicitationsQueryKey(status), () =>
     triagemSolicitationService.list(status),
   );
+}
+
+// Contadores são do cliente+competência: a chave usa esse par, não o ID do pedido,
+// para que pedidos da mesma competência compartilhem o cache.
+export function triagemNoteCountsQueryKey(clientId: string, competence: string) {
+  return ["triagem", "note-counts", clientId, competence] as const;
+}
+
+export function useTriageNoteCounts(solicitation: TriageSolicitation) {
+  const queryClient = useQueryClient();
+  const queryKey = triagemNoteCountsQueryKey(solicitation.client_id, solicitation.competence);
+  const query = useFetch(queryKey, () =>
+    triagemSolicitationService.getNoteCounts(solicitation.id),
+  );
+  const update = useMutation({
+    mutationFn: (input: TriageNoteCountsInput) =>
+      triagemSolicitationService.updateNoteCounts(solicitation.id, input),
+    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+  });
+  return { query, update };
 }
 
 export function useTriageSolicitationMutations() {
