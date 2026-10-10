@@ -1041,7 +1041,8 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
     async (c, next) => {
       // Mesma regra do serviço Express: todo POST do módulo pede permissão de escrita.
       requireWritePermission(c, "Permissão insuficiente para comparar a planilha Veri.");
-      if (c.req.header("content-type")?.split(";")[0].trim() !== VERI_XLSX_MIME_TYPE) {
+      const contentType = c.req.header("content-type")?.split(";")[0].trim().toLowerCase();
+      if (contentType !== VERI_XLSX_MIME_TYPE) {
         throw new ServiceError(415, "Envie um arquivo XLSX.");
       }
       return next();
@@ -1049,7 +1050,7 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
     bodyLimit({
       maxSize: VERI_LIMITS.bytes,
       onError: () => {
-        throw new ServiceError(413, "O XLSX excede 2 MiB.");
+        throw new ServiceError(413, "XLSX inválido ou maior que 2 MiB.");
       },
     }),
     async (c) => {

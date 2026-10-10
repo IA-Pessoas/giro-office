@@ -50,7 +50,7 @@ describe("parseVeriWorkbook", () => {
         row: 6,
         name: "Documento curto",
         value: "123.456",
-        reason: "CPF/CNPJ deve ter 11 ou 14 dígitos; a célula tem 6.",
+        reason: "Não é um CPF (11 dígitos) nem um CNPJ (14 posições).",
       },
       {
         row: 7,
@@ -77,6 +77,39 @@ describe("parseVeriWorkbook", () => {
     ]);
   });
 
+  it("não completa com zeros um número curto demais para ser CPF ou CNPJ", () => {
+    const result = parseVeriWorkbook(
+      veriWorkbook([["a"], ["b"], ["Número curto", "", 123456], ["Decimal", "", 1.5]]),
+    );
+
+    expect(result.entries).toEqual([]);
+    expect(result.invalid.map((entry) => [entry.row, entry.reason])).toEqual([
+      [3, "Não é um CPF (11 dígitos) nem um CNPJ (14 posições)."],
+      [4, "Não é um CPF (11 dígitos) nem um CNPJ (14 posições)."],
+    ]);
+  });
+
+  it("usa o endereço da célula, mesmo quando a planilha não começa em A1", () => {
+    // Só a área B4:C5 está preenchida: a coluna A fica vazia e a linha 3 não existe.
+    const result = parseVeriWorkbook(
+      veriWorkbook(
+        [
+          ["coluna B", "11.222.333/0001-81"],
+          ["coluna B", "11.444.777/0001-61"],
+        ],
+        "B4",
+      ),
+    );
+
+    expect(result).toEqual({
+      entries: [
+        { row: 4, name: "", document: "11222333000181" },
+        { row: 5, name: "", document: "11444777000161" },
+      ],
+      invalid: [],
+    });
+  });
+
   it("aceita planilha sem linhas de dados", () => {
     expect(parseVeriWorkbook(veriWorkbook([["a"], ["b"]]))).toEqual({ entries: [], invalid: [] });
   });
@@ -98,13 +131,55 @@ describe("parseVeriWorkbook", () => {
     );
   });
 
-  it("recusa XLSX que declara conteúdo descompactado acima do limite", () => {
-    const bytes = veriWorkbook([["a"], ["b"], ["Alfa", "", "11222333000181"]]);
-    // Tamanho descompactado da primeira entrada do diretório central (deslocamento 24).
-    const directory = bytes.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
-    bytes.writeUInt32LE(VERI_LIMITS.uncompressedBytes + 1, directory + 24);
+  it("não aceita texto com letras no lugar do documento", () => {
+    const result = parseVeriWorkbook(
+      veriWorkbook([
+        ["a"],
+        ["b"],
+        ["Texto de 11 letras", "", "SEM CADASTRO"],
+        ["CNPJ alfanumérico", "", "12.ABC.345/01DE-35"],
+      ]),
+    );
 
+    expect(result.entries).toEqual([
+      { row: 4, name: "CNPJ alfanumérico", document: "12ABC34501DE35" },
+    ]);
+    expect(result.invalid.map((entry) => entry.row)).toEqual([3]);
+  });
+
+  it("recusa XLSX pequeno no envio que infla acima do limite", () => {
+    // Textos longos e repetitivos: poucos KiB compactados, mais de 8 MiB descompactados.
+    const rows = Array.from({ length: 4000 }, (_, index) => [
+      String(index).padEnd(2500, "x"),
+      "",
+      "11222333000181",
+    ]);
+    const bytes = veriWorkbook([["a"], ["b"], ...rows]);
+
+    expect(bytes.length).toBeLessThan(VERI_LIMITS.bytes);
     expect(() => parseVeriWorkbook(bytes)).toThrowError(
+      expect.objectContaining({
+        statusCode: 400,
+        message: "O XLSX descompactado excede o limite de 8 MiB.",
+      }),
+    );
+  });
+
+  it("recusa planilha com colunas demais", () => {
+    const wide = Array.from({ length: VERI_LIMITS.columns + 1 }, (_, index) => `c${index}`);
+
+    expect(() => parseVeriWorkbook(veriWorkbook([["a"], ["b"], wide]))).toThrowError(
+      expect.objectContaining({
+        statusCode: 400,
+        message: "O XLSX excede o limite de 64 colunas.",
+      }),
+    );
+  });
+
+  it("recusa ZIP com diretório truncado sem estourar a leitura", () => {
+    const bytes = veriWorkbook([["a"], ["b"], ["Alfa", "", "11222333000181"]]);
+
+    expect(() => parseVeriWorkbook(bytes.subarray(0, bytes.length - 30))).toThrowError(
       expect.objectContaining({ statusCode: 400 }),
     );
   });

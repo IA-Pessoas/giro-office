@@ -1,10 +1,15 @@
-import { normalizeCpfCnpj } from "@workspace/shared";
+import { normalizeCpfCnpj, REGULARIZE_PORTFOLIO_LEGACY_STATUS } from "@workspace/shared";
 
 import { parseVeriWorkbook, type VeriInvalidEntry } from "./veriWorkbookParser.js";
 
 // Carteira comparada pelo relatorios/veri.php: clientes ativos ou em processo de inativação
-// (situação A ou P no legado).
-const COMPARED_CLIENT_STATUSES = ["Ativo", "Processo de Inativação", "A", "P"];
+// (situação A ou P no legado), pelo rótulo atual ou pelo código antigo.
+const COMPARED_CLIENT_STATUSES = [
+  REGULARIZE_PORTFOLIO_LEGACY_STATUS.A,
+  REGULARIZE_PORTFOLIO_LEGACY_STATUS.P,
+  "A",
+  "P",
+];
 
 export type VeriComparisonStatus = "Ambos" | "Veri" | "Workspace";
 
@@ -28,6 +33,8 @@ export interface VeriComparison {
     invalid: number;
     // Clientes da carteira sem CPF/CNPJ no cadastro: não há como compará-los.
     workspace_without_document: number;
+    // Clientes que repetem o CPF/CNPJ de outro: contam uma vez só, com o nome do primeiro.
+    workspace_duplicate_documents: number;
   };
 }
 
@@ -55,10 +62,12 @@ export class VeriComparisonService {
     const veri = new Map(workbook.entries.map((entry) => [entry.document, entry.name]));
     const workspace = new Map<string, string>();
     let workspaceWithoutDocument = 0;
+    let workspaceDuplicateDocuments = 0;
     for (const client of clients) {
       const document = normalizeCpfCnpj(client.cpf_cnpj);
-      if (document) workspace.set(document, client.name);
-      else workspaceWithoutDocument++;
+      if (!document) workspaceWithoutDocument++;
+      else if (workspace.has(document)) workspaceDuplicateDocuments++;
+      else workspace.set(document, client.name);
     }
 
     const rows = [...new Set([...veri.keys(), ...workspace.keys()])]
@@ -89,6 +98,7 @@ export class VeriComparisonService {
         workspace_only: count("Workspace"),
         invalid: workbook.invalid.length,
         workspace_without_document: workspaceWithoutDocument,
+        workspace_duplicate_documents: workspaceDuplicateDocuments,
       },
     };
   }

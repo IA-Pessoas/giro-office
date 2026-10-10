@@ -789,6 +789,7 @@ export type RegularizeVeriComparison = {
     workspace_only: number;
     invalid: number;
     workspace_without_document: number;
+    workspace_duplicate_documents: number;
   };
 };
 

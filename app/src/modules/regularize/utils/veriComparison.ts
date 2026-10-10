@@ -30,6 +30,20 @@ export function veriComparisonColumns(totals: RegularizeVeriComparison["totals"]
   ];
 }
 
+// No CSV, as linhas da planilha que ficaram fora da comparação vão depois das comparadas.
+export function veriComparisonCsvRows(comparison: RegularizeVeriComparison): string[][] {
+  return [
+    ...veriComparisonRows(comparison),
+    ...comparison.invalid.map((entry) => [
+      entry.name,
+      entry.value,
+      "",
+      "",
+      `Inválida (linha ${entry.row}): ${entry.reason}`,
+    ]),
+  ];
+}
+
 export function veriComparisonRows(comparison: RegularizeVeriComparison): string[][] {
   return comparison.rows.map((row) => [
     row.name,

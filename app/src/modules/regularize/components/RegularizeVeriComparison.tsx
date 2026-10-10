@@ -7,6 +7,7 @@ import {
   VERI_MAX_FILE_BYTES,
   VERI_XLSX_MIME_TYPE,
   veriComparisonColumns,
+  veriComparisonCsvRows,
   veriComparisonRows,
 } from "../utils/veriComparison";
 import {
@@ -35,7 +36,8 @@ export function RegularizeVeriComparison({ canEdit }: { canEdit: boolean }) {
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         Envie a planilha XLSX do Veri para comparar com os clientes ativos ou em processo de
         inativação, pelo CPF/CNPJ. A leitura começa na linha 3, com a razão social na coluna A e o
-        CNPJ na coluna C. Ela foi validada apenas com planilhas de exemplo: confira o resultado.
+        CNPJ na coluna C. Ela foi validada apenas com planilhas sintéticas, sem uma exportação
+        real do Veri: confira o resultado.
       </p>
 
       {canEdit ? (
@@ -95,11 +97,19 @@ export function RegularizeVeriComparison({ canEdit }: { canEdit: boolean }) {
               {comparison.totals.workspace_without_document
                 ? ` · ${comparison.totals.workspace_without_document} clientes sem CPF/CNPJ no cadastro, fora da comparação`
                 : ""}
+              {comparison.totals.workspace_duplicate_documents
+                ? ` · ${comparison.totals.workspace_duplicate_documents} clientes com CPF/CNPJ repetido no cadastro, contados uma vez`
+                : ""}
             </p>
             <button
               type="button"
-              disabled={!rows.length}
-              onClick={() => downloadCsvFile("comparador-veri.csv", createCsv([columns, ...rows]))}
+              disabled={!rows.length && !comparison.invalid.length}
+              onClick={() =>
+                downloadCsvFile(
+                  "comparador-veri.csv",
+                  createCsv([columns, ...veriComparisonCsvRows(comparison)]),
+                )
+              }
               className={regularizeSecondaryButtonClassName}
             >
               Baixar CSV
@@ -150,7 +160,7 @@ export function RegularizeVeriComparison({ canEdit }: { canEdit: boolean }) {
           ) : (
             <p className="text-sm text-slate-600 dark:text-slate-400">
               Nenhum CPF/CNPJ para comparar: a planilha não tem linhas válidas e não há clientes
-              ativos com documento.
+              ativos ou em processo de inativação com documento.
             </p>
           )}
         </div>

@@ -14,7 +14,11 @@ import {
   unwrapRegularizePage,
 } from "./services/regularizeService.contract.ts";
 import { createCsv } from "../marketing/utils/marketingCsv.ts";
-import { veriComparisonColumns, veriComparisonRows } from "./utils/veriComparison.ts";
+import {
+  veriComparisonColumns,
+  veriComparisonCsvRows,
+  veriComparisonRows,
+} from "./utils/veriComparison.ts";
 import {
   buildRegularizeProcessStatusUpdatePayload,
   groupRegularizeProcessesByStatus,
@@ -1864,8 +1868,8 @@ await runTest("Veri comparison shows the same rows on screen and in the CSV (#17
       { name: "Beta", document: "12345678901", in_veri: true, in_workspace: false, status: "Veri" },
       { name: "=Gama", document: "11444777000161", in_veri: false, in_workspace: true, status: "Workspace" },
     ],
-    invalid: [],
-    totals: { veri: 2, workspace: 2, both: 1, veri_only: 1, workspace_only: 1, invalid: 0, workspace_without_document: 0 },
+    invalid: [{ row: 7, name: "Delta", value: "123", reason: "CPF/CNPJ deve ter 11 ou 14 dígitos; a célula tem 3." }],
+    totals: { veri: 2, workspace: 2, both: 1, veri_only: 1, workspace_only: 1, invalid: 1, workspace_without_document: 0, workspace_duplicate_documents: 0 },
   };
 
   assert.deepEqual(veriComparisonColumns(comparison.totals), [
@@ -1881,8 +1885,19 @@ await runTest("Veri comparison shows the same rows on screen and in the CSV (#17
     ["=Gama", "11.444.777/0001-61", "Não", "Sim", "Workspace"],
   ]);
   // Nome vindo da planilha não pode virar fórmula ao abrir o CSV.
-  const csv = createCsv([veriComparisonColumns(comparison.totals), ...veriComparisonRows(comparison)]);
+  const csv = createCsv([
+    veriComparisonColumns(comparison.totals),
+    ...veriComparisonCsvRows(comparison),
+  ]);
   assert.match(csv, /"'=Gama"/);
+  // As linhas inválidas da planilha também vão no arquivo, com a linha e o motivo.
+  assert.deepEqual(veriComparisonCsvRows(comparison).at(-1), [
+    "Delta",
+    "123",
+    "",
+    "",
+    "Inválida (linha 7): CPF/CNPJ deve ter 11 ou 14 dígitos; a célula tem 3.",
+  ]);
 
   const page = await readModuleSource("components/RegularizePage.tsx");
   assert.match(page, /activeTab === "veri" \? <RegularizeVeriComparison/);

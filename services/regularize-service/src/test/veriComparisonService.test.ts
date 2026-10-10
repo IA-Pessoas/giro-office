@@ -12,6 +12,7 @@ describe("VeriComparisonService", () => {
     const findMany = vi.fn().mockResolvedValue([
       { name: "Alfa (cadastro)", cpf_cnpj: "11.222.333/0001-81" },
       { name: "Delta só no Workspace", cpf_cnpj: "11444777000161" },
+      { name: "Delta duplicada no cadastro", cpf_cnpj: "11.444.777/0001-61" },
       { name: "Sem documento", cpf_cnpj: "" },
     ]);
     const service = new VeriComparisonService({ client: { findMany } });
@@ -55,7 +56,7 @@ describe("VeriComparisonService", () => {
         row: 5,
         name: "Inválida",
         value: "123",
-        reason: "CPF/CNPJ deve ter 11 ou 14 dígitos; a célula tem 3.",
+        reason: "Não é um CPF (11 dígitos) nem um CNPJ (14 posições).",
       },
     ]);
     expect(result.totals).toEqual({
@@ -66,6 +67,7 @@ describe("VeriComparisonService", () => {
       workspace_only: 1,
       invalid: 1,
       workspace_without_document: 1,
+      workspace_duplicate_documents: 1,
     });
   });
 
