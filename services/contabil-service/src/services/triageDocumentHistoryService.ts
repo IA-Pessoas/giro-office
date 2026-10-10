@@ -18,6 +18,7 @@ export type TriageDocumentHistoryPrisma = {
   triageClosing: Finder;
   clientCloud: Finder;
   controlContabil: Finder;
+  triageCatalogItem: Finder;
 };
 
 type HistoryObject = {
@@ -64,6 +65,17 @@ export type TriageDocumentHistoryInput = {
   page: number;
   pageSize: number;
 };
+
+/** Catálogo da organização que traduz o código gravado no campo, quando houver. */
+function catalogKind(field: string): "JUSTIFICATION" | "DELIVERY_METHOD" | null {
+  const parts = field.split(".");
+  const name = parts[parts.length - 1];
+  return name === "justification"
+    ? "JUSTIFICATION"
+    : name === "delivery_method"
+      ? "DELIVERY_METHOD"
+      : null;
+}
 
 type Scalar = boolean | string | null;
 type Change = { field: string; from: Scalar; to: Scalar };
@@ -272,6 +284,25 @@ export async function listTriageDocumentHistory(
         })
       : [],
   ]);
+  // Justificativa e meio de envio guardam o código do catálogo; a tela mostra o rótulo.
+  const catalogCodes = [...changesOf.values()]
+    .flat()
+    .filter((change) => catalogKind(change.field))
+    .flatMap((change) => [change.from, change.to])
+    .filter((code): code is string => typeof code === "string");
+  const catalogItems = catalogCodes.length
+    ? await prisma.triageCatalogItem.findMany({
+        where: {
+          ...organization,
+          kind: { in: ["JUSTIFICATION", "DELIVERY_METHOD"] },
+          code: { in: [...new Set(catalogCodes)] },
+        },
+        select: { kind: true, code: true, label: true },
+      })
+    : [];
+  const catalogLabels = new Map(
+    catalogItems.map((item) => [`${item.kind}:${item.code}`, item.label]),
+  );
   const clientNames = new Map(
     clients.map((client) => [
       client.id,
@@ -302,15 +333,17 @@ export async function listTriageDocumentHistory(
             competence: object?.competence ?? null,
             routine_type: object?.type ?? null,
           },
-          changes: (changesOf.get(event.id) ?? []).map((change) =>
-            change.field === "responsible_id"
-              ? {
-                  ...change,
-                  from: userNames.get(change.from) ?? change.from,
-                  to: userNames.get(change.to) ?? change.to,
-                }
-              : change,
-          ),
+          changes: (changesOf.get(event.id) ?? []).map((change) => {
+            const kind = catalogKind(change.field);
+            // Código sem item no catálogo e usuário de fora da organização saem como estão.
+            const display = (value: Scalar) =>
+              (change.field === "responsible_id"
+                ? userNames.get(value)
+                : kind
+                  ? catalogLabels.get(`${kind}:${value}`)
+                  : undefined) ?? value;
+            return { ...change, from: display(change.from), to: display(change.to) };
+          }),
         };
       })
       .filter((item) => item.changes.length > 0),

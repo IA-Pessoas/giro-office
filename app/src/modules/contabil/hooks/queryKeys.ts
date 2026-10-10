@@ -71,15 +71,20 @@ export function triageStatementHistoryQueryKey(clientId: string, pendingOnly?: b
   return pendingOnly === undefined ? base : ([...base, pendingOnly] as const);
 }
 
+/** Prefixo de todo histórico documental: quem altera documento, extrato ou Cloud o invalida. */
+export const TRIAGE_DOCUMENT_HISTORY_QUERY_KEY = [
+  ...CONTABIL_QUERY_KEY,
+  "triage",
+  "document-history",
+] as const;
+
 export function triageDocumentHistoryQueryKey(filters: {
   clientId?: string;
   competence?: string;
   page: number;
 }) {
   return [
-    ...CONTABIL_QUERY_KEY,
-    "triage",
-    "document-history",
+    ...TRIAGE_DOCUMENT_HISTORY_QUERY_KEY,
     filters.clientId ?? "all",
     filters.competence ?? "all",
     filters.page,

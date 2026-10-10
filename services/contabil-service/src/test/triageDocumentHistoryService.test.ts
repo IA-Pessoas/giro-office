@@ -90,6 +90,13 @@ function database() {
     },
     triageClosing: { findMany: vi.fn().mockResolvedValue([]) },
     clientCloud: { findMany: vi.fn().mockResolvedValue([{ id: CLOUD, client_id: CLIENT }]) },
+    triageCatalogItem: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { kind: "JUSTIFICATION", code: "SEM_MOVIMENTO", label: "Sem movimento no mês" },
+        ]),
+    },
     controlContabil: {
       findMany: vi
         .fn()
@@ -181,7 +188,12 @@ describe("listTriageDocumentHistory", () => {
         },
         changes: [
           { field: "checklist.sped_fiscal", from: "PENDING", to: "NOT_PRESENT" },
-          { field: "item_notes.sped_fiscal.justification", from: null, to: "SEM_MOVIMENTO" },
+          // Justificativa sai pelo rótulo do catálogo da organização.
+          {
+            field: "item_notes.sped_fiscal.justification",
+            from: null,
+            to: "Sem movimento no mês",
+          },
         ],
       },
       {
@@ -236,6 +248,7 @@ describe("listTriageDocumentHistory", () => {
       prisma.auditRequest,
       prisma.client,
       prisma.user,
+      prisma.triageCatalogItem,
       prisma.triageMonthly,
       prisma.triageBankStatement,
       prisma.clientCloud,
@@ -344,6 +357,15 @@ describe("listTriageDocumentHistory", () => {
         },
       },
       {
+        id: "event-4b",
+        user_id: USER,
+        created_at: new Date("2026-09-19T18:00:00.000Z"),
+        action: "Restaurar competência contábil",
+        referring: "contabil.control",
+        referring_id: CONTROL,
+        changes_json: { monthly: { to: 1 }, statements: { to: 2 }, closings: { to: 0 } },
+      },
+      {
         id: "event-4",
         user_id: USER,
         created_at: new Date("2026-09-19T12:00:00.000Z"),
@@ -384,6 +406,15 @@ describe("listTriageDocumentHistory", () => {
           { field: "archived_at", from: null, to: "2026-09-20T12:00:00.000Z" },
           { field: "monthly", from: null, to: "1" },
           { field: "statements", from: null, to: "2" },
+        ],
+      },
+      {
+        action: "Restaurar competência contábil",
+        object: { kind: "contabil.control", competence: "2026-09" },
+        changes: [
+          { field: "monthly", from: null, to: "1" },
+          { field: "statements", from: null, to: "2" },
+          { field: "closings", from: null, to: "0" },
         ],
       },
       {

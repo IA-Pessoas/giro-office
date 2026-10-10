@@ -1181,6 +1181,13 @@ await (async () => {
     assert.equal(formatTriageHistoryValue("active_items", "[]"), "(vazio)");
     assert.equal(formatTriageHistoryValue("active_items", "texto solto"), "texto solto");
     assert.equal(formatTriageHistoryField("monthly"), "Rotinas");
+    // Datas em ISO saem no formato brasileiro; o arquivamento, na hora de Brasília.
+    assert.match(
+      formatTriageHistoryValue("archived_at", "2026-09-12T15:00:00.000Z"),
+      /^12\/09\/2026,? 12:00$/,
+    );
+    assert.equal(formatTriageHistoryValue("download_date", "2026-09-30T00:00:00.000Z"), "30/09/2026");
+    assert.equal(formatTriageHistoryValue("download_date", "sem data"), "sem data");
 
     const entry = (object, action = "Atualizar pendência documental") => ({
       id: "e1",
@@ -1213,6 +1220,15 @@ await (async () => {
         ),
       ),
       "Alfa Ltda · 2026-09 · Extrato bancário · Arquivar marcador de extrato bancário",
+    );
+    assert.equal(
+      describeTriageHistoryEntry(
+        entry(
+          { kind: "triagem.configs", competence: null, routine_type: null },
+          "Configurar documentos fiscais especiais",
+        ),
+      ),
+      "Alfa Ltda · Configuração da Triagem · Configurar documentos fiscais especiais",
     );
   });
 
