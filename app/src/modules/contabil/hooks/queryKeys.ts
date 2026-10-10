@@ -47,6 +47,11 @@ export function triageFiscalPortfolioQueryKey(competence: string) {
   return [...TRIAGE_FISCAL_PORTFOLIO_QUERY_KEY, competence] as const;
 }
 
+/** Histórico bancário do cliente (todas as variações de período e filtro). */
+export function triageStatementHistoryQueryKey(clientId: string, ...filters: unknown[]) {
+  return [...CONTABIL_QUERY_KEY, "triage", "statement-history", clientId, ...filters] as const;
+}
+
 export function triageStatementsQueryKey(clientId: string, competence: string) {
   return [...CONTABIL_QUERY_KEY, "triage", "statements", clientId, competence] as const;
 }

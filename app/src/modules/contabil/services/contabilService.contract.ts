@@ -29,6 +29,7 @@ export const CONTABIL_ENDPOINTS = {
   triageConfig: "/triagem/config",
   triageFiscalSettings: "/triagem/fiscal-settings",
   triageStatements: "/triagem/statements",
+  triageStatementHistory: "/triagem/statements/history",
   triageClosing: "/triagem/closing",
 } as const;
 
