@@ -1993,7 +1993,9 @@ export function RegularizePage() {
         className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
       >
         <div className="overflow-x-auto u-scrollbar-system">
-          <div role="tablist" className="flex min-w-max items-center justify-center gap-1 md:min-w-full">
+          {/* Sem min-w-full: quando as abas não cabem, a largura mínima igual à da tela cortava
+              as primeiras, que ficavam sem clique. Mesmo padrão de Fiscal e Contábil. */}
+          <div role="tablist" className="flex min-w-max items-center justify-center gap-1">
             {REGULARIZE_TABS.map((tab) => (
               <TabButton
                 key={tab.id}
