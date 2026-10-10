@@ -359,6 +359,7 @@ export class RegularizePortfolioReportingService {
                 organization_id: organizationId,
                 pj_id: { in: clients.map((client) => client.id) },
                 exit: null,
+                clientPF: { is: { organization_id: organizationId } },
               },
               select: { pj_id: true },
               distinct: ["pj_id"],

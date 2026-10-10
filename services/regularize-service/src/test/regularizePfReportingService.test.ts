@@ -226,7 +226,12 @@ describe("RegularizePortfolioReportingService — PF e sócios", () => {
       reachedLimit: false,
     });
     expect(partners).toHaveBeenCalledWith({
-      where: { organization_id: organizationId, pj_id: { in: ["c1", "c2"] }, exit: null },
+      where: {
+        organization_id: organizationId,
+        pj_id: { in: ["c1", "c2"] },
+        exit: null,
+        clientPF: { is: { organization_id: organizationId } },
+      },
       select: { pj_id: true },
       distinct: ["pj_id"],
     });
