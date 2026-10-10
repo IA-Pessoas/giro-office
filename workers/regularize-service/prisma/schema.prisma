@@ -372,9 +372,10 @@ model RegularizeDteImport {
   @@map("regularize.dte_imports")
 }
 
-// Aviso DTE (tb_regularize.dte do legado). Datas ficam como o texto da origem: sem amostra
-// real, o formato não foi confirmado. dedupe_key = SHA-256 dos nove campos de
-// Fiscal::cadastrarDTE; pending_reading = coluna `lido` do legado.
+// Aviso DTE (tb_regularize.dte do legado). Datas ficam como o texto da origem; a de emissão
+// também é lida como dd/mm/aaaa hh:mm em data_emissao_at, que a caixa de avisos usa no período
+// (dte/home.php). dedupe_key = SHA-256 dos nove campos de Fiscal::cadastrarDTE;
+// pending_reading = coluna `lido` do legado.
 model RegularizeDteNotice {
   id              String              @id @default(uuid())
   organization_id String
@@ -386,6 +387,7 @@ model RegularizeDteNotice {
   destinatario    String
   remetente       String
   data_emissao    String?
+  data_emissao_at DateTime?
   assunto         String
   data_leitura    String?
   data_ciencia    String?
@@ -397,6 +399,7 @@ model RegularizeDteNotice {
 
   @@unique([organization_id, dedupe_key], map: "uq_regularize_dte_notice_dedupe")
   @@index([organization_id, created_at], map: "idx_regularize_dte_notice_org_created")
+  @@index([organization_id, data_emissao_at], map: "idx_regularize_dte_notice_org_emissao")
   @@map("regularize.dte_notices")
 }
 

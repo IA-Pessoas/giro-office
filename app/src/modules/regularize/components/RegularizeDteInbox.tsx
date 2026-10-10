@@ -32,24 +32,25 @@ const PAGE_SIZE = 20;
 const DEFAULT_WINDOW_DAYS = 45;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// O tipo do aviso é a classe do selo que o portal exibia (Bootstrap 2). Sem amostra real,
-// não se sabe quais cores o portal usa de fato: valor fora da lista aparece como veio.
+// O tipo do aviso é a classe do selo do portal. As cores seguem o dte/home.php do legado, que
+// chama badge-important de Amarelo e badge-warning de Vermelho (o inverso do Bootstrap).
+// Valor fora da lista aparece como veio.
 const TIPO_OPTIONS: Array<{ value: string; label: string; variant: StatusBadgeVariant }> = [
-  { value: "badge-important", label: "Vermelho", variant: "danger" },
-  { value: "badge-warning", label: "Amarelo", variant: "warning" },
-  { value: "badge-success", label: "Verde", variant: "success" },
   { value: "badge-info", label: "Azul", variant: "info" },
-  { value: "badge-inverse", label: "Preto", variant: "neutral" },
+  { value: "badge-success", label: "Verde", variant: "success" },
+  { value: "badge-important", label: "Amarelo", variant: "warning" },
+  { value: "badge-warning", label: "Vermelho", variant: "danger" },
 ];
-
 
 function initialFilters(): RegularizeDteNoticeListFilters {
   return {
     from: formatDateToInput(new Date(Date.now() - DEFAULT_WINDOW_DAYS * DAY_MS)),
+    // Sem data final: uma aba aberta de ontem continua mostrando o que for emitido hoje.
     to: "",
     tipo: "",
     search: "",
-    reading: "Todos",
+    // Como no legado, a caixa abre nos avisos que ainda precisam de leitura.
+    reading: "Pendente",
     page: 1,
     limit: PAGE_SIZE,
   };
@@ -66,8 +67,8 @@ function TipoBadge({ tipo }: { tipo: string }) {
   );
 }
 
-// Caixa de avisos DTE (#1745): avisos importados pela colagem (#1744). O período filtra pela
-// data da importação, porque as datas do próprio aviso ficam como texto da origem.
+// Caixa de avisos DTE (#1745): avisos importados pela colagem (#1744), como o dte/home.php do
+// legado. O período filtra pela data de emissão do aviso.
 export function RegularizeDteInbox({ canEdit }: { canEdit: boolean }) {
   const [filters, setFilters] = useState(initialFilters);
   const debouncedSearch = useDebouncedValue(filters.search, 300);
@@ -83,13 +84,13 @@ export function RegularizeDteInbox({ canEdit }: { canEdit: boolean }) {
     <section className={regularizePanelClassName}>
       <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Caixa de avisos DTE</h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        Avisos importados pela colagem, a partir dos últimos {DEFAULT_WINDOW_DAYS} dias. O período
-        considera a data da importação.
+        Avisos importados pela colagem. A caixa abre nos pendentes de leitura emitidos nos últimos{" "}
+        {DEFAULT_WINDOW_DAYS} dias.
       </p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <label className={regularizePanelLabelClassName}>
-          Importado de
+          Emitido de
           <input
             type="date"
             className={`${regularizeTextFieldClassName} mt-1.5`}
@@ -184,9 +185,13 @@ export function RegularizeDteInbox({ canEdit }: { canEdit: boolean }) {
                 <th className={cellClassName}>Aviso</th>
                 <th className={cellClassName}>CNPJ/CPF</th>
                 <th className={cellClassName}>Destinatário</th>
-                <th className={cellClassName}>Assunto</th>
+                <th className={cellClassName}>Remetente</th>
                 <th className={cellClassName}>Emissão</th>
-                <th className={cellClassName}>Importado em</th>
+                <th className={cellClassName}>Assunto</th>
+                <th className={cellClassName}>Leitura no portal</th>
+                <th className={cellClassName}>Ciência</th>
+                <th className={cellClassName}>Consulta SEFAZ</th>
+                <th className={cellClassName}>Registro no sistema</th>
                 <th className={cellClassName}>Leitura</th>
               </tr>
             </thead>
@@ -199,9 +204,19 @@ export function RegularizeDteInbox({ canEdit }: { canEdit: boolean }) {
                   <td className={cellClassName}>{notice.aviso}</td>
                   <td className={`${cellClassName} whitespace-nowrap`}>{notice.cnpj_cpf}</td>
                   <td className={cellClassName}>{notice.destinatario}</td>
-                  <td className={cellClassName}>{notice.assunto}</td>
+                  <td className={cellClassName}>{notice.remetente}</td>
                   <td className={`${cellClassName} whitespace-nowrap`}>
                     {notice.data_emissao ?? "—"}
+                  </td>
+                  <td className={cellClassName}>{notice.assunto}</td>
+                  <td className={`${cellClassName} whitespace-nowrap`}>
+                    {notice.data_leitura ?? "—"}
+                  </td>
+                  <td className={`${cellClassName} whitespace-nowrap`}>
+                    {notice.data_ciencia ?? "—"}
+                  </td>
+                  <td className={`${cellClassName} whitespace-nowrap`}>
+                    {notice.registro ?? "—"}
                   </td>
                   <td className={`${cellClassName} whitespace-nowrap`}>
                     {formatDateTime(notice.created_at)}

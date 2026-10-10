@@ -254,6 +254,10 @@ export class DteQueryService {
 
     const date = isoDay(input.date);
     const clientIds = [...doneIds, ...notDoneIds];
+    // Nada a gravar (só conflitos ou documentos desconhecidos): não cria histórico vazio.
+    if (clientIds.length === 0) {
+      return { date, done_count: 0, not_done_count: 0, conflicts, unknown };
+    }
     await this.prisma.$transaction(async (transaction) => {
       const scope = { organization_id: input.organizationId, date: input.date };
       const existing = await transaction.regularizeDteQuery.findMany({

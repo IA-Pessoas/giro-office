@@ -965,10 +965,12 @@ await runTest("regularize process contract keeps canonical states and explicit F
   assert.match(pageSource, /Aviso ao cliente/);
 });
 
-await runTest("regularize DTE notice filters cover whole days and omit empty filters (#1745)", () => {
+await runTest("regularize DTE notice filters send plain days and omit empty filters (#1745)", () => {
   const base = { from: "", to: "", tipo: "", search: "  ", reading: "Todos", page: 1, limit: 20 };
 
+  // Período vazio pede tudo: sem from, a API aplicaria os 45 dias.
   assert.deepEqual(buildRegularizeDteNoticeListParams(base), {
+    from: "1900-01-01",
     reading: "Todos",
     page: 1,
     limit: 20,
@@ -982,12 +984,15 @@ await runTest("regularize DTE notice filters cover whole days and omit empty fil
     search: " intima ",
     reading: "Pendente",
   });
-  assert.equal(params.from, new Date(2026, 8, 1).toISOString());
-  assert.equal(params.to, new Date(2026, 8, 30, 23, 59, 59, 999).toISOString());
-  assert.deepEqual(
-    { tipo: params.tipo, search: params.search, reading: params.reading },
-    { tipo: "badge-warning", search: "intima", reading: "Pendente" },
-  );
+  assert.deepEqual(params, {
+    from: "2026-09-01",
+    to: "2026-09-30",
+    tipo: "badge-warning",
+    search: "intima",
+    reading: "Pendente",
+    page: 1,
+    limit: 20,
+  });
   // "Sem cor" vai como tipo vazio, que a API entende como avisos sem selo.
   assert.equal(
     buildRegularizeDteNoticeListParams({ ...base, tipo: REGULARIZE_DTE_NO_TIPO_FILTER }).tipo,

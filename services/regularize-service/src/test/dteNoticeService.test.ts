@@ -43,11 +43,19 @@ describe("DteNoticeService.list", () => {
     expect(DTE_NOTICE_DEFAULT_WINDOW_DAYS).toBe(45);
     expect(prisma.regularizeDteNotice.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        // Pela emissão; aviso sem data de emissão legível entra pela data da importação.
         where: {
           organization_id: ORG,
-          created_at: { gte: new Date("2026-08-26T12:00:00.000Z") },
+          OR: [
+            { data_emissao_at: { gte: new Date("2026-08-26T00:00:00.000Z") } },
+            { data_emissao_at: null, created_at: { gte: new Date("2026-08-26T00:00:00.000Z") } },
+          ],
         },
-        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+        orderBy: [
+          { data_emissao_at: { sort: "desc", nulls: "last" } },
+          { created_at: "desc" },
+          { id: "desc" },
+        ],
         skip: 0,
         take: 20,
       }),
@@ -58,7 +66,9 @@ describe("DteNoticeService.list", () => {
   it("filtra por período, tipo, texto do aviso e leitura", async () => {
     const prisma = createPrisma();
     const from = new Date("2026-01-01T00:00:00.000Z");
-    const to = new Date("2026-01-31T23:59:59.999Z");
+    const to = new Date("2026-01-31T00:00:00.000Z");
+    // O último dia entra inteiro.
+    const period = { gte: from, lt: new Date("2026-02-01T00:00:00.000Z") };
 
     await serviceFor(prisma).list({
       organizationId: ORG,
@@ -74,7 +84,14 @@ describe("DteNoticeService.list", () => {
     expect(prisma.regularizeDteNotice.findMany.mock.calls[0]?.[0]).toMatchObject({
       where: {
         organization_id: ORG,
-        created_at: { gte: from, lte: to },
+        OR: [
+          { data_emissao_at: period },
+          // Pela importação (instante em UTC), com um dia de folga no fim.
+          {
+            data_emissao_at: null,
+            created_at: { gte: from, lt: new Date("2026-02-02T00:00:00.000Z") },
+          },
+        ],
         tipo: { contains: "badge-warning" },
         aviso: { contains: "intima", mode: "insensitive" },
         pending_reading: true,

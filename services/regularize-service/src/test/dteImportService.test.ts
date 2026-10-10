@@ -6,7 +6,13 @@ import { DteImportService } from "../services/dteImportService.js";
 const ORG = "a0000000-0000-4000-8000-000000000001";
 
 function notice(aviso: string) {
-  return { tipo: "badge badge-important", cell3: aviso, cell4: "123", cell5: "Dest" };
+  return {
+    tipo: "badge badge-important",
+    cell3: aviso,
+    cell4: "123",
+    cell5: "Dest",
+    cell7: "05/03/2024 10:22",
+  };
 }
 
 // Banco em memória só com o que o serviço usa; o índice único fica por conta do Set.
@@ -81,7 +87,12 @@ describe("DteImportService", () => {
     const created = prisma.regularizeDteNotice.createMany.mock.calls[0]?.[0].data ?? [];
     expect(created).toHaveLength(2);
     expect(created.every((row) => row.organization_id === ORG)).toBe(true);
-    expect(created[0]).toMatchObject({ aviso: "Aviso 1", pending_reading: true });
+    expect(created[0]).toMatchObject({
+      aviso: "Aviso 1",
+      pending_reading: true,
+      data_emissao: "05/03/2024 10:22",
+      data_emissao_at: new Date("2024-03-05T10:22:00.000Z"),
+    });
     // O conteúdo colado não é guardado.
     expect(JSON.stringify(prisma.regularizeDteImport.create.mock.calls)).not.toContain("lixo");
   });

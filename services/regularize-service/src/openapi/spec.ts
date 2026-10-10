@@ -602,7 +602,10 @@ export function buildRegularizeServiceOpenApiSpec(
       { name: "PF", description: "Clientes PF do regularize" },
       { name: "Partners", description: "Quadro societario" },
       { name: "MunicipalTaxes", description: "Tributos municipais" },
-      { name: "DTE", description: "Importação manual de avisos DTE" },
+      {
+        name: "DTE",
+        description: "Importação manual de avisos, caixa de avisos e consultas diárias ao DTE",
+      },
       { name: "Processes", description: "Processos de regularize" },
       { name: "Guidance", description: "Orientacoes procedurais" },
       { name: "Licenses", description: "Alvaras e licencas" },
@@ -896,11 +899,11 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["DTE"],
           summary: "Listar avisos DTE importados",
           description:
-            "Sem `from`, lista os avisos importados nos últimos 45 dias. O período usa a data da importação.",
+            "Sem `from`, lista os avisos emitidos nos últimos 45 dias. O período usa a data de emissão do aviso; quando ela não pôde ser lida, a data da importação.",
           security: [{ bearerAuth: [] }],
           parameters: [
-            { name: "from", in: "query", schema: { type: "string", format: "date-time" } },
-            { name: "to", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "from", in: "query", schema: { type: "string", format: "date" } },
+            { name: "to", in: "query", schema: { type: "string", format: "date" } },
             {
               name: "tipo",
               in: "query",

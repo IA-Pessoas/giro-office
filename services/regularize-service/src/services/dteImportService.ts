@@ -1,5 +1,10 @@
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
-import { type DteImportFormat, dteDedupeKey, parseDteImport } from "./dteImportParser.js";
+import {
+  type DteImportFormat,
+  dteDedupeKey,
+  parseDteDateTime,
+  parseDteImport,
+} from "./dteImportParser.js";
 
 export type DteImportDuplicate = { row: number; aviso: string; cnpj_cpf: string };
 
@@ -69,6 +74,7 @@ export class DteImportService {
       const { count } = await transaction.regularizeDteNotice.createMany({
         data: fresh.map((notice) => ({
           ...notice.fields,
+          data_emissao_at: parseDteDateTime(notice.fields.data_emissao),
           organization_id: input.organizationId,
           import_id: importId,
           dedupe_key: notice.key,
