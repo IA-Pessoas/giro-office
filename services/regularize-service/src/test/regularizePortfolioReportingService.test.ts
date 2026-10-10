@@ -89,6 +89,70 @@ describe("RegularizePortfolioReportingService", () => {
     });
   });
 
+  it("não reaproveita o catálogo de segmentos entre organizações na mesma instância", async () => {
+    const otherOrganizationId = "20000000-0000-4000-8000-000000000002";
+    const clients = vi.fn().mockResolvedValue([{ id: "c1", segment: "Padaria" }]);
+    const segments = vi.fn(async ({ where }: { where: { organization_id: string } }) => [
+      {
+        name: "Padaria",
+        type: where.organization_id === organizationId ? "Comércio" : "Indústria",
+      },
+    ]);
+    const service = new RegularizePortfolioReportingService(
+      prismaWith({ client: { findMany: clients }, clientSegment: { findMany: segments } }),
+    );
+    const extract = (organization: string) =>
+      service.extract({
+        organizationId: organization,
+        source: "regularize.clients",
+        fields: ["segment_type"],
+        limit: 10,
+      });
+
+    await expect(extract(organizationId)).resolves.toMatchObject({
+      rows: [{ segment_type: "Comércio" }],
+    });
+    await expect(extract(otherOrganizationId)).resolves.toMatchObject({
+      rows: [{ segment_type: "Indústria" }],
+    });
+  });
+
+  it("trata departamento não marcado como falso e preserva licitação não informada", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      { id: "c1", fiscal: null, contabil: true, licitacao: null },
+      { id: "c2", fiscal: false, contabil: null, licitacao: false },
+    ]);
+    const service = new RegularizePortfolioReportingService(prismaWith({ client: { findMany } }));
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "regularize.clients",
+        fields: ["fiscal", "contabil", "licitacao"],
+        limit: 10,
+      }),
+    ).resolves.toMatchObject({
+      rows: [
+        { fiscal: false, contabil: true, licitacao: null },
+        { fiscal: false, contabil: false, licitacao: false },
+      ],
+    });
+  });
+
+  it("mantém status desconhecido como veio do cadastro", async () => {
+    const findMany = vi.fn().mockResolvedValue([{ id: "c1", status: "constructor" }]);
+    const service = new RegularizePortfolioReportingService(prismaWith({ client: { findMany } }));
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "regularize.clients",
+        fields: ["status"],
+        limit: 10,
+      }),
+    ).resolves.toMatchObject({ rows: [{ status: "constructor" }] });
+  });
+
   it("aplica os mesmos filtros e totais à carteira e aos grupos", async () => {
     const clients = [
       { id: "c1", name: "Alfa", status: "P", licitacao: true },

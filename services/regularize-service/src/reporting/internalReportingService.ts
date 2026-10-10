@@ -190,6 +190,18 @@ type PortfolioDelegate = {
 };
 
 // Campos calculados na extração; os demais são colunas do cadastro canônico do cliente.
+// Departamento não marcado no cadastro é "não": sem isso o filtro "= não" perderia os nulos.
+// Licitação fica fora: nulo ali é "não informado", distinto de Sim/Não (#1743).
+const PORTFOLIO_DEPARTMENT_FLAGS = new Set([
+  "contabil",
+  "fiscal",
+  "pessoal",
+  "consultoria",
+  "infoproduto",
+  "tecnologia",
+  "castelo_med",
+]);
+
 const PORTFOLIO_DERIVED_FIELDS = new Set([
   "segment_type",
   "has_passwords",
@@ -198,8 +210,6 @@ const PORTFOLIO_DERIVED_FIELDS = new Set([
 ]);
 
 export class RegularizePortfolioReportingService {
-  private segmentTypes?: Promise<ReadonlyMap<string, unknown>>;
-
   constructor(
     private readonly prisma: {
       client: PortfolioDelegate;
@@ -227,8 +237,14 @@ export class RegularizePortfolioReportingService {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
 
+    // Catálogo lido uma vez por extração: a instância é compartilhada entre organizações.
+    let segmentTypes: Promise<ReadonlyMap<string, unknown>> | undefined;
+    const loadSegmentTypes = () => {
+      segmentTypes ??= this.loadSegmentTypes(input.organizationId);
+      return segmentTypes;
+    };
     const loadPage = (fields: readonly string[], limit: number, cursor?: string) =>
-      this.loadPage(input.organizationId, input.source, fields, limit, cursor);
+      this.loadPage(input.organizationId, input.source, fields, limit, loadSegmentTypes, cursor);
     if (input.query) {
       return executeReportingQuery({ ...input, query: input.query }, { loadPage });
     }
@@ -248,6 +264,7 @@ export class RegularizePortfolioReportingService {
     source: RegularizePortfolioReportingSource,
     fields: readonly string[],
     limit: number,
+    loadSegmentTypes: () => Promise<ReadonlyMap<string, unknown>>,
     cursor?: string,
   ): Promise<ReportingPage> {
     const columns = new Set(fields.filter((field) => !PORTFOLIO_DERIVED_FIELDS.has(field)));
@@ -281,9 +298,7 @@ export class RegularizePortfolioReportingService {
     const page = found.slice(0, limit);
     const clients = page.map((row) => (grouped ? row.client : row) as Record<string, unknown>);
 
-    const segmentTypes = fields.includes("segment_type")
-      ? await this.loadSegmentTypes(organizationId)
-      : undefined;
+    const segmentTypes = fields.includes("segment_type") ? await loadSegmentTypes() : undefined;
     const withPasswords = fields.includes("has_passwords")
       ? new Set(
           (
@@ -308,10 +323,19 @@ export class RegularizePortfolioReportingService {
         has_passwords: withPasswords?.has(client.id),
         segment_type:
           segmentTypes?.get(String(client.segment ?? "").toLocaleLowerCase("pt-BR")) ?? null,
-        status: REGULARIZE_PORTFOLIO_LEGACY_STATUS[String(client.status)] ?? client.status,
+        status: Object.keys(REGULARIZE_PORTFOLIO_LEGACY_STATUS).includes(String(client.status))
+          ? REGULARIZE_PORTFOLIO_LEGACY_STATUS[String(client.status)]
+          : client.status,
       };
       return Object.fromEntries(
-        fields.map((field) => [field, field in derived ? derived[field] : client[field]]),
+        fields.map((field) => [
+          field,
+          field in derived
+            ? derived[field]
+            : PORTFOLIO_DEPARTMENT_FLAGS.has(field)
+              ? client[field] === true
+              : client[field],
+        ]),
       );
     });
     const lastId = page[page.length - 1]?.id;
@@ -325,7 +349,7 @@ export class RegularizePortfolioReportingService {
 
   // O cliente guarda o nome do segmento; o tipo vem do catálogo, sem diferenciar maiúsculas.
   private loadSegmentTypes(organizationId: string): Promise<ReadonlyMap<string, unknown>> {
-    this.segmentTypes ??= this.prisma.clientSegment
+    return this.prisma.clientSegment
       .findMany({ where: { organization_id: organizationId }, select: { name: true, type: true } })
       .then(
         (segments) =>
@@ -336,6 +360,5 @@ export class RegularizePortfolioReportingService {
             ]),
           ),
       );
-    return this.segmentTypes;
   }
 }

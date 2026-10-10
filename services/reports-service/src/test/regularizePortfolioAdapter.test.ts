@@ -1,6 +1,8 @@
 import { regularizePortfolioReportingCatalog } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
+import { SourceCatalogService } from "../catalog/sourceCatalogService.js";
+import { ClientIntegrationAdapter } from "../integrations/clientIntegrationAdapter.js";
 import { RegularizePortfolioAdapter } from "../integrations/regularizePortfolioAdapter.js";
 
 describe("RegularizePortfolioAdapter", () => {
@@ -81,6 +83,27 @@ describe("RegularizePortfolioAdapter", () => {
       fields: ["group_name", "status"],
       limit: 102,
     });
+  });
+
+  it("separa a carteira do Regularize das fontes de Integração no catálogo autorizado", () => {
+    const env = {
+      regularizeServiceUrl: "http://regularize.test",
+      regularizeReportingToken: "token",
+      regularizeReportingGrantSecret: "secret",
+      clientServiceUrl: "http://client.test",
+      reportsInternalToken: "token",
+      reportsGrantSecret: "secret",
+      sourceTimeoutMs: 100,
+    };
+    const catalog = new SourceCatalogService([
+      new ClientIntegrationAdapter(env),
+      new RegularizePortfolioAdapter(env),
+    ]);
+    const keys = (modules: Record<string, number>) =>
+      catalog.getAuthorizedCatalog({ modules } as never).sources.map((source) => source.key);
+
+    expect(keys({ regularize: 1 })).toEqual(["regularize.clients", "regularize.client_groups"]);
+    expect(keys({ integracao: 3 })).toEqual(["integracao.clients", "integracao.client_groups"]);
   });
 
   it("converte resposta upstream inválida em erro seguro", async () => {
