@@ -340,7 +340,7 @@ describe("RegularizePortfolioReportingService", () => {
       ]);
     });
 
-    it("aplica a mesma regra aos clientes dentro dos grupos e ignora espaços no segmento", async () => {
+    it("aplica a mesma regra nos grupos e casa o segmento como o cadastro: sem acento nem espaço sobrando", async () => {
       const members = vi.fn().mockResolvedValue([
         {
           id: "m1",
@@ -349,7 +349,7 @@ describe("RegularizePortfolioReportingService", () => {
             id: "c1",
             status: "Ativo",
             state: "BA",
-            segment: " padaria ",
+            segment: "  comercio   varejista ",
             state_registration: "1",
           },
         },
@@ -369,7 +369,9 @@ describe("RegularizePortfolioReportingService", () => {
         prismaWith({
           clientsGroup: { findMany: members },
           clientSegment: {
-            findMany: vi.fn().mockResolvedValue([{ name: "Padaria ", type: "comercio" }]),
+            findMany: vi
+              .fn()
+              .mockResolvedValue([{ name: "Comércio Varejista ", type: "comercio" }]),
           },
         }),
       );

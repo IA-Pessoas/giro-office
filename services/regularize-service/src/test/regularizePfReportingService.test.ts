@@ -104,7 +104,7 @@ describe("RegularizePortfolioReportingService — PF e sócios", () => {
         entry: new Date("2019-05-01T00:00:00Z"),
         exit: new Date("2024-02-01T00:00:00Z"),
         clientPF: { name: "Davi", cpf: "22222222222", sex: "M" },
-        clientPJ: { name: "Beta", company_name: null, cpf_cnpj: "2", status: "Ativo" },
+        clientPJ: { name: "Beta", company_name: "", cpf_cnpj: "2", status: "Ativo" },
       },
     ]);
     const service = new RegularizePortfolioReportingService(
