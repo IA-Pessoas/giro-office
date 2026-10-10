@@ -2051,6 +2051,7 @@ export function createReportingService(
           clients: input.prisma.client,
           clouds: input.prisma.clientCloud,
           monthly: input.prisma.triageMonthly,
+          responsibles: input.prisma.responsibleContabil,
         },
         { ...input, source: input.source },
       );

@@ -51,7 +51,7 @@ describe("createWorkerSourceCatalog", () => {
     const scope = (modules: Record<string, number>) => ({
       organization_id: "10000000-0000-0000-0000-000000000001",
       modules,
-      grant: { sources: { [source]: ["legal_name"] }, relations: [] },
+      grant: { sources: { [source]: ["company_name"] }, relations: [] },
     });
 
     expect(catalog.findAdapterForSources([source], scope({ triagem: 1 }))).toBeDefined();

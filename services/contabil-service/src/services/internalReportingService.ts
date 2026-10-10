@@ -60,6 +60,7 @@ export class InternalReportingService {
           clients: this.prisma.client,
           clouds: this.prisma.clientClouds,
           monthly: this.prisma.triageMonthly,
+          responsibles: this.prisma.responsibleContabil,
         },
         { ...input, source: input.source },
       );

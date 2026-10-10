@@ -21,14 +21,17 @@ function field(
   };
 }
 
-// Mesmos campos de cliente e de serviço contratado nas duas áreas: o filtro vale igual em ambas.
+// Mesmos campos de cliente, serviço contratado e movimento nas duas áreas: o filtro vale
+// igual em ambas.
 const clientFields = [
-  field("legal_name", "Razão social", "string", stringOperators),
-  field("trade_name", "Nome fantasia", "string", stringOperators),
+  field("name", "Nome", "string", stringOperators),
+  field("company_name", "Razão social", "string", stringOperators),
   field("cpf_cnpj", "CPF/CNPJ", "string", stringOperators),
-  field("entry_date", "Data de entrada", "date", dateOperators),
+  field("status", "Status do cliente", "string", stringOperators),
+  field("competence_entry", "Data de entrada", "date", dateOperators),
   field("contabil", "Serviço Contábil", "boolean", booleanOperators),
   field("fiscal", "Serviço Fiscal", "boolean", booleanOperators),
+  field("customer_with_movement", "Cliente com movimento", "boolean", booleanOperators),
 ] as const;
 
 export const CONTABIL_TRIAGE_REPORTING_SOURCES = [
@@ -41,25 +44,25 @@ export const contabilTriageReportingCatalog = {
   sources: [
     {
       key: "contabil.triage_clouds",
-      label: "Clouds dos clientes",
+      label: "Clouds e movimentação dos clientes",
       module: "triagem",
       minimum_permission: 1,
       keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
       fields: [
-        field("type", "Tipo de Cloud", "string", stringOperators),
-        field("link", "Link da Cloud", "string", stringOperators),
         ...clientFields,
+        field("cloud_types", "Tipos de Cloud", "string", stringOperators),
+        field("clouds", "Clouds (tipo e link)", "string", stringOperators),
       ],
     },
     {
       key: "contabil.triage_movement",
-      label: "Movimento Contábil da Triagem",
+      label: "Movimento Contábil por competência",
       module: "triagem",
       minimum_permission: 1,
       keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
       fields: [
         field("competence", "Competência", "string", stringOperators),
-        field("sends_movement", "Envia movimento", "boolean", booleanOperators),
+        field("sends_movement", "Movimento enviado", "boolean", booleanOperators),
         ...clientFields,
       ],
     },

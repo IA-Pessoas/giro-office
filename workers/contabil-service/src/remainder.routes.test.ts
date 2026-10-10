@@ -790,6 +790,7 @@ describe("contabil Worker remainder routes", () => {
           .fn()
           .mockResolvedValue([{ id: CLIENT, name: "Alfa", company_name: "Alfa Ltda" }]),
       },
+      responsibleContabil: { findMany: vi.fn() },
       $transaction: vi.fn(),
     };
     prisma.$transaction.mockImplementation(
@@ -797,7 +798,7 @@ describe("contabil Worker remainder routes", () => {
     );
     const body = {
       source: "contabil.triage_movement",
-      fields: ["legal_name", "competence"],
+      fields: ["company_name", "competence"],
       limit: 10,
       query: {
         filters: [
@@ -812,7 +813,7 @@ describe("contabil Worker remainder routes", () => {
       headers: {
         ...(await signedReportingHeaders(body, "extract", {
           source: body.source,
-          fields: ["legal_name", "competence", "sends_movement"],
+          fields: ["company_name", "competence", "sends_movement"],
         })),
         "content-type": "application/json",
       },
@@ -821,7 +822,7 @@ describe("contabil Worker remainder routes", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      data: { rows: [{ legal_name: "Alfa Ltda", competence: "2026-09" }], reachedLimit: false },
+      data: { rows: [{ company_name: "Alfa Ltda", competence: "2026-09" }], reachedLimit: false },
     });
     expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
