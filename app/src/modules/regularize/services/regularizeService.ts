@@ -28,6 +28,10 @@ import type {
   RegularizeDteNoticeListFilters,
   RegularizeDteNoticeReadingPayload,
   RegularizeDteNoticesPage,
+  RegularizeDteQueryGrid,
+  RegularizeDteQueryListsPayload,
+  RegularizeDteQueryListsResult,
+  RegularizeDteQueryStatusPayload,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
@@ -333,6 +337,31 @@ export const regularizeService = {
     const response = await api.put(REGULARIZE_ENDPOINTS.dteNoticeReading, payload);
 
     return unwrapRegularizeEnvelope<RegularizeDteNotice>(response.data);
+  },
+
+  async getDteQueryGrid(date: string): Promise<RegularizeDteQueryGrid> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dteQueries, { params: { date } });
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryGrid>(response.data);
+  },
+
+  async setDteQueryStatus(
+    payload: RegularizeDteQueryStatusPayload,
+  ): Promise<RegularizeDteQueryStatusPayload> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.dteQueryStatus, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryStatusPayload>(response.data);
+  },
+
+  async importDteQueryLists(
+    payload: RegularizeDteQueryListsPayload,
+  ): Promise<RegularizeDteQueryListsResult> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.dteQueryImport, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryListsResult>(response.data);
   },
 
   async createMunicipalTax(

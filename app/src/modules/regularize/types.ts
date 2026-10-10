@@ -731,6 +731,44 @@ export type RegularizeDteNoticeReadingPayload = {
   pending_reading: boolean;
 };
 
+export const REGULARIZE_DTE_QUERY_STATUSES = ["feita", "nao_feita", "sem_registro"] as const;
+export type RegularizeDteQueryStatus = (typeof REGULARIZE_DTE_QUERY_STATUSES)[number];
+
+export type RegularizeDteQueryGridRow = {
+  client_id: RegularizeId;
+  name: string;
+  fantasy_name: string | null;
+  cpf_cnpj: string | null;
+  status: RegularizeDteQueryStatus;
+};
+
+export type RegularizeDteQueryGrid = {
+  date: string;
+  rows: RegularizeDteQueryGridRow[];
+  totals: Record<RegularizeDteQueryStatus, number>;
+};
+
+// date no formato do <input type="date"> (aaaa-mm-dd).
+export type RegularizeDteQueryStatusPayload = {
+  client_id: RegularizeId;
+  date: string;
+  status: RegularizeDteQueryStatus;
+};
+
+export type RegularizeDteQueryListsPayload = {
+  date: string;
+  done: string;
+  not_done: string;
+};
+
+export type RegularizeDteQueryListsResult = {
+  date: string;
+  done: number;
+  not_done: number;
+  conflicts: string[];
+  unknown: string[];
+};
+
 export type RegularizeDteImportsPage = {
   data: RegularizeDteImport[];
   total: number;

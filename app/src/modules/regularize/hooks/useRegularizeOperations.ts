@@ -26,6 +26,10 @@ import type {
   RegularizeDteNoticeListFilters,
   RegularizeDteNoticeReadingPayload,
   RegularizeDteNoticesPage,
+  RegularizeDteQueryGrid,
+  RegularizeDteQueryListsPayload,
+  RegularizeDteQueryListsResult,
+  RegularizeDteQueryStatusPayload,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
@@ -129,6 +133,44 @@ export function useSetRegularizeDteNoticeReadingMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.setDteNoticeReading(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useRegularizeDteQueryGrid(
+  date: string,
+): UseQueryResult<RegularizeDteQueryGrid, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(
+    regularizeQueryKeys.dteQueryGrid(date, scope),
+    () => regularizeService.getDteQueryGrid(date),
+    { enabled: Boolean(date), placeholderData: keepPreviousData },
+  );
+}
+
+export function useSetRegularizeDteQueryStatusMutation(): UseMutationResult<
+  RegularizeDteQueryStatusPayload,
+  Error,
+  RegularizeDteQueryStatusPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.setDteQueryStatus(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useImportRegularizeDteQueryListsMutation(): UseMutationResult<
+  RegularizeDteQueryListsResult,
+  Error,
+  RegularizeDteQueryListsPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.importDteQueryLists(payload),
     onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }
