@@ -4,6 +4,8 @@ import {
   type ContabilTriageReportingSource,
   normalizeTriageDocumentStatus,
   TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
+  TRIAGE_DOCUMENT_STATUS_LABELS,
+  TRIAGE_FISCAL_SPECIAL_FIELDS,
   type TriageDocumentStatus,
 } from "@workspace/shared";
 
@@ -20,6 +22,8 @@ export type TriageReportingPrisma = {
   monthly: TriageReportingDelegate;
   responsibles: TriageReportingDelegate;
   assignments: TriageReportingDelegate;
+  configs: TriageReportingDelegate;
+  catalogItems: TriageReportingDelegate;
   competences: TriageReportingDelegate;
   users: TriageReportingDelegate;
 };
@@ -47,7 +51,7 @@ type RowSource = {
   /** Colunas lidas a mais para descobrir o responsável da linha. */
   responsibleColumns?: readonly string[];
   /** Campos calculados a partir de uma coluna da linha. */
-  derived?: { column: string; fields: readonly string[]; values(raw: unknown): Row };
+  derived?: { columns: readonly string[]; fields: readonly string[]; values(row: Row): Row };
 };
 type RowSourceKey = Exclude<ContabilTriageReportingSource, "contabil.triage_sgq">;
 // Nenhuma área esconde cliente inativado (`deletion_date` é a data da inativação): status e
@@ -78,19 +82,51 @@ const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
     columns: { competence: "competence" },
     responsibleColumns: ["responsible_id", "competence", "type"],
     derived: {
-      column: "checklist",
+      columns: ["checklist"],
       fields: ["completion_percent", "completed_items", "applicable_items"],
-      values: accountingMetric,
+      values: (row) => accountingMetric(row.checklist),
+    },
+  },
+  "contabil.triage_fiscal_special_documents": {
+    delegate: "monthly",
+    where: { type: "FISCAL", archived_at: null },
+    columns: { competence: "competence", billing_amount: "billing_amount" },
+    responsibleColumns: ["responsible_id", "competence", "type"],
+    derived: {
+      columns: ["checklist", "item_notes", "billing_amount"],
+      fields: [...TRIAGE_FISCAL_SPECIAL_FIELDS, "billing_status"],
+      values: fiscalSpecialDocuments,
     },
   },
 };
 
-function accountingStatuses(checklist: unknown): TriageDocumentStatus[] {
-  const items = checklist && typeof checklist === "object" ? (checklist as Row) : {};
-  // Item ausente do checklist não fazia parte do movimento, como na tela da rotina.
-  return TRIAGE_ACCOUNTING_CHECKLIST_FIELDS.map(
-    (field) => normalizeTriageDocumentStatus(items[field]) ?? "NOT_APPLICABLE",
-  );
+/** Estado de cada item pedido; item ausente do checklist não fazia parte da rotina. */
+function checklistStatuses(checklist: unknown, fields: readonly string[]): TriageDocumentStatus[] {
+  const items = jsonObject(checklist);
+  return fields.map((field) => normalizeTriageDocumentStatus(items[field]) ?? "NOT_APPLICABLE");
+}
+
+function jsonObject(value: unknown): Row {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Row) : {};
+}
+
+/**
+ * Documentos fiscais especiais da rotina: o estado de cada um no checklist canônico e a
+ * situação do faturamento, que é valor e não item (só sai da rotina com `required: false`).
+ */
+function fiscalSpecialDocuments(row: Row): Row {
+  const statuses = checklistStatuses(row.checklist, TRIAGE_FISCAL_SPECIAL_FIELDS);
+  const billingOff = jsonObject(jsonObject(row.item_notes).billing_amount).required === false;
+  const billed = typeof row.billing_amount === "string" && row.billing_amount.trim() !== "";
+  return {
+    ...Object.fromEntries(
+      TRIAGE_FISCAL_SPECIAL_FIELDS.map((field, index) => [
+        field,
+        TRIAGE_DOCUMENT_STATUS_LABELS[statuses[index]],
+      ]),
+    ),
+    billing_status: billingOff ? "Não aplicável" : billed ? "Informado" : "Pendente",
+  };
 }
 
 /**
@@ -99,7 +135,7 @@ function accountingStatuses(checklist: unknown): TriageDocumentStatus[] {
  * percentual.
  */
 function accountingMetric(checklist: unknown): Row {
-  const statuses = accountingStatuses(checklist);
+  const statuses = checklistStatuses(checklist, TRIAGE_ACCOUNTING_CHECKLIST_FIELDS);
   const applicable = statuses.filter(
     (status) => status !== "NOT_PRESENT" && status !== "NOT_APPLICABLE",
   ).length;
@@ -194,7 +230,7 @@ async function extractSgqPage(
   const movement = new Map(
     monthly.map((row) => [
       `${row.client_id}|${row.competence}`,
-      accountingStatuses(row.checklist)[movementIndex],
+      checklistStatuses(row.checklist, TRIAGE_ACCOUNTING_CHECKLIST_FIELDS)[movementIndex],
     ]),
   );
   const time = (value: unknown) => (value == null ? null : new Date(value as string).getTime());
@@ -309,7 +345,7 @@ export async function extractTriageReportingPage(
                 .filter(wanted)
                 .map((field) => base.columns[field]),
               ...(wantsResponsible ? (base.responsibleColumns ?? []) : []),
-              ...(derived ? [derived.column] : []),
+              ...(derived?.columns ?? []),
             ].map((column) => [column, true]),
           ),
         },
@@ -331,7 +367,7 @@ export async function extractTriageReportingPage(
   // Só a rotina mensal sem responsável próprio herda da competência ou da atribuição.
   const inherits =
     wantsResponsible && rows.some((row) => "responsible_id" in row && !row.responsible_id);
-  const [clients, clouds, responsibles, snapshots, assignments] = await Promise.all([
+  const [clients, clouds, responsibles, snapshots, assignments, configs] = await Promise.all([
     clientIsRow
       ? rows
       : rows.length && clientColumns.some(wanted)
@@ -356,6 +392,13 @@ export async function extractTriageReportingPage(
     related(prisma.assignments, inherits, {
       select: { client_id: true, type: true, user_id: true },
     }),
+    // Meio de envio é da configuração Fiscal do cliente.
+    related(
+      prisma.configs,
+      wanted("delivery_method"),
+      { select: { client_id: true, delivery_method: true } },
+      { type: "FISCAL" },
+    ),
   ]);
   const responsibleIdOf = (row: Row) =>
     row.user_id ?? row.responsible_id ?? inheritedResponsible(snapshots, assignments, row);
@@ -372,18 +415,36 @@ export async function extractTriageReportingPage(
   const clientById = new Map(clients.map((client) => [String(client.id), client]));
   const cloudsByClient = byClient(clouds);
   const responsiblesByClient = byClient(responsibles);
+  const configByClient = byClient(configs);
+  // A configuração guarda o código do catálogo; relatório mostra o rótulo, como a tela.
+  const deliveryCodes = [
+    ...new Set(configs.map((config) => config.delivery_method).filter((code) => code != null)),
+  ];
+  const deliveryLabels = new Map(
+    (deliveryCodes.length
+      ? await prisma.catalogItems.findMany({
+          where: { ...organization, kind: "DELIVERY_METHOD", code: { in: deliveryCodes } },
+          select: { code: true, label: true },
+        })
+      : []
+    ).map((item) => [item.code, item.label]),
+  );
 
   return {
     rows: rows.map((row) => {
       const clientId = clientIdOf(row);
       const client = clientIsRow ? row : (clientById.get(clientId) ?? {});
       const clientClouds = cloudsByClient.get(clientId) ?? [];
-      const derivedValues = derived?.values(row[derived.column]) ?? {};
+      const derivedValues = derived?.values(row) ?? {};
       const value = (field: string): unknown => {
         if (field in derivedValues) return derivedValues[field];
         if (field in base.columns) {
           const column = row[base.columns[field]];
           return field === "type" ? (serviceLabels[String(column)] ?? column) : column;
+        }
+        if (field === "delivery_method") {
+          const code = configByClient.get(clientId)?.[0]?.delivery_method ?? null;
+          return deliveryLabels.get(code) ?? code;
         }
         if (field === "responsible_name") return userNames.get(responsibleIdOf(row)) ?? null;
         if (clientFlags.has(field)) return client[field] === true;

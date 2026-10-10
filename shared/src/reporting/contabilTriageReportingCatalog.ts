@@ -46,6 +46,7 @@ export const CONTABIL_TRIAGE_REPORTING_SOURCES = [
   "contabil.triage_competence_responsibles",
   "contabil.triage_accounting_metric",
   "contabil.triage_sgq",
+  "contabil.triage_fiscal_special_documents",
 ] as const;
 export type ContabilTriageReportingSource = (typeof CONTABIL_TRIAGE_REPORTING_SOURCES)[number];
 
@@ -127,6 +128,29 @@ export const contabilTriageReportingCatalog = {
         field("not_triaged", "Clientes não triado", "number", numberOperators),
         field("triaged", "Clientes triado", "number", numberOperators),
         field("eligible_clients", "Clientes na carteira", "number", numberOperators),
+      ],
+    },
+    {
+      key: "contabil.triage_fiscal_special_documents",
+      label: "Documentos fiscais especiais por competência",
+      module: "triagem",
+      minimum_permission: 1,
+      keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
+      fields: [
+        field("competence", "Competência", "string", competenceOperators),
+        // Uma coluna por documento especial, com o estado dele no checklist Fiscal.
+        field("nfce_documents", "Documentos NFCe", "string", stringOperators),
+        field("sped_fiscal", "SPED Fiscal", "string", stringOperators),
+        field("sped_contributions", "SPED Contribuições", "string", stringOperators),
+        field("nfse_received", "NFSe recebidos", "string", stringOperators),
+        field("model_21_invoice", "Nota fiscal modelo 21", "string", stringOperators),
+        field("cte_as_issuer", "CTe como emitente", "string", stringOperators),
+        field("services_provided_as_mei", "Serviços prestados como MEI", "string", stringOperators),
+        field("billing_status", "Situação do faturamento", "string", stringOperators),
+        field("billing_amount", "Faturamento", "string", stringOperators),
+        field("delivery_method", "Meio de envio", "string", stringOperators),
+        field("responsible_name", "Responsável", "string", stringOperators),
+        ...clientFields,
       ],
     },
   ],

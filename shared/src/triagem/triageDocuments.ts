@@ -10,6 +10,16 @@ export const TRIAGE_DOCUMENT_STATUSES = [
 
 export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
 
+/** Rótulo de cada estado fora da tela (relatórios e exportações); o app tem os seus. */
+export const TRIAGE_DOCUMENT_STATUS_LABELS: Readonly<Record<TriageDocumentStatus, string>> = {
+  PENDING: "Pendente",
+  COMPLETED: "Concluído",
+  ATTENTION: "Atenção",
+  UNDER_REVIEW: "Em revisão",
+  NOT_PRESENT: "Não possui",
+  NOT_APPLICABLE: "Não aplicável",
+};
+
 /**
  * Status que ainda pendem: PENDING aguarda o documento; ATTENTION e UNDER_REVIEW aguardam
  * conferência. NOT_PRESENT e NOT_APPLICABLE não pendem.

@@ -30,6 +30,8 @@ export class InternalReportingService {
       triageMonthly: ReportingDelegate;
       triageResponsible: ReportingDelegate;
       triageCompetence: ReportingDelegate;
+      triageConfig: ReportingDelegate;
+      triageCatalogItem: ReportingDelegate;
       user: ReportingDelegate;
     },
     private readonly inSnapshot = false,
@@ -66,6 +68,8 @@ export class InternalReportingService {
           responsibles: this.prisma.responsibleContabil,
           assignments: this.prisma.triageResponsible,
           competences: this.prisma.triageCompetence,
+          configs: this.prisma.triageConfig,
+          catalogItems: this.prisma.triageCatalogItem,
           users: this.prisma.user,
         },
         { ...input, source: input.source },
