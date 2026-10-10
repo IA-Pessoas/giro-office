@@ -382,6 +382,17 @@ const DTE_STATUSES: readonly unknown[] = [
   REGULARIZE_PORTFOLIO_LEGACY_STATUS.P,
 ];
 
+// Mesma comparação que o cadastro usa entre a ficha e o catálogo (normalizeCatalogName em
+// workers/client-service/src/clientService.ts): sem acento, sem caixa e com espaços colapsados.
+function catalogNameKey(name: unknown): string {
+  return String(name ?? "")
+    .trim()
+    .replace(/\s+/gu, " ")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
 function blank(value: unknown): boolean {
   return String(value ?? "").trim() === "";
 }
@@ -572,12 +583,7 @@ export class RegularizePortfolioReportingService {
     const rows = page.map((row, index) => {
       const client = clients[index] ?? {};
       const group = (row.group ?? {}) as { name?: unknown; status?: unknown };
-      const segmentType =
-        segmentTypes?.get(
-          String(client.segment ?? "")
-            .trim()
-            .toLocaleLowerCase("pt-BR"),
-        ) ?? null;
+      const segmentType = segmentTypes?.get(catalogNameKey(client.segment)) ?? null;
       const derived: Record<string, unknown> = {
         group_name: group.name,
         group_active: group.status,
@@ -678,7 +684,7 @@ export class RegularizePortfolioReportingService {
         partner_name: pf.name,
         partner_cpf: pf.cpf,
         partner_sex: pf.sex,
-        company_name: company.company_name ?? company.name,
+        company_name: clientName(company),
         company_cpf_cnpj: company.cpf_cnpj,
         company_status: portfolioStatus(company.status),
         entry: partnership.entry,
@@ -691,18 +697,13 @@ export class RegularizePortfolioReportingService {
     return portfolioPage(found, limit, rows);
   }
 
-  // O cliente guarda o nome do segmento; o tipo vem do catálogo, sem diferenciar maiúsculas.
+  // O cliente guarda o nome do segmento; o tipo vem do catálogo.
   private loadSegmentTypes(organizationId: string): Promise<ReadonlyMap<string, unknown>> {
     return this.prisma.clientSegment
       .findMany({ where: { organization_id: organizationId }, select: { name: true, type: true } })
       .then(
         (segments) =>
-          new Map(
-            segments.map((segment) => [
-              String(segment.name).trim().toLocaleLowerCase("pt-BR"),
-              segment.type,
-            ]),
-          ),
+          new Map(segments.map((segment) => [catalogNameKey(segment.name), segment.type])),
       );
   }
 }
