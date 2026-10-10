@@ -1143,6 +1143,8 @@ runTest("password vault offers Empregador Web and portal shortcuts carry no cred
   assert.doesNotMatch(section, /pessoalPasswordPortalUrl\(detail/);
   assert.match(section, /href=\{portalUrl\}\s+target="_blank"\s+rel="noopener noreferrer"/);
   assert.doesNotMatch(section, /href=\{[^}]*(login_|senha_)/);
+});
+
 runTest("payroll sheet lists the legacy fields and keeps empty ones readable", () => {
   const payroll = {
     id: "payroll-1",

@@ -39,15 +39,19 @@ const normalize = (value: string) =>
     .trim()
     .toLowerCase();
 
-/** Nomes da tela antiga e variações comuns de digitação, já normalizados. */
-const PORTAL_ALIASES: Record<string, PessoalPasswordServiceOption> = {
-  esocial: "Portal eSocial",
-  "codigos de acesso gov": "Gov.br",
-  "codigo de acesso gov": "Gov.br",
-  "bem+": "Bem Mais",
-  "bem+(mais)": "Bem Mais",
-  "beneficio social familiar": "BSF",
-};
+/** Nomes da tela antiga e variações comuns de digitação; a comparação é normalizada. */
+const PORTAL_ALIASES = new Map<string, PessoalPasswordServiceOption>(
+  (
+    [
+      ["eSocial", "Portal eSocial"],
+      ["Códigos de Acesso Gov", "Gov.br"],
+      ["Código de Acesso Gov", "Gov.br"],
+      ["Bem+", "Bem Mais"],
+      ["Bem+(Mais)", "Bem Mais"],
+      ["Benefício Social Familiar", "BSF"],
+    ] as const
+  ).map(([alias, service]) => [normalize(alias), service]),
+);
 
 /**
  * Atalho do portal pelo nome do serviço, sem diferenciar caixa, acento ou espaço nas pontas.
@@ -57,6 +61,6 @@ export function pessoalPasswordPortalUrl(serviceName: string): string | null {
   const wanted = normalize(serviceName);
   const service =
     PESSOAL_PASSWORD_SERVICE_OPTIONS.find((option) => normalize(option) === wanted) ??
-    PORTAL_ALIASES[wanted];
+    PORTAL_ALIASES.get(wanted);
   return service ? (PESSOAL_PASSWORD_PORTALS[service] ?? null) : null;
 }
