@@ -33,6 +33,22 @@ import {
   obligationItemState,
   obligationItemValue,
 } from "./utils/obligationPortfolio.ts";
+import {
+  buildLddImportDraftRows,
+  buildLddImportRows,
+  editLddImportDraftRow,
+  lddImportDraftRowErrors,
+  lddImportDraftTotal,
+  summarizeLddImportByKey,
+  validateLddPdfFile,
+} from "./utils/lddImportPreview.ts";
+import { buildLddSheet } from "./utils/lddSheet.ts";
+import {
+  PESSOAL_PASSWORD_PORTALS,
+  PESSOAL_PASSWORD_SERVICE_OPTIONS,
+  pessoalPasswordPortalUrl,
+} from "./utils/passwordPortals.ts";
+import { buildPayrollSheetRows, sortSituationsForSheet } from "./utils/payrollSheet.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
   cancelUnionDeletion,
@@ -55,6 +71,8 @@ function runTest(name, fn) {
 runTest("pessoal endpoints match the gateway public contract", () => {
   assert.equal(PESSOAL_ENDPOINTS.ldd, "/pessoal/ldd");
   assert.equal(PESSOAL_ENDPOINTS.lddDetail("ldd-1"), "/pessoal/ldd/ldd-1");
+  assert.equal(PESSOAL_ENDPOINTS.lddImportPreview, "/pessoal/ldd/import/preview");
+  assert.equal(PESSOAL_ENDPOINTS.lddImport, "/pessoal/ldd/import");
   assert.equal(PESSOAL_ENDPOINTS.overview, "/pessoal/overview");
   assert.equal(PESSOAL_ENDPOINTS.groups, "/pessoal/groups");
   assert.equal(PESSOAL_ENDPOINTS.groupDetail("group-1"), "/pessoal/groups/group-1");
@@ -723,9 +741,9 @@ runTest("pessoal shell wires access, active client selector, and functional tabs
   assert.match(shell, /useModuleAccess\("pessoal"\)/);
   assert.match(shell, /PessoalUnionsSection canEdit=\{access\.canEdit\}/);
   assert.match(shell, /PessoalGroupsSection canEdit=\{access\.canEdit\}/);
-  assert.match(shell, /PessoalPayrollSection selectedClientId=\{selectedClientId\}/);
+  assert.match(shell, /PessoalPayrollSection\s+selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalObligationsSection selectedClientId=\{selectedClientId\}/);
-  assert.match(shell, /PessoalTrackingSection selectedClientId=\{selectedClientId\}/);
+  assert.match(shell, /PessoalTrackingSection\s+selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalPasswordsSection[\s\S]*selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalPasswordsSection\s+key=\{selectedClientId\}/);
   assert.match(shell, /PessoalOverviewSection onSelectTab=\{setActiveTab\}/);
@@ -929,6 +947,282 @@ runTest("ficha edits refresh ficha, portfolio and history under one prefix", () 
     /useUpdatePessoalObligationMutation\([\s\S]*?invalidateQueries\(\{ queryKey: pessoalQueryKey\("obligations"\) \}\)/,
   );
   assert.match(hooks, /pessoalQueryKey\("obligations", "history"/);
+});
+
+runTest("LDD import preview keeps read errors until the row is edited", () => {
+  const rows = buildLddImportDraftRows({
+    file_name: "ldd.pdf",
+    file_hash: "a".repeat(64),
+    already_imported_at: null,
+    rows: [
+      {
+        line: 1,
+        source: "CP-SEGUR. 01/2024 20/02/2024 1.500,00 1.234,56",
+        period: "01/2024",
+        due_date: "2024-02-20",
+        balance_amount: 1234.56,
+        errors: [],
+      },
+      {
+        line: 2,
+        source: "CP-SEGUR. 13/2023 20/12/2023",
+        period: "13/2023",
+        due_date: "2023-12-20",
+        balance_amount: null,
+        errors: ["Valor não identificado na linha."],
+      },
+    ],
+  });
+
+  assert.deepEqual(rows[0], {
+    line: 1,
+    source: "CP-SEGUR. 01/2024 20/02/2024 1.500,00 1.234,56",
+    period: "01/2024",
+    due_date: "2024-02-20",
+    balance_amount: "R$ 1.234,56",
+    errors: [],
+  });
+  assert.deepEqual(rows[1].errors, ["Valor não identificado na linha."]);
+  assert.equal(lddImportDraftTotal(rows), 1234.56);
+
+  const fixed = editLddImportDraftRow(rows[1], "balance_amount", "0,10");
+  assert.deepEqual(fixed.errors, []);
+  assert.equal(
+    lddImportDraftTotal([rows[0], fixed, editLddImportDraftRow(fixed, "balance_amount", "0,20")]),
+    1234.86,
+  );
+  assert.deepEqual(editLddImportDraftRow(fixed, "balance_amount", "0,00").errors, [
+    "Informe um valor maior que zero.",
+  ]);
+  assert.deepEqual(
+    lddImportDraftRowErrors({ period: "14/2023", due_date: "2023-02-31", balance_amount: "" }),
+    [
+      "Informe a competência no formato MM/AAAA.",
+      "Informe um vencimento válido.",
+      "Informe um valor maior que zero.",
+    ],
+  );
+});
+
+runTest("LDD import shows existing balance and increase per key and sends only valid rows", () => {
+  const draft = (line, period, due_date, balance_amount, errors = []) => ({
+    line,
+    source: "",
+    period,
+    due_date,
+    balance_amount,
+    errors,
+  });
+  const rows = [
+    draft(1, "01/2024", "2024-02-20", "0,10"),
+    draft(2, "01/2024", "2024-02-20", "0,20"),
+    draft(3, "02/2024", "2024-03-20", "5,00"),
+    draft(4, "03/2024", "", "9,00", ["Informe um vencimento válido."]),
+  ];
+  const existing = [
+    { id: "b", type: "INSS", period: "01/2024", due_date: "2024-02-20T00:00:00.000Z", balance_amount: 7 },
+    { id: "a", type: "INSS", period: "01/2024", due_date: "2024-02-20T00:00:00.000Z", balance_amount: 100.1 },
+    // Débito migrado do legado (tipo 1) também é saldo previdenciário existente.
+    { id: "d", type: "1", period: "02/2024", due_date: "2024-03-20T00:00:00.000Z", balance_amount: 20 },
+    { id: "c", type: "FGTS", period: "02/2024", due_date: "2024-03-20T00:00:00.000Z", balance_amount: 50 },
+  ];
+
+  assert.deepEqual(buildLddImportRows(rows), [
+    { period: "01/2024", due_date: "2024-02-20", balance_amount: 0.1 },
+    { period: "01/2024", due_date: "2024-02-20", balance_amount: 0.2 },
+    { period: "02/2024", due_date: "2024-03-20", balance_amount: 5 },
+  ]);
+  assert.deepEqual(summarizeLddImportByKey(rows, existing), [
+    { period: "01/2024", due_date: "2024-02-20", existing: 100.1, increase: 0.3, total: 100.4 },
+    { period: "02/2024", due_date: "2024-03-20", existing: 20, increase: 5, total: 25 },
+  ]);
+});
+
+runTest("LDD import refuses non-PDF, empty and oversized files before upload", () => {
+  const pdf = { name: "ldd.PDF", type: "", size: 10 };
+  assert.equal(validateLddPdfFile(pdf), null);
+  assert.equal(validateLddPdfFile({ ...pdf, name: "ldd.xlsx" }), "Selecione um arquivo PDF.");
+  assert.equal(validateLddPdfFile({ ...pdf, size: 0 }), "O arquivo está vazio.");
+  assert.equal(
+    validateLddPdfFile({ ...pdf, size: 700 * 1024 + 1 }),
+    "O PDF excede o limite de 700 KB.",
+  );
+});
+
+runTest("LDD sheet separates previdenciário and PGFN with subtotals and total", () => {
+  const ldd = (id, type, due_date, balance_amount, extra = {}) => ({
+    id,
+    client_id: "client-1",
+    type,
+    period: null,
+    due_date,
+    balance_amount,
+    registration_status: null,
+    status: null,
+    ...extra,
+  });
+  const sheet = buildLddSheet([
+    ldd("1", "INSS", "2024-02-20T00:00:00.000Z", 0.1, { period: "01/2024" }),
+    // Registro migrado do legado: tipo 1 é previdenciário, tipo 0 é PGFN.
+    ldd("2", "1", "2024-03-20T00:00:00.000Z", 0.2, { period: "02/2024" }),
+    ldd("3", "INSS", null, null, { period: "03/2024" }),
+    ldd("4", "PGFN", null, 50, { registration_status: "12.3.45.678901-23", status: "Ativa" }),
+    ldd("5", "0", null, 25.5),
+    ldd("6", "FGTS", "2024-01-07T00:00:00.000Z", 10),
+  ]);
+
+  // Vencimento mais recente primeiro, como na ficha antiga; sem vencimento vai para o fim.
+  assert.deepEqual(
+    sheet.previdenciario.rows.map((row) => row.id),
+    ["2", "1", "3"],
+  );
+  assert.equal(sheet.previdenciario.subtotal, 0.3);
+  assert.deepEqual(
+    sheet.pgfn.rows.map((row) => row.id),
+    ["4", "5"],
+  );
+  assert.equal(sheet.pgfn.subtotal, 75.5);
+  // FGTS, IRRF e ISS não entram na ficha nem no total, como na ficha antiga.
+  assert.equal(sheet.excluded, 1);
+  assert.equal(sheet.total, 75.8);
+
+  const empty = buildLddSheet([]);
+  assert.deepEqual(
+    [empty.previdenciario.rows, empty.pgfn.rows, empty.excluded, empty.total],
+    [[], [], 0, 0],
+  );
+});
+
+runTest("LDD sheet prints without a competence filter and the manual form offers PGFN", () => {
+  const sheet = readFileSync(new URL("./components/PessoalLddSheet.tsx", import.meta.url), "utf8");
+  const tracking = readFileSync(
+    new URL("./components/PessoalTrackingSection.tsx", import.meta.url),
+    "utf8",
+  );
+  const styles = readFileSync(new URL("../../styles/global.css", import.meta.url), "utf8");
+
+  const shell = readFileSync(new URL("./components/PessoalPrintSheet.tsx", import.meta.url), "utf8");
+  assert.match(shell, /className="print-report/);
+  assert.match(shell, /printReport\(id\)/);
+  assert.match(sheet, /id="pessoal-ldd-sheet"/);
+  assert.doesNotMatch(sheet, /Competência/);
+  assert.match(tracking, /lddTypeOptions = \["INSS", "PGFN", "FGTS", "IRRF", "ISS"\]/);
+  assert.match(styles, /\.print-report \*/);
+  // PGFN manual: inscrição e situação são texto livre, como na ficha.
+  assert.match(tracking, /isPgfnDetail \? \(field\.name === "registration_status" \? "Inscrição" : "Situação"\)/);
+});
+
+runTest("password vault offers Empregador Web and portal shortcuts carry no credentials", () => {
+  assert.ok(PESSOAL_PASSWORD_SERVICE_OPTIONS.includes("Empregador Web"));
+  assert.equal(
+    pessoalPasswordPortalUrl("Empregador Web"),
+    "https://sd.mte.gov.br/sdweb/empregadorweb/index.jsf",
+  );
+  // Nome personalizado segue permitido e não ganha atalho.
+  assert.equal(pessoalPasswordPortalUrl("Portal do sindicato"), null);
+  assert.equal(pessoalPasswordPortalUrl("Onvio"), null);
+  // Caixa, acento, espaço e os nomes da tela antiga levam ao mesmo portal.
+  assert.equal(pessoalPasswordPortalUrl("  empregador web "), PESSOAL_PASSWORD_PORTALS["Empregador Web"]);
+  assert.equal(pessoalPasswordPortalUrl("eSocial"), PESSOAL_PASSWORD_PORTALS["Portal eSocial"]);
+  assert.equal(pessoalPasswordPortalUrl("Bem+(Mais)"), PESSOAL_PASSWORD_PORTALS["Bem Mais"]);
+  assert.equal(pessoalPasswordPortalUrl("Benefício Social Familiar"), PESSOAL_PASSWORD_PORTALS.BSF);
+  assert.equal(pessoalPasswordPortalUrl("Códigos de Acesso Gov"), PESSOAL_PASSWORD_PORTALS["Gov.br"]);
+
+  for (const [service, url] of Object.entries(PESSOAL_PASSWORD_PORTALS)) {
+    const parsed = new URL(url);
+    assert.equal(parsed.protocol, "https:", service);
+    assert.deepEqual([parsed.username, parsed.password, parsed.search, parsed.hash], ["", "", "", ""]);
+    assert.ok(PESSOAL_PASSWORD_SERVICE_OPTIONS.includes(service), service);
+  }
+
+  const section = readFileSync(
+    new URL("./components/PessoalPasswordsSection.tsx", import.meta.url),
+    "utf8",
+  );
+  // O atalho é o endereço fixo do catálogo: nada do acesso (login, senha) entra no href.
+  // O atalho sai do nome que já vem na lista: ver o link não abre o detalhe (leitura auditada).
+  assert.match(section, /const portalUrl = pessoalPasswordPortalUrl\(password\.service_name\);/);
+  assert.doesNotMatch(section, /pessoalPasswordPortalUrl\(detail/);
+  assert.match(section, /href=\{portalUrl\}\s+target="_blank"\s+rel="noopener noreferrer"/);
+  assert.doesNotMatch(section, /href=\{[^}]*(login_|senha_)/);
+});
+
+runTest("payroll sheet lists the legacy fields and keeps empty ones readable", () => {
+  const payroll = {
+    id: "payroll-1",
+    client_id: "client-1",
+    responsible_id: null,
+    advance: true,
+    advance_type: "Percentual",
+    advance_amount: 40,
+    info: "",
+    previous: false,
+    onvio: true,
+    group_id: "group-1",
+    group: { id: "group-1", name: "Mensal", archived_at: null },
+    vt: true,
+    vt_value: 220.5,
+    vt_type: null,
+    va: false,
+    assistance_fee: true,
+    union_id: "union-1",
+    bem_mais: false,
+    bsf: true,
+    reinf: false,
+    employees: 12,
+    contact: null,
+  };
+
+  assert.deepEqual(buildPayrollSheetRows(payroll, [{ id: "union-1", name: "Sindicato A" }]), [
+    ["Grupo", "Mensal"],
+    ["Adiantamento", "Sim - Percentual - 40,00"],
+    ["Prévia", "Não"],
+    ["Onvio", "Sim"],
+    ["Vale transporte", "Sim - 220,50"],
+    ["Vale alimentação", "Não"],
+    ["Taxa assistencial", "Sim"],
+    ["Bem Mais", "Não"],
+    ["BSF", "Sim"],
+    ["Quantidade de funcionários", "12"],
+    ["REINF", "Não"],
+    ["Sindicato", "Sindicato A"],
+    ["Contato", "Não informado"],
+  ]);
+
+  const bare = buildPayrollSheetRows(
+    { ...payroll, group: null, advance: false, vt: false, union_id: null },
+    [],
+  );
+  assert.deepEqual(
+    [bare[0], bare[1], bare[4], bare[11]],
+    [
+      ["Grupo", "Não informado"],
+      ["Adiantamento", "Não"],
+      ["Vale transporte", "Não"],
+      ["Sindicato", "Não informado"],
+    ],
+  );
+  // Sindicato fora da lista carregada não vira "undefined".
+  assert.deepEqual(buildPayrollSheetRows(payroll, [])[11], ["Sindicato", "Não informado"]);
+});
+
+runTest("payroll sheet orders situations by registration date and prints through the shared helper", () => {
+  const situation = (id, registration_date) => ({ id, registration_date });
+  assert.deepEqual(
+    sortSituationsForSheet([
+      situation("b", "2026-03-02T10:00:00.000Z"),
+      situation("a", "2026-01-15T10:00:00.000Z"),
+    ]).map((item) => item.id),
+    ["a", "b"],
+  );
+
+  const sheet = readFileSync(
+    new URL("./components/PessoalPayrollSheet.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(sheet, /<PessoalPrintSheet/);
+  assert.match(sheet, /id="pessoal-payroll-sheet"/);
+  assert.match(sheet, /usePessoalSituations\(clientId, open\)/);
 });
 
 console.log("pessoal contract tests passed");

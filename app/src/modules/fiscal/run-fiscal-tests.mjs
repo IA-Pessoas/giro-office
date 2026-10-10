@@ -479,7 +479,8 @@ await runTest("fiscal Domínio × SEFAZ conference reads files and shows partial
 });
 
 await runTest("fiscal XML selection parses requests, encodes the ZIP and shows ambiguous items", async () => {
-  const { fileToBase64, parseNoteRequests } = await import("./utils/xmlSelection.ts");
+  const { parseNoteRequests } = await import("./utils/xmlSelection.ts");
+  const { fileToBase64 } = await import("../../shared/utils/fileToBase64.ts");
   assert.deepEqual(parseNoteRequests(" 100\r\n\n11.222.333/0001-81;1;101, 2;7 \n"), [
     "100",
     "11.222.333/0001-81;1;101",

@@ -116,11 +116,19 @@ export function PessoalShell() {
       ) : activeTab === "unions" ? (
         <PessoalUnionsSection canEdit={access.canEdit} />
       ) : activeTab === "payroll" ? (
-        <PessoalPayrollSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
+        <PessoalPayrollSection
+          selectedClientId={selectedClientId}
+          selectedClient={selectedClient}
+          canEdit={access.canEdit}
+        />
       ) : activeTab === "obligations" ? (
         <PessoalObligationsSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : activeTab === "tracking" ? (
-        <PessoalTrackingSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
+        <PessoalTrackingSection
+          selectedClientId={selectedClientId}
+          selectedClient={selectedClient}
+          canEdit={access.canEdit}
+        />
       ) : activeTab === "passwords" ? (
         <PessoalPasswordsSection
           key={selectedClientId}

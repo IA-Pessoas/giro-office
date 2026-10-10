@@ -1,7 +1,21 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { CreateLddBody, ListLddQuery, UpdateLddBody } from "../schemas/ldd.schemas.js";
+import type {
+  ConfirmLddImportBody,
+  CreateLddBody,
+  ListLddQuery,
+  PreviewLddImportBody,
+  UpdateLddBody,
+} from "../schemas/ldd.schemas.js";
+import {
+  buildLddImportPreview,
+  confirmLddImport,
+  findLddImportDate,
+  LDD_IMPORT_AUDIT_REFERRING,
+  type LddImportPreview,
+  type LddImportResult,
+} from "./lddPdfImportService.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
 import {
   omitUndefined,
@@ -78,6 +92,62 @@ export class LddService {
       logError("Erro ao criar LDD de pessoal", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao criar LDD de pessoal.", err);
+    }
+  }
+
+  /** Lê o PDF LDD/INSS e devolve as linhas para revisão; não grava nem audita. */
+  async previewImport(
+    context: PessoalAuthContext,
+    body: PreviewLddImportBody,
+  ): Promise<LddImportPreview & { already_imported_at: Date | null }> {
+    requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
+    await this.ensureClient(context.organizationId, body.client_id);
+
+    const preview = buildLddImportPreview(body);
+    const already_imported_at = await findLddImportDate(this.prisma, {
+      organizationId: context.organizationId,
+      clientId: body.client_id,
+      fileHash: preview.file_hash,
+    });
+
+    return { ...preview, already_imported_at };
+  }
+
+  /** Grava as linhas revisadas; arquivo e saldos entram na mesma transação. */
+  async confirmImport(
+    context: PessoalAuthContext,
+    body: ConfirmLddImportBody,
+  ): Promise<LddImportResult> {
+    try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
+      const userId = requireUserId(context);
+      await this.ensureClient(context.organizationId, body.client_id);
+
+      const result = await this.prisma.$transaction((tx) => confirmLddImport(tx, context, body));
+
+      await this.auditService.recordChange({
+        requestId: context.requestId,
+        organizationId: context.organizationId,
+        userId,
+        permission: context.permission,
+        action: "Cadastro",
+        referring: LDD_IMPORT_AUDIT_REFERRING,
+        referringId: result.import_id,
+        // Só metadados: nome do arquivo e conteúdo do PDF ficam fora da auditoria.
+        changes: {
+          client_id: body.client_id,
+          rows_count: result.rows_count,
+          total_amount: result.total_amount,
+          ldd_ids: result.records.map((record) => record.id),
+        },
+        path: "/pessoal/ldd/import",
+      });
+
+      return result;
+    } catch (err: unknown) {
+      logError("Erro ao importar LDD de pessoal", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao importar LDD de pessoal.", err);
     }
   }
 

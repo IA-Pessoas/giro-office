@@ -456,6 +456,63 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     expectOk(await call("DELETE", `/pessoal/ldd/${id}`), "DELETE ldd");
   });
 
+  it("LDD: importa PDF somando por chave e recusa o reenvio do mesmo arquivo", async () => {
+    const lines = [
+      "CP-SEGUR. 03/2031 20/04/2031 10,00 0,10",
+      "CP-TERC. 03/2031 20/04/2031 10,00 0,20",
+    ];
+    const content = lines
+      .map((line, index) => `BT /F1 10 Tf 1 0 0 1 40 ${700 - index * 14} Tm (${line}) Tj ET`)
+      .join("\n");
+    // O comentário com o carimbo muda o hash a cada execução do smoke.
+    const pdf = [
+      "%PDF-1.4",
+      `% ${Date.now()}`,
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+      `4 0 obj << /Length ${content.length} >>\nstream\n${content}\nendstream endobj`,
+      "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      "trailer << /Root 1 0 R >>",
+    ].join("\n");
+    const preview = expectOk(
+      await call("POST", "/pessoal/ldd/import/preview", {
+        client_id: clientId,
+        file_name: "ldd.pdf",
+        content_base64: Buffer.from(pdf, "latin1").toString("base64"),
+      }),
+      "POST preview",
+    ).data;
+    expect(preview.already_imported_at).toBeNull();
+    expect(preview.rows).toHaveLength(2);
+
+    const body = {
+      client_id: clientId,
+      file_name: preview.file_name,
+      file_hash: preview.file_hash,
+      rows: preview.rows.map(
+        (row: { period: string; due_date: string; balance_amount: number }) => ({
+          period: row.period,
+          due_date: row.due_date,
+          balance_amount: row.balance_amount,
+        }),
+      ),
+    };
+    const imported = expectOk(await call("POST", "/pessoal/ldd/import", body), "POST import").data;
+    expect(imported).toMatchObject({ rows_count: 2, total_amount: 0.3 });
+    expect(imported.records).toHaveLength(1);
+    const [record] = imported.records;
+
+    const replay = await call("POST", "/pessoal/ldd/import", body);
+    expect(replay.status).toBe(409);
+    const stored = expectOk(
+      await call("GET", `/pessoal/ldd?client_id=${clientId}`),
+      "GET ldd importado",
+    ).data.find((row: { id: string }) => row.id === record.id);
+    expect(stored).toMatchObject({ type: "INSS", period: "03/2031", balance_amount: 0.3 });
+    expectOk(await call("DELETE", `/pessoal/ldd/${record.id}`), "DELETE ldd importado");
+  });
+
   it("situações: cria, lê, lista, finaliza, reabre e remove", async () => {
     const state = requireSmokeState();
     const id = expectOk(

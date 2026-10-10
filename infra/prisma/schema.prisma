@@ -213,6 +213,7 @@ model Organization {
   permissionsProjects           PermissionProject[]
   permissionsSpecifics          PermissionSpecific[]
   lddPessoal                    LddPessoal[]
+  lddImportPessoal              LddImportPessoal[]
   obrigationsPessoal            ObrigationsPessoal[]
   passwordsPessoal              PasswordPessoal[]
   pessoalGroups                 PessoalGroup[]
@@ -813,6 +814,7 @@ model Client {
   installments                  Installment[]
   panoramasParcelameto          PanoramaParcelameto[]
   lddPessoal                    LddPessoal[]
+  lddImportPessoal              LddImportPessoal[]
   obrigationsPessoal            ObrigationsPessoal[]
   passPessoal                   PasswordPessoal[]
   situationsPessoal             SituationsPessoal[]
@@ -2343,6 +2345,24 @@ model LddPessoal {
   organization        Organization @relation(fields: [organization_id], references: [id])
 
   @@map("pessoal.ldd")
+}
+
+/// Arquivos LDD/INSS já importados: o hash impede somar o mesmo PDF duas vezes (#1769).
+model LddImportPessoal {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  file_hash       String
+  file_name       String
+  rows_count      Int
+  total_amount    Float
+  imported_by_id  String
+  created_at      DateTime     @default(now())
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id, file_hash], map: "uq_pessoal_ldd_imports_file")
+  @@map("pessoal.ldd_imports")
 }
 
 model PasswordPessoal {

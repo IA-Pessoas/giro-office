@@ -104,7 +104,8 @@ export function createPessoalApp({
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "pessoal-service")));
-  app.use(express.json());
+  // 1 MB, o mesmo teto do gateway: o PDF LDD chega em base64 no corpo JSON.
+  app.use(express.json({ limit: "1mb" }));
   app.use(requestContext);
 
   app.get("/health", (_request, response) => {

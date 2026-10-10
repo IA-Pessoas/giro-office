@@ -1,7 +1,7 @@
 import { setupAPIClient } from "@shared/services/api";
 
 import { readSpreadsheetText } from "../utils/readSpreadsheetText";
-import { fileToBase64 } from "../utils/xmlSelection";
+import { fileToBase64 } from "@shared/utils/fileToBase64";
 import { unwrapFiscalEnvelope } from "./fiscalService.contract";
 
 export type FiscalConferenceSource = "dominio" | "sefaz";

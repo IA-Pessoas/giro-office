@@ -1,7 +1,6 @@
 import { csvLine } from "@workspace/shared";
-
+import { extractPdfText } from "@workspace/shared/pdf";
 import { brl, formatCents, parseCents } from "./documentConferenceService.js";
-import { extractPdfText } from "./pdfText.js";
 
 /**
  * Totais de faturas em PDF (FIS-14): lê o texto de cada PDF, procura o total da fatura por
