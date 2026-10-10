@@ -68,12 +68,15 @@ export const OBLIGATION_ITEM_STATES = ["pending", "done", "none"] as const;
 export const listObligationPortfolioQuerySchema = z
   .object({
     competence: competenceSchema,
-    responsavel_id: z.string().uuid({ message: "responsavel_id inválido." }).optional(),
+    // "none" filtra obrigações sem responsável.
+    responsavel_id: z
+      .union([z.string().uuid({ message: "responsavel_id inválido." }), z.literal("none")])
+      .optional(),
     group_id: z.string().uuid({ message: "group_id inválido." }).optional(),
     item: z.enum(OBLIGATION_ITEMS).optional(),
     state: z.enum(OBLIGATION_ITEM_STATES).optional(),
     page: z.coerce.number().int().min(1).default(1),
-    page_size: z.coerce.number().int().min(1).max(100).default(50),
+    pageSize: z.coerce.number().int().min(1).max(100).default(50),
   })
   .strict()
   .refine((value) => !value.state || value.item || value.state === "pending", {

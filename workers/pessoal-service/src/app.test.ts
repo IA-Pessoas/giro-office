@@ -112,7 +112,7 @@ function payrollService(): PessoalPayrollService {
 function obligationService(): PessoalObligationService {
   return {
     detail: vi.fn(async () => ({ id: OBLIGATION_ID, client_id: CLIENT_ID, competence: "2026-09" })),
-    listPortfolio: vi.fn(async () => ({ items: [], total: 0, page: 2, page_size: 20 })),
+    listPortfolio: vi.fn(async () => ({ items: [], total: 0, page: 2, pageSize: 20 })),
     history: vi.fn(async () => ({ obligation_id: OBLIGATION_ID, total: 0, items: [] })),
     create: vi.fn(async () => ({
       created: true,
@@ -475,7 +475,7 @@ describe("pessoal Worker", () => {
     const app = createPessoalWorkerApp({ env: env(), obligationService: obligations });
     const base = "https://pessoal.test/pessoal/obrigations/portfolio?competence=2026-09";
 
-    const listed = await app.request(`${base}&item=va&state=pending&page=2&page_size=20`, {
+    const listed = await app.request(`${base}&item=va&state=pending&page=2&pageSize=20`, {
       headers: headers("1"),
     });
     const invalid = await app.request(`${base}&state=done`, { headers: headers("1") });
@@ -485,7 +485,7 @@ describe("pessoal Worker", () => {
     expect(obligations.listPortfolio).toHaveBeenCalledTimes(1);
     expect(obligations.listPortfolio).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID },
-      { competence: "2026-09", item: "va", state: "pending", page: 2, page_size: 20 },
+      { competence: "2026-09", item: "va", state: "pending", page: 2, pageSize: 20 },
     );
   });
 

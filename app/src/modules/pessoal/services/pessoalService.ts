@@ -133,7 +133,7 @@ export function buildPessoalObligationPortfolioParams(
   const params: Record<string, string | number> = {
     competence: filters.competence,
     page: filters.page,
-    page_size: filters.page_size,
+    pageSize: filters.pageSize,
   };
   if (filters.responsavel_id) params.responsavel_id = filters.responsavel_id;
   if (filters.group_id) params.group_id = filters.group_id;
@@ -388,10 +388,14 @@ export const pessoalService = {
     return unwrapPessoalEnvelope<PessoalObligationPortfolioPage>(response.data);
   },
 
-  async listObligationHistory(id: string, page: number): Promise<PessoalObligationHistoryPage> {
+  async listObligationHistory(
+    id: string,
+    page: number,
+    pageSize: number,
+  ): Promise<PessoalObligationHistoryPage> {
     const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
     const response = await api.get(PESSOAL_ENDPOINTS.obligationHistory(id), {
-      params: { page, pageSize: 20 },
+      params: { page, pageSize },
     });
 
     return unwrapPessoalEnvelope<PessoalObligationHistoryPage>(response.data);

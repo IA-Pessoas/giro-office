@@ -903,7 +903,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             queryParam("item", undefined, false),
             queryParam("state", undefined, false),
             queryParam("page", undefined, false),
-            queryParam("page_size", undefined, false),
+            queryParam("pageSize", undefined, false),
           ],
           responses: readResponses,
         },

@@ -13,6 +13,7 @@ import {
   type PessoalObligationItem,
   type PessoalObligationItemState,
   type PessoalObligationPortfolioItem,
+  type PessoalObligationUpdatePayload,
 } from "../types/obligations";
 import {
   obligationItemState,
@@ -55,13 +56,13 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
     item: item || undefined,
     state: state || undefined,
     page,
-    page_size: PAGE_SIZE,
+    pageSize: PAGE_SIZE,
   });
   const usersQuery = useAssignableUsers({ module: "pessoal" });
   const groupsQuery = usePessoalGroups();
   const updateMutation = useUpdatePessoalPortfolioObligationMutation();
   const data = portfolioQuery.data;
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   function handleItemChange(next: PessoalObligationItem | "") {
     setItem(next);
@@ -69,17 +70,10 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
     if (!next && state && state !== "pending") setState("");
   }
 
-  async function handleChange(
-    row: PessoalObligationPortfolioItem,
-    field: PessoalObligationItem,
-    next: PessoalObligationItemState,
-  ) {
+  async function updateRow(row: PessoalObligationPortfolioItem, payload: PessoalObligationUpdatePayload) {
     setError(null);
     try {
-      await updateMutation.mutateAsync({
-        id: row.id,
-        payload: { [field]: obligationItemValue(next) },
-      });
+      await updateMutation.mutateAsync({ id: row.id, payload });
     } catch (err) {
       setError(getPessoalErrorMessage(err, "Não foi possível atualizar a obrigação."));
     }
@@ -103,6 +97,7 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
             className={pessoalTextFieldClassName}
           >
             <option value="">Todos</option>
+            <option value="none">Sem responsável</option>
             {(usersQuery.data ?? []).map((user) => (
               <option key={user.id} value={user.id}>
                 {user.name}
@@ -195,7 +190,32 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
                 <tr className="text-gray-800 dark:text-gray-200">
                   <td className="px-3 py-2 font-medium">{row.client.name}</td>
                   <td className="px-3 py-2">{row.group_snapshot_name ?? "—"}</td>
-                  <td className="px-3 py-2">{row.responsible?.name ?? "Sem responsável"}</td>
+                  <td className="px-3 py-2">
+                    {canEdit ? (
+                      <select
+                        aria-label={`Responsável de ${row.client.name}`}
+                        value={row.responsavel_id ?? ""}
+                        disabled={updateMutation.isPending}
+                        onChange={(event) =>
+                          void updateRow(row, { responsavel_id: event.target.value || null })
+                        }
+                        className={pessoalCompactSelectClassName}
+                      >
+                        <option value="">Sem responsável</option>
+                        {row.responsible &&
+                        !(usersQuery.data ?? []).some((user) => user.id === row.responsible?.id) ? (
+                          <option value={row.responsible.id}>{row.responsible.name}</option>
+                        ) : null}
+                        {(usersQuery.data ?? []).map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      (row.responsible?.name ?? "Sem responsável")
+                    )}
+                  </td>
                   {PESSOAL_OBLIGATION_ITEMS.map((option) => {
                     const current = obligationItemState(row[option.name]);
                     return (
@@ -206,11 +226,11 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
                             value={current}
                             disabled={updateMutation.isPending}
                             onChange={(event) =>
-                              void handleChange(
-                                row,
-                                option.name,
-                                event.target.value as PessoalObligationItemState,
-                              )
+                              void updateRow(row, {
+                                [option.name]: obligationItemValue(
+                                  event.target.value as PessoalObligationItemState,
+                                ),
+                              })
                             }
                             className={pessoalCompactSelectClassName}
                           >

@@ -302,7 +302,7 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     const portfolio = expectOk(
       await call(
         "GET",
-        `/pessoal/obrigations/portfolio?competence=${competence}&item=va&state=done&page_size=10`,
+        `/pessoal/obrigations/portfolio?competence=${competence}&item=va&state=done&pageSize=10`,
       ),
       "GET carteira",
     ).data;

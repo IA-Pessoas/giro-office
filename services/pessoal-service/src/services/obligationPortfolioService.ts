@@ -41,7 +41,9 @@ export function buildObligationPortfolioWhere(
     organization_id: organizationId,
     competence: query.competence,
   };
-  if (query.responsavel_id) where.responsavel_id = query.responsavel_id;
+  if (query.responsavel_id) {
+    where.responsavel_id = query.responsavel_id === "none" ? null : query.responsavel_id;
+  }
   if (query.group_id) where.group_snapshot_id = query.group_id;
   if (query.state && query.item) {
     where[query.item] = STATE_VALUE[query.state];
@@ -63,10 +65,10 @@ export async function listObligationPortfolio(
       where,
       select: portfolioSelect,
       orderBy: [{ client: { name: "asc" } }, { id: "asc" }],
-      skip: (query.page - 1) * query.page_size,
-      take: query.page_size,
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
     }),
     prisma.obrigationsPessoal.count({ where }),
   ]);
-  return { items, total, page: query.page, page_size: query.page_size };
+  return { items, total, page: query.page, pageSize: query.pageSize };
 }
