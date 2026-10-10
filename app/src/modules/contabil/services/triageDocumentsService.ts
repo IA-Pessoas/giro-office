@@ -10,7 +10,6 @@ import type {
   TriageClosing,
   TriageClosingStatus,
   TriageDocumentField,
-  TriageFiscalChecklistField,
   TriageFiscalSettings,
   TriageFiscalSpecialConfig,
   TriageMonthlyUpdate,
