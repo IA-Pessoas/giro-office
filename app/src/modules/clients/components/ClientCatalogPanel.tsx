@@ -7,7 +7,11 @@ import {
 import { useState } from "react";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
-import { clientTextFieldClassName } from "../form/clientFormControls";
+import {
+  clientPrimaryButtonClassName as primaryButtonClassName,
+  clientSecondaryButtonClassName as secondaryButtonClassName,
+  clientTextFieldClassName,
+} from "../form/clientFormControls";
 import {
   CLIENT_REGIMES_QUERY_KEY,
   CLIENT_SEGMENTS_QUERY_KEY,
@@ -15,6 +19,7 @@ import {
   useClientSegments,
 } from "../hooks/useClients";
 import { clientService } from "../services/clientService";
+import { ClientListState, clientListClassName } from "./ClientListState";
 
 type CatalogKind = "regime" | "segment";
 
@@ -69,10 +74,6 @@ const CATALOGS = {
 } as const;
 
 const DEFAULT_SEGMENT_TYPE: ClientSegmentType = CLIENT_SEGMENT_TYPES[0];
-const primaryButtonClassName =
-  "rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50";
-const secondaryButtonClassName =
-  "rounded-xl border border-slate-200 font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   const message = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
@@ -213,22 +214,14 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
       ) : null}
 
       <div className="mt-5">
-        {query.isLoading ? (
-          <p
-            role="status"
-            className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-slate-950/40 dark:text-slate-400"
-          >
-            {catalog.loading}
-          </p>
-        ) : query.error ? (
-          <p
-            role="alert"
-            className="rounded-xl bg-rose-50 px-3 py-4 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
-          >
-            {catalog.loadError}
-          </p>
-        ) : items.length ? (
-          <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+        <ClientListState
+          query={query}
+          isEmpty={!items.length}
+          loading={catalog.loading}
+          error={catalog.loadError}
+          empty={catalog.empty}
+        >
+          <ul className={clientListClassName}>
             {items.map((item) => (
               <li
                 key={item.id}
@@ -304,11 +297,7 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-400">
-            {catalog.empty}
-          </p>
-        )}
+        </ClientListState>
       </div>
     </section>
   );
