@@ -4,7 +4,7 @@ import {
   type AuditHistoryPage,
   type AuditHistoryPrisma,
   listAuditFieldHistory,
-} from "./auditHistoryService.js";
+} from "@workspace/shared/audit";
 
 export const CONTROL_HISTORY_FIELDS = [
   "regenerate_accounting_entries",

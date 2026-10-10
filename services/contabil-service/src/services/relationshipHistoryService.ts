@@ -5,7 +5,7 @@ import {
   type AuditHistoryPage,
   type AuditHistoryPrisma,
   listAuditFieldHistory,
-} from "./auditHistoryService.js";
+} from "@workspace/shared/audit";
 
 export const RELATIONSHIP_AUDIT_REFERRING = "contabil.relationship";
 export const RELATIONSHIP_HISTORY_FIELDS = [
