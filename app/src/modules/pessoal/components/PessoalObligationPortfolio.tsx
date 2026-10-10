@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 import { useAssignableUsers } from "@modules/rh";
@@ -25,6 +25,7 @@ import {
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
+import { PessoalObligationHistory } from "./PessoalObligationHistory";
 
 const PAGE_SIZE = 25;
 const STATES = Object.keys(PESSOAL_OBLIGATION_STATE_LABELS) as PessoalObligationItemState[];
@@ -41,6 +42,7 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
   const [state, setState] = useState<PessoalObligationItemState | "">("");
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
 
   useEffect(() => setPage(1), [competence, responsibleId, groupId, item, state]);
 
@@ -180,11 +182,15 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
                     {option.label}
                   </th>
                 ))}
+                <th className="px-3 py-2">
+                  <span className="sr-only">Histórico</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {data.items.map((row) => (
-                <tr key={row.id} className="text-gray-800 dark:text-gray-200">
+                <Fragment key={row.id}>
+                <tr className="text-gray-800 dark:text-gray-200">
                   <td className="px-3 py-2 font-medium">{row.client.name}</td>
                   <td className="px-3 py-2">{row.group_snapshot_name ?? "—"}</td>
                   <td className="px-3 py-2">{row.responsible?.name ?? "Sem responsável"}</td>
@@ -218,7 +224,25 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
                       </td>
                     );
                   })}
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      aria-expanded={historyId === row.id}
+                      onClick={() => setHistoryId(historyId === row.id ? null : row.id)}
+                      className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Histórico
+                    </button>
+                  </td>
                 </tr>
+                {historyId === row.id ? (
+                  <tr>
+                    <td colSpan={PESSOAL_OBLIGATION_ITEMS.length + 4} className="bg-gray-50 px-3 py-3 dark:bg-gray-900/30">
+                      <PessoalObligationHistory obligationId={row.id} />
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

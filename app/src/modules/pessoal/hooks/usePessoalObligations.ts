@@ -13,6 +13,7 @@ import type {
   PessoalObligationCreatePayload,
   PessoalObligationCreateResult,
   PessoalObligationGenerationResult,
+  PessoalObligationHistoryPage,
   PessoalObligationPortfolioFilters,
   PessoalObligationPortfolioPage,
   PessoalObligationUpdatePayload,
@@ -67,9 +68,25 @@ export function useUpdatePessoalObligationMutation(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: obligationKey(clientId, competence) }),
         queryClient.invalidateQueries({ queryKey: pessoalQueryKey("obligations", "portfolio") }),
+        queryClient.invalidateQueries({ queryKey: obligationHistoryKey(id) }),
       ]);
     },
   });
+}
+
+function obligationHistoryKey(id: string, page?: number) {
+  return pessoalQueryKey("obligations", "history", id || "missing", page);
+}
+
+export function usePessoalObligationHistory(
+  id: string,
+  page: number,
+): UseQueryResult<PessoalObligationHistoryPage, Error> {
+  return useFetch(
+    obligationHistoryKey(id, page),
+    () => pessoalService.listObligationHistory(id, page),
+    { enabled: id.length > 0 },
+  );
 }
 
 export function usePessoalObligationPortfolio(

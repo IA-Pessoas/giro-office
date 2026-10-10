@@ -11,6 +11,7 @@ import type {
   PessoalObligationCreatePayload,
   PessoalObligationCreateResult,
   PessoalObligationGenerationResult,
+  PessoalObligationHistoryPage,
   PessoalObligationPortfolioFilters,
   PessoalObligationPortfolioPage,
   PessoalObligationUpdatePayload,
@@ -385,6 +386,15 @@ export const pessoalService = {
     });
 
     return unwrapPessoalEnvelope<PessoalObligationPortfolioPage>(response.data);
+  },
+
+  async listObligationHistory(id: string, page: number): Promise<PessoalObligationHistoryPage> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.obligationHistory(id), {
+      params: { page, pageSize: 20 },
+    });
+
+    return unwrapPessoalEnvelope<PessoalObligationHistoryPage>(response.data);
   },
 
   async createObligation(
