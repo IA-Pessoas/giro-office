@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { DTE_IMPORT_LIMITS } from "../services/dteImportParser.js";
+import { DTE_IMPORT_FORMATS, DTE_IMPORT_LIMITS } from "../services/dteImportParser.js";
 
 export const importDteBodySchema = z
   .object({
-    format: z.enum(["html", "json"]),
+    format: z.enum(DTE_IMPORT_FORMATS),
     content: z
       .string()
       .min(1, "content obrigatório.")

@@ -933,6 +933,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/regularize\/dte\/import$/,
+    description: { action: "importou", item: "avisos DTE no Regularize" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/imports$/,
+    description: { action: "consultou", item: "a lista de importações de avisos DTE" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/regularize\/process\/send-to-fiscal$/,
     description: { action: "enviou", item: "um processo de regularização ao Fiscal" },
   },

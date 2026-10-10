@@ -11,7 +11,8 @@ export const DTE_IMPORT_LIMITS = {
   maxFieldLength: 2_000,
 } as const;
 
-export type DteImportFormat = "html" | "json";
+export const DTE_IMPORT_FORMATS = ["html", "json"] as const;
+export type DteImportFormat = (typeof DTE_IMPORT_FORMATS)[number];
 
 export type DteNoticeFields = {
   tipo: string;
@@ -117,7 +118,6 @@ function extractHtmlRows(html: string): HtmlCell[][] {
   let sawTable = false;
   let tags = 0;
   let cursor = 0;
-  const lowerHtml = html.toLowerCase();
   TOKEN.lastIndex = 0;
 
   for (let match = TOKEN.exec(html); match; match = TOKEN.exec(html)) {
@@ -132,8 +132,10 @@ function extractHtmlRows(html: string): HtmlCell[][] {
     const name = rawName.toLowerCase();
 
     if (!closing && RAW_TEXT_TAGS.has(name)) {
-      const end = lowerHtml.indexOf(`</${name}`, cursor);
-      cursor = end === -1 ? html.length : end;
+      // Busca sem toLowerCase(): ele muda o tamanho do texto ("İ") e desloca o índice.
+      const closer = new RegExp(`</${name}`, "gi");
+      closer.lastIndex = cursor;
+      cursor = closer.exec(html)?.index ?? html.length;
       TOKEN.lastIndex = cursor;
       continue;
     }
@@ -217,7 +219,10 @@ function text(item: LegacyItem, key: string): string {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string" && typeof value !== "number")
     throw new InvalidField("CAMPO_INVALIDO");
-  const result = String(value);
+  // Mesmo trim nos dois formatos, para a chave de duplicata não depender de onde veio.
+  const result = phpTrim(String(value));
+  // O Postgres recusa NUL em TEXT e JSONB: melhor recusar a linha que perder o lote.
+  if (result.includes("\0")) throw new InvalidField("CAMPO_INVALIDO");
   if (result.length > DTE_IMPORT_LIMITS.maxFieldLength) throw new InvalidField("CAMPO_LONGO");
   return result;
 }

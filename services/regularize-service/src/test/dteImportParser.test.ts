@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DTE_IMPORT_LIMITS, dteDedupeKey, parseDteImport } from "./dteImportParser.js";
+import { DTE_IMPORT_LIMITS, dteDedupeKey, parseDteImport } from "../services/dteImportParser.js";
 
 // Tabela sintética no formato que o regularize/pages/dte/upload.php lia: aviso na célula 3
 // (com o span cuja classe vira o tipo), CNPJ na 4 e datas nas 7, 9 e 10.
@@ -183,6 +183,33 @@ describe("parseDteImport (JSON)", () => {
       { row: 3, reason: "CAMPO_INVALIDO" },
     ]);
     expect(result.notices[0]?.fields.cnpj_cpf).toBe("1");
+  });
+
+  it("recusa a linha com NUL em vez de perder o lote no banco", () => {
+    const result = parseDteImport("json", JSON.stringify([{ cell3: "a\u0000b" }, { cell3: "ok" }]));
+
+    expect(result.rejections).toEqual([{ row: 1, reason: "CAMPO_INVALIDO" }]);
+    expect(result.notices).toHaveLength(1);
+  });
+
+  it("gera a mesma chave para o mesmo aviso colado em HTML e em JSON com espaços", async () => {
+    const [fromHtml] = parseDteImport(
+      "html",
+      `<table>${row(["1", "2", " Aviso 1 ", "123", "Dest"])}</table>`,
+    ).notices;
+    const [fromJson] = parseDteImport(
+      "json",
+      JSON.stringify([{ tipo: "", cell3: " Aviso 1 ", cell4: "123 ", cell5: "Dest" }]),
+    ).notices;
+    if (!fromHtml || !fromJson) throw new Error("aviso sintético não foi lido");
+
+    expect(await dteDedupeKey(fromJson.fields)).toBe(await dteDedupeKey(fromHtml.fields));
+  });
+
+  it("acha o fim do script mesmo quando minúsculas mudam o tamanho do texto", () => {
+    const html = `${"İ".repeat(10)}<table>${row(["1", "2", "<script>x</script>Aviso", "123", "Dest"])}</table>`;
+
+    expect(parseDteImport("html", html).notices[0]?.fields.aviso).toBe("Aviso");
   });
 
   it("recusa JSON inválido ou que não é lista", () => {

@@ -13,6 +13,7 @@ import type {
 import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import {
+  regularizePanelClassName,
   regularizePrimaryButtonClassName,
   regularizeTextareaClassName,
 } from "./regularizeFormControls";
@@ -27,9 +28,6 @@ const REJECTION_LABELS: Record<RegularizeDteRejectionReason, string> = {
   CAMPO_LONGO: "campo longo demais",
   SEM_DADOS: "linha sem dados",
 };
-
-const sectionClassName =
-  "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6";
 
 function ImportSummary({ item }: { item: RegularizeDteImport }) {
   return (
@@ -81,7 +79,7 @@ export function RegularizeDtePanel({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-4">
-      <section className={sectionClassName}>
+      <section className={regularizePanelClassName}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
           Importar avisos DTE
         </h2>
@@ -163,7 +161,7 @@ export function RegularizeDtePanel({ canEdit }: { canEdit: boolean }) {
         ) : null}
       </section>
 
-      <section className={sectionClassName}>
+      <section className={regularizePanelClassName}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
           Importações recentes
         </h2>
