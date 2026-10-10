@@ -101,6 +101,14 @@ export const OPERATIONAL_PROCESS_FILTER = {
   process_type: { not: LEGACY_GUIDANCE_PROCESS_TYPE },
 } as const;
 
+/** Status canônico de um processo; aliases legados caem no mesmo valor das listas. */
+export function canonicalProcessStatus(status: unknown): unknown {
+  const canonical = Object.entries(PROCESS_STATUS_EQUIVALENTS).find(([, values]) =>
+    values.some((value) => value === status),
+  );
+  return canonical ? canonical[0] : status;
+}
+
 export function buildProcessStatusFilter(status: string): Record<string, unknown> {
   if (status === "Todos") {
     return {};

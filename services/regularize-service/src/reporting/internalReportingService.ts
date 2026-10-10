@@ -6,7 +6,7 @@ import {
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
-import { OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
+import { canonicalProcessStatus, OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
 import {
   getRegularizeLicenseReportingFields,
   type RegularizeLicenseReportingSource,
@@ -38,7 +38,7 @@ type ReportingFilter = Partial<typeof OPERATIONAL_PROCESS_FILTER>;
 type ReportingDelegate = {
   findMany(input: {
     where: { organization_id: string } & ReportingFilter;
-    select: Record<string, true>;
+    select: Record<string, unknown>;
     take: number;
     cursor?: { id: string };
     skip?: number;
@@ -72,6 +72,77 @@ async function loadReportingPage(
   const reachedLimit = rows.length > limit;
   return {
     rows: projectRows(pageRows, fields),
+    reachedLimit,
+    ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
+  };
+}
+
+// Campos de processo montados na extração; os demais são colunas da tabela.
+const PROCESS_DERIVED_FIELDS: Readonly<Record<string, Record<string, unknown>>> = {
+  client_name: {
+    clientPJ: { select: { name: true, company_name: true } },
+    clientPF: { select: { name: true } },
+  },
+  responsible1_name: { responsible1: { select: { name: true } } },
+  responsible2_name: { responsible2: { select: { name: true } } },
+  responsible3_name: { responsible3: { select: { name: true } } },
+  entry_month: { entry_date: true },
+  completion_month: { completion_date: true },
+  locked: { locking_type: true },
+};
+
+function reportingMonth(value: unknown): string | null {
+  return value instanceof Date ? value.toISOString().slice(0, 7) : null;
+}
+
+function relatedName(value: unknown): unknown {
+  return (value as { name?: unknown } | null)?.name ?? null;
+}
+
+async function loadProcessReportingPage(
+  delegate: ReportingDelegate,
+  organizationId: string,
+  fields: readonly string[],
+  limit: number,
+  cursor?: string,
+): Promise<ReportingPage> {
+  const select: Record<string, unknown> = { id: true };
+  for (const field of fields) {
+    Object.assign(select, PROCESS_DERIVED_FIELDS[field] ?? { [field]: true });
+  }
+  const found = await delegate.findMany({
+    where: { organization_id: organizationId, ...OPERATIONAL_PROCESS_FILTER },
+    select,
+    ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
+    orderBy: { id: "asc" },
+    take: limit + 1,
+  });
+  const page = found.slice(0, limit);
+  const rows = page.map((process) => {
+    const company = process.clientPJ as { name?: unknown; company_name?: unknown } | null;
+    // Texto livre no cadastro: em branco é "sem travamento".
+    const lockingType = String(process.locking_type ?? "").trim() || null;
+    const derived: Record<string, unknown> = {
+      client_name: company?.company_name ?? company?.name ?? relatedName(process.clientPF),
+      responsible1_name: relatedName(process.responsible1),
+      responsible2_name: relatedName(process.responsible2),
+      responsible3_name: relatedName(process.responsible3),
+      entry_month: reportingMonth(process.entry_date),
+      completion_month: reportingMonth(process.completion_date),
+      locking_type: lockingType,
+      locked: lockingType !== null,
+      status: canonicalProcessStatus(process.status),
+    };
+    return Object.fromEntries(
+      fields
+        .map((field) => [field, field in derived ? derived[field] : process[field]])
+        .filter(([, value]) => value !== undefined),
+    );
+  });
+  const lastId = page[page.length - 1]?.id;
+  const reachedLimit = found.length > limit;
+  return {
+    rows,
     reachedLimit,
     ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
   };
@@ -123,9 +194,10 @@ export class RegularizeLicenseReportingService {
       throw new ServiceError(500, "Fonte interna de relatórios não configurada.");
     }
 
-    const filter = input.source === "regularize.licenses" ? {} : OPERATIONAL_PROCESS_FILTER;
     const loadPage = (fields: readonly string[], limit: number, cursor?: string) =>
-      loadReportingPage(delegate, input.organizationId, fields, limit, cursor, filter);
+      input.source === "regularize.licenses"
+        ? loadReportingPage(delegate, input.organizationId, fields, limit, cursor)
+        : loadProcessReportingPage(delegate, input.organizationId, fields, limit, cursor);
     if (input.query) {
       return executeReportingQuery(
         { ...input, query: input.query },

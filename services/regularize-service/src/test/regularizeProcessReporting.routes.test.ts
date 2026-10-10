@@ -95,6 +95,16 @@ describe("regularize process reporting routes", () => {
       "status",
       "locking_type",
       "urgency",
+      "locked",
+      "client_name",
+      "description",
+      "observation",
+      "financial_status",
+      "responsible1_name",
+      "responsible2_name",
+      "responsible3_name",
+      "entry_month",
+      "completion_month",
     ]);
     expect(source.fields.map((field: { key: string }) => field.key)).not.toContain("cpf_cnpj");
   });
