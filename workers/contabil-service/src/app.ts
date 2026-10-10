@@ -10,6 +10,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
+import { contingencyQuerySchema } from "../../../services/contabil-service/src/schemas/contingency.schemas.js";
 import {
   controlCompetenceBodySchema,
   controlIdParamsSchema,
@@ -35,6 +36,8 @@ import {
   responsibleIdParamsSchema,
   updateResponsibleBodySchema,
 } from "../../../services/contabil-service/src/schemas/responsible.schemas.js";
+import { CONTINGENCY_LIMITS } from "../../../services/contabil-service/src/services/contingencyCalculationService.js";
+import { ContingencyService } from "../../../services/contabil-service/src/services/contingencyService.js";
 import { NOAH_LIMITS } from "../../../services/contabil-service/src/services/noahConversionService.js";
 import { NoahService } from "../../../services/contabil-service/src/services/noahService.js";
 import { createContabilAudit } from "./audit.js";
@@ -90,6 +93,7 @@ type ContabilOptions = {
   env?: ContabilWorkerEnv;
   prisma?: ContabilPrisma;
   controlService?: ControlService;
+  contingencyService?: Pick<ContingencyService, "simulate">;
   relationshipService?: RelationshipService;
   responsibleService?: ResponsibleService;
   triageClosingService?: ClosingService;
@@ -285,6 +289,34 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       },
     });
   });
+
+  app.post(
+    "/contabil/contingency",
+    async (c, next) => {
+      requireContabilWrite(c.get("auth"));
+      if (c.req.header("content-type")?.split(";")[0].trim() !== "application/vnd.ms-excel") {
+        throw new ServiceError(415, "Envie um arquivo XLS.");
+      }
+      return next();
+    },
+    bodyLimit({
+      maxSize: CONTINGENCY_LIMITS.bytes,
+      onError: () => {
+        throw new ServiceError(413, "O XLS excede 5 MiB.");
+      },
+    }),
+    async (c) => {
+      const input = parseWithZod(contingencyQuerySchema, c.req.query());
+      const bytes = Buffer.from(await c.req.arrayBuffer());
+      const invoke = (service: Pick<ContingencyService, "simulate">) =>
+        service.simulate(bytes, input, contabilAuthContext(c.get("auth")));
+      const result = options.contingencyService
+        ? await invoke(options.contingencyService)
+        : await withPrisma(c, options, (prisma) => invoke(new ContingencyService(prisma)));
+      c.header("Cache-Control", "no-store");
+      return c.json(createSuccessResponse(result));
+    },
+  );
 
   app.get("/contabil/controls/list", async (c) => {
     const query = parseWithZod(listControlQuerySchema, c.req.query());

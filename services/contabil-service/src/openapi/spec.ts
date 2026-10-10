@@ -1,5 +1,6 @@
 import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 
 import type { ContabilServiceEnv } from "../config/env.js";
 import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../constants/triageDocuments.js";
@@ -171,6 +172,96 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
       },
     },
     paths: {
+      "/contabil/contingency": {
+        post: {
+          tags: ["Contingency"],
+          summary: "Simula contingência a partir de XLS temporário",
+          description:
+            "Exige edição no Contábil. Analisa a primeira planilha XLS/BIFF8 (até 5 MiB, 10.000 linhas e 256 colunas). Valores em centavos; classificação é hipótese legada, sem exportação ou alteração de lançamentos.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "company_name",
+              in: "query",
+              required: true,
+              schema: { type: "string", maxLength: 200 },
+            },
+            {
+              name: "cnpj",
+              in: "query",
+              required: true,
+              schema: { type: "string", maxLength: 18 },
+            },
+            {
+              name: "period_start",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            },
+            {
+              name: "period_end",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            },
+            {
+              name: "regime",
+              in: "query",
+              required: true,
+              schema: {
+                type: "string",
+                enum: [...TAX_REGIME_OPTIONS],
+              },
+            },
+            {
+              name: "annex",
+              in: "query",
+              schema: { type: "string", enum: ["", "I", "II", "III", "IV", "V"], default: "" },
+            },
+            {
+              name: "rate",
+              in: "query",
+              schema: { type: "number", minimum: 0, maximum: 100, multipleOf: 0.01, default: 11 },
+            },
+            {
+              name: "filename",
+              in: "query",
+              required: true,
+              schema: { type: "string", maxLength: 180 },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/vnd.ms-excel": { schema: { type: "string", format: "binary" } },
+            },
+          },
+          responses: {
+            "200": {
+              description:
+                "Extração com rótulos, células, valores e cenários mínimo/máximo no envelope success/data; resposta no-store.",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": {
+              description: "XLS, parâmetros, rótulos, valores ou limites de planilha inválidos.",
+            },
+            "401": { description: "Não autenticado." },
+            "403": { description: "Sem permissão de edição no Contábil." },
+            "404": { description: "Cliente não encontrado na organização." },
+            "409": { description: "Empresa ou CNPJ divergente." },
+            "413": { description: "XLS maior que 5 MiB." },
+            "415": { description: "Tipo de mídia diferente de application/vnd.ms-excel." },
+          },
+        },
+      },
       "/contabil/noah": {
         post: {
           tags: ["Noah"],

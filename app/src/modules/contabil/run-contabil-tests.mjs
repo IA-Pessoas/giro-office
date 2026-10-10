@@ -306,6 +306,7 @@ await (async () => {
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
     assert.match(contabilServiceSources.permissions, /const CONTABIL_WRITE_PERMISSION = 2;/);
+    assert.match(contabilServiceSources.authMiddleware, /import \{ CONTABIL_WRITE_PERMISSION \} from "\.\.\/constants\/permissions\.js"/);
     assert.match(contabilServiceSources.authMiddleware, /requireContabilWritePermission/);
 
     assert.equal(

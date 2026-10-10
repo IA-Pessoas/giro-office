@@ -15,6 +15,7 @@ import type { ContabilServiceEnv } from "./config/env.js";
 import prismaClient from "./integrations/prisma.js";
 import { TriagemOverviewClient } from "./integrations/triagemOverviewClient.js";
 import { buildContabilServiceOpenApiSpec } from "./openapi/spec.js";
+import { createContingencyRoutes } from "./routes/contingency.routes.js";
 import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createNoahRoutes, type NoahRouteDeps } from "./routes/noah.routes.js";
@@ -31,6 +32,7 @@ import {
   createTriageDocumentsRoutes,
   type TriageDocumentsRouteDeps,
 } from "./routes/triageDocuments.routes.js";
+import { ContingencyService } from "./services/contingencyService.js";
 import { ControlService } from "./services/controlService.js";
 import { InternalReportingService } from "./services/internalReportingService.js";
 import { NoahService } from "./services/noahService.js";
@@ -63,6 +65,7 @@ export function createContabilApp(options: {
   env: ContabilServiceEnv;
   logger: Logger;
   controlRouteDeps?: ControlRouteDeps;
+  contingencyService?: Pick<ContingencyService, "simulate">;
   responsibleRouteDeps?: ResponsibleRouteDeps;
   relationshipRouteDeps?: RelationshipRouteDeps;
   triageDocumentsRouteDeps?: TriageDocumentsRouteDeps;
@@ -109,6 +112,10 @@ export function createContabilApp(options: {
   }
 
   app.use("/contabil", createControlRoutes(controlRouteDeps));
+  app.use(
+    "/contabil/contingency",
+    createContingencyRoutes(options.contingencyService ?? new ContingencyService(prismaClient)),
+  );
   app.use("/contabil", createResponsibleRoutes(responsibleRouteDeps));
   app.use("/contabil", createRelationshipRoutes(relationshipRouteDeps));
   app.use(
