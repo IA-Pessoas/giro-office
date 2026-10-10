@@ -100,8 +100,8 @@ const ALLOWLIST = [
     reason: "valor de status legado",
   },
   {
-    file: "workers/contabil-service/src/services.ts",
-    text: '"nao possui": "NOT_PRESENT"',
+    file: "shared/src/triagem/triageDocuments.ts",
+    text: '["nao possui", "NOT_PRESENT"]',
     reason: "status legado gravado em triagem.monthly, lido como NOT_PRESENT",
   },
   {
