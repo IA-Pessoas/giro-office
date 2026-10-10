@@ -688,7 +688,9 @@ export type RegularizeDteImport = {
   created_at: string;
 };
 
-export type RegularizeDteNoticeReadingFilter = "Todos" | "Pendente" | "Lido";
+export const REGULARIZE_DTE_NOTICE_READING_FILTERS = ["Todos", "Pendente", "Lido"] as const;
+export type RegularizeDteNoticeReadingFilter =
+  (typeof REGULARIZE_DTE_NOTICE_READING_FILTERS)[number];
 
 // Datas no formato do <input type="date"> (aaaa-mm-dd); vazio = sem limite.
 export type RegularizeDteNoticeListFilters = {

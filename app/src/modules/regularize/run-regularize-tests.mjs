@@ -10,6 +10,7 @@ import {
   buildRegularizeMunicipalTaxesListParams,
   buildRegularizeProcessListParams,
   buildRegularizeSitePasswordListParams,
+  REGULARIZE_DTE_NO_TIPO_FILTER,
   unwrapRegularizePage,
 } from "./services/regularizeService.contract.ts";
 import {
@@ -974,7 +975,7 @@ await runTest("regularize DTE notice filters cover whole days and omit empty fil
     ...base,
     from: "2026-09-01",
     to: "2026-09-30",
-    tipo: "badge badge-warning",
+    tipo: "badge-warning",
     search: " intima ",
     reading: "Pendente",
   });
@@ -982,7 +983,12 @@ await runTest("regularize DTE notice filters cover whole days and omit empty fil
   assert.equal(params.to, new Date(2026, 8, 30, 23, 59, 59, 999).toISOString());
   assert.deepEqual(
     { tipo: params.tipo, search: params.search, reading: params.reading },
-    { tipo: "badge badge-warning", search: "intima", reading: "Pendente" },
+    { tipo: "badge-warning", search: "intima", reading: "Pendente" },
+  );
+  // "Sem cor" vai como tipo vazio, que a API entende como avisos sem selo.
+  assert.equal(
+    buildRegularizeDteNoticeListParams({ ...base, tipo: REGULARIZE_DTE_NO_TIPO_FILTER }).tipo,
+    "",
   );
 });
 

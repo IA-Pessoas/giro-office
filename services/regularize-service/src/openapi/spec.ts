@@ -901,7 +901,12 @@ export function buildRegularizeServiceOpenApiSpec(
           parameters: [
             { name: "from", in: "query", schema: { type: "string", format: "date-time" } },
             { name: "to", in: "query", schema: { type: "string", format: "date-time" } },
-            { name: "tipo", in: "query", schema: { type: "string" } },
+            {
+              name: "tipo",
+              in: "query",
+              description: "Trecho da classe do selo (ex.: badge-warning); vazio lista os sem cor.",
+              schema: { type: "string" },
+            },
             { name: "search", in: "query", schema: { type: "string", default: "" } },
             {
               name: "reading",

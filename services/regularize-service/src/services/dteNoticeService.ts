@@ -3,6 +3,7 @@ import { ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 
+// A tela repete este valor em RegularizeDteInbox.tsx para mostrar a data inicial no filtro.
 export const DTE_NOTICE_DEFAULT_WINDOW_DAYS = 45;
 export const DTE_NOTICE_READING_FILTERS = ["Todos", "Pendente", "Lido"] as const;
 export type DteNoticeReadingFilter = (typeof DTE_NOTICE_READING_FILTERS)[number];
@@ -42,14 +43,19 @@ export class DteNoticeService {
     const where: Prisma.RegularizeDteNoticeWhereInput = {
       organization_id: params.organizationId,
       created_at: { gte: from, ...(params.to ? { lte: params.to } : {}) },
-      ...(params.tipo === undefined ? {} : { tipo: params.tipo }),
+      // O tipo gravado é o atributo class inteiro do selo: busca pelo trecho para não perder
+      // aviso com classe extra. Vazio pede os avisos sem cor.
+      ...(params.tipo === undefined
+        ? {}
+        : { tipo: params.tipo === "" ? "" : { contains: params.tipo } }),
       ...(params.search ? { aviso: { contains: params.search, mode: "insensitive" } } : {}),
       ...(params.reading === "Todos" ? {} : { pending_reading: params.reading === "Pendente" }),
     };
     const [data, total] = await Promise.all([
       this.prisma.regularizeDteNotice.findMany({
         where,
-        orderBy: { created_at: "desc" },
+        // Avisos da mesma importação têm o mesmo created_at: o id desempata a paginação.
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
         skip: (params.page - 1) * params.limit,
         take: params.limit,
       }),

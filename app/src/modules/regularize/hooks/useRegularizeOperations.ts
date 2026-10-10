@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useMutation,
   useQueryClient,
   type UseMutationResult,
@@ -111,8 +112,11 @@ export function useRegularizeDteNotices(
 ): UseQueryResult<RegularizeDteNoticesPage, Error> {
   const scope = useRegularizeQueryScope();
 
-  return useFetch(regularizeQueryKeys.dteNotices(filters, scope), () =>
-    regularizeService.listDteNotices(filters),
+  // Mantém a página anterior na tela enquanto a próxima carrega.
+  return useFetch(
+    regularizeQueryKeys.dteNotices(filters, scope),
+    () => regularizeService.listDteNotices(filters),
+    { placeholderData: keepPreviousData },
   );
 }
 

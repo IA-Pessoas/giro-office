@@ -47,7 +47,7 @@ describe("DteNoticeService.list", () => {
           organization_id: ORG,
           created_at: { gte: new Date("2026-08-26T12:00:00.000Z") },
         },
-        orderBy: { created_at: "desc" },
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
         skip: 0,
         take: 20,
       }),
@@ -64,7 +64,7 @@ describe("DteNoticeService.list", () => {
       organizationId: ORG,
       from,
       to,
-      tipo: "badge badge-warning",
+      tipo: "badge-warning",
       search: "intima",
       reading: "Pendente",
       page: 2,
@@ -75,12 +75,29 @@ describe("DteNoticeService.list", () => {
       where: {
         organization_id: ORG,
         created_at: { gte: from, lte: to },
-        tipo: "badge badge-warning",
+        tipo: { contains: "badge-warning" },
         aviso: { contains: "intima", mode: "insensitive" },
         pending_reading: true,
       },
       skip: 10,
       take: 10,
+    });
+  });
+
+  it("tipo vazio pede só os avisos sem cor", async () => {
+    const prisma = createPrisma();
+
+    await serviceFor(prisma).list({
+      organizationId: ORG,
+      tipo: "",
+      search: "",
+      reading: "Todos",
+      page: 1,
+      limit: 20,
+    });
+
+    expect(prisma.regularizeDteNotice.findMany.mock.calls[0]?.[0]).toMatchObject({
+      where: { tipo: "" },
     });
   });
 
