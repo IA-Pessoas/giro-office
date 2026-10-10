@@ -108,13 +108,16 @@ describe("MarketingAiUsageControlService", () => {
 
   it("marca controles com qualquer resposta ausente e separa integração explicitamente negativa", async () => {
     const pending = [{ id: "pending-1", user: { id: userId, name: "Ana" } }];
+    const unanswered = [{ id: "unanswered-1", user: { id: userId, name: "Ana" } }];
     const withoutIntegration = [{ id: "no-integration", user: { id: "user-2", name: "Bia" } }];
     prisma.marketingAiUsageControl.findMany
       .mockResolvedValueOnce(pending)
+      .mockResolvedValueOnce(unanswered)
       .mockResolvedValueOnce(withoutIntegration);
 
     await expect(service.getReport(organizationId, competence)).resolves.toEqual({
       pending,
+      unanswered,
       withoutIntegration,
     });
 
@@ -133,16 +136,86 @@ describe("MarketingAiUsageControlService", () => {
       include: { user: { select: { id: true, name: true, full_name: true } } },
       orderBy: [{ user: { name: "asc" } }, { id: "asc" }],
     });
-    expect(prisma.marketingAiUsageControl.findMany).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        where: {
-          organization_id: organizationId,
-          competence: new Date("2026-04-01T00:00:00.000Z"),
-          integration: false,
-        },
-      }),
+    // Legado: "sem resposta" é conhecimento=0 (nulo aqui); "sem integração" é integracao=1 ("Não").
+    expect(prisma.marketingAiUsageControl.findMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        organization_id: organizationId,
+        competence: new Date("2026-04-01T00:00:00.000Z"),
+        knowledge: null,
+      },
+      include: { user: { select: { id: true, name: true, full_name: true } } },
+      orderBy: [{ user: { name: "asc" } }, { id: "asc" }],
+    });
+    expect(prisma.marketingAiUsageControl.findMany).toHaveBeenNthCalledWith(3, {
+      where: {
+        organization_id: organizationId,
+        competence: new Date("2026-04-01T00:00:00.000Z"),
+        integration: false,
+      },
+      include: { user: { select: { id: true, name: true, full_name: true } } },
+      orderBy: [{ user: { name: "asc" } }, { id: "asc" }],
+    });
+  });
+
+  it("separa não respondeu de respondeu Não e ignora outra organização", async () => {
+    type Row = Record<string, unknown> & { id: string };
+    const april = new Date("2026-04-01T00:00:00.000Z");
+    const rows: Row[] = [
+      {
+        id: "sem-resposta",
+        organization_id: organizationId,
+        competence: april,
+        knowledge: null,
+        integration: null,
+      },
+      {
+        id: "respondeu-nao",
+        organization_id: organizationId,
+        competence: april,
+        knowledge: false,
+        integration: false,
+      },
+      {
+        id: "respondeu-sim",
+        organization_id: organizationId,
+        competence: april,
+        knowledge: true,
+        integration: true,
+      },
+      {
+        id: "outra-org",
+        organization_id: "other-org",
+        competence: april,
+        knowledge: null,
+        integration: false,
+      },
+      {
+        id: "outro-mes",
+        organization_id: organizationId,
+        competence: new Date("2026-05-01T00:00:00.000Z"),
+        knowledge: null,
+        integration: false,
+      },
+    ];
+    // Avalia o `where` do Prisma sobre linhas em memória (igualdade e OR).
+    const matches = (where: Record<string, unknown>, row: Row): boolean =>
+      Object.entries(where).every(([key, expected]) =>
+        key === "OR"
+          ? (expected as Record<string, unknown>[]).some((clause) => matches(clause, row))
+          : expected instanceof Date
+            ? (row[key] as Date).getTime() === expected.getTime()
+            : row[key] === expected,
+      );
+    prisma.marketingAiUsageControl.findMany = vi.fn(async ({ where }) =>
+      rows.filter((row) => matches(where, row)),
     );
+
+    const report = await service.getReport(organizationId, competence);
+    const ids = (list: Row[]) => list.map((row) => row.id);
+
+    expect(ids(report.unanswered as Row[])).toEqual(["sem-resposta"]);
+    expect(ids(report.withoutIntegration as Row[])).toEqual(["respondeu-nao"]);
+    expect(ids(report.pending as Row[])).toEqual(["sem-resposta"]);
   });
 
   it("atualiza respostas dentro da organização autenticada", async () => {

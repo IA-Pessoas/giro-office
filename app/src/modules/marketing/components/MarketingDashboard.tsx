@@ -1,20 +1,13 @@
 import { AlertCircle, Cake, Download, Loader2, Megaphone } from "lucide-react";
 
 import { useMarketingDashboard } from "../hooks/useMarketingDashboard";
-import { createBirthdayCsv } from "../utils/birthdayCsv";
+import { createBirthdayCsv, downloadCsvFile } from "../utils/marketingCsv";
 
 function downloadBirthdays(
   filename: string,
   items: readonly { name: string; day: number }[],
 ): void {
-  const url = URL.createObjectURL(
-    new Blob([`\uFEFF${createBirthdayCsv(items)}`], { type: "text/csv;charset=utf-8" }),
-  );
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  downloadCsvFile(filename, createBirthdayCsv(items));
 }
 
 function formatNumber(value: number): string {

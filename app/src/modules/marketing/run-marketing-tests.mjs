@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { toInstagramProfileUrl } from "./utils/instagramProfile.ts";
-import { createBirthdayCsv } from "./utils/birthdayCsv.ts";
+import {
+  createBirthdayCsv,
+  createMonthlyClientBirthdayCsv,
+  createMonthlyEmployeeBirthdayCsv,
+  createAiUsageReportCsv,
+  createMarketingStockCsv,
+} from "./utils/marketingCsv.ts";
 
 const dashboard = await readFile(new URL("./components/MarketingDashboard.tsx", import.meta.url), "utf8");
+const aiUsageReport = await readFile(new URL("./components/MarketingAiUsageReport.tsx", import.meta.url), "utf8");
+const stockReport = await readFile(new URL("./components/MarketingStockReport.tsx", import.meta.url), "utf8");
+const birthdayReport = await readFile(new URL("./components/MarketingBirthdayReport.tsx", import.meta.url), "utf8");
 const events = await readFile(new URL("./components/MarketingEvents.tsx", import.meta.url), "utf8");
 const eventsService = await readFile(new URL("./services/marketingEventsService.ts", import.meta.url), "utf8");
 const eventsHooks = await readFile(new URL("./hooks/useMarketingEvents.ts", import.meta.url), "utf8");
@@ -139,6 +148,68 @@ assert.equal(
   '"Nome","Dia"\r\n"Ana ""Nina""","12"',
 );
 assert.match(createBirthdayCsv([{ name: "=HYPERLINK(1)", day: 8 }]), /'=HYPERLINK/);
+assert.equal(
+  createMonthlyEmployeeBirthdayCsv([
+    { name: "Ana", birthDate: "1990-05-01", department: "Marketing" },
+    { name: "Bruno", birthDate: "1985-05-31", department: null },
+  ]),
+  '"Data","Colaborador","Departamento"\r\n"01/05/1990","Ana","Marketing"\r\n"31/05/1985","Bruno","Sem departamento"',
+);
+assert.equal(
+  createMonthlyClientBirthdayCsv([{ name: "Carla", birthDate: "1970-05-15", companies: "Alfa, Beta" }]),
+  '"Data","Cliente","Empresa"\r\n"15/05/1970","Carla","Alfa, Beta"',
+);
+assert.match(birthdayReport, /useMarketingMonthlyBirthdays\(month/);
+assert.match(birthdayReport, /id="marketing-birthday-report"/);
+assert.match(birthdayReport, /printMarketingReport\("marketing-birthday-report"\)/);
+assert.match(birthdayReport, /employeeBirthdayRows\(report\.employees\.items\)/);
+assert.match(
+  await readFile(new URL("./utils/printMarketingReport.ts", import.meta.url), "utf8"),
+  /window\.print\(\)/,
+);
+assert.match(styles, /\.marketing-print-report \*/);
+assert.match(birthdayReport, /marketing-print-report/);
+assert.match(page, /MarketingBirthdayReport/);
+assert.equal(
+  createMarketingStockCsv(
+    {
+      totals: { items: 2, quantity: 3 },
+      items: [
+        { id: "s-1", name: "Banner", quantity: 3, lastEntryAt: "2026-09-30T13:05:00.000Z", lastExitAt: null },
+        { id: "s-2", name: "-Caneta", quantity: 0, lastEntryAt: null, lastExitAt: "2026-10-01T09:30:00.000Z" },
+      ],
+    },
+    "UTC",
+  ),
+  '"Nome","Quantidade","Última entrada","Última saída"\r\n' +
+    '"Banner","3","30/09/2026, 13:05","Sem registro"\r\n' +
+    '"\'-Caneta","0","Sem registro","01/10/2026, 09:30"\r\n' +
+    '"Total: 2 itens","3","",""',
+);
+assert.match(stockReport, /useMarketingStock\(open\)/);
+assert.match(stockReport, /marketingStockRows\(stock\.items\)/);
+assert.match(stockReport, /printMarketingReport\("marketing-stock-report"\)/);
+assert.match(stockReport, /marketing-print-report/);
+assert.match(page, /MarketingStockReport/);
+assert.equal(
+  createAiUsageReportCsv(
+    [
+      { user: { name: "ana", full_name: "Ana Souza" } },
+      { user: { name: "=bia", full_name: null } },
+    ],
+    "2026-04",
+  ),
+  '"Nome","Competência"\r\n"Ana Souza","04/2026"\r\n"\'=bia","04/2026"',
+);
+assert.match(aiUsageReport, /key: "unanswered"/);
+assert.match(aiUsage, /\.\.\.AI_USAGE_REPORT_SECTIONS/);
+assert.match(aiUsageReport, /key: "withoutIntegration"/);
+assert.match(aiUsageReport, /aiUsageReportRows\(report\[section\.key\], competence\)/);
+assert.match(aiUsageReport, /printMarketingReport\("marketing-ai-usage-report"\)/);
+assert.match(aiUsageReport, /marketing-print-report/);
+assert.match(aiUsage, /<MarketingAiUsageReport competence=\{competence\} report=\{reportQuery\.data\} \/>/);
+assert.match(service, /"\/marketing\/stock"/);
+assert.match(service, /"\/marketing\/birthdays"/);
 assert.match(events, /query\.isLoading/);
 assert.match(events, /query\.isError/);
 assert.match(events, /query\.data\?\.length\s*===\s*0/);
@@ -171,7 +242,7 @@ assert.match(editionsService, /createFeedback/);
 assert.match(editionsService, /getReport/);
 assert.match(editionsHooks, /useCreateMarketingEventEditionFeedback/);
 assert.match(editionsHooks, /invalidateQueries/);
-assert.match(editionReport, /window\.print\(\)/);
+assert.match(editionReport, /printMarketingReport\("marketing-event-edition-report"\)/);
 assert.match(editionReport, /budgetItems/);
 assert.match(editionReport, /logistics/);
 assert.match(editionReport, /marketingCommunication/);
@@ -180,7 +251,7 @@ assert.match(editionReport, /duringEvent/);
 assert.match(editionReport, /afterEvent/);
 assert.match(editionReport, /feedback/);
 assert.match(styles, /@media print/);
-assert.match(styles, /marketing-event-edition-report/);
+assert.match(editionReport, /marketing-print-report/);
 assert.doesNotMatch(page, /notFound:\s*true/);
 assert.match(page, /MarketingDashboard/);
 assert.match(page, /MarketingEvents/);

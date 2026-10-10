@@ -246,6 +246,16 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
           },
         },
       },
+      "/marketing/birthdays": {
+        get: protectedOperation(
+          "Listar aniversariantes do mês (query `month` 1-12): colaboradores ativos e clientes PF vinculados a empresas ativas.",
+        ),
+      },
+      "/marketing/stock": {
+        get: protectedOperation(
+          "Consultar o estoque do departamento Marketing (cadastro Office) com quantidade e últimas entrada/saída.",
+        ),
+      },
       "/marketing/ai-usage-controls/users": {
         get: protectedOperation("Listar usuários ativos da organização elegíveis para pesquisa."),
       },
@@ -259,7 +269,9 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         get: protectedOperation("Consultar respostas da competência selecionada."),
       },
       "/marketing/ai-usage-controls/report": {
-        get: protectedOperation("Consultar respostas pendentes e usuários sem integração."),
+        get: protectedOperation(
+          "Consultar, na competência, controles pendentes (qualquer resposta ausente), sem resposta de conhecimento e com integração respondida como Não.",
+        ),
       },
       "/marketing/ai-usage-controls/{id}": {
         patch: protectedOperation("Salvar respostas da pesquisa mensal."),

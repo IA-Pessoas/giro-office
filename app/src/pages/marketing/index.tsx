@@ -1,12 +1,14 @@
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
+import { MarketingBirthdayReport } from "@modules/marketing/components/MarketingBirthdayReport";
 import { MarketingDashboard } from "@modules/marketing/components/MarketingDashboard";
 import { MarketingCanonicalQueries } from "@modules/marketing/components/MarketingCanonicalQueries";
 import { MarketingAiUsageControls } from "@modules/marketing/components/MarketingAiUsageControls";
 import { MarketingInstagramProfiles } from "@modules/marketing/components/MarketingInstagramProfiles";
 import { MarketingPasswords } from "@modules/marketing/components/MarketingPasswords";
 import { MarketingEvents } from "@modules/marketing/components/MarketingEvents";
+import { MarketingStockReport } from "@modules/marketing/components/MarketingStockReport";
 import { MarketingUsers } from "@modules/marketing/components/MarketingUsers";
 import { MarketingDepartments } from "@modules/marketing/components/MarketingDepartments";
 
@@ -26,6 +28,8 @@ export default function MarketingPage() {
         <MarketingCanonicalQueries />
         <MarketingDepartments />
         <MarketingDashboard />
+        <MarketingBirthdayReport />
+        <MarketingStockReport />
         <MarketingEvents />
         <MarketingAiUsageControls />
         <MarketingInstagramProfiles />
