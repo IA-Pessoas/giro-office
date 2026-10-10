@@ -375,4 +375,34 @@ describe("MarketingPasswordService", () => {
     expect(JSON.stringify(updated)).not.toContain("kept-secret");
     expect(updated.notes).toBeNull();
   });
+
+  it("drops legacy notes holding the old secret when only the password changes", async () => {
+    const prisma = createPrisma();
+    const encryption = new EncryptionService(encryptionKey);
+    const audit = vi.fn(async () => {});
+    const service = new MarketingPasswordService(prisma as never, encryption, audit);
+    prisma.passwordMkt.findFirst
+      .mockResolvedValueOnce({
+        id: "credential-1",
+        local: "Instagram",
+        user: "acme",
+        notes: "senha antiga: old-secret",
+        password: encryption.encrypt("old-secret"),
+      } as never)
+      .mockResolvedValueOnce(null);
+
+    const updated = await service.update(
+      organizationId,
+      "credential-1",
+      { password: "new-secret" },
+      actorUserId,
+    );
+
+    expect(prisma.passwordMkt.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ notes: null }) }),
+    );
+    expect(JSON.stringify(updated)).not.toContain("old-secret");
+    expect(JSON.stringify(audit.mock.calls)).not.toContain("old-secret");
+    expect(JSON.stringify(audit.mock.calls)).not.toContain("new-secret");
+  });
 });
