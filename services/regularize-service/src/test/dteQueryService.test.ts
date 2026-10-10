@@ -39,27 +39,19 @@ function createPrisma(initial: Record<string, boolean> = {}) {
         async (args: { where: { organization_id_client_id_date: { client_id: string } } }) =>
           rows.get(args.where.organization_id_client_id_date.client_id) ?? null,
       ),
-      create: vi.fn(async (args: { data: { client_id: string; done: boolean } }) => {
+      upsert: vi.fn(async (args: { create: { client_id: string; done: boolean } }) => {
         const row = {
-          id: `query-${args.data.client_id}`,
+          id: `query-${args.create.client_id}`,
           organization_id: ORG,
-          client_id: args.data.client_id,
-          done: args.data.done,
+          client_id: args.create.client_id,
+          done: args.create.done,
         };
         rows.set(row.client_id, row);
         return row;
       }),
-      update: vi.fn(async (args: { where: { id: string }; data: { done: boolean } }) => {
-        const row = [...rows.values()].find((item) => item.id === args.where.id);
-        if (!row) throw new Error("linha inexistente");
-        row.done = args.data.done;
-        return row;
-      }),
-      delete: vi.fn(async (args: { where: { id: string } }) => {
-        const row = [...rows.values()].find((item) => item.id === args.where.id);
-        if (row) rows.delete(row.client_id);
-        return row;
-      }),
+      deleteMany: vi.fn(async (args: { where: { client_id: string } }) => ({
+        count: rows.delete(args.where.client_id) ? 1 : 0,
+      })),
       createMany: vi.fn(async (args: { data: Array<{ client_id: string; done: boolean }> }) => {
         for (const item of args.data) {
           rows.set(item.client_id, {
@@ -132,7 +124,10 @@ describe("DteQueryService.grid", () => {
     };
     expect(where.organization_id).toBe(ORG);
     expect(where.OR[0]).toEqual({ id: { in: ["client-a"] } });
-    expect(where.OR[1]).toMatchObject({ segment: { in: ["Varejo"] }, state: "BA" });
+    expect(where.OR[1]).toMatchObject({
+      segment: { in: ["Varejo"], mode: "insensitive" },
+      state: { equals: "BA", mode: "insensitive" },
+    });
   });
 });
 
@@ -198,7 +193,7 @@ describe("DteQueryService.setStatus", () => {
 
     await serviceFor(prisma).setStatus({ ...base, clientId: "client-a", status: "feita" });
 
-    expect(prisma.regularizeDteQuery.update).not.toHaveBeenCalled();
+    expect(prisma.regularizeDteQuery.upsert).not.toHaveBeenCalled();
     expect(prisma.logs.create).not.toHaveBeenCalled();
   });
 
@@ -213,7 +208,7 @@ describe("DteQueryService.setStatus", () => {
         status: "feita",
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
-    expect(prisma.regularizeDteQuery.create).not.toHaveBeenCalled();
+    expect(prisma.regularizeDteQuery.upsert).not.toHaveBeenCalled();
   });
 });
 
@@ -232,12 +227,18 @@ describe("DteQueryService.importLists", () => {
     expect(statusOf(prisma)).toEqual({ "client-a": true, "client-b": true, "client-c": false });
     expect(result).toEqual({
       date: "2026-10-09",
-      done: 2,
-      not_done: 1,
+      done_count: 2,
+      not_done_count: 1,
       conflicts: [],
       unknown: [],
     });
+    // O histórico guarda de onde saiu quem a lista trocou de conjunto.
     expect(prisma.logs.create).toHaveBeenCalledTimes(1);
+    expect(prisma.logs.create.mock.calls[0]?.[0].data.changes).toMatchObject({
+      done_client_ids: ["client-a", "client-b"],
+      not_done_client_ids: ["client-c"],
+      moved_from: { "client-a": "nao_feita" },
+    });
   });
 
   it("não aplica documento que veio nas duas listas e informa os desconhecidos", async () => {
@@ -251,8 +252,8 @@ describe("DteQueryService.importLists", () => {
 
     expect(statusOf(prisma)).toEqual({ "client-b": true });
     expect(result).toMatchObject({
-      done: 1,
-      not_done: 0,
+      done_count: 1,
+      not_done_count: 0,
       conflicts: ["11111111000111"],
       unknown: ["99999999000199"],
     });

@@ -1,4 +1,5 @@
 import { normalizeCpfCnpj, ServiceError } from "@workspace/shared";
+import type { ClientSegmentType } from "@workspace/shared/regularize";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
@@ -17,7 +18,7 @@ export const DTE_QUERY_IMPORT_LIMITS = {
 } as const;
 
 // Recorte de clientes do registros.php: comércio ou indústria, da BA, com inscrição estadual.
-const ELIGIBLE_SEGMENT_TYPES = ["comercio", "industria"];
+const ELIGIBLE_SEGMENT_TYPES: ClientSegmentType[] = ["comercio", "industria"];
 const ELIGIBLE_STATE = "BA";
 const EXEMPT_STATE_REGISTRATION = "ISENTO";
 
@@ -39,8 +40,8 @@ export type DteQueryGrid = {
 
 export type DteQueryImportResult = {
   date: string;
-  done: number;
-  not_done: number;
+  done_count: number;
+  not_done_count: number;
   conflicts: string[];
   unknown: string[];
 };
@@ -66,6 +67,7 @@ export function parseDocumentList(text: string): string[] {
 export class DteQueryService {
   constructor(private readonly prisma: PrismaClient) {}
 
+  // Grade do dia, como o registros.php: a competência do dia define a carteira.
   async grid(input: { organizationId: string; date: Date }): Promise<DteQueryGrid> {
     const monthStart = new Date(Date.UTC(input.date.getUTCFullYear(), input.date.getUTCMonth(), 1));
     const nextMonthStart = new Date(
@@ -90,8 +92,9 @@ export class DteQueryService {
       OR: [
         { id: { in: [...doneByClient.keys()] } },
         {
-          segment: { in: segments.map((segment) => segment.name) },
-          state: ELIGIBLE_STATE,
+          // O cliente guarda o nome do segmento; renomear no catálogo não reescreve o cadastro.
+          segment: { in: segments.map((segment) => segment.name), mode: "insensitive" },
+          state: { equals: ELIGIBLE_STATE, mode: "insensitive" },
           AND: [
             {
               OR: [
@@ -99,9 +102,16 @@ export class DteQueryService {
                 { state_registration: { not: EXEMPT_STATE_REGISTRATION, mode: "insensitive" } },
               ],
             },
-            // Carteira da competência do dia, como Cliente::compGeralCliente.
+            // Carteira da competência, como Cliente::compGeralCliente. Diferença: cliente sem
+            // "cliente desde" entra, porque o cadastro migrado nem sempre tem a data.
             { OR: [{ customer_since: null }, { customer_since: { lt: nextMonthStart } }] },
-            { OR: [{ status: "Ativo" }, { competence_output: { gte: monthStart } }] },
+            {
+              OR: [
+                { status: "Ativo" },
+                { competence_output: { gte: monthStart } },
+                { deletion_date: { gte: input.date } },
+              ],
+            },
           ],
         },
       ],
@@ -140,51 +150,42 @@ export class DteQueryService {
     });
     if (!client) throw new ServiceError(404, "Cliente não encontrado.");
 
-    const existing = await this.prisma.regularizeDteQuery.findUnique({
-      where: {
-        organization_id_client_id_date: {
-          organization_id: input.organizationId,
-          client_id: client.id,
-          date: input.date,
-        },
-      },
-    });
-    const from = toStatus(existing?.done);
+    const key = {
+      organization_id: input.organizationId,
+      client_id: client.id,
+      date: input.date,
+    };
     const result = { client_id: client.id, date: isoDay(input.date), status: input.status };
-    if (from === input.status) return result;
 
+    // Leitura e escrita na mesma transação, e escrita pela chave única: duas correções
+    // simultâneas do mesmo cliente não quebram no índice nem deixam o histórico defasado.
     await this.prisma.$transaction(async (transaction) => {
-      const done = input.status === "feita";
-      let referringId: string;
-      let action: string;
-      if (!existing) {
-        const created = await transaction.regularizeDteQuery.create({
-          data: {
-            organization_id: input.organizationId,
-            client_id: client.id,
-            date: input.date,
-            done,
-            updated_by_user_id: input.userId,
-          },
-        });
-        referringId = created.id;
-        action = "Cadastro";
-      } else if (input.status === "sem_registro") {
-        await transaction.regularizeDteQuery.delete({ where: { id: existing.id } });
-        referringId = existing.id;
-        action = "Exclusao";
+      const existing = await transaction.regularizeDteQuery.findUnique({
+        where: { organization_id_client_id_date: key },
+      });
+      const from = toStatus(existing?.done);
+      if (from === input.status) return;
+
+      let referringId = existing?.id ?? "";
+      if (input.status === "sem_registro") {
+        await transaction.regularizeDteQuery.deleteMany({ where: key });
       } else {
-        await transaction.regularizeDteQuery.update({
-          where: { id: existing.id },
-          data: { done, updated_by_user_id: input.userId },
+        const done = input.status === "feita";
+        const saved = await transaction.regularizeDteQuery.upsert({
+          where: { organization_id_client_id_date: key },
+          create: { ...key, done, updated_by_user_id: input.userId },
+          update: { done, updated_by_user_id: input.userId },
         });
-        referringId = existing.id;
-        action = "Atualizacao";
+        referringId = saved.id;
       }
       await new RegularizeLogService(transaction).createLog({
         userId: input.userId,
         organizationId: input.organizationId,
-        action,
+        action: !existing
+          ? "Cadastro"
+          : input.status === "sem_registro"
+            ? "Exclusao"
+            : "Atualizacao",
         referring: LOG_REFERRING,
         referringId,
         changes: {
@@ -197,6 +198,8 @@ export class DteQueryService {
     return result;
   }
 
+  // Registro do dia pelas duas listas do list.php. Diferença do legado: lá a lista só valia se
+  // o dia ainda não tinha registro; aqui ela substitui a situação de quem estiver nela.
   async importLists(input: {
     organizationId: string;
     userId: string;
@@ -226,50 +229,55 @@ export class DteQueryService {
     const clients = await this.prisma.client.findMany({
       where: { organization_id: input.organizationId },
       select: { id: true, cpf_cnpj: true },
+      orderBy: { id: "asc" },
     });
     const clientByDocument = new Map<string, string>();
     for (const client of clients) {
       const document = normalizeCpfCnpj(client.cpf_cnpj);
-      if (document) clientByDocument.set(document, client.id);
+      if (document && !clientByDocument.has(document)) clientByDocument.set(document, client.id);
     }
 
     const unknown: string[] = [];
-    const doneByClient = new Map<string, boolean>();
-    for (const [documents, done] of [
-      [doneDocuments, true],
-      [notDoneDocuments, false],
-    ] as const) {
+    const resolve = (documents: string[]): string[] => {
+      const ids: string[] = [];
       for (const document of documents) {
         if (conflictSet.has(document)) continue;
         const clientId = clientByDocument.get(document);
-        if (clientId) doneByClient.set(clientId, done);
+        if (clientId) ids.push(clientId);
         else unknown.push(document);
       }
-    }
+      return ids;
+    };
+    const doneIds = resolve(doneDocuments);
+    const notDoneIds = resolve(notDoneDocuments);
+    const doneSet = new Set(doneIds);
 
     const date = isoDay(input.date);
-    const clientIds = [...doneByClient.keys()];
-    const idsWith = (done: boolean) => clientIds.filter((id) => doneByClient.get(id) === done);
+    const clientIds = [...doneIds, ...notDoneIds];
     await this.prisma.$transaction(async (transaction) => {
       const scope = { organization_id: input.organizationId, date: input.date };
       const existing = await transaction.regularizeDteQuery.findMany({
         where: { ...scope, client_id: { in: clientIds } },
-        select: { client_id: true },
+        select: { client_id: true, done: true },
       });
-      const existingIds = new Set(existing.map((record) => record.client_id));
+      const previous = new Map(existing.map((record) => [record.client_id, record.done]));
       await transaction.regularizeDteQuery.createMany({
         data: clientIds
-          .filter((id) => !existingIds.has(id))
+          .filter((id) => !previous.has(id))
           .map((id) => ({
             ...scope,
             client_id: id,
-            done: doneByClient.get(id) === true,
+            done: doneSet.has(id),
             updated_by_user_id: input.userId,
           })),
         skipDuplicates: true,
       });
+      // Só quem muda de conjunto é atualizado: quem já estava certo não ganha novo autor.
+      const moved = clientIds.filter(
+        (id) => previous.has(id) && previous.get(id) !== doneSet.has(id),
+      );
       for (const done of [true, false]) {
-        const ids = idsWith(done).filter((id) => existingIds.has(id));
+        const ids = moved.filter((id) => doneSet.has(id) === done);
         if (ids.length === 0) continue;
         await transaction.regularizeDteQuery.updateMany({
           where: { ...scope, client_id: { in: ids } },
@@ -284,8 +292,10 @@ export class DteQueryService {
         referringId: date,
         changes: {
           date,
-          done_client_ids: idsWith(true),
-          not_done_client_ids: idsWith(false),
+          done_client_ids: doneIds,
+          not_done_client_ids: notDoneIds,
+          // Situação anterior de quem a lista trocou de conjunto.
+          moved_from: Object.fromEntries(moved.map((id) => [id, toStatus(previous.get(id))])),
           conflicts,
           unknown,
         },
@@ -294,8 +304,8 @@ export class DteQueryService {
 
     return {
       date,
-      done: idsWith(true).length,
-      not_done: idsWith(false).length,
+      done_count: doneIds.length,
+      not_done_count: notDoneIds.length,
       conflicts,
       unknown,
     };

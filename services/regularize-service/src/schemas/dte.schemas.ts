@@ -3,6 +3,7 @@ import { z } from "zod";
 import { DTE_IMPORT_FORMATS, DTE_IMPORT_LIMITS } from "../services/dteImportParser.js";
 import { DTE_NOTICE_READING_FILTERS } from "../services/dteNoticeService.js";
 import { DTE_QUERY_IMPORT_LIMITS, DTE_QUERY_STATUSES } from "../services/dteQueryService.js";
+import { isCalendarDay } from "./common.schemas.js";
 
 export const importDteBodySchema = z
   .object({
@@ -37,8 +38,8 @@ export const updateDteNoticeReadingBodySchema = z
 const dteQueryDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "date deve estar no formato aaaa-mm-dd.")
-  .transform((value) => new Date(`${value}T00:00:00.000Z`))
-  .refine((value) => !Number.isNaN(value.getTime()), "date inválida.");
+  .refine(isCalendarDay, "date não existe no calendário.")
+  .transform((value) => new Date(`${value}T00:00:00.000Z`));
 
 const dteQueryListSchema = z
   .string()

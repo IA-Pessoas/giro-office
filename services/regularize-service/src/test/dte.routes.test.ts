@@ -162,7 +162,7 @@ describe("dte routes", () => {
       .get("/regularize/dte/queries?date=2026-10-09")
       .set(gatewayHeaders({ permission: 1 }));
     const invalid = await request(app)
-      .get("/regularize/dte/queries?date=2026-13-40")
+      .get("/regularize/dte/queries?date=2026-02-31")
       .set(gatewayHeaders());
     const missing = await request(app).get("/regularize/dte/queries").set(gatewayHeaders());
 
@@ -203,8 +203,8 @@ describe("dte routes", () => {
   it("registra as listas de consultas só com permissão de escrita", async () => {
     const importLists = vi.spyOn(DteQueryService.prototype, "importLists").mockResolvedValue({
       date: "2026-10-09",
-      done: 1,
-      not_done: 0,
+      done_count: 1,
+      not_done_count: 0,
       conflicts: [],
       unknown: [],
     });

@@ -763,8 +763,8 @@ export type RegularizeDteQueryListsPayload = {
 
 export type RegularizeDteQueryListsResult = {
   date: string;
-  done: number;
-  not_done: number;
+  done_count: number;
+  not_done_count: number;
   conflicts: string[];
   unknown: string[];
 };

@@ -548,8 +548,8 @@ describe("regularize Worker", () => {
       })),
       importLists: vi.fn(async () => ({
         date: "2026-10-09",
-        done: 1,
-        not_done: 0,
+        done_count: 1,
+        not_done_count: 0,
         conflicts: [],
         unknown: [],
       })),

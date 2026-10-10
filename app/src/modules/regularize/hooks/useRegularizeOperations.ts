@@ -145,7 +145,8 @@ export function useRegularizeDteQueryGrid(
   return useFetch(
     regularizeQueryKeys.dteQueryGrid(date, scope),
     () => regularizeService.getDteQueryGrid(date),
-    { enabled: Boolean(date), placeholderData: keepPreviousData },
+    // Sem manter a grade anterior: os campos de situação gravam no dia escolhido.
+    { enabled: Boolean(date) },
   );
 }
 

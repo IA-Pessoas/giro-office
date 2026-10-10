@@ -81,6 +81,7 @@ model Client {
   segment         String?
   customer_since  DateTime?
   competence_output DateTime?
+  deletion_date   DateTime?
   dteQueries      RegularizeDteQuery[]
 
   @@map("clients")

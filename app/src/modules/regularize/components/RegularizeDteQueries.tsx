@@ -10,8 +10,11 @@ import { REGULARIZE_DTE_QUERY_STATUSES, type RegularizeDteQueryStatus } from "..
 import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import {
+  regularizePanelAlertClassName as alertClassName,
   regularizePanelClassName,
   regularizePanelLabelClassName,
+  regularizePanelSuccessClassName,
+  regularizePanelTableCellClassName as cellClassName,
   regularizePrimaryButtonClassName,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
@@ -23,9 +26,6 @@ const STATUS_LABELS: Record<RegularizeDteQueryStatus, string> = {
   sem_registro: "Sem registro",
 };
 
-const cellClassName = "px-3 py-2 align-top";
-const alertClassName =
-  "mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200";
 
 // Consultas diárias ao DTE (#1746): quem teve a consulta feita ou não em cada dia. É o
 // "Status de consultas" do sistema anterior; não tem relação com a leitura dos avisos.
@@ -207,10 +207,10 @@ export function RegularizeDteQueries({ canEdit }: { canEdit: boolean }) {
           {listsMutation.isSuccess ? (
             <div
               role="status"
-              className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
+              className={regularizePanelSuccessClassName}
             >
-              Registro concluído: {listsMutation.data.done} feitas e {listsMutation.data.not_done}{" "}
-              não feitas.
+              Registro concluído: {listsMutation.data.done_count} feitas e{" "}
+              {listsMutation.data.not_done_count} não feitas.
               {listsMutation.data.conflicts.length ? (
                 <p className="mt-1">
                   Nas duas listas, não aplicados: {listsMutation.data.conflicts.join(", ")}.
