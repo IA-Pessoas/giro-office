@@ -60,6 +60,10 @@ const clientFields = [
   field("size", "Porte", "string", stringOperators),
   field("city", "Cidade", "string", stringOperators),
   field("state", "Estado", "string", stringOperators),
+  field("state_registration", "Inscrição estadual", "string", stringOperators),
+  // Filtro DTE do legado (relatorios/estados.php); combine com Estado para a lista por UF.
+  field("dte_eligible", "Elegível à consulta DTE", "boolean", booleanOperators),
+  field("dte_missing_data", "DTE: dado ausente no cadastro", "string", stringOperators),
   field("licitacao", "Faz licitação", "boolean", booleanOperators),
   field("contabil", "Departamento Contábil", "boolean", booleanOperators),
   field("fiscal", "Departamento Fiscal", "boolean", booleanOperators),

@@ -225,6 +225,236 @@ describe("RegularizePortfolioReportingService", () => {
     });
   });
 
+  describe("lista DTE por UF", () => {
+    // Regra do legado (relatorios/estados.php): ativo ou em inativação, segmento de comércio
+    // ou indústria e inscrição estadual diferente de ISENTO.
+    const clients = [
+      {
+        id: "c1",
+        name: "Comércio BA",
+        status: "Ativo",
+        state: "BA",
+        segment: "Padaria",
+        state_registration: "123",
+      },
+      {
+        id: "c2",
+        name: "Indústria em inativação",
+        status: "P",
+        state: "BA",
+        segment: "Fábrica",
+        state_registration: "456",
+      },
+      {
+        id: "c3",
+        name: "Isenta",
+        status: "Ativo",
+        state: "BA",
+        segment: "Padaria",
+        state_registration: " isento ",
+      },
+      {
+        id: "c4",
+        name: "Serviço",
+        status: "Ativo",
+        state: "BA",
+        segment: "Consultoria",
+        state_registration: "789",
+      },
+      {
+        id: "c5",
+        name: "Inativa",
+        status: "Inativo",
+        state: "BA",
+        segment: "Padaria",
+        state_registration: "321",
+      },
+      {
+        id: "c6",
+        name: "Sem inscrição",
+        status: "Ativo",
+        state: "BA",
+        segment: "Padaria",
+        state_registration: null,
+      },
+      {
+        id: "c7",
+        name: "Sem segmento",
+        status: "Ativo",
+        state: "BA",
+        segment: null,
+        state_registration: "654",
+      },
+      {
+        id: "c8",
+        name: "Comércio sem UF",
+        status: "Ativo",
+        state: null,
+        segment: "Padaria",
+        state_registration: "987",
+      },
+      {
+        id: "c9",
+        name: "Comércio PE",
+        status: "Ativo",
+        state: "PE",
+        segment: "padaria",
+        state_registration: "111",
+      },
+    ];
+    const segments = [
+      { name: "Padaria", type: "comercio" },
+      { name: "Fábrica", type: "industria" },
+      { name: "Consultoria", type: "servico" },
+    ];
+    const pick = (row: Record<string, unknown>, select: Record<string, unknown>) =>
+      Object.fromEntries(Object.keys(select).map((key) => [key, row[key]]));
+    const build = () => {
+      const prisma = prismaWith({
+        client: { findMany: vi.fn(async ({ select }) => clients.map((row) => pick(row, select))) },
+        clientSegment: { findMany: vi.fn().mockResolvedValue(segments) },
+      }) as { $transaction?: unknown };
+      prisma.$transaction = async (read: (transaction: unknown) => unknown) => read(prisma);
+      return new RegularizePortfolioReportingService(prisma as never);
+    };
+
+    it("marca os elegíveis e diz o que falta no cadastro", async () => {
+      const result = await build().extract({
+        organizationId,
+        source: "regularize.clients",
+        fields: ["name", "dte_eligible", "dte_missing_data"],
+        limit: 20,
+      });
+
+      expect(result.rows).toEqual([
+        { name: "Comércio BA", dte_eligible: true, dte_missing_data: null },
+        { name: "Indústria em inativação", dte_eligible: true, dte_missing_data: null },
+        { name: "Isenta", dte_eligible: false, dte_missing_data: null },
+        { name: "Serviço", dte_eligible: false, dte_missing_data: null },
+        { name: "Inativa", dte_eligible: false, dte_missing_data: null },
+        // Sem inscrição entra, como no PHP (vazio é diferente de ISENTO), e fica sinalizado.
+        { name: "Sem inscrição", dte_eligible: true, dte_missing_data: "Inscrição estadual" },
+        { name: "Sem segmento", dte_eligible: false, dte_missing_data: "Segmento" },
+        { name: "Comércio sem UF", dte_eligible: true, dte_missing_data: "UF" },
+        { name: "Comércio PE", dte_eligible: true, dte_missing_data: null },
+      ]);
+    });
+
+    it("aplica a mesma regra aos clientes dentro dos grupos e ignora espaços no segmento", async () => {
+      const members = vi.fn().mockResolvedValue([
+        {
+          id: "m1",
+          group: { name: "Grupo Norte", status: true },
+          client: {
+            id: "c1",
+            status: "Ativo",
+            state: "BA",
+            segment: " padaria ",
+            state_registration: "1",
+          },
+        },
+        {
+          id: "m2",
+          group: { name: "Grupo Norte", status: true },
+          client: {
+            id: "c2",
+            status: "Ativo",
+            state: "BA",
+            segment: "Outro",
+            state_registration: "2",
+          },
+        },
+      ]);
+      const service = new RegularizePortfolioReportingService(
+        prismaWith({
+          clientsGroup: { findMany: members },
+          clientSegment: {
+            findMany: vi.fn().mockResolvedValue([{ name: "Padaria ", type: "comercio" }]),
+          },
+        }),
+      );
+
+      await expect(
+        service.extract({
+          organizationId,
+          source: "regularize.client_groups",
+          fields: ["group_name", "dte_eligible", "segment_type", "dte_missing_data"],
+          limit: 10,
+        }),
+      ).resolves.toEqual({
+        rows: [
+          {
+            group_name: "Grupo Norte",
+            dte_eligible: true,
+            segment_type: "comercio",
+            dte_missing_data: null,
+          },
+          // Segmento fora do catálogo: sem tipo, fora da lista e sinalizado.
+          {
+            group_name: "Grupo Norte",
+            dte_eligible: false,
+            segment_type: null,
+            dte_missing_data: "Segmento fora do catálogo",
+          },
+        ],
+        reachedLimit: false,
+      });
+      expect(members.mock.calls[0]?.[0].select.client.select).toEqual({
+        id: true,
+        segment: true,
+        status: true,
+        state: true,
+        state_registration: true,
+      });
+    });
+
+    it("filtra por UF e fecha a contagem com a lista", async () => {
+      const filters = [
+        { field: "dte_eligible", operator: "eq", parameter: "dte", value: true },
+        { field: "state", operator: "eq", parameter: "uf", value: "BA" },
+      ];
+      const service = build();
+
+      await expect(
+        service.extract({
+          organizationId,
+          source: "regularize.clients",
+          fields: ["name", "state_registration"],
+          limit: 20,
+          query: { filters },
+        }),
+      ).resolves.toEqual({
+        rows: [
+          { name: "Comércio BA", state_registration: "123" },
+          { name: "Indústria em inativação", state_registration: "456" },
+          { name: "Sem inscrição", state_registration: null },
+        ],
+        reachedLimit: false,
+      });
+      await expect(
+        service.extract({
+          organizationId,
+          source: "regularize.clients",
+          fields: ["state"],
+          limit: 20,
+          query: {
+            filters: [filters[0] as never],
+            group_by: ["state"],
+            aggregations: [{ field: "state", function: "count_rows", alias: "total" }],
+            order_by: [{ field: "state", direction: "asc" }],
+          },
+        }),
+      ).resolves.toEqual({
+        rows: [
+          { state: "BA", total: 3 },
+          { state: "PE", total: 1 },
+          { state: null, total: 1 },
+        ],
+        reachedLimit: false,
+      });
+    });
+  });
+
   it("rejeita chaves internas e campos não publicados", async () => {
     const findMany = vi.fn();
     const service = new RegularizePortfolioReportingService(prismaWith({ client: { findMany } }));
