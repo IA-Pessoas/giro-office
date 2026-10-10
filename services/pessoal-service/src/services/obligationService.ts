@@ -7,7 +7,10 @@ import type {
   ListObligationPortfolioQuery,
   UpdateObligationFieldBody,
 } from "../schemas/obligation.schemas.js";
-import { listObligationPortfolio, type ObligationPortfolioPrisma } from "./obligationPortfolio.js";
+import {
+  listObligationPortfolio,
+  type ObligationPortfolioPrisma,
+} from "./obligationPortfolioService.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
 import { NO_OBLIGATIONS_GROUP_POLICY, NORMAL_GROUP_POLICY } from "./pessoalGroupPolicy.js";
 import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";

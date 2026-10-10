@@ -20,7 +20,11 @@ import {
   PESSOAL_OBLIGATION_STATE_LABELS,
 } from "../utils/obligationPortfolio";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
-import { pessoalSecondaryButtonClassName, pessoalTextFieldClassName } from "./pessoalFormControls";
+import {
+  pessoalCompactSelectClassName,
+  pessoalSecondaryButtonClassName,
+  pessoalTextFieldClassName,
+} from "./pessoalFormControls";
 
 const PAGE_SIZE = 25;
 const STATES = Object.keys(PESSOAL_OBLIGATION_STATE_LABELS) as PessoalObligationItemState[];
@@ -54,7 +58,12 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
   const updateMutation = useUpdatePessoalPortfolioObligationMutation();
   const data = portfolioQuery.data;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
-  const stateNeedsItem = Boolean(state) && state !== "pending" && !item;
+
+  function handleItemChange(next: PessoalObligationItem | "") {
+    setItem(next);
+    // Sem item, o servidor só aceita "pendente em qualquer item".
+    if (!next && state && state !== "pending") setState("");
+  }
 
   async function handleChange(
     row: PessoalObligationPortfolioItem,
@@ -116,7 +125,7 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
           Item
           <select
             value={item}
-            onChange={(event) => setItem(event.target.value as PessoalObligationItem | "")}
+            onChange={(event) => handleItemChange(event.target.value as PessoalObligationItem | "")}
             className={pessoalTextFieldClassName}
           >
             <option value="">Todos</option>
@@ -136,20 +145,13 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
           >
             <option value="">Todos</option>
             {STATES.map((option) => (
-              <option key={option} value={option}>
+              <option key={option} value={option} disabled={!item && option !== "pending"}>
                 {PESSOAL_OBLIGATION_STATE_LABELS[option]}
               </option>
             ))}
           </select>
         </label>
       </div>
-
-      {stateNeedsItem ? (
-        <p className="text-sm text-amber-700 dark:text-amber-300">
-          Escolha um item para filtrar por esse estado; sem item, só “Pendente” vale para
-          qualquer item.
-        </p>
-      ) : null}
 
       {portfolioQuery.isLoading ? (
         <p className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -162,7 +164,8 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
         </p>
       ) : data && data.items.length === 0 ? (
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Nenhuma obrigação encontrada para a competência e os filtros escolhidos.
+          Nenhuma obrigação encontrada para a competência e os filtros escolhidos. Se a
+          competência ainda não foi gerada, use “Gerar todos”.
         </p>
       ) : data ? (
         <div className="overflow-x-auto u-scrollbar-system rounded-lg border border-gray-200 dark:border-gray-700">
@@ -201,7 +204,7 @@ export function PessoalObligationPortfolio({ competence, canEdit }: PessoalOblig
                                 event.target.value as PessoalObligationItemState,
                               )
                             }
-                            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
+                            className={pessoalCompactSelectClassName}
                           >
                             {STATES.map((value) => (
                               <option key={value} value={value}>

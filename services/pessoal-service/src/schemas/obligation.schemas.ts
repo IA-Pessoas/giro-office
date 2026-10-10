@@ -62,13 +62,16 @@ export const OBLIGATION_ITEMS = [
   "vt",
 ] as const;
 
+/** Estado do item na carteira: pendente (false), concluído (true), não possui (null). */
+export const OBLIGATION_ITEM_STATES = ["pending", "done", "none"] as const;
+
 export const listObligationPortfolioQuerySchema = z
   .object({
     competence: competenceSchema,
     responsavel_id: z.string().uuid({ message: "responsavel_id inválido." }).optional(),
     group_id: z.string().uuid({ message: "group_id inválido." }).optional(),
     item: z.enum(OBLIGATION_ITEMS).optional(),
-    state: z.enum(["pending", "done", "none"]).optional(),
+    state: z.enum(OBLIGATION_ITEM_STATES).optional(),
     page: z.coerce.number().int().min(1).default(1),
     page_size: z.coerce.number().int().min(1).max(100).default(50),
   })

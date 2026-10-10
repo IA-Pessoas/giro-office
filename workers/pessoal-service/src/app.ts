@@ -27,7 +27,7 @@ import {
   obligationIdParamsSchema,
   updateObligationFieldBodySchema,
 } from "@workspace/pessoal-service/src/schemas/obligation.schemas.js";
-import { listObligationPortfolio } from "@workspace/pessoal-service/src/services/obligationPortfolio.js";
+import { listObligationPortfolio } from "@workspace/pessoal-service/src/services/obligationPortfolioService.js";
 import {
   createPasswordBodySchema,
   listPasswordsQuerySchema,

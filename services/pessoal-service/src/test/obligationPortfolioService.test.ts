@@ -5,7 +5,7 @@ import { listObligationPortfolioQuerySchema } from "../schemas/obligation.schema
 import {
   buildObligationPortfolioWhere,
   listObligationPortfolio,
-} from "../services/obligationPortfolio.js";
+} from "../services/obligationPortfolioService.js";
 import { organizationId, responsibleId } from "./pessoalCoreTestUtils.js";
 
 const GROUP_ID = "c0000000-0000-4000-8000-000000000001";
