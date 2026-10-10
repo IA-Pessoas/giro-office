@@ -33,6 +33,7 @@ model License {
   protocol_file_uploaded_at         DateTime?
   protocol_file_uploaded_by_user_id String?
   client                            Client? @relation(fields: [client_id], references: [id])
+  responsible                       User? @relation(fields: [responsible_id], references: [id])
 
   @@map("regularize.license")
 }
@@ -88,6 +89,7 @@ model Client {
   regime          String?
   size            String?
   responsible     String?
+  municipal_registration String?
   email           String?
   number          String?
   coringa_status  String?
@@ -170,6 +172,7 @@ model User {
   responsible1    Process[] @relation("responsible1")
   responsible2    Process[] @relation("responsible2")
   responsible3    Process[] @relation("responsible3")
+  licenses        License[]
   logs            Logs[]
   permissions     Permission[]
   regularizeNotifications RegularizeNotification[]

@@ -55,6 +55,12 @@ describe("RegularizeLicenseAdapter", () => {
       "entry_date",
       "date_last_consultation",
       "due_date",
+      "client_name",
+      "observation",
+      "responsible_name",
+      "entry_month",
+      "locking_type",
+      "locked",
     ]);
     expect(adapter.sources[0]?.keys).toBeUndefined();
     expect(regularizeLicenseReportingCatalog.sources[0]?.keys.map((field) => field.key)).toEqual([
