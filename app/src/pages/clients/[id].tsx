@@ -24,6 +24,7 @@ import { getContabilCardState, useContabilPermissions } from "@modules/contabil"
 import {
   useActivateClientMutation,
   useClient,
+  useClientSegments,
   useDeactivateClientMutation,
   useUpdateClientMutation,
 } from "@modules/clients/hooks/useClients";
@@ -31,6 +32,7 @@ import type { ClientFormValues } from "@modules/clients/types";
 import {
   buildUpdateClientPayload,
   createClientFormInitialValues,
+  describeClientSegment,
   getClientInternalName,
 } from "@modules/clients/utils/clientForm";
 import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
@@ -74,6 +76,7 @@ export default function ClientDetailPage() {
   const deactivateClientMutation = useDeactivateClientMutation(clientId ?? "");
   const { canViewContabil, isLoading: isContabilAccessLoading } = useContabilPermissions();
   const { access: integracaoAccess } = useModuleAccess("integracao");
+  const segmentsQuery = useClientSegments();
   const [formValues, setFormValues] = useState<ClientFormValues>(createClientFormInitialValues());
 
   const canEditClient = integracaoAccess.canEdit;
@@ -120,7 +123,7 @@ export default function ClientDetailPage() {
     }
 
     try {
-      await updateClientMutation.mutateAsync(buildUpdateClientPayload(formValues, client.regime));
+      await updateClientMutation.mutateAsync(buildUpdateClientPayload(formValues));
 
       toast.success("Cliente atualizado com sucesso.");
       await clientQuery.refetch();
@@ -217,6 +220,10 @@ export default function ClientDetailPage() {
                     <DocumentIssueBadge value={client.cpf_cnpj} />
                   </SummaryItem>
                   <SummaryItem label="Regime" value={client.regime || "A definir"} />
+                  <SummaryItem
+                    label="Segmento"
+                    value={describeClientSegment(client.segment, segmentsQuery.data ?? [])}
+                  />
                   <SummaryItem label="Organização" value={organizationName} />
                   <SummaryItem
                     label="Razão social"
@@ -314,7 +321,8 @@ export default function ClientDetailPage() {
 
                 <ClientForm
                   values={formValues}
-                  legacyTaxRegime={client.regime}
+                  storedRegime={client.regime}
+                  storedSegment={client.segment}
                   onChange={handleInputChange}
                   onSubmit={() => void handleUpdate()}
                   onCancel={() =>

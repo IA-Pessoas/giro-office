@@ -61,10 +61,38 @@ function createMockDeps(): RelationshipRouteDeps {
     delete: vi.fn(async () => ({
       message: "Registro deletado com sucesso.",
     })) as unknown as RelationshipRouteDeps["delete"],
+    history: vi.fn(async () => ({
+      total: 0,
+      items: [],
+    })) as unknown as RelationshipRouteDeps["history"],
   };
 }
 
 describe("relationship routes", () => {
+  it("GET /contabil/relationships/client/:clientId/history pagina na organização autenticada (#1723)", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, relationshipRouteDeps: deps });
+
+    const res = await request(app)
+      .get(`/contabil/relationships/client/${CLIENT_ID}/history`)
+      .query({ page: "2", pageSize: "10" })
+      .set(gatewayHeaders(0));
+    const invalid = await request(app)
+      .get(`/contabil/relationships/client/${CLIENT_ID}/history`)
+      .query({ pageSize: "500" })
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(200);
+    expect(deps.history).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      clientId: CLIENT_ID,
+      page: 2,
+      pageSize: 10,
+    });
+    expect(invalid.status).toBe(400);
+    expect(deps.history).toHaveBeenCalledTimes(1);
+  });
+
   it("GET /contabil/relationships/client/:clientId permite viewer", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, relationshipRouteDeps: deps });

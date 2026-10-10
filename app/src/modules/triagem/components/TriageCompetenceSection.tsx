@@ -8,6 +8,7 @@ import {
   useTriageCompetenceMutations,
   useTriageCompetences,
 } from "../hooks";
+import { TriageClientCloudsSection } from "./TriageClientCloudsSection";
 import { TriageExternalLinksSection } from "./TriageExternalLinksSection";
 import { TriageUrgentRequestsSection } from "./TriageUrgentRequestsSection";
 import { TriageAuditTimeline } from "./TriageAuditTimeline";
@@ -181,6 +182,10 @@ export function TriageCompetenceSection({
             </button>
           </form>
         ) : null}
+      </div>
+
+      <div className="mt-4">
+        <TriageClientCloudsSection clientId={clientId} canEdit={canEdit} />
       </div>
 
       {renderCompetenceContent()}

@@ -86,9 +86,20 @@ async function reportsHeaders(body: unknown, operation: "catalog" | "extract", f
   };
 }
 
-// CNPJ alfanumérico único (14 caracteres) para não colidir entre execuções.
-const uniqueCnpj = () =>
-  `SM${Date.now().toString().slice(-8)}${randomUUID().slice(0, 4)}`.toUpperCase();
+// CNPJ alfanumérico único com dígitos verificadores válidos (o Worker valida desde #1309).
+function cnpjDigit(base: string): number {
+  const weights = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2].slice(13 - base.length);
+  const sum = weights.reduce(
+    (total, weight, index) => total + (base.charCodeAt(index) - 48) * weight,
+    0,
+  );
+  return sum % 11 < 2 ? 0 : 11 - (sum % 11);
+}
+const uniqueCnpj = () => {
+  const base = `SM${Date.now().toString().slice(-6)}${randomUUID().slice(0, 4)}`.toUpperCase();
+  const first = cnpjDigit(base);
+  return `${base}${first}${cnpjDigit(`${base}${first}`)}`;
+};
 
 describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
   const env = () =>
@@ -98,6 +109,194 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     });
   const call = (method: string, path: string, body?: unknown, headers?: Record<string, string>) =>
     smokeCall(debugApp(env()), env(), method, path, body, headers);
+
+  it("regimes: cadastra, renomeia e seleciona na ficha sem reescrever o valor gravado", async () => {
+    const name = `Smoke Regime ${Date.now()}`;
+    const regime = expectOk(
+      await call("POST", "/client/regimes", { name }),
+      "POST /client/regimes",
+    ).data;
+    expect(
+      expectOk(await call("GET", "/client/regimes"), "GET /client/regimes").data.map(
+        (row: { id: string }) => row.id,
+      ),
+    ).toContain(regime.id);
+
+    const client = expectOk(
+      await call("POST", "/client/integration", {
+        organization_id: requireSmokeState().organizationId,
+        type: "PJ",
+        name: `Smoke Cliente Regime ${Date.now()}`,
+        cpf_cnpj: uniqueCnpj(),
+      }),
+      "POST /client/integration (regime)",
+    ).data;
+    expectOk(
+      await call("PATCH", `/client/${client.id}`, { regime: name.toUpperCase() }),
+      "PATCH /client/:id regime",
+    );
+    expect(expectOk(await call("GET", `/client/${client.id}`), "GET regime").data.regime).toBe(
+      name,
+    );
+
+    expectOk(
+      await call("PATCH", `/client/regimes/${regime.id}`, { name: `${name} Renomeado` }),
+      "PATCH /client/regimes/:id",
+    );
+    expect(
+      expectOk(await call("GET", `/client/${client.id}`), "GET após renomear").data.regime,
+    ).toBe(name);
+  });
+
+  it("segmentos: cadastra com tipo, muda o tipo e seleciona pelo Regularize", async () => {
+    const name = `Smoke Segmento ${Date.now()}`;
+    const segment = expectOk(
+      await call("POST", "/client/segments", { name, type: "servico" }),
+      "POST /client/segments",
+    ).data;
+    expectOk(
+      await call("PATCH", `/client/segments/${segment.id}`, { type: "industria" }),
+      "PATCH /client/segments/:id",
+    );
+    const listed = expectOk(await call("GET", "/client/segments"), "GET /client/segments").data;
+    expect(listed.find((row: { id: string }) => row.id === segment.id)).toMatchObject({
+      name,
+      type: "industria",
+    });
+
+    const client = expectOk(
+      await call("POST", "/client/integration", {
+        organization_id: requireSmokeState().organizationId,
+        type: "PJ",
+        name: `Smoke Cliente Segmento ${Date.now()}`,
+        cpf_cnpj: uniqueCnpj(),
+      }),
+      "POST /client/integration (segmento)",
+    ).data;
+    expectOk(
+      await call("PATCH", `/client/${client.id}/regularize`, { segment: name.toLowerCase() }),
+      "PATCH /client/:id/regularize segmento",
+    );
+    expect(expectOk(await call("GET", `/client/${client.id}`), "GET segmento").data.segment).toBe(
+      name,
+    );
+  });
+
+  it("grupos: vínculo único por cliente+grupo, cliente em vários grupos e inativação", async () => {
+    const newClient = async (label: string) =>
+      expectOk(
+        await call("POST", "/client/integration", {
+          organization_id: requireSmokeState().organizationId,
+          type: "PJ",
+          name: `Smoke ${label} ${Date.now()}`,
+          cpf_cnpj: uniqueCnpj(),
+        }),
+        `POST /client/integration (${label})`,
+      ).data as { id: string };
+    const first = await newClient("Grupo A");
+    const second = await newClient("Grupo B");
+    const createGroup = async (name: string) =>
+      expectOk(await call("POST", "/client/groups", { name }), "POST /client/groups").data as {
+        id: string;
+      };
+    const holding = await createGroup(`Smoke Holding ${Date.now()}`);
+    const filiais = await createGroup(`Smoke Filiais ${Date.now()}`);
+
+    for (const ids of [
+      [first.id, second.id],
+      [first.id, second.id, first.id],
+    ]) {
+      expectOk(
+        await call("PUT", `/client/groups/${holding.id}/clients`, { client_ids: ids }),
+        "PUT /client/groups/:id/clients",
+      );
+    }
+    expectOk(
+      await call("PUT", `/client/groups/${filiais.id}/clients`, { client_ids: [first.id] }),
+      "PUT segundo grupo",
+    );
+    expectOk(
+      await call("PATCH", `/client/groups/${filiais.id}`, { status: false }),
+      "PATCH /client/groups/:id status",
+    );
+
+    const groups = expectOk(await call("GET", "/client/groups"), "GET /client/groups").data as {
+      id: string;
+      status: boolean;
+      clients: { id: string }[];
+    }[];
+    const savedHolding = groups.find((group) => group.id === holding.id);
+    expect(savedHolding?.clients.map((client) => client.id).sort()).toEqual(
+      [first.id, second.id].sort(),
+    );
+    expect(groups.find((group) => group.id === filiais.id)).toMatchObject({
+      status: false,
+      clients: [{ id: first.id }],
+    });
+  });
+
+  it("licitação: três estados distintos, histórico com ator e lista de licitantes", async () => {
+    const client = expectOk(
+      await call("POST", "/client/integration", {
+        organization_id: requireSmokeState().organizationId,
+        type: "PJ",
+        name: `Smoke Licitante ${Date.now()}`,
+        cpf_cnpj: uniqueCnpj(),
+      }),
+      "POST /client/integration (licitação)",
+    ).data as { id: string };
+    expectOk(
+      await call("PATCH", `/client/${client.id}`, { status: "Ativo" }),
+      "PATCH status Ativo",
+    );
+    expect(
+      expectOk(await call("GET", `/client/${client.id}`), "GET licitação inicial").data.licitacao,
+    ).toBeNull();
+
+    for (const value of [true, false, true]) {
+      expectOk(
+        await call("PATCH", `/client/${client.id}/regularize`, {
+          licitacao: value,
+          tecnologia: false,
+          coringa_status: "Em análise",
+        }),
+        `PATCH regularize licitacao=${value}`,
+      );
+    }
+    const detail = expectOk(await call("GET", `/client/${client.id}`), "GET após licitação").data;
+    expect(detail).toMatchObject({
+      licitacao: true,
+      tecnologia: false,
+      coringa_status: "Em análise",
+    });
+
+    const history = expectOk(
+      await call("GET", `/client/${client.id}/licitacao/history`),
+      "GET /client/:id/licitacao/history",
+    ).data as {
+      previous_value: boolean | null;
+      new_value: boolean | null;
+      actor: { id: string };
+    }[];
+    expect(history.map((row) => [row.previous_value, row.new_value])).toEqual([
+      [false, true],
+      [true, false],
+      [null, true],
+    ]);
+    expect(history[0].actor.id).toBe(requireSmokeState().ownerId);
+
+    const bidders = expectOk(
+      await call("GET", "/client/licitacao/bidders"),
+      "GET /client/licitacao/bidders",
+    ).data as { id: string }[];
+    expect(bidders.map((row) => row.id)).toContain(client.id);
+    expectOk(await call("DELETE", `/client/${client.id}`), "DELETE inativa licitante");
+    const afterInactivation = expectOk(
+      await call("GET", "/client/licitacao/bidders"),
+      "GET licitantes após inativar",
+    ).data as { id: string }[];
+    expect(afterInactivation.map((row) => row.id)).not.toContain(client.id);
+  });
 
   it("integração: cria, lê, lista com filtros, atualiza, inativa e reativa", async () => {
     const cnpj = uniqueCnpj();
@@ -254,6 +453,12 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
         "POST /client",
       ).data as { id: string }
     ).id;
+    // Segmento vem do catálogo da organização (#1741).
+    const segmentName = `Smoke Contabilidade ${Date.now()}`;
+    expectOk(
+      await call("POST", "/client/segments", { name: segmentName, type: "servico" }),
+      "POST /client/segments (regularize)",
+    );
 
     // buildFinancePayload: só `contract`.
     const finance = expectOk(
@@ -266,12 +471,14 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     );
 
     // buildRegularizePayload com todos os campos do formulário.
+    // CNPJ novo a cada execução: o banco do smoke é reaproveitado entre rodadas.
+    const regularizedCnpj = uniqueCnpj();
     const regularize = {
       dominio_code: "4321",
       name: "Smoke Regularizado",
       company_name: "Regularizada LTDA",
       fantasy_name: "Regularizada",
-      cpf_cnpj: "12345678000195",
+      cpf_cnpj: regularizedCnpj,
       cnae: "6201-5/01",
       cnae_secondary: "6202-3/00",
       responsible: "Beltrano",
@@ -290,7 +497,7 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
       opening_date: "2019-03-04",
       regime: "Lucro Presumido",
       size: "EPP",
-      segment: "Contabilidade",
+      segment: segmentName,
       contabil: true,
       fiscal: true,
       pessoal: false,
@@ -308,11 +515,11 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     expect(after).toMatchObject({
       dominio_code: "4321",
       name: "Smoke Regularizado",
-      cpf_cnpj: "12345678000195",
+      cpf_cnpj: regularizedCnpj,
       cnae: "6201-5/01",
       regime: "Lucro Presumido",
       size: "EPP",
-      segment: "Contabilidade",
+      segment: segmentName,
       contabil: true,
       fiscal: true,
       pessoal: false,
@@ -332,7 +539,7 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
           status: "Ativo",
           cpf_cnpj: uniqueCnpj(),
           prospecting_status: "Fechado",
-          regime: "MEI",
+          regime: "Lucro Presumido",
         }),
         "POST /client",
       ).data as { id: string }
@@ -344,7 +551,7 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     const detail = expectOk(await call("GET", `/client/${id}/pa`), "GET /client/:id/pa").data
       .detail;
     expect(detail).not.toBeNull();
-    expect(detail.client.regime).toBe("MEI");
+    expect(detail.client.regime).toBe("Lucro Presumido");
     expect((await call("POST", `/client/${id}/pa`, {})).status).toBe(409);
 
     const pa = {

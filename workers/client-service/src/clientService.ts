@@ -5,8 +5,10 @@ import {
   isValidCpfCnpj,
   normalizeCpfCnpj,
   ServiceError,
+  TAX_REGIME_OPTIONS,
   withReportingSnapshot,
 } from "@workspace/shared";
+import type { ClientSegmentType } from "@workspace/shared/regularize";
 import { ACTIVE_CLIENT_STATUS } from "../../../services/client-service/src/schemas/client.schemas.js";
 import { lookupOfficialCnpj } from "./cnpjLookup.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
@@ -19,6 +21,18 @@ export type ClientAuthorization = {
   permission?: number;
   isOwner: boolean;
 };
+
+export type ClientAuditEvent = {
+  organizationId: string;
+  userId: string;
+  permission: number | null;
+  action: "create" | "update";
+  referring: "clients" | "clients.regimes" | "clients.segments" | "clients.group";
+  referringId: string;
+  changes: Record<string, { from: unknown; to: unknown }>;
+};
+
+export type ClientAuditSink = (event: ClientAuditEvent) => Promise<void>;
 
 export type ClientFilters = {
   page: number;
@@ -125,6 +139,57 @@ export type ClientWorkerService = {
     userId: string,
     input: Record<string, unknown>,
   ) => Promise<unknown>;
+  listRegimes: (organizationId: string, authorization: ClientAuthorization) => Promise<unknown>;
+  createRegime: (
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  updateRegime: (
+    id: string,
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  listSegments: (organizationId: string, authorization: ClientAuthorization) => Promise<unknown>;
+  createSegment: (
+    organizationId: string,
+    input: { name: string; type: ClientSegmentType },
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  updateSegment: (
+    id: string,
+    organizationId: string,
+    input: CatalogItemInput,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  listGroups: (organizationId: string, authorization: ClientAuthorization) => Promise<unknown>;
+  createGroup: (
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  updateGroup: (
+    id: string,
+    organizationId: string,
+    input: { name?: string; status?: boolean },
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  replaceGroupClients: (
+    id: string,
+    organizationId: string,
+    clientIds: readonly string[],
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  listLicitacaoHistory: (
+    clientId: string,
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  listLicitacaoBidders: (
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
   runCompetenceOutputUpdate: () => Promise<unknown>;
   applyCommercialProjection: (event: Record<string, unknown>) => Promise<unknown>;
   reportingCatalog: () => Promise<unknown>;
@@ -148,7 +213,11 @@ type WorkerModelName =
   | "clientHistory"
   | "clientHistoryPending"
   | "pA"
-  | "clientCommercialProjectionEvent";
+  | "clientCommercialProjectionEvent"
+  | "clientRegime"
+  | "clientSegment"
+  | "clientLicitacaoHistory"
+  | "user";
 
 type WorkerModelDelegate = {
   findUnique: (args: unknown) => Promise<ClientRow | null>;
@@ -212,6 +281,9 @@ const clientSelect = {
   regime: true,
   size: true,
   segment: true,
+  coringa_status: true,
+  tecnologia: true,
+  licitacao: true,
   start_strike: true,
   end_strike: true,
   cnae: true,
@@ -301,6 +373,48 @@ const paDetailSelect = {
   },
 } as const;
 
+const regularizeSelect = {
+  id: true,
+  dominio_code: true,
+  name: true,
+  company_name: true,
+  fantasy_name: true,
+  cpf_cnpj: true,
+  cnae_secondary: true,
+  cnae: true,
+  responsible: true,
+  cpf_responsible: true,
+  address: true,
+  cep: true,
+  neighborhood: true,
+  state: true,
+  city: true,
+  customer_since: true,
+  municipal_registration: true,
+  state_registration: true,
+  commercial_board_registration: true,
+  status: true,
+  competence_entry: true,
+  competence_output: true,
+  opening_date: true,
+  regime: true,
+  size: true,
+  segment: true,
+  coringa_status: true,
+  tecnologia: true,
+  licitacao: true,
+  contabil: true,
+  fiscal: true,
+  pessoal: true,
+  infoproduto: true,
+  consultoria: true,
+  start_strike: true,
+  end_strike: true,
+  deletion_date: true,
+} as const;
+
+const LICITACAO_BIDDER_STATUSES = ["Ativo", "Processo de Inativação"] as const;
+
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
 const CLIENT_DOMAIN_MODULES = [
   "comercial",
@@ -385,8 +499,99 @@ function assertValidClientDocument(value: unknown, type: unknown): string {
   return normalized;
 }
 
-function isClientDocumentUniqueConstraintError(error: unknown): boolean {
+function isUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
+type CatalogKind = "regime" | "segment";
+
+/**
+ * Catálogos da ficha por organização (#1740, #1741). O cliente guarda o nome: renomear não
+ * reescreve fichas, e um valor gravado fora do catálogo continua aceito como está.
+ */
+const CATALOGS = {
+  regime: {
+    model: "clientRegime",
+    field: "regime",
+    referring: "clients.regimes",
+    label: "Regime",
+    shared: TAX_REGIME_OPTIONS as readonly string[],
+    select: { id: true, name: true, created_at: true, updated_at: true },
+  },
+  segment: {
+    model: "clientSegment",
+    field: "segment",
+    referring: "clients.segments",
+    label: "Segmento",
+    shared: [] as readonly string[],
+    select: { id: true, name: true, type: true, created_at: true, updated_at: true },
+  },
+} as const;
+
+type CatalogItemInput = { name?: string; type?: ClientSegmentType };
+
+function changedFields(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, { from: unknown; to: unknown }> {
+  return Object.fromEntries(
+    keys
+      .filter((key) => after[key] !== undefined && after[key] !== before[key])
+      .map((key) => [key, { from: before[key], to: after[key] }]),
+  );
+}
+
+function collapseWhitespace(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+function normalizeCatalogName(name: string): string {
+  return collapseWhitespace(name)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
+// Catálogos da ficha (regimes, segmentos) e grupos canônicos são da Integração e também são
+// geridos pelo Regularize, que no legado mantinha tb_regularize.regimes (#1740, #1741, #1742).
+// Mesma regra de clientCatalogsReadPolicy/EditPolicy em services/gateway/src/security/policies.ts.
+const CLIENT_CATALOG_MODULES = ["integracao", "regularize"] as const;
+
+function requireClientCatalogPermission(auth: ClientAuthorization, minimum: number): void {
+  if (auth.isOwner) return;
+  if (!CLIENT_CATALOG_MODULES.some((module) => (auth.modules?.[module] ?? 0) >= minimum)) {
+    throw new ServiceError(403, "Usuário não possui permissão para os catálogos de clientes.");
+  }
+}
+
+function groupSelect(organizationId: string) {
+  return {
+    id: true,
+    name: true,
+    status: true,
+    organization_id: true,
+    clients: {
+      where: {
+        organization_id: organizationId,
+        client: { is: { organization_id: organizationId } },
+      },
+      select: {
+        client: {
+          select: { id: true, name: true, company_name: true, fantasy_name: true, cpf_cnpj: true },
+        },
+      },
+    },
+  } as const;
+}
+
+type GroupRow = { clients: Array<{ client: { id: string } & Record<string, unknown> }> } & Record<
+  string,
+  unknown
+>;
+
+function presentGroup(group: GroupRow) {
+  return { ...group, clients: group.clients.map(({ client }) => client) };
 }
 
 function serialize(value: unknown): unknown {
@@ -414,6 +619,7 @@ export class ClientService implements ClientWorkerService {
     private readonly cnpjLookupApiToken?: string,
     private readonly historyStorage?: WorkerHistoryStorageLike,
     private readonly inReportingSnapshot = false,
+    private readonly audit?: ClientAuditSink,
   ) {
     this.prisma = prisma;
     this.db = prisma as unknown as WorkerPrismaClient;
@@ -426,6 +632,379 @@ export class ClientService implements ClientWorkerService {
     });
     if (!row) throw new ServiceError(404, "Organização não encontrada.");
     return row;
+  }
+
+  private catalog(kind: CatalogKind) {
+    const config = CATALOGS[kind];
+    return { config, delegate: this.db[config.model] };
+  }
+
+  /** Valor aceito na ficha: compartilhado, do catálogo da organização ou o já gravado. */
+  private async resolveCatalogValue(
+    kind: CatalogKind,
+    organizationId: string,
+    value: unknown,
+    current: unknown,
+  ): Promise<string | null | undefined> {
+    if (value === undefined) return undefined;
+    const name = typeof value === "string" ? collapseWhitespace(value) : "";
+    if (!name) return null;
+    const normalized = normalizeCatalogName(name);
+    // Mesmo valor gravado (até em caixa ou espaços diferentes) volta como está.
+    if (typeof current === "string" && normalizeCatalogName(current) === normalized) return current;
+    const { config, delegate } = this.catalog(kind);
+    const shared = config.shared.find((option) => normalizeCatalogName(option) === normalized);
+    if (shared) return shared;
+    const row = await delegate.findFirst({
+      where: { organization_id: organizationId, normalized_name: normalized },
+      select: { name: true },
+    });
+    if (!row) throw new ServiceError(400, `${config.label} não cadastrado na organização.`);
+    return String(row.name);
+  }
+
+  /** Resolve regime e segmento do input e devolve o de/para a auditar depois da gravação. */
+  private async resolveCatalogFields(
+    organizationId: string,
+    data: Record<string, unknown>,
+    existing: ClientRow | undefined,
+  ): Promise<Record<string, { from: unknown; to: unknown }>> {
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    for (const kind of ["regime", "segment"] as const) {
+      const field = CATALOGS[kind].field;
+      const current = existing?.[field];
+      const value = await this.resolveCatalogValue(kind, organizationId, data[field], current);
+      if (value === undefined) continue;
+      data[field] = value;
+      if (existing && (current ?? null) !== value)
+        changes[field] = { from: current ?? null, to: value };
+    }
+    return changes;
+  }
+
+  private async emitAudit(
+    referring: ClientAuditEvent["referring"],
+    action: ClientAuditEvent["action"],
+    referringId: string,
+    organizationId: string,
+    authorization: Pick<ClientAuthorization, "userId" | "permission">,
+    changes: ClientAuditEvent["changes"],
+  ): Promise<void> {
+    if (Object.keys(changes).length === 0) return;
+    await this.audit?.({
+      organizationId,
+      userId: authorization.userId,
+      permission: authorization.permission ?? null,
+      action,
+      referring,
+      referringId,
+      changes,
+    });
+  }
+
+  private auditClientChanges(
+    clientId: string,
+    organizationId: string,
+    authorization: Pick<ClientAuthorization, "userId" | "permission">,
+    changes: ClientAuditEvent["changes"],
+  ): Promise<void> {
+    return this.emitAudit("clients", "update", clientId, organizationId, authorization, changes);
+  }
+
+  private async listCatalog(
+    kind: CatalogKind,
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientListPermission(authorization);
+    const { config, delegate } = this.catalog(kind);
+    return delegate.findMany({
+      where: { organization_id: organizationId },
+      orderBy: { name: "asc" },
+      select: config.select,
+    });
+  }
+
+  private async assertCatalogNameFree(
+    kind: CatalogKind,
+    organizationId: string,
+    normalized: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const { config, delegate } = this.catalog(kind);
+    const duplicate = await delegate.findFirst({
+      where: {
+        organization_id: organizationId,
+        normalized_name: normalized,
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (duplicate) throw new ServiceError(409, `${config.label} já cadastrado.`);
+  }
+
+  private async writeCatalogItem(
+    kind: CatalogKind,
+    write: () => Promise<ClientRow>,
+  ): Promise<ClientRow> {
+    try {
+      return await write();
+    } catch (error) {
+      if (isUniqueConstraintError(error))
+        throw new ServiceError(409, `${CATALOGS[kind].label} já cadastrado.`, error);
+      throw error;
+    }
+  }
+
+  private async createCatalogItem(
+    kind: CatalogKind,
+    organizationId: string,
+    input: CatalogItemInput,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientCatalogPermission(authorization, 2);
+    const { config, delegate } = this.catalog(kind);
+    const name = collapseWhitespace(input.name ?? "");
+    const normalized = normalizeCatalogName(name);
+    await this.assertCatalogNameFree(kind, organizationId, normalized);
+    const fields = { name, ...(input.type !== undefined ? { type: input.type } : {}) };
+    const row = await this.writeCatalogItem(kind, () =>
+      delegate.create({
+        data: { organization_id: organizationId, ...fields, normalized_name: normalized },
+        select: config.select,
+      }),
+    );
+    await this.emitAudit(
+      config.referring,
+      "create",
+      String(row.id),
+      organizationId,
+      authorization,
+      Object.fromEntries(Object.entries(fields).map(([key, to]) => [key, { from: null, to }])),
+    );
+    return row;
+  }
+
+  private async updateCatalogItem(
+    kind: CatalogKind,
+    id: string,
+    organizationId: string,
+    input: CatalogItemInput,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientCatalogPermission(authorization, 2);
+    const { config, delegate } = this.catalog(kind);
+    const existing = await delegate.findFirst({
+      where: { id, organization_id: organizationId },
+      select: config.select,
+    });
+    if (!existing) throw new ServiceError(404, `${config.label} não encontrado.`);
+    const data: Record<string, unknown> = {};
+    if (input.name !== undefined) {
+      data.name = collapseWhitespace(input.name);
+      data.normalized_name = normalizeCatalogName(input.name);
+      await this.assertCatalogNameFree(kind, organizationId, String(data.normalized_name), id);
+    }
+    if (input.type !== undefined) data.type = input.type;
+    // Clientes guardam o nome: renomear o catálogo não reescreve fichas já gravadas.
+    const row = await this.writeCatalogItem(kind, () =>
+      delegate.update({ where: { id }, data, select: config.select }),
+    );
+    await this.emitAudit(
+      config.referring,
+      "update",
+      id,
+      organizationId,
+      authorization,
+      changedFields(existing, data, ["name", "type"]),
+    );
+    return row;
+  }
+
+  listRegimes(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
+    return this.listCatalog("regime", organizationId, authorization);
+  }
+
+  createRegime(
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    return this.createCatalogItem("regime", organizationId, { name }, authorization);
+  }
+
+  updateRegime(
+    id: string,
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    return this.updateCatalogItem("regime", id, organizationId, { name }, authorization);
+  }
+
+  listSegments(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
+    return this.listCatalog("segment", organizationId, authorization);
+  }
+
+  createSegment(
+    organizationId: string,
+    input: { name: string; type: ClientSegmentType },
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    return this.createCatalogItem("segment", organizationId, input, authorization);
+  }
+
+  updateSegment(
+    id: string,
+    organizationId: string,
+    input: CatalogItemInput,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    return this.updateCatalogItem("segment", id, organizationId, input, authorization);
+  }
+
+  private auditGroup(
+    organizationId: string,
+    authorization: ClientAuthorization,
+    action: ClientAuditEvent["action"],
+    groupId: string,
+    changes: ClientAuditEvent["changes"],
+  ): Promise<void> {
+    return this.emitAudit("clients.group", action, groupId, organizationId, authorization, changes);
+  }
+
+  private async assertGroupNameFree(
+    organizationId: string,
+    name: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const duplicate = await this.prisma.group.findFirst({
+      where: {
+        organization_id: organizationId,
+        name,
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (duplicate) throw new ServiceError(409, "Já existe um grupo com este nome.");
+  }
+
+  async listGroups(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
+    requireClientCatalogPermission(authorization, 1);
+    const groups = await this.prisma.group.findMany({
+      where: { organization_id: organizationId },
+      orderBy: { name: "asc" },
+      select: groupSelect(organizationId),
+    });
+    return groups.map(presentGroup);
+  }
+
+  async createGroup(
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientCatalogPermission(authorization, 2);
+    const trimmed = collapseWhitespace(name);
+    await this.assertGroupNameFree(organizationId, trimmed);
+    const group = await this.prisma.group.create({
+      data: { name: trimmed, organization_id: organizationId },
+      select: groupSelect(organizationId),
+    });
+    await this.auditGroup(organizationId, authorization, "create", group.id, {
+      name: { from: null, to: trimmed },
+      status: { from: null, to: group.status },
+    });
+    return presentGroup(group);
+  }
+
+  async updateGroup(
+    id: string,
+    organizationId: string,
+    input: { name?: string; status?: boolean },
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientCatalogPermission(authorization, 2);
+    const existing = await this.prisma.group.findFirst({
+      where: { id, organization_id: organizationId },
+      select: { id: true, name: true, status: true },
+    });
+    if (!existing) throw new ServiceError(404, "Grupo não encontrado.");
+    const data: { name?: string; status?: boolean } = {};
+    if (input.name !== undefined) {
+      data.name = collapseWhitespace(input.name);
+      await this.assertGroupNameFree(organizationId, data.name, id);
+    }
+    if (input.status !== undefined) data.status = input.status;
+    const group = await this.prisma.group.update({
+      where: { id },
+      data,
+      select: groupSelect(organizationId),
+    });
+    await this.auditGroup(
+      organizationId,
+      authorization,
+      "update",
+      id,
+      changedFields(existing, data, ["name", "status"]),
+    );
+    return presentGroup(group);
+  }
+
+  async replaceGroupClients(
+    id: string,
+    organizationId: string,
+    clientIds: readonly string[],
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientCatalogPermission(authorization, 2);
+    const wanted = [...new Set(clientIds)];
+    const result = await this.prisma.$transaction(async (transaction) => {
+      const group = await transaction.group.findFirst({
+        where: { id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!group) throw new ServiceError(404, "Grupo não encontrado.");
+      const clients = wanted.length
+        ? await transaction.client.findMany({
+            where: { id: { in: wanted }, organization_id: organizationId },
+            select: { id: true },
+          })
+        : [];
+      if (clients.length !== wanted.length) {
+        throw new ServiceError(404, "Um ou mais clientes não foram encontrados nesta organização.");
+      }
+      const before = await transaction.clientsGroup.findMany({
+        where: { group_id: id, organization_id: organizationId },
+        select: { client_id: true },
+      });
+      const current = new Set(before.map((row) => row.client_id));
+      const removed = [...current].filter((clientId) => !wanted.includes(clientId));
+      const added = wanted.filter((clientId) => !current.has(clientId));
+      if (removed.length) {
+        await transaction.clientsGroup.deleteMany({
+          where: { group_id: id, organization_id: organizationId, client_id: { in: removed } },
+        });
+      }
+      if (added.length) {
+        // O índice único (group_id, client_id) impede o par repetido mesmo em gravações concorrentes.
+        await transaction.clientsGroup.createMany({
+          data: added.map((clientId) => ({
+            group_id: id,
+            client_id: clientId,
+            organization_id: organizationId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      return { clients, added, removed };
+    });
+    if (result.added.length || result.removed.length) {
+      await this.auditGroup(organizationId, authorization, "update", id, {
+        clients: { from: { removed: result.removed }, to: { added: result.added } },
+      });
+    }
+    return { id, clients: result.clients };
   }
 
   private async client(id: string, organizationId: string): Promise<ClientRow> {
@@ -508,14 +1087,20 @@ export class ClientService implements ClientWorkerService {
       select: { id: true },
     });
     if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
+    const data: Record<string, unknown> = { ...input };
+    await this.resolveCatalogFields(organizationId, data, undefined);
     try {
       const row = await this.db.client.create({
-        data: { ...input, organization_id: organizationId, cpf_cnpj: normalizedDocument },
+        data: {
+          ...data,
+          organization_id: organizationId,
+          cpf_cnpj: normalizedDocument,
+        },
         select: clientSelect,
       });
       return toPublic(row, organization);
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
@@ -543,15 +1128,17 @@ export class ClientService implements ClientWorkerService {
       if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
       data.cpf_cnpj = normalizedDocument;
     }
+    const changes = await this.resolveCatalogFields(organizationId, data, existing);
     try {
       const row = await this.db.client.update({
         where: { id },
         data,
         select: clientSelect,
       });
+      await this.auditClientChanges(id, organizationId, authorization, changes);
       return toPublic(row, await this.organization(organizationId));
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
@@ -635,7 +1222,7 @@ export class ClientService implements ClientWorkerService {
         select: { id: true, name: true, cpf_cnpj: true },
       });
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
@@ -667,7 +1254,7 @@ export class ClientService implements ClientWorkerService {
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
     if (data.cpf_agent !== undefined) data.cpf_agent = cleanDocument(String(data.cpf_agent));
     try {
-      return await this.db.client.update({
+      const row = await this.db.client.update({
         where: { id },
         data,
         select: {
@@ -694,8 +1281,15 @@ export class ClientService implements ClientWorkerService {
           service_unique: true,
         },
       });
+      // O schema de integração só aceita os regimes compartilhados; a troca também é auditada.
+      if (data.regime !== undefined && (existing.regime ?? null) !== (data.regime ?? null)) {
+        await this.auditClientChanges(id, organizationId, authorization, {
+          regime: { from: existing.regime ?? null, to: data.regime ?? null },
+        });
+      }
+      return row;
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
@@ -970,11 +1564,12 @@ export class ClientService implements ClientWorkerService {
   async updateRegularize(
     clientId: string,
     organizationId: string,
-    _userId: string,
+    userId: string,
     input: Record<string, unknown>,
   ): Promise<unknown> {
     const existing = await this.client(clientId, organizationId);
     const data = { ...input };
+    const changes = await this.resolveCatalogFields(organizationId, data, existing);
     if (data.cpf_cnpj !== undefined) {
       const normalizedDocument = assertValidClientDocument(data.cpf_cnpj, existing.type);
       const duplicate = await this.db.client.findFirst({
@@ -990,53 +1585,100 @@ export class ClientService implements ClientWorkerService {
     }
     if (data.cpf_responsible !== undefined)
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
+    // Não informado (null), Sim e Não são valores distintos; toda troca entra no histórico.
+    const nextLicitacao = data.licitacao === undefined ? undefined : (data.licitacao ?? null);
     try {
-      return await this.db.client.update({
-        where: { id: clientId },
-        data,
-        select: {
-          id: true,
-          dominio_code: true,
-          name: true,
-          company_name: true,
-          fantasy_name: true,
-          cpf_cnpj: true,
-          cnae_secondary: true,
-          cnae: true,
-          responsible: true,
-          cpf_responsible: true,
-          address: true,
-          cep: true,
-          neighborhood: true,
-          state: true,
-          city: true,
-          customer_since: true,
-          municipal_registration: true,
-          state_registration: true,
-          commercial_board_registration: true,
-          status: true,
-          competence_entry: true,
-          competence_output: true,
-          opening_date: true,
-          regime: true,
-          size: true,
-          segment: true,
-          contabil: true,
-          fiscal: true,
-          pessoal: true,
-          infoproduto: true,
-          consultoria: true,
-          start_strike: true,
-          end_strike: true,
-          deletion_date: true,
-        },
+      const row = await this.db.$transaction(async (transaction) => {
+        // Anterior lido na mesma transação do update, não no carregamento da ficha.
+        const current =
+          nextLicitacao === undefined
+            ? undefined
+            : await transaction.client.findFirst({
+                where: { id: clientId, organization_id: organizationId },
+                select: { licitacao: true },
+              });
+        const previousLicitacao = current?.licitacao ?? null;
+        const licitacaoChanged = nextLicitacao !== undefined && nextLicitacao !== previousLicitacao;
+        if (licitacaoChanged) changes.licitacao = { from: previousLicitacao, to: nextLicitacao };
+        const updated = await transaction.client.update({
+          where: { id: clientId },
+          data,
+          select: regularizeSelect,
+        });
+        if (licitacaoChanged) {
+          await transaction.clientLicitacaoHistory.create({
+            data: {
+              organization_id: organizationId,
+              client_id: clientId,
+              previous_value: previousLicitacao,
+              new_value: nextLicitacao,
+              actor_user_id: userId,
+            },
+          });
+        }
+        return updated;
       });
+      await this.auditClientChanges(clientId, organizationId, { userId }, changes);
+      return row;
     } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error)) {
+      if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);
       }
       throw error;
     }
+  }
+
+  async listLicitacaoHistory(
+    clientId: string,
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientListPermission(authorization);
+    await this.ensureClient(clientId, organizationId);
+    const rows = await this.db.clientLicitacaoHistory.findMany({
+      where: { organization_id: organizationId, client_id: clientId },
+      // Desempate estável para trocas no mesmo milissegundo.
+      orderBy: [{ created_at: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        previous_value: true,
+        new_value: true,
+        actor_user_id: true,
+        created_at: true,
+      },
+    });
+    const actorIds = [...new Set(rows.map((row) => String(row.actor_user_id)))];
+    const actors = actorIds.length
+      ? await this.db.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const actorName = new Map(actors.map((actor) => [String(actor.id), actor.name]));
+    return rows.map((row) => ({
+      id: row.id,
+      previous_value: row.previous_value ?? null,
+      new_value: row.new_value ?? null,
+      created_at: serialize(row.created_at),
+      actor: { id: row.actor_user_id, name: actorName.get(String(row.actor_user_id)) ?? null },
+    }));
+  }
+
+  // Lista de licitantes do legado: só "Sim" entre ativos ou em inativação da organização.
+  async listLicitacaoBidders(
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientListPermission(authorization);
+    return this.db.client.findMany({
+      where: {
+        organization_id: organizationId,
+        licitacao: true,
+        status: { in: [...LICITACAO_BIDDER_STATUSES] },
+      },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, company_name: true, cpf_cnpj: true, status: true },
+    });
   }
 
   async runCompetenceOutputUpdate(): Promise<unknown> {

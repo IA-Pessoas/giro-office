@@ -77,6 +77,8 @@ const accountingFixture = createFixture(
   "CONTABIL",
   accountingFields,
 );
+const fiscalSpecialConfig = { client_id: clientId, type: "FISCAL", configured: true, active_items: ["sped_fiscal"] };
+const fiscalSettings = { client_id: clientId, priority: true, delivery_method: "EMAIL" };
 const fiscalFixture = createFixture(
   fiscalMonthlyId,
   "FISCAL",
@@ -143,6 +145,8 @@ await context.addCookies([
 ]);
 
 const page = await context.newPage();
+// A competência inicial é a do relógio; fixar o mês mantém o smoke estável fora de 2026-09.
+await page.clock.setFixedTime(new Date("2026-09-15T12:00:00-03:00"));
 page.on("pageerror", (error) => console.error("[triagem-fiscal browser]", error));
 page.on("console", (message) => {
   if (message.type() === "error") console.error("[triagem-fiscal console]", message.text());
@@ -181,6 +185,18 @@ await page.route("**/*", async (route) => {
       { id: "delivery-email", code: "EMAIL", label: "E-mail" },
       { id: "delivery-portal", code: "PORTAL", label: "Portal" },
     ] : []);
+  }
+  if (apiPath === "/triagem/config" && url.searchParams.get("type") === "FISCAL") {
+    return json(route, fiscalSpecialConfig);
+  }
+  if (request.method() === "PUT" && apiPath === "/triagem/config") {
+    const body = request.postDataJSON();
+    if (body.type === "FISCAL") fiscalSpecialConfig.active_items = body.active_items;
+    return json(route, { ...fiscalSpecialConfig, ...body });
+  }
+  if (apiPath === "/triagem/fiscal-settings") {
+    if (request.method() === "PUT") Object.assign(fiscalSettings, request.postDataJSON());
+    return json(route, fiscalSettings);
   }
   if (request.method() === "GET" && apiPath === "/client/list") {
     return json(route, {
@@ -226,6 +242,8 @@ await page.route("**/*", async (route) => {
           regime: "MEI",
           responsible_id: user.id,
           responsible_name: user.name,
+          priority: fiscalSettings.priority,
+          delivery_method: fiscalSettings.delivery_method,
           can_edit: true,
           has_competence: true,
           planned_checklist: null,
@@ -328,6 +346,21 @@ try {
     await section.screenshot({ path: `${portfolioScreenshotDir}/04-colunas-finais.png` });
     await scroller.evaluate((element) => { element.scrollLeft = 0; });
   }
+  await page.getByLabel("Filtrar prioridade").selectOption("yes");
+  await expect(page.getByText("Empresa sem rotina")).toHaveCount(0);
+  await expect(page.getByText("Cliente Demonstração").first()).toBeVisible();
+  await page.getByLabel("Filtrar prioridade").selectOption("");
+  await page.getByLabel("Filtrar meio de envio").selectOption("none");
+  await expect(page.getByText("Empresa sem rotina")).toBeVisible();
+  await expect(page.getByLabel("Cliente Demonstração: Relatório de entradas")).toHaveCount(0);
+  await page.getByLabel("Filtrar meio de envio").selectOption("");
+  await page.getByLabel("Filtrar responsável").selectOption("none");
+  await page.getByLabel("Filtrar justificativa").selectOption("without");
+  await expect(page.getByText("Empresa sem rotina")).toBeVisible();
+  await expect(page.getByLabel("Cliente Demonstração: Relatório de entradas")).toHaveCount(0);
+  await page.getByLabel("Filtrar responsável").selectOption("");
+  await page.getByLabel("Filtrar justificativa").selectOption("");
+  await expect(page.getByLabel("Cliente Demonstração: Relatório de entradas")).toHaveCount(1);
   const csvDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV" }).click();
   const csv = await csvDownload;
@@ -348,6 +381,18 @@ try {
   await expect(page.getByRole("heading", { name: "Pendências fiscais" })).toBeVisible();
   await expect(page.locator('select[aria-label$=" status"]')).toHaveCount(23);
   await expect(page.getByLabel("Faturamento fiscal")).toHaveCount(1);
+  await expect(page.getByLabel("Cliente prioritário")).toHaveValue("yes");
+  await expect(page.getByLabel("Meio de envio do cliente")).toHaveValue("EMAIL");
+  await page.getByLabel("Cliente prioritário").selectOption("no");
+  await page.getByLabel("Meio de envio do cliente").selectOption("PORTAL");
+  await page.getByRole("button", { name: "Salvar prioridade e meio de envio" }).click();
+  await expect.poll(() => fiscalSettings).toMatchObject({ priority: false, delivery_method: "PORTAL" });
+  await expect(page.getByLabel("Documento especial: SPED Fiscal")).toBeChecked();
+  await page.getByLabel("Documento especial: Nota fiscal modelo 21").check();
+  await page.getByRole("button", { name: "Salvar documentos especiais" }).click();
+  await expect
+    .poll(() => fiscalSpecialConfig.active_items)
+    .toEqual(["sped_fiscal", "model_21_invoice"]);
   await expect(page.getByLabel("Movimentações financeiras Método de entrega")).toHaveCount(0);
 
   await page.getByLabel("Faturamento fiscal").fill("13000,00");

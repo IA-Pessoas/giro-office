@@ -4,13 +4,10 @@ import { Download, Filter, Search } from "lucide-react";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
-import { useCoringaClients } from "../hooks/useClients";
+import { useClientSegments, useCoringaClients } from "../hooks/useClients";
 import { clientService } from "../services/clientService";
 import type { ClientCoringaFilters, ClientCoringaRow } from "../types";
-import {
-  REGULARIZE_SEGMENT_OPTIONS,
-  REGULARIZE_SIZE_OPTIONS,
-} from "../utils/regularizeForm";
+import { REGULARIZE_SIZE_OPTIONS } from "../utils/regularizeForm";
 import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 
 const indicatorFields = [
@@ -59,6 +56,7 @@ export function ClientCoringaList() {
   const [exportError, setExportError] = useState("");
   const filters = useMemo(() => toApiFilters(applied, page), [applied, page]);
   const { data, error, isLoading, isFetching } = useCoringaClients(filters);
+  const segmentsQuery = useClientSegments();
   const rows = data?.items ?? [];
   const total = data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / (data?.pageSize ?? 20)));
@@ -110,7 +108,7 @@ export function ClientCoringaList() {
         <label className={labelClass}>Regime<input className={clientTextFieldClassName} list="coringa-regimes" value={draft.regime} onChange={(event) => update("regime", event.target.value)} placeholder="Todos" /><datalist id="coringa-regimes">{selectOptions(TAX_REGIME_OPTIONS)}</datalist></label>
         <label className={labelClass}>Data Entrada<input type="date" className={clientTextFieldClassName} value={draft.dataEntrada} onChange={(event) => update("dataEntrada", event.target.value)} /></label>
         <label className={labelClass}>Porte<input className={clientTextFieldClassName} list="coringa-portes" value={draft.porte} onChange={(event) => update("porte", event.target.value)} placeholder="Todos" /><datalist id="coringa-portes">{selectOptions(REGULARIZE_SIZE_OPTIONS)}</datalist></label>
-        <label className={labelClass}>Segmento<input className={clientTextFieldClassName} list="coringa-segmentos" value={draft.segmento} onChange={(event) => update("segmento", event.target.value)} placeholder="Todos" /><datalist id="coringa-segmentos">{selectOptions(REGULARIZE_SEGMENT_OPTIONS)}</datalist></label>
+        <label className={labelClass}>Segmento<input className={clientTextFieldClassName} list="coringa-segmentos" value={draft.segmento} onChange={(event) => update("segmento", event.target.value)} placeholder="Todos" /><datalist id="coringa-segmentos">{selectOptions((segmentsQuery.data ?? []).map((segment) => segment.name))}</datalist></label>
         <label className={labelClass}>Status Coringa<input className={clientTextFieldClassName} value={draft.status} onChange={(event) => update("status", event.target.value)} placeholder="Todos" /></label>
         {indicatorFields.map(([field, label]) => <label className={labelClass} key={field}>{label}<ClientNativeSelect value={draft[field]} onChange={(event) => update(field, event.target.value)}><option value="">Todos</option><option value="true">Sim</option><option value="false">Não</option></ClientNativeSelect></label>)}
       </div>

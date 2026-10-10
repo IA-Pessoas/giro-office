@@ -23,6 +23,8 @@ export const CLIENT_ENDPOINTS = {
   createHistoryPending: (id: string) => `/client/${id}/histories/pending`,
   listHistoryPending: "/client/histories/pending",
   deleteHistoryPending: (pendingId: string) => `/client/histories/pending/${pendingId}`,
+  licitacaoHistory: (id: string) => `/client/${id}/licitacao/history`,
+  licitacaoBidders: "/client/licitacao/bidders",
 } as const;
 
 export const CLIENT_GROUP_ENDPOINTS = {
@@ -30,6 +32,18 @@ export const CLIENT_GROUP_ENDPOINTS = {
   create: "/client/groups",
   detail: (id: string) => `/client/groups/${id}`,
   clients: (id: string) => `/client/groups/${id}/clients`,
+} as const;
+
+export const CLIENT_REGIME_ENDPOINTS = {
+  list: "/client/regimes",
+  create: "/client/regimes",
+  detail: (id: string) => `/client/regimes/${id}`,
+} as const;
+
+export const CLIENT_SEGMENT_ENDPOINTS = {
+  list: "/client/segments",
+  create: "/client/segments",
+  detail: (id: string) => `/client/segments/${id}`,
 } as const;
 
 const LEGACY_CLIENT_STATUS_FILTERS = new Set(["Ativo", "Inativo"]);

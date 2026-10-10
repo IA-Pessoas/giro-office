@@ -1,3 +1,5 @@
+import { TRIAGE_FISCAL_CONFIGURABLE_FIELDS } from "@workspace/shared/triagem/documents";
+
 import type { TriageDocumentStatus } from "../types";
 
 // Rótulos dos documentos da Triagem, sem dependências: o Fiscal também os lê, e importar
@@ -29,11 +31,23 @@ export const FISCAL_DOCUMENTS = [
   ["cte_as_issuer", "CTe como emitente"],
   ["services_provided_as_mei", "Serviços prestados como MEI"],
 ] as const;
+/** Documentos especiais e faturamento configuráveis por cliente na rotina fiscal. */
+export const FISCAL_CONFIGURABLE_DOCUMENTS = TRIAGE_FISCAL_CONFIGURABLE_FIELDS.map(
+  (field) =>
+    [
+      field,
+      field === "billing_amount"
+        ? "Faturamento"
+        : (FISCAL_DOCUMENTS.find(([document]) => document === field)?.[1] ?? field),
+    ] as const,
+);
 export const STATUSES: Array<[TriageDocumentStatus, string]> = [
   ["PENDING", "Pendente"],
   ["COMPLETED", "Concluído"],
   ["ATTENTION", "Atenção"],
   ["UNDER_REVIEW", "Em revisão"],
-  ["NOT_PRESENT", "Não recebido"],
+  ["NOT_PRESENT", "Não possui"],
   ["NOT_APPLICABLE", "Não aplicável"],
 ];
+
+export const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<TriageDocumentStatus, string>;

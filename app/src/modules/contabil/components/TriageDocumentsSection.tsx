@@ -29,6 +29,10 @@ import type {
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
+import { FiscalClientSettingsPanel } from "./FiscalClientSettingsPanel";
+import { FiscalSpecialDocumentsPanel } from "./FiscalSpecialDocumentsPanel";
+import { TriageMovementPanel } from "./TriageMovementPanel";
+import { TriageStatementHistoryPanel } from "./TriageStatementHistoryPanel";
 import { CONTABIL_DOCUMENTS, FISCAL_DOCUMENTS, STATUSES } from "./triageDocumentLabels";
 
 export { FISCAL_DOCUMENTS, STATUSES };
@@ -129,6 +133,11 @@ export function TriageDocumentsSection({
       ...current,
       [field]: { ...current[field], [key]: value },
     }));
+  }
+
+  // Item fora do movimento padrão na criação da rotina contábil: o backend recusa alterar.
+  function isDisabled(field: string) {
+    return documentType === "CONTABIL" && record?.item_notes[field]?.required === false;
   }
 
   async function confirmBankArchive() {
@@ -236,6 +245,24 @@ export function TriageDocumentsSection({
           )}
         </div>
       ) : null}
+      {documentType === "FISCAL" ? (
+        <>
+          <FiscalClientSettingsPanel key={clientId} clientId={clientId} canEdit={canEdit} />
+          <FiscalSpecialDocumentsPanel key={`special-${clientId}`} clientId={clientId} canEdit={canEdit} />
+        </>
+      ) : null}
+      {documentType === "CONTABIL" ? (
+        <TriageMovementPanel
+          clientId={clientId}
+          competence={competence}
+          canEdit={canEdit}
+          record={record}
+          justifications={justifications.data ?? []}
+        />
+      ) : null}
+      {documentType === "CONTABIL" ? (
+        <TriageStatementHistoryPanel clientId={clientId} onOpenCompetence={setCompetence} />
+      ) : null}
       {!record ? (
         <ContabilStateBox
           icon={FileText}
@@ -262,7 +289,11 @@ export function TriageDocumentsSection({
             {record.summary.completed}/{record.summary.applicable} aplicáveis ·{" "}
             {record.summary.attention} em atenção
           </div>
-          {documentType === "FISCAL" ? (
+          {documentType === "FISCAL" && record.item_notes.billing_amount?.required === false ? (
+            <p className="text-sm text-gray-600 dark:text-slate-400">
+              Faturamento não se aplica a este cliente nesta competência.
+            </p>
+          ) : documentType === "FISCAL" ? (
             <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
                 Faturamento
@@ -335,7 +366,11 @@ export function TriageDocumentsSection({
                   ) : null}
                 </span>
                 <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
-                  {canEdit ? (
+                  {isDisabled(field) ? (
+                    <span className="text-sm text-gray-500 dark:text-slate-400">
+                      Desativado no movimento padrão
+                    </span>
+                  ) : canEdit ? (
                     <select
                       aria-label={`${label} status`}
                       value={statusDrafts[field] ?? record.checklist[field]}
@@ -366,7 +401,7 @@ export function TriageDocumentsSection({
                       {STATUSES.find(([value]) => value === record.checklist[field])?.[1]}
                     </span>
                   )}
-                  {canEdit ? (
+                  {canEdit && !isDisabled(field) ? (
                     <div className="grid w-full gap-2 sm:min-w-[22rem] sm:grid-cols-2">
                       <label className="text-xs text-gray-600 dark:text-slate-300">
                         Nota

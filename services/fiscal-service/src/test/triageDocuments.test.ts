@@ -33,6 +33,29 @@ describe("triageDocumentsView", () => {
     expect(hasTriagePendency(view)).toBe(true);
   });
 
+  it("lê os estados do legado com o mesmo mapeamento da Triagem (#1693)", () => {
+    const view = triageDocumentsView(
+      {
+        checklist: {
+          sped_fiscal: "concluido",
+          nfce_documents: "",
+          model_21_invoice: "nao possui",
+          cte_as_issuer: "atenção",
+          services_provided_as_mei: "desconhecido",
+        },
+      },
+      undefined,
+    );
+
+    expect(view.items).toEqual([
+      { field: "sped_fiscal", status: "COMPLETED" },
+      { field: "nfce_documents", status: "PENDING" },
+      { field: "model_21_invoice", status: "NOT_PRESENT" },
+      { field: "cte_as_issuer", status: "ATTENTION" },
+    ]);
+    expect(view.pending).toBe(2);
+  });
+
   it("sem rotina mensal, os itens obrigatórios planejados na competência estão pendentes", () => {
     const view = triageDocumentsView(undefined, {
       configuration_snapshot: {

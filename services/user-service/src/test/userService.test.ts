@@ -924,6 +924,60 @@ describe("UserService", () => {
     );
   });
 
+  it("lista perfis de Marketing apenas com campos de perfil e organização", async () => {
+    prismaMock.user.findMany.mockResolvedValue([
+      {
+        id: "user-1",
+        name: "Ana",
+        status: "active",
+        photo_url: null,
+        department: { name: "Fiscal" },
+      },
+    ]);
+    prismaMock.user.count.mockResolvedValue(1);
+
+    const result = await new UserService().listMarketingProfiles({
+      organizationId: "org-1",
+      skip: 0,
+      take: 20,
+    });
+
+    expect(result.users).toEqual([
+      {
+        id: "user-1",
+        name: "Ana",
+        status: "active",
+        photo_url: null,
+        department: { name: "Fiscal" },
+      },
+    ]);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { organization_id: "org-1" },
+            { organization_id: null, department: { organization_id: "org-1" } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          photo_url: true,
+          department: { select: { name: true } },
+        },
+      }),
+    );
+    expect(prismaMock.user.count).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { organization_id: "org-1" },
+          { organization_id: null, department: { organization_id: "org-1" } },
+        ],
+      },
+    });
+  });
+
   it("rejeita o rebaixamento do último owner ativo antes de persistir", async () => {
     prismaMock.user.findFirst.mockResolvedValue({
       id: "owner-1",

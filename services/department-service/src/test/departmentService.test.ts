@@ -60,6 +60,29 @@ describe("DepartmentService", () => {
     });
   });
 
+  it("update não altera departamento que não pertence à organização", async () => {
+    const prisma = createMockPrisma();
+    const findFirst = vi.fn(async () => null);
+    prisma.department.findFirst = findFirst;
+    const service = new DepartmentService(prisma, createAuditMock());
+
+    await expect(
+      service.update({
+        user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+        dep_id: DEPARTMENT_ID,
+        color: "#0F766E",
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: DEPARTMENT_ID, organization_id: ORGANIZATION_ID },
+      }),
+    );
+    expect(prisma.department.update).not.toHaveBeenCalled();
+  });
+
   it("update lança 409 quando o novo nome conflita com outro departamento", async () => {
     const prisma = createMockPrisma();
     prisma.department.findFirst = vi

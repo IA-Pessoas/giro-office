@@ -18,6 +18,9 @@ import { InternalReportingService as Ti } from "../../../ti-service/src/reportin
 const organizationId = "00000000-0000-4000-8000-000000000001";
 const pessoalDerivedFields = new Set([
   "client_name",
+  "client_code",
+  "client_document",
+  "client_status",
   "responsible_name",
   "union_name",
   "group_name",

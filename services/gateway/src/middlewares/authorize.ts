@@ -38,6 +38,33 @@ function deny(next: NextFunction): void {
   next(new ServiceError(403, "Acesso negado para esta rota."));
 }
 
+function isInstagramOnlyUpdate(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return false;
+  }
+
+  const fields = Object.keys(body);
+  return fields.length === 1 && fields[0] === "instagram";
+}
+
+function isDepartmentColorOnlyUpdate(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const fields = Object.keys(body);
+  return fields.length === 2 && fields.includes("dep_id") && fields.includes("color");
+}
+
+function isSelfPasswordUpdate(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return false;
+  }
+
+  const fields = Object.keys(body);
+  return (
+    fields.includes("password") &&
+    fields.every((field) => field === "password" || field === "current_password")
+  );
+}
+
 export function buildAuthorizeMiddleware(
   mode: GatewayAuthorizationMode,
   logger?: Pick<Logger, "warn">,
@@ -82,12 +109,49 @@ export function buildAuthorizeMiddleware(
       return;
     }
 
+    const isClientIntegrationUpdate =
+      request.method.toUpperCase() === "PATCH" &&
+      /^\/client\/[^/]+\/integration\/?$/.test(normalizedPath);
+    const hasIntegrationEditAccess = canAccessRoute(request.auth, {
+      modulePermission: { module: "integracao", minPermission: 2 },
+    });
+    if (
+      isClientIntegrationUpdate &&
+      !hasIntegrationEditAccess &&
+      !isInstagramOnlyUpdate(request.body)
+    ) {
+      deny(next);
+      return;
+    }
+
+    const isDepartmentUpdate =
+      request.method.toUpperCase() === "PUT" && normalizedPath === "/department";
+    const hasDepartmentAdminAccess = canAccessRoute(request.auth, {
+      anyOf: [
+        { modulePermission: { module: "rh", minPermission: 3 } },
+        { modulePermission: { module: "ti", minPermission: 3 } },
+      ],
+    });
+    const hasMarketingDepartmentAdminAccess = canAccessRoute(request.auth, {
+      modulePermission: { module: "marketing", minPermission: 3 },
+    });
+    if (
+      isDepartmentUpdate &&
+      hasMarketingDepartmentAdminAccess &&
+      !hasDepartmentAdminAccess &&
+      !isDepartmentColorOnlyUpdate(request.body)
+    ) {
+      deny(next);
+      return;
+    }
+
     const selfUserPutMatch =
       request.method.toUpperCase() === "PUT" ? selfUserPutPath.exec(normalizedPath) : null;
     if (
       request.auth.actorKind === "organization" &&
       request.auth.organizationId.length > 0 &&
-      selfUserPutMatch?.[1] === request.auth.userId
+      selfUserPutMatch?.[1] === request.auth.userId &&
+      isSelfPasswordUpdate(request.body)
     ) {
       next();
       return;

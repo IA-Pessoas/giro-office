@@ -20,6 +20,22 @@ import {
   updateClientBodySchema,
 } from "../../../services/client-service/src/schemas/client.schemas.js";
 import {
+  clientGroupParamsSchema,
+  createClientGroupBodySchema,
+  replaceClientGroupClientsBodySchema,
+  updateClientGroupBodySchema,
+} from "../../../services/client-service/src/schemas/clientGroup.schemas.js";
+import {
+  clientRegimeIdParamsSchema,
+  createClientRegimeBodySchema,
+  updateClientRegimeBodySchema,
+} from "../../../services/client-service/src/schemas/clientRegime.schemas.js";
+import {
+  clientSegmentIdParamsSchema,
+  createClientSegmentBodySchema,
+  updateClientSegmentBodySchema,
+} from "../../../services/client-service/src/schemas/clientSegment.schemas.js";
+import {
   cnpjLookupQuerySchema,
   createClientPABodySchema,
   createHistoryBodySchema,
@@ -37,6 +53,7 @@ import {
 } from "../../../services/client-service/src/schemas/clientVerticals.schemas.js";
 import { commercialProspectingTransitionEventSchema } from "../../../services/client-service/src/schemas/commercialProjection.schemas.js";
 import { internalReportingExtractBodySchema } from "../../../services/client-service/src/schemas/internalReporting.schemas.js";
+import { createClientAudit } from "./audit.js";
 import { authenticateClientRequest, clientAuthorization, requireOrganization } from "./auth.js";
 import { ClientService, type ClientWorkerService } from "./clientService.js";
 import type { ClientWorkerEnv } from "./env.js";
@@ -206,6 +223,8 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
           env.CNPJ_LOOKUP_API_URL,
           env.CNPJ_LOOKUP_API_TOKEN,
           historyStorage,
+          false,
+          createClientAudit(env),
         ),
       ),
     );
@@ -263,6 +282,119 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
         201,
       );
     }),
+  );
+
+  // Antes de /client/:id, que exige uuid e responderia 400 para "regimes".
+  app.get("/client/regimes", async (c) =>
+    withService(c, async (service) =>
+      c.json(createSuccessResponse(await service.listRegimes(organizationId(c), authz(c)))),
+    ),
+  );
+
+  app.post("/client/regimes", async (c) =>
+    withService(c, async (service) => {
+      const { name } = parse(createClientRegimeBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.createRegime(organizationId(c), name, authz(c))),
+        201,
+      );
+    }),
+  );
+
+  app.patch("/client/regimes/:id", async (c) =>
+    withService(c, async (service) => {
+      const id = pathParam(c, clientRegimeIdParamsSchema);
+      const { name } = parse(updateClientRegimeBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.updateRegime(id, organizationId(c), name, authz(c))),
+      );
+    }),
+  );
+
+  app.get("/client/segments", async (c) =>
+    withService(c, async (service) =>
+      c.json(createSuccessResponse(await service.listSegments(organizationId(c), authz(c)))),
+    ),
+  );
+
+  app.post("/client/segments", async (c) =>
+    withService(c, async (service) => {
+      const body = parse(createClientSegmentBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.createSegment(organizationId(c), body, authz(c))),
+        201,
+      );
+    }),
+  );
+
+  app.patch("/client/segments/:id", async (c) =>
+    withService(c, async (service) => {
+      const id = pathParam(c, clientSegmentIdParamsSchema);
+      const body = parse(updateClientSegmentBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.updateSegment(id, organizationId(c), body, authz(c))),
+      );
+    }),
+  );
+
+  app.get("/client/groups", async (c) =>
+    withService(c, async (service) =>
+      c.json(createSuccessResponse(await service.listGroups(organizationId(c), authz(c)))),
+    ),
+  );
+
+  app.post("/client/groups", async (c) =>
+    withService(c, async (service) => {
+      const { name } = parse(createClientGroupBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.createGroup(organizationId(c), name, authz(c))),
+        201,
+      );
+    }),
+  );
+
+  app.patch("/client/groups/:id", async (c) =>
+    withService(c, async (service) => {
+      const id = pathParam(c, clientGroupParamsSchema);
+      const body = parse(updateClientGroupBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.updateGroup(id, organizationId(c), body, authz(c))),
+      );
+    }),
+  );
+
+  app.put("/client/groups/:id/clients", async (c) =>
+    withService(c, async (service) => {
+      const id = pathParam(c, clientGroupParamsSchema);
+      const { client_ids } = parse(replaceClientGroupClientsBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(
+          await service.replaceGroupClients(id, organizationId(c), client_ids, authz(c)),
+        ),
+      );
+    }),
+  );
+
+  app.get("/client/licitacao/bidders", async (c) =>
+    withService(c, async (service) =>
+      c.json(
+        createSuccessResponse(await service.listLicitacaoBidders(organizationId(c), authz(c))),
+      ),
+    ),
+  );
+
+  app.get("/client/:id/licitacao/history", async (c) =>
+    withService(c, async (service) =>
+      c.json(
+        createSuccessResponse(
+          await service.listLicitacaoHistory(
+            pathParam(c, clientIdParamsSchema),
+            organizationId(c),
+            authz(c),
+          ),
+        ),
+      ),
+    ),
   );
 
   app.post("/client", async (c) =>

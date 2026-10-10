@@ -1,3 +1,10 @@
+import {
+  TRIAGE_FISCAL_CHECKLIST_FIELDS,
+  TRIAGE_FISCAL_CONFIGURABLE_FIELDS,
+  TRIAGE_PORTFOLIO_DOCUMENT_STATUSES,
+  TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS,
+  TRIAGE_PORTFOLIO_PRIORITY_FILTERS,
+} from "@workspace/shared/triagem";
 import { z } from "zod";
 
 const competence = z
@@ -59,11 +66,93 @@ export const monthlySchema = z
     type: z.enum(["CONTABIL", "FISCAL"] as const).optional(),
   })
   .strict();
-export const fiscalPortfolioSchema = z.object({ competence }).strict();
+const optionalText = z.string().max(200).optional();
+export const fiscalPortfolioSchema = z
+  .object({
+    competence,
+    search: optionalText,
+    responsible_id: optionalText,
+    regime: optionalText,
+    document_field: z
+      .enum(TRIAGE_FISCAL_CHECKLIST_FIELDS, { message: "document_field inválido." })
+      .optional(),
+    document_status: z
+      .enum(TRIAGE_PORTFOLIO_DOCUMENT_STATUSES, { message: "document_status inválido." })
+      .optional(),
+    justification: z
+      .enum(TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS, {
+        message: "justification deve ser with ou without.",
+      })
+      .optional(),
+    priority: z
+      .enum(TRIAGE_PORTFOLIO_PRIORITY_FILTERS, { message: "priority deve ser yes ou no." })
+      .optional(),
+    delivery_method: optionalText,
+  })
+  .strict();
+export const contabilPortfolioSchema = z
+  .object({
+    competence,
+    responsible_id: optionalText,
+    regime: optionalText,
+    status: closingUpdateSchema.shape.status.optional(),
+  })
+  .strict();
 export const editabilitySchema = z
   .object({ client_id: uuid("client_id"), type: monthlySchema.shape.type })
   .strict();
 export const monthlyIdSchema = z.object({ id: uuid("id") }).strict();
+const dateOnly = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u, "data deve estar no formato YYYY-MM-DD.")
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
+  }, "data inválida.");
+export const monthlyUpdateSchema = z
+  .object({
+    type: monthlySchema.shape.type,
+    triad_moviment: z.boolean().optional(),
+    notes: z.string().trim().max(2_000).nullable().optional(),
+    justification: z.string().trim().max(100).nullable().optional(),
+    responsible_id: uuid("responsible_id").nullable().optional(),
+    download_date: dateOnly.nullable().optional(),
+    settlement_date: dateOnly.nullable().optional(),
+  })
+  .strict()
+  .refine((body) => Object.keys(body).some((key) => key !== "type"), {
+    message: "Informe ao menos um campo do movimento mensal.",
+  });
+// Contábil configura o movimento padrão; Fiscal, os documentos especiais aplicáveis.
+const configType = z.enum(["CONTABIL", "FISCAL"] as const).default("CONTABIL");
+export const triageConfigQuerySchema = z
+  .object({ client_id: uuid("client_id"), type: configType })
+  .strict();
+export const fiscalSettingsQuerySchema = z.object({ client_id: uuid("client_id") }).strict();
+export const fiscalSettingsBodySchema = fiscalSettingsQuerySchema
+  .extend({
+    priority: z.boolean().optional(),
+    delivery_method: z.string().trim().min(1).max(100).nullable().optional(),
+  })
+  .strict()
+  .refine((body) => body.priority !== undefined || body.delivery_method !== undefined, {
+    message: "Informe a prioridade ou o meio de envio.",
+  });
+export const triageConfigBodySchema = triageConfigQuerySchema
+  .extend({ active_items: z.array(z.string()).max(documentFields.length) })
+  .strict()
+  .superRefine((body, context) => {
+    // Fiscal só configura os documentos especiais; os demais itens seguem a rotina.
+    const allowed: readonly string[] =
+      body.type === "FISCAL" ? TRIAGE_FISCAL_CONFIGURABLE_FIELDS : documentFields;
+    for (const item of body.active_items)
+      if (!allowed.includes(item))
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["active_items"],
+          message: `Item ${item} não é configurável na rotina ${body.type === "FISCAL" ? "fiscal" : "contábil"}.`,
+        });
+  });
 export const documentItemSchema = z
   .object({
     type: monthlySchema.shape.type,
@@ -116,6 +205,39 @@ export const statementSchema = z
     status: z.enum(triageDocumentStatuses),
   })
   .strict();
+export const statementHistorySchema = z
+  .object({
+    client_id: uuid("client_id"),
+    from: competence.optional(),
+    to: competence.optional(),
+    pending: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .optional(),
+  })
+  .strict()
+  .refine((query) => !query.from || !query.to || query.from <= query.to, {
+    message: "from deve ser anterior ou igual a to.",
+  });
+// Referência externa: só http(s), para o link não virar `javascript:` na tela.
+const cloudLink = z
+  .string()
+  .trim()
+  .max(2_000)
+  .url("link inválido.")
+  .refine((value) => /^https?:\/\//iu.test(value), "link deve começar com http:// ou https://.");
+const cloudType = z.string().trim().min(1, "type é obrigatório.").max(100);
+export const cloudListSchema = z.object({ client_id: uuid("client_id") }).strict();
+export const cloudIdSchema = z.object({ id: uuid("id") }).strict();
+export const cloudCreateSchema = cloudListSchema
+  .extend({ type: cloudType, link: cloudLink })
+  .strict();
+export const cloudUpdateSchema = z
+  .object({ type: cloudType.optional(), link: cloudLink.optional() })
+  .strict()
+  .refine((body) => body.type !== undefined || body.link !== undefined, {
+    message: "Informe o tipo ou o link.",
+  });
 export const statementArchiveSchema = z
   .object({
     client_id: uuid("client_id"),

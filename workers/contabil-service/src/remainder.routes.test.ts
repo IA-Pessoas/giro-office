@@ -124,7 +124,16 @@ function services() {
       getOrCreateMonthly: vi.fn(async () => ({ id: ID })),
       updateItem: vi.fn(async () => ({ id: ID })),
       updateAll: vi.fn(async () => ({ id: ID })),
+      updateMonthly: vi.fn(async () => ({ id: ID })),
+      getConfig: vi.fn(async () => ({ active_items: [] })),
+      saveConfig: vi.fn(async () => ({ active_items: [] })),
+      getFiscalSettings: vi.fn(async () => ({ priority: false, delivery_method: null })),
+      saveFiscalSettings: vi.fn(async () => ({ priority: true, delivery_method: null })),
       listStatements: vi.fn(async () => []),
+      listStatementHistory: vi.fn(async () => ({ client_id: CLIENT, competences: [] })),
+      listClouds: vi.fn(async () => []),
+      createCloud: vi.fn(async () => ({ id: ID })),
+      updateCloud: vi.fn(async () => ({ id: ID })),
       upsertStatement: vi.fn(async () => ({ id: ID })),
       archiveStatement: vi.fn(async () => ({ id: ID })),
     },
@@ -189,6 +198,116 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("relacionamento aceita estados não selecionados e exige permissão Contábil (#1721)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const put = (permission: string) =>
+      app.request(`https://contabil.test/contabil/relationships/${ID}`, {
+        method: "PUT",
+        headers: { ...headers(permission), "content-type": "application/json" },
+        body: JSON.stringify({ bidding: null, chart_accounts: null }),
+      });
+
+    expect((await put("2")).status).toBe(200);
+    expect(deps.relationshipService.update).toHaveBeenCalledWith(
+      ID,
+      { bidding: null, chart_accounts: null },
+      expect.objectContaining({ organizationId: ORG, userId: USER }),
+    );
+    expect((await put("1")).status).toBe(403);
+    const read = await app.request(
+      `https://contabil.test/contabil/relationships/client/${CLIENT}`,
+      { headers: headers("0") },
+    );
+    expect(read.status).toBe(403);
+    expect(deps.relationshipService.update).toHaveBeenCalledTimes(1);
+    expect(deps.relationshipService.getByClientId).not.toHaveBeenCalled();
+  });
+
+  it("histórico do controle lê a auditoria da organização e exige módulo Contábil (#1722)", async () => {
+    const prisma = {
+      controlContabil: { findFirst: vi.fn(async () => ({ id: ID })) },
+      auditRequest: {
+        findMany: vi.fn(async () => [
+          {
+            id: "audit-1",
+            user_id: USER,
+            created_at: new Date("2026-09-10T12:00:00.000Z"),
+            action: "Atualização",
+            changes_json: { depreciation: { from: false, to: true } },
+          },
+        ]),
+        count: vi.fn(async () => 1),
+      },
+      user: { findMany: vi.fn(async () => [{ id: USER, name: "Ana" }]) },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const url = `https://contabil.test/contabil/controls/history?client_id=${CLIENT}&competence=2026-09&organization_id=forged`;
+
+    const forged = await app.request(url, { headers: headers("1") });
+    const denied = await app.request(url, { headers: headers("0") });
+
+    expect(forged.status).toBe(400);
+    expect(denied.status).toBe(403);
+    const ok = await app.request(url.replace("&organization_id=forged", ""), {
+      headers: headers("1"),
+    });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({
+      data: {
+        total: 1,
+        items: [
+          {
+            actor: { id: USER, name: "Ana" },
+            changes: [{ field: "depreciation", from: false, to: true }],
+          },
+        ],
+      },
+    });
+    expect(prisma.controlContabil.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+    expect(prisma.auditRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
+  it("histórico do relacionamento lê a auditoria da organização e exige módulo Contábil (#1723)", async () => {
+    const prisma = {
+      relationshipContabil: { findFirst: vi.fn(async () => ({ id: ID })) },
+      auditRequest: {
+        findMany: vi.fn(async () => [
+          {
+            id: "audit-1",
+            user_id: USER,
+            created_at: new Date("2026-10-01T10:00:00.000Z"),
+            action: "Atualização",
+            changes_json: { bidding: { from: true, to: null } },
+          },
+        ]),
+        count: vi.fn(async () => 1),
+      },
+      user: { findMany: vi.fn(async () => [{ id: USER, name: "Ana" }]) },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const url = `https://contabil.test/contabil/relationships/client/${CLIENT}/history`;
+
+    const denied = await app.request(url, { headers: headers("0") });
+    const ok = await app.request(url, { headers: headers("1") });
+
+    expect(denied.status).toBe(403);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({
+      data: { total: 1, items: [{ changes: [{ field: "bidding", from: true, to: null }] }] },
+    });
+    expect(prisma.relationshipContabil.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, client_id: CLIENT } }),
+    );
+    expect(prisma.auditRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
   it("expõe triagem documental com validação de entrada", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });
@@ -220,6 +339,274 @@ describe("contabil Worker remainder routes", () => {
     );
     expect(deps.triageDocumentsService.getMonthly).toHaveBeenCalledWith(
       expect.objectContaining({ client_id: CLIENT, competence: "2026-09" }),
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("aplica na carteira fiscal os mesmos filtros da tela", async () => {
+    const deps = services();
+    const row = (legal_name: string, extra: Record<string, unknown>) => ({
+      legal_name,
+      cpf_cnpj: "",
+      regime: null,
+      responsible_id: null,
+      planned_checklist: null,
+      monthly: null,
+      ...extra,
+    });
+    deps.triageDocumentsService.listFiscalPortfolio.mockResolvedValue({
+      competence: "2026-09",
+      items: [
+        row("Alfa", {
+          regime: "Simples Nacional",
+          responsible_id: USER,
+          monthly: {
+            checklist: { inbound_report: "NOT_PRESENT" },
+            item_notes: { inbound_report: { note: null, justification: "Sem movimento" } },
+          },
+        }),
+        row("Beta", { regime: "Simples Nacional", responsible_id: USER }),
+        row("Gama", {}),
+      ],
+    });
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const get = (query: string) =>
+      app.request(`https://contabil.test/triagem/fiscal-portfolio?competence=2026-09&${query}`, {
+        headers: headers("2"),
+      });
+
+    const filtered = await get(
+      `responsible_id=${USER}&regime=Simples%20Nacional&document_field=inbound_report&justification=with`,
+    );
+    const byStatus = await get("document_field=inbound_report&document_status=NOT_STARTED");
+    const invalid = await get("justification=talvez");
+
+    expect(filtered.status).toBe(200);
+    expect(
+      (await filtered.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Alfa"]);
+    expect(
+      (await byStatus.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Beta", "Gama"]);
+    expect(invalid.status).toBe(400);
+  });
+
+  it("carteiras filtradas exigem sessão e consultam só a organização do token (#1690)", async () => {
+    const OTHER_ORG = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const urls = [
+      "https://contabil.test/triagem/fiscal-portfolio?competence=2025-03&justification=with",
+      "https://contabil.test/contabil/controls/list?competence=2025-03&status=CLOSED",
+    ];
+    const otherOrg = { ...headers("2"), "x-auth-organization-id": OTHER_ORG };
+
+    for (const url of urls) {
+      expect((await app.request(url)).status).toBe(401);
+      expect((await app.request(url, { headers: otherOrg })).status).toBe(200);
+    }
+
+    expect(deps.triageDocumentsService.listFiscalPortfolio).toHaveBeenCalledOnce();
+    expect(deps.triageDocumentsService.listFiscalPortfolio).toHaveBeenCalledWith(
+      "2025-03",
+      expect.objectContaining({ organizationId: OTHER_ORG }),
+    );
+    expect(deps.controlService.list).toHaveBeenCalledExactlyOnceWith("2025-03", OTHER_ORG);
+  });
+
+  it("filtra a carteira contábil por regime, responsável e estado do fechamento", async () => {
+    const deps = services();
+    deps.controlService.list.mockResolvedValue({
+      competence: "2026-09",
+      items: [
+        {
+          legal_name: "Alfa",
+          regime: "Simples Nacional",
+          person_responsible_id: USER,
+          closing: { status: "CLOSED" },
+        },
+        {
+          legal_name: "Beta",
+          regime: null,
+          person_responsible_id: null,
+          closing: { status: "NOT_RECEIVED" },
+        },
+      ],
+    });
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const get = (query: string) =>
+      app.request(`https://contabil.test/contabil/controls/list?competence=2026-09&${query}`, {
+        headers: headers("2"),
+      });
+
+    const byOwner = await get(`responsible_id=${USER}&regime=Simples%20Nacional&status=CLOSED`);
+    const unassigned = await get("responsible_id=none&regime=N%C3%A3o%20informado");
+    const invalid = await get("status=QUALQUER");
+
+    expect(
+      (await byOwner.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Alfa"]);
+    expect(
+      (await unassigned.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Beta"]);
+    expect(invalid.status).toBe(400);
+    expect(deps.controlService.list).toHaveBeenCalledWith("2026-09", ORG);
+  });
+
+  it("movimento mensal e movimento padrão validam corpo e usam a organização do token (#1691)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, path: string, body?: unknown, auth = true) =>
+      app.request(`https://contabil.test${path}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const monthly = await send("PATCH", `/triagem/monthly/${ID}`, {
+      type: "CONTABIL",
+      triad_moviment: true,
+      download_date: "2026-10-03",
+    });
+    const emptyMonthly = await send("PATCH", `/triagem/monthly/${ID}`, { type: "CONTABIL" });
+    const badDate = await send("PATCH", `/triagem/monthly/${ID}`, { download_date: "03/10/2026" });
+    const impossibleDate = await send("PATCH", `/triagem/monthly/${ID}`, {
+      settlement_date: "2026-02-31",
+    });
+    const config = await send("PUT", "/triagem/config", {
+      client_id: CLIENT,
+      active_items: ["bank_reconciliation"],
+    });
+    const fiscalField = await send("PUT", "/triagem/config", {
+      client_id: CLIENT,
+      active_items: ["inbound_report"],
+    });
+    const read = await send("GET", `/triagem/config?client_id=${CLIENT}`);
+    const anonymous = await send("GET", `/triagem/config?client_id=${CLIENT}`, undefined, false);
+
+    expect(monthly.status).toBe(200);
+    expect([
+      emptyMonthly.status,
+      badDate.status,
+      impossibleDate.status,
+      fiscalField.status,
+    ]).toEqual([400, 400, 400, 400]);
+    expect(config.status).toBe(200);
+    expect(read.status).toBe(200);
+    expect(anonymous.status).toBe(401);
+    expect(deps.triageDocumentsService.updateMonthly).toHaveBeenCalledExactlyOnceWith(
+      ID,
+      { type: "CONTABIL", triad_moviment: true, download_date: "2026-10-03" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.saveConfig).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "CONTABIL", active_items: ["bank_reconciliation"] },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.getConfig).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "CONTABIL" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("prioridade e meio de envio fiscal validam corpo e usam a organização do token (#1692)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, body?: unknown, query = "", auth = true) =>
+      app.request(`https://contabil.test/triagem/fiscal-settings${query}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const saved = await send("PUT", {
+      client_id: CLIENT,
+      priority: true,
+      delivery_method: "EMAIL",
+    });
+    const empty = await send("PUT", { client_id: CLIENT });
+    const textPriority = await send("PUT", { client_id: CLIENT, priority: "Sim" });
+    const read = await send("GET", undefined, `?client_id=${CLIENT}`);
+    const anonymous = await send("GET", undefined, `?client_id=${CLIENT}`, false);
+
+    expect([saved.status, read.status]).toEqual([200, 200]);
+    expect([empty.status, textPriority.status, anonymous.status]).toEqual([400, 400, 401]);
+    expect(deps.triageDocumentsService.saveFiscalSettings).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, priority: true, delivery_method: "EMAIL" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.getFiscalSettings).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("histórico bancário exige sessão e consulta a organização do token (#1694)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const url = `https://contabil.test/triagem/statements/history?client_id=${CLIENT}&from=2026-01&to=2026-09&pending=true`;
+
+    const anonymous = await app.request(url);
+    const ok = await app.request(url, { headers: headers("2") });
+    const inverted = await app.request(
+      `https://contabil.test/triagem/statements/history?client_id=${CLIENT}&from=2026-09&to=2026-01`,
+      { headers: headers("2") },
+    );
+
+    const denied = await app.request(url, {
+      headers: {
+        ...headers("0"),
+        "x-auth-modules": JSON.stringify({ contabil: 0, triagem: 0, fiscal: 0 }),
+      },
+    });
+
+    expect([anonymous.status, ok.status, inverted.status, denied.status]).toEqual([
+      401, 200, 400, 403,
+    ]);
+    expect(deps.triageDocumentsService.listStatementHistory).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, from: "2026-01", to: "2026-09", pending: true },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("nuvens do cliente validam link e usam a organização do token (#1695)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, path: string, body?: unknown, auth = true) =>
+      app.request(`https://contabil.test${path}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const created = await send("POST", "/triagem/clouds", {
+      client_id: CLIENT,
+      type: "Google Drive",
+      link: "https://drive.example/pasta",
+    });
+    const script = await send("POST", "/triagem/clouds", {
+      client_id: CLIENT,
+      type: "Drive",
+      link: "javascript:alert(1)",
+    });
+    const updated = await send("PATCH", `/triagem/clouds/${ID}`, { type: "OneDrive" });
+    const listed = await send("GET", `/triagem/clouds?client_id=${CLIENT}`);
+    const anonymous = await send("GET", `/triagem/clouds?client_id=${CLIENT}`, undefined, false);
+
+    expect([
+      created.status,
+      script.status,
+      updated.status,
+      listed.status,
+      anonymous.status,
+    ]).toEqual([201, 400, 200, 200, 401]);
+    expect(deps.triageDocumentsService.createCloud).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "Google Drive", link: "https://drive.example/pasta" },
+      expect.objectContaining({ organizationId: ORG, userId: USER }),
+    );
+    expect(deps.triageDocumentsService.updateCloud).toHaveBeenCalledExactlyOnceWith(
+      ID,
+      { type: "OneDrive" },
       expect.objectContaining({ organizationId: ORG }),
     );
   });

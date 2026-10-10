@@ -16,6 +16,17 @@ export const FISCAL_TAX_REGIME_CODES = {
   "Lucro Real": "2",
 } as const satisfies Record<TaxRegime, string>;
 
+// Tipo do segmento herdado de tb_integracao.segmentos (#1741).
+export const CLIENT_SEGMENT_TYPES = ["servico", "comercio", "industria"] as const;
+
+export type ClientSegmentType = (typeof CLIENT_SEGMENT_TYPES)[number];
+
+export const CLIENT_SEGMENT_TYPE_LABELS = {
+  servico: "Serviço",
+  comercio: "Comércio",
+  industria: "Indústria",
+} as const satisfies Record<ClientSegmentType, string>;
+
 export const REGULARIZE_GUIDANCE_TARGET_TYPES = ["PJ", "PF", "SEM_CLIENTE"] as const;
 
 export const REGULARIZE_GUIDANCE_CHECKLIST_ITEMS = [

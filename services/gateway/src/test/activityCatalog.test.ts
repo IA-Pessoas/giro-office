@@ -6,6 +6,19 @@ describe("activityCatalog", () => {
   it.each([
     ["GET", "/client/groups", "consultou", "a lista de grupos de empresas"],
     ["POST", "/client/groups", "cadastrou", "um novo grupo de empresas"],
+    ["GET", "/client/regimes", "consultou", "a lista de regimes"],
+    ["POST", "/client/regimes", "cadastrou", "um novo regime"],
+    ["GET", "/client/segments", "consultou", "a lista de segmentos"],
+    ["GET", "/client/licitacao/bidders", "consultou", "a lista de licitantes"],
+    [
+      "GET",
+      "/client/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/licitacao/history",
+      "consultou",
+      "o histórico de licitação de um cliente",
+    ],
+    ["POST", "/client/segments", "cadastrou", "um novo segmento"],
+    ["PATCH", "/client/segments/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e", "atualizou", "um segmento"],
+    ["PATCH", "/client/regimes/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e", "atualizou", "um regime"],
     [
       "PATCH",
       "/client/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",

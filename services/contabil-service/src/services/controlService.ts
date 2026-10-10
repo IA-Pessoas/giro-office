@@ -7,6 +7,14 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import {
+  CONTROL_AUDIT_ACTIONS,
+  CONTROL_AUDIT_REFERRING,
+  CONTROL_HISTORY_FIELDS,
+  type ControlHistoryInput,
+  type ControlHistoryPrisma,
+  listControlHistory,
+} from "./controlHistoryService.js";
 
 export type ControlServicePrisma = typeof prismaClient;
 
@@ -51,26 +59,7 @@ export interface ControlPortfolio {
   }>;
 }
 
-const UPDATABLE_FIELDS = new Set<string>([
-  "regenerate_accounting_entries",
-  "check_summary_by_accumulator",
-  "post_accounting_transaction",
-  "import_bank_statements",
-  "reconcile_bank_statements",
-  "reconcile_vendors",
-  "integrate_taxes",
-  "settle_federal_taxes_via_ecac",
-  "settle_state_taxes_via_sefaz_ba",
-  "integrate_payroll",
-  "suspense_accounts",
-  "check_overdrawn_accounts",
-  "general_account_reconciliation",
-  "check_loan_and_interest_accounts",
-  "monthly_closing",
-  "reconcile_icms_pis_cofins",
-  "depreciation",
-  "notes",
-]);
+const UPDATABLE_FIELDS = new Set<string>(CONTROL_HISTORY_FIELDS);
 
 const DEFAULT_CREATE_DATA = {
   regenerate_accounting_entries: false,
@@ -263,7 +252,7 @@ export class ControlService {
         organizationId: data.organizationId,
         permission: data.permission ?? null,
         action: "Cadastro",
-        referring: "contabil.control",
+        referring: CONTROL_AUDIT_REFERRING,
         referringId: control.id,
         changes: "{}",
       });
@@ -334,6 +323,10 @@ export class ControlService {
     }
   }
 
+  history(input: ControlHistoryInput) {
+    return listControlHistory(this.prisma as unknown as ControlHistoryPrisma, input);
+  }
+
   async detail(
     clientId: string,
     competence: string,
@@ -393,8 +386,8 @@ export class ControlService {
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Atualização",
-        referring: "contabil.control",
+        action: CONTROL_AUDIT_ACTIONS.updateField,
+        referring: CONTROL_AUDIT_REFERRING,
         referringId: id,
         oldData: exists as unknown as Record<string, unknown>,
         updatedData: updated as unknown as Record<string, unknown>,
@@ -428,8 +421,8 @@ export class ControlService {
       userId: auth.userId,
       organizationId: auth.organizationId,
       permission: auth.permission ?? null,
-      action: "Concluir todos os itens do controle contábil",
-      referring: "contabil.control",
+      action: CONTROL_AUDIT_ACTIONS.completeAll,
+      referring: CONTROL_AUDIT_REFERRING,
       referringId: id,
       oldData: current as unknown as Record<string, unknown>,
       updatedData: updated as unknown as Record<string, unknown>,
@@ -484,7 +477,7 @@ export class ControlService {
       organizationId: data.organizationId,
       permission: data.permission ?? null,
       action: "Arquivar competência contábil",
-      referring: "contabil.control",
+      referring: CONTROL_AUDIT_REFERRING,
       referringId: current.id,
       oldData: current as unknown as Record<string, unknown>,
       updatedData: { ...result, archived_at: archivedAt.toISOString() },
@@ -534,7 +527,7 @@ export class ControlService {
       organizationId: data.organizationId,
       permission: data.permission ?? null,
       action: "Restaurar competência contábil",
-      referring: "contabil.control",
+      referring: CONTROL_AUDIT_REFERRING,
       referringId: data.clientId,
       changes: JSON.stringify({ competence: data.competence, ...result }),
     });

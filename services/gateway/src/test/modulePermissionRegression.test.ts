@@ -233,39 +233,76 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
-  it("restringe a gestão de grupos de empresas ao módulo Integração", () => {
-    const reader = authContext({ modules: { integracao: 1, comercial: 3 } });
-    const editor = authContext({ modules: { integracao: 2 } });
+  it("libera licitantes e histórico de licitação para quem lê clientes pelo Regularize", () => {
+    const regularizeReader = authContext({ modules: { regularize: 1 } });
+    const noModule = authContext({ modules: {} });
+    for (const path of [
+      "/client/licitacao/bidders",
+      "/client/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/licitacao/history",
+    ]) {
+      const policy = requiredRoutePolicy("GET", path);
+      expect(canAccessRoute(regularizeReader, policy), `Regularize 1: ${path}`).toBe(true);
+      expect(canAccessRoute(noModule, policy), `sem módulo: ${path}`).toBe(false);
+    }
+  });
+
+  it("libera os grupos de empresas para Integração e Regularize, e só para eles", () => {
+    const regularizeReader = authContext({ modules: { regularize: 1 } });
+    const regularizeEditor = authContext({ modules: { regularize: 2 } });
+    const integracaoEditor = authContext({ modules: { integracao: 2 } });
     const otherModule = authContext({ modules: { comercial: 3, contabil: 3 } });
     const routes = [
-      ["GET", "/client/groups", true, true],
-      ["POST", "/client/groups", false, true],
-      ["PATCH", "/client/groups/group-1", false, true],
-      ["PUT", "/client/groups/group-1/clients", false, true],
+      ["GET", "/client/groups", true],
+      ["POST", "/client/groups", false],
+      ["PATCH", "/client/groups/group-1", false],
+      ["PUT", "/client/groups/group-1/clients", false],
     ] as const;
 
-    for (const [method, path, canRead, canWrite] of routes) {
+    for (const [method, path, readerCanAccess] of routes) {
       const policy = requiredRoutePolicy(method, path);
-      expect(canAccessRoute(reader, policy), `Integração nível 1: ${method} ${path}`).toBe(canRead);
-      expect(canAccessRoute(editor, policy), `Integração nível 2: ${method} ${path}`).toBe(
-        canWrite,
+      expect(canAccessRoute(regularizeReader, policy), `Regularize 1: ${method} ${path}`).toBe(
+        readerCanAccess,
+      );
+      expect(canAccessRoute(regularizeEditor, policy), `Regularize 2: ${method} ${path}`).toBe(
+        true,
+      );
+      expect(canAccessRoute(integracaoEditor, policy), `Integração 2: ${method} ${path}`).toBe(
+        true,
       );
       expect(canAccessRoute(otherModule, policy), `outro módulo: ${method} ${path}`).toBe(false);
     }
   });
 
-  it.each([
-    "/client/coringa/list",
-    "/client/coringa/pdf",
-  ])("aplica a permissão da lista de clientes em %s", (path) => {
-    const listPolicy = requiredRoutePolicy("GET", "/client/list");
-    const policy = requiredRoutePolicy("GET", path);
-    expect(policy).toEqual(listPolicy);
-    for (const module of ["regularize", "pessoal", "integracao"]) {
-      expect(canAccessRoute(authContext({ modules: { [module]: 1 } }), policy)).toBe(true);
+  it("libera regimes e segmentos para Integração e Regularize; a leitura segue a lista de clientes", () => {
+    const regularizeReader = authContext({ modules: { regularize: 1 } });
+    const regularizeEditor = authContext({ modules: { regularize: 2 } });
+    const integracaoEditor = authContext({ modules: { integracao: 2 } });
+    const otherModule = authContext({ modules: { comercial: 3, contabil: 3 } });
+
+    for (const path of ["/client/regimes", "/client/segments"]) {
+      const read = requiredRoutePolicy("GET", path);
+      expect(canAccessRoute(otherModule, read), `leitura na ficha: ${path}`).toBe(true);
+      expect(canAccessRoute(authContext({ modules: {} }), read)).toBe(false);
     }
-    expect(canAccessRoute(authContext({ permission: 1, modules: {} }), policy)).toBe(true);
-    expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
+
+    for (const [method, path] of [
+      ["POST", "/client/regimes"],
+      ["PATCH", "/client/regimes/regime-1"],
+      ["POST", "/client/segments"],
+      ["PATCH", "/client/segments/segment-1"],
+    ] as const) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(regularizeReader, policy), `Regularize 1: ${method} ${path}`).toBe(
+        false,
+      );
+      expect(canAccessRoute(regularizeEditor, policy), `Regularize 2: ${method} ${path}`).toBe(
+        true,
+      );
+      expect(canAccessRoute(integracaoEditor, policy), `Integração 2: ${method} ${path}`).toBe(
+        true,
+      );
+      expect(canAccessRoute(otherModule, policy), `outro módulo: ${method} ${path}`).toBe(false);
+    }
   });
 
   it("permite usuário autenticado consultar relatórios sem política modular do gateway", () => {

@@ -1,5 +1,5 @@
 import {
-  TRIAGE_DOCUMENT_STATUSES,
+  normalizeTriageDocumentStatus,
   TRIAGE_FISCAL_CHECKLIST_FIELDS,
   TRIAGE_PENDING_DOCUMENT_STATUSES,
 } from "@workspace/shared";
@@ -11,7 +11,6 @@ import {
  * Pendência e campos vêm do shared, os mesmos da Triagem (TRIAGE_PENDING_DOCUMENT_STATUSES).
  */
 const PENDING = new Set<string>(TRIAGE_PENDING_DOCUMENT_STATUSES);
-const STATUSES = new Set<string>(TRIAGE_DOCUMENT_STATUSES);
 // Só os itens da rotina fiscal, como a própria Triagem lê o checklist.
 const FISCAL_FIELDS = new Set<string>(TRIAGE_FISCAL_CHECKLIST_FIELDS);
 
@@ -55,11 +54,11 @@ export function triageDocumentsView(
   competence: { configuration_snapshot: unknown } | undefined,
 ): TriageDocumentsView {
   if (monthly) {
-    const items = Object.entries(asRecord(monthly.checklist)).flatMap(([field, status]) =>
-      FISCAL_FIELDS.has(field) && typeof status === "string" && STATUSES.has(status)
-        ? [{ field, status }]
-        : [],
-    );
+    // Mesmo mapeamento de estados da Triagem, inclusive os gravados pelo legado.
+    const items = Object.entries(asRecord(monthly.checklist)).flatMap(([field, value]) => {
+      const status = normalizeTriageDocumentStatus(value);
+      return FISCAL_FIELDS.has(field) && status ? [{ field, status }] : [];
+    });
     return {
       source: "MONTHLY",
       pending: items.filter((item) => PENDING.has(item.status)).length,

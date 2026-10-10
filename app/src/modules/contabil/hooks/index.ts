@@ -22,12 +22,14 @@ export {
   useCreateYearContabilControlsMutation,
   useArchiveContabilCompetenceMutation,
   useContabilControlDetail,
+  useContabilControlHistory,
   useContabilControlPortfolio,
   usePatchContabilControlFieldMutation,
   useRestoreContabilCompetenceMutation,
 } from "./useContabilControl";
 export {
   useContabilRelationship,
+  useContabilRelationshipHistory,
   useCreateContabilRelationshipMutation,
   useDeleteContabilRelationshipMutation,
   useUpdateContabilRelationshipMutation,

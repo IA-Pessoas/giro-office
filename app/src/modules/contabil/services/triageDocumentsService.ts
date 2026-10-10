@@ -4,11 +4,17 @@ import type {
   ContabilCompetence,
   FiscalTriagePortfolio,
   TriageBankStatement,
+  TriageStatementHistory,
   TriageDocumentStatus,
   TriageDocumentItemNotes,
   TriageDocumentsMonthly,
   TriageClosing,
   TriageClosingStatus,
+  TriageDocumentField,
+  TriageFiscalSettings,
+  TriageFiscalSpecialConfig,
+  TriageMonthlyUpdate,
+  TriageMovementConfig,
   TriageRoutineType,
 } from "../types";
 import {
@@ -82,6 +88,71 @@ export const triageDocumentsService = {
       CONTABIL_ENDPOINTS.triageMonthlyItems(monthlyId),
       { status, ...(type === "FISCAL" ? { type } : {}) },
     );
+    return unwrapContabilEnvelope(response.data);
+  },
+  async updateMonthly(monthlyId: string, data: TriageMonthlyUpdate): Promise<TriageDocumentsMonthly> {
+    const response = await setupAPIClient().patch(
+      CONTABIL_ENDPOINTS.triageMonthlyById(monthlyId),
+      data,
+    );
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getMovementConfig(clientId: string): Promise<TriageMovementConfig> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageConfig, {
+      params: { client_id: clientId },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async saveMovementConfig(
+    clientId: string,
+    activeItems: TriageDocumentField[],
+  ): Promise<TriageMovementConfig> {
+    const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageConfig, {
+      client_id: clientId,
+      active_items: activeItems,
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getFiscalSpecialConfig(clientId: string): Promise<TriageFiscalSpecialConfig> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageConfig, {
+      params: { client_id: clientId, type: "FISCAL" },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async saveFiscalSpecialConfig(
+    clientId: string,
+    activeItems: TriageFiscalSpecialConfig["active_items"],
+  ): Promise<TriageFiscalSpecialConfig> {
+    const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageConfig, {
+      client_id: clientId,
+      type: "FISCAL",
+      active_items: activeItems,
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getFiscalSettings(clientId: string): Promise<TriageFiscalSettings> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageFiscalSettings, {
+      params: { client_id: clientId },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async saveFiscalSettings(
+    clientId: string,
+    settings: Pick<TriageFiscalSettings, "priority" | "delivery_method">,
+  ): Promise<TriageFiscalSettings> {
+    const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageFiscalSettings, {
+      client_id: clientId,
+      ...settings,
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getStatementHistory(
+    clientId: string,
+    pendingOnly: boolean,
+  ): Promise<TriageStatementHistory> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageStatementHistory, {
+      params: { client_id: clientId, ...(pendingOnly ? { pending: "true" } : {}) },
+    });
     return unwrapContabilEnvelope(response.data);
   },
   async getStatements(params: MonthlyParams): Promise<TriageBankStatement[]> {
