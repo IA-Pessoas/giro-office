@@ -4,6 +4,7 @@ import {
   createRegularizeWorkerApp,
   type RegularizeClientPfService,
   type RegularizeDashboardService,
+  type RegularizeDteImportService,
   type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
   type RegularizeLicenseReportingService,
@@ -438,6 +439,48 @@ describe("regularize Worker", () => {
       search: "",
       status: "Criado",
       type: "TFF",
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it("routes DTE import with write permission and lists imports by organization", async () => {
+    const dte: RegularizeDteImportService = {
+      importNotices: vi.fn(async () => ({ id: "import-1", created_count: 1 })),
+      listImports: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dteImportService: dte,
+    });
+    const post = (permission: string) =>
+      app.request("https://regularize.test/regularize/dte/import", {
+        method: "POST",
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ format: "json", content: "[]" }),
+      });
+
+    const denied = await post("1");
+    const created = await post("2");
+    const list = await app.request("https://regularize.test/regularize/dte/imports", {
+      headers: headers(),
+    });
+
+    expect([denied.status, created.status, list.status]).toEqual([403, 201, 200]);
+    expect(dte.importNotices).toHaveBeenCalledTimes(1);
+    expect(dte.importNotices).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      format: "json",
+      content: "[]",
+    });
+    expect(dte.listImports).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
       page: 1,
       limit: 20,
     });

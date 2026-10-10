@@ -7,6 +7,7 @@ export type RegularizeTabId =
   | "passwords"
   | "sites"
   | "taxes"
+  | "dte"
   | "groups"
   | "bidders"
   | "catalogs";

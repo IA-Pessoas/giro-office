@@ -48,6 +48,8 @@ Exemplos de paths publicos:
   - aceita `status`, `search`, `page` e `limit`; retorna uma página com `data`, `total` e `hasMore`.
 - `/regularize/partners`
 - `/regularize/municipal-taxes`
+- `/regularize/dte/import` - importa avisos DTE colados em HTML ou JSON; leitor verificado só com casos sintéticos
+- `/regularize/dte/imports` - importações da organização, com recusas e duplicatas
 - `/regularize/process`
 - `/regularize/processes`
 - `/regularize/guidance`

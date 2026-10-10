@@ -69,6 +69,8 @@ export const regularizeQueryKeys = {
     [...regularizeQueryKeys.people(scope), "partners", "detail", id ?? ""] as const,
   operations: (scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.scopedRoot(scope), "operations"] as const,
+  dteImports: (scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.operations(scope), "dte-imports"] as const,
   municipalTaxes: (filters: RegularizeMunicipalTaxesListFilters, scope: RegularizeQueryScope) =>
     [
       ...regularizeQueryKeys.operations(scope),

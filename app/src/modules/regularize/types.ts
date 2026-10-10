@@ -661,3 +661,37 @@ export interface RegularizeDashboard {
     Pick<RegularizeLicenseListItem, "id" | "type_license" | "protocol" | "due_date">
   >;
 }
+
+export type RegularizeDteImportFormat = "html" | "json";
+
+export type RegularizeDteImportPayload = {
+  format: RegularizeDteImportFormat;
+  content: string;
+};
+
+export type RegularizeDteRejectionReason =
+  | "LINHA_INCOMPLETA"
+  | "ITEM_INVALIDO"
+  | "CAMPO_INVALIDO"
+  | "CAMPO_LONGO"
+  | "SEM_DADOS";
+
+export type RegularizeDteImport = {
+  id: RegularizeId;
+  format: RegularizeDteImportFormat;
+  total_rows: number;
+  created_count: number;
+  duplicate_count: number;
+  rejected_count: number;
+  duplicates: Array<{ row: number; aviso: string; cnpj_cpf: string }>;
+  rejections: Array<{ row: number; reason: RegularizeDteRejectionReason }>;
+  created_at: string;
+};
+
+export type RegularizeDteImportsPage = {
+  data: RegularizeDteImport[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};
