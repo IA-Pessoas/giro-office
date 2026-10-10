@@ -114,10 +114,14 @@ export function buildRegularizeMunicipalTaxesListParams(
 // Opção "Sem cor" do filtro: a API recebe tipo vazio, que no select já significa "todas".
 export const REGULARIZE_DTE_NO_TIPO_FILTER = "sem-cor";
 
+// Sem "Emitido de", a caixa mostra tudo (o ?todos do legado). A API aplica 45 dias quando o
+// from não vem, então o filtro vazio vai como uma data anterior a qualquer aviso.
+export const REGULARIZE_DTE_ALL_PERIOD_FROM = "1900-01-01";
+
 // from e to vão como dia (aaaa-mm-dd): a emissão do aviso é comparada pelo dia, sem fuso.
 export function buildRegularizeDteNoticeListParams(filters: RegularizeDteNoticeListFilters) {
   return {
-    ...(filters.from ? { from: filters.from } : {}),
+    from: filters.from || REGULARIZE_DTE_ALL_PERIOD_FROM,
     ...(filters.to ? { to: filters.to } : {}),
     ...(filters.tipo
       ? { tipo: filters.tipo === REGULARIZE_DTE_NO_TIPO_FILTER ? "" : filters.tipo }

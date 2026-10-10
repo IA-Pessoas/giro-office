@@ -602,7 +602,10 @@ export function buildRegularizeServiceOpenApiSpec(
       { name: "PF", description: "Clientes PF do regularize" },
       { name: "Partners", description: "Quadro societario" },
       { name: "MunicipalTaxes", description: "Tributos municipais" },
-      { name: "DTE", description: "Importação manual de avisos DTE" },
+      {
+        name: "DTE",
+        description: "Importação manual de avisos, caixa de avisos e consultas diárias ao DTE",
+      },
       { name: "Processes", description: "Processos de regularize" },
       { name: "Guidance", description: "Orientacoes procedurais" },
       { name: "Licenses", description: "Alvaras e licencas" },

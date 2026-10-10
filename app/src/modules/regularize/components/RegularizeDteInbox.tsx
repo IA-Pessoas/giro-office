@@ -45,7 +45,8 @@ const TIPO_OPTIONS: Array<{ value: string; label: string; variant: StatusBadgeVa
 function initialFilters(): RegularizeDteNoticeListFilters {
   return {
     from: formatDateToInput(new Date(Date.now() - DEFAULT_WINDOW_DAYS * DAY_MS)),
-    to: formatDateToInput(new Date()),
+    // Sem data final: uma aba aberta de ontem continua mostrando o que for emitido hoje.
+    to: "",
     tipo: "",
     search: "",
     // Como no legado, a caixa abre nos avisos que ainda precisam de leitura.

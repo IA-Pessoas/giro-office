@@ -259,6 +259,20 @@ describe("DteQueryService.importLists", () => {
     });
   });
 
+  it("não grava nem cria histórico quando nenhum documento é de cliente", async () => {
+    const prisma = createPrisma();
+
+    const result = await serviceFor(prisma).importLists({
+      ...base,
+      done: "99999999000199",
+      notDone: "",
+    });
+
+    expect(result).toMatchObject({ done_count: 0, not_done_count: 0, unknown: ["99999999000199"] });
+    expect(prisma.regularizeDteQuery.createMany).not.toHaveBeenCalled();
+    expect(prisma.logs.create).not.toHaveBeenCalled();
+  });
+
   it("recusa listas vazias", async () => {
     const prisma = createPrisma();
 

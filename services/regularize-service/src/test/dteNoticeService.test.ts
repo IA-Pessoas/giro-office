@@ -84,7 +84,14 @@ describe("DteNoticeService.list", () => {
     expect(prisma.regularizeDteNotice.findMany.mock.calls[0]?.[0]).toMatchObject({
       where: {
         organization_id: ORG,
-        OR: [{ data_emissao_at: period }, { data_emissao_at: null, created_at: period }],
+        OR: [
+          { data_emissao_at: period },
+          // Pela importação (instante em UTC), com um dia de folga no fim.
+          {
+            data_emissao_at: null,
+            created_at: { gte: from, lt: new Date("2026-02-02T00:00:00.000Z") },
+          },
+        ],
         tipo: { contains: "badge-warning" },
         aviso: { contains: "intima", mode: "insensitive" },
         pending_reading: true,

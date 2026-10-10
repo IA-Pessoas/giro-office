@@ -9,6 +9,7 @@ export const DTE_NOTICE_READING_FILTERS = ["Todos", "Pendente", "Lido"] as const
 export type DteNoticeReadingFilter = (typeof DTE_NOTICE_READING_FILTERS)[number];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const LOG_REFERRING = "regularize.dte_notices";
 
 export type DteNoticeListParams = {
   organizationId: string;
@@ -54,9 +55,15 @@ export class DteNoticeService {
       gte: from,
       ...(params.to ? { lt: new Date(params.to.getTime() + DAY_MS) } : {}),
     };
+    // A data da importação é um instante em UTC, e o dia pedido é o de quem consulta: um dia
+    // a mais no fim, para o aviso importado à noite não ficar fora do próprio dia.
+    const importPeriod = {
+      gte: from,
+      ...(params.to ? { lt: new Date(params.to.getTime() + 2 * DAY_MS) } : {}),
+    };
     const where: Prisma.RegularizeDteNoticeWhereInput = {
       organization_id: params.organizationId,
-      OR: [{ data_emissao_at: period }, { data_emissao_at: null, created_at: period }],
+      OR: [{ data_emissao_at: period }, { data_emissao_at: null, created_at: importPeriod }],
       // O tipo gravado é o atributo class inteiro do selo: busca pelo trecho para não perder
       // aviso com classe extra. Vazio pede os avisos sem cor.
       ...(params.tipo === undefined
@@ -109,7 +116,7 @@ export class DteNoticeService {
         userId: input.userId,
         organizationId: input.organizationId,
         action: "Atualizacao",
-        referring: "regularize.dte_notices",
+        referring: LOG_REFERRING,
         referringId: existing.id,
         changes: {
           pending_reading: { from: existing.pending_reading, to: input.pendingReading },

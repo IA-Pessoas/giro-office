@@ -13,6 +13,11 @@ describe("parseDteDateTime", () => {
     expect(parseDteDateTime("05/03/2024")).toEqual(new Date("2024-03-05T00:00:00.000Z"));
   });
 
+  it("aceita dígito único e ignora segundos, como o STR_TO_DATE do legado", () => {
+    expect(parseDteDateTime("1/9/2026 9:05")).toEqual(new Date("2026-09-01T09:05:00.000Z"));
+    expect(parseDteDateTime("01/06/2026 10:00:30")).toEqual(new Date("2026-06-01T10:00:00.000Z"));
+  });
+
   it("devolve null para texto fora do formato ou data que não existe", () => {
     expect(parseDteDateTime(null)).toBeNull();
     expect(parseDteDateTime("2024-03-05")).toBeNull();

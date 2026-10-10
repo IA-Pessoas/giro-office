@@ -968,7 +968,9 @@ await runTest("regularize process contract keeps canonical states and explicit F
 await runTest("regularize DTE notice filters send plain days and omit empty filters (#1745)", () => {
   const base = { from: "", to: "", tipo: "", search: "  ", reading: "Todos", page: 1, limit: 20 };
 
+  // Período vazio pede tudo: sem from, a API aplicaria os 45 dias.
   assert.deepEqual(buildRegularizeDteNoticeListParams(base), {
+    from: "1900-01-01",
     reading: "Todos",
     page: 1,
     limit: 20,
