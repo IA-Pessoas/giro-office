@@ -109,6 +109,11 @@ export function canonicalProcessStatus(status: unknown): unknown {
   return canonical ? canonical[0] : status;
 }
 
+/** Licença ativa do legado ("Ativo") é a "Em Andamento" de hoje, como no filtro das listas. */
+export function canonicalLicenseStatus(status: unknown): unknown {
+  return status === "Ativo" ? "Em Andamento" : status;
+}
+
 export function buildProcessStatusFilter(status: string): Record<string, unknown> {
   if (status === "Todos") {
     return {};

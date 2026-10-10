@@ -4,6 +4,7 @@ import { buildRegularizeServiceOpenApiSpec } from "../openapi/spec.js";
 import {
   buildLicenseStatusFilter,
   buildProcessStatusFilter,
+  canonicalLicenseStatus,
   canonicalProcessStatus,
   getLicenseDueDateBounds,
   getLicenseNotificationDateRange,
@@ -44,6 +45,13 @@ describe("regularize status contracts", () => {
     expect(canonicalProcessStatus("Pendente")).toBe("Pendente");
     expect(canonicalProcessStatus("Migrado")).toBe("Migrado");
     expect(canonicalProcessStatus(null)).toBeNull();
+  });
+
+  it("reads the legacy active license status as Em Andamento", () => {
+    expect(canonicalLicenseStatus("Ativo")).toBe("Em Andamento");
+    expect(canonicalLicenseStatus("Em Andamento")).toBe("Em Andamento");
+    expect(canonicalLicenseStatus("Paralisado")).toBe("Paralisado");
+    expect(canonicalLicenseStatus(null)).toBeNull();
   });
 
   it("accepts only canonical guidance and license statuses on writes", () => {
