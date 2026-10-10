@@ -112,3 +112,29 @@ export function createMarketingStockCsv(
     [`Total: ${itemCountLabel(stock.totals.items)}`, String(stock.totals.quantity), "", ""],
   ]);
 }
+
+export const AI_USAGE_REPORT_COLUMNS = ["Nome", "Competência"];
+
+/** `2026-04` → `04/2026`. */
+export function formatCompetence(competence: string): string {
+  const [year, month] = competence.split("-");
+  return `${month}/${year}`;
+}
+
+export function aiUsageUserName(control: { user: { name: string; full_name: string | null } }): string {
+  return control.user.full_name || control.user.name;
+}
+
+export function aiUsageReportRows(
+  controls: readonly { user: { name: string; full_name: string | null } }[],
+  competence: string,
+): string[][] {
+  return controls.map((control) => [aiUsageUserName(control), formatCompetence(competence)]);
+}
+
+export function createAiUsageReportCsv(
+  controls: Parameters<typeof aiUsageReportRows>[0],
+  competence: string,
+): string {
+  return createCsv([AI_USAGE_REPORT_COLUMNS, ...aiUsageReportRows(controls, competence)]);
+}

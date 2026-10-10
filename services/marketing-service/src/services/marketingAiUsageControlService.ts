@@ -265,7 +265,7 @@ export class MarketingAiUsageControlService {
 
   async getReport(organizationId: string, competenceValue: string) {
     const competence = normalizeMarketingCompetence(competenceValue);
-    const [pending, withoutIntegration] = await Promise.all([
+    const [pending, unanswered, withoutIntegration] = await Promise.all([
       this.prisma.marketingAiUsageControl.findMany({
         where: {
           organization_id: organizationId,
@@ -281,13 +281,20 @@ export class MarketingAiUsageControlService {
         include: { user: { select: USER_SUMMARY } },
         orderBy: CONTROL_ORDER,
       }),
+      // Relatório legado "sem resposta": conhecimento=0, importado como nulo.
+      this.prisma.marketingAiUsageControl.findMany({
+        where: { organization_id: organizationId, competence, knowledge: null },
+        include: { user: { select: USER_SUMMARY } },
+        orderBy: CONTROL_ORDER,
+      }),
+      // Relatório legado "sem integração": integracao=1, a resposta "Não".
       this.prisma.marketingAiUsageControl.findMany({
         where: { organization_id: organizationId, competence, integration: false },
         include: { user: { select: USER_SUMMARY } },
         orderBy: CONTROL_ORDER,
       }),
     ]);
-    return { pending, withoutIntegration };
+    return { pending, unanswered, withoutIntegration };
   }
 
   async getPendingKnowledgeCount(organizationId: string, competence: Date): Promise<number> {
