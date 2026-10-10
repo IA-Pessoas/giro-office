@@ -6564,6 +6564,25 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  // Período aberto: o aviso de smoke só é criado na primeira rodada e sai da janela de 45 dias.
+  async regularizeDteNoticesList(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      query: { from: "2000-01-01", search: "QA_ smoke aviso DTE" },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.regularizeDteNoticeId = response.body?.data?.data?.[0]?.id;
+  },
+
+  async regularizeDteNoticeReadingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { id: requireState("regularizeDteNoticeId"), pending_reading: false },
+    });
+  },
+
   async taskIntegrationCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

@@ -3321,6 +3321,22 @@ const baseManifest = [
     auth: "bearer",
   }),
   op({
+    service: "regularize-service",
+    method: "GET",
+    path: "/regularize/dte/notices",
+    action: "regularizeDteNoticesList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "regularize-service",
+    method: "PUT",
+    path: "/regularize/dte/notices/reading",
+    action: "regularizeDteNoticeReadingUpdate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
     service: "task-service",
     method: "POST",
     path: "/task/integration",

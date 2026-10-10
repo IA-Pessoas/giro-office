@@ -5,6 +5,7 @@ import {
   type RegularizeClientPfService,
   type RegularizeDashboardService,
   type RegularizeDteImportService,
+  type RegularizeDteNoticeService,
   type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
   type RegularizeLicenseReportingService,
@@ -483,6 +484,52 @@ describe("regularize Worker", () => {
       organizationId: ORGANIZATION_ID,
       page: 1,
       limit: 20,
+    });
+  });
+
+  it("lists DTE notices by organization and changes reading only with write permission", async () => {
+    const notices: RegularizeDteNoticeService = {
+      list: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+      setReading: vi.fn(async () => ({ id: LICENSE_ID, pending_reading: false })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dteNoticeService: notices,
+    });
+    const put = (permission: string) =>
+      app.request("https://regularize.test/regularize/dte/notices/reading", {
+        method: "PUT",
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: LICENSE_ID, pending_reading: false }),
+      });
+
+    const list = await app.request(
+      "https://regularize.test/regularize/dte/notices?reading=Pendente&tipo=badge%20badge-warning",
+      { headers: headers() },
+    );
+    const denied = await put("1");
+    const updated = await put("2");
+
+    expect([list.status, denied.status, updated.status]).toEqual([200, 403, 200]);
+    expect(notices.list).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      tipo: "badge badge-warning",
+      search: "",
+      reading: "Pendente",
+      page: 1,
+      limit: 20,
+    });
+    expect(notices.setReading).toHaveBeenCalledTimes(1);
+    expect(notices.setReading).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      id: LICENSE_ID,
+      pendingReading: false,
     });
   });
 

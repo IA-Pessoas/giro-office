@@ -54,6 +54,7 @@ import { RegularizeGuidanceActivityForm } from "./RegularizeGuidanceActivityForm
 import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
 import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
 import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
+import { RegularizeDteInbox } from "./RegularizeDteInbox";
 import { RegularizeDtePanel } from "./RegularizeDtePanel";
 import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
@@ -2928,7 +2929,13 @@ export function RegularizePage() {
 
       {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}
 
-      {activeTab === "dte" ? <RegularizeDtePanel canEdit={regularizeAccess.canEdit} /> : null}
+      {activeTab === "dte" ? (
+        // Caixa de avisos (#1745) e importação (#1744) são fluxos separados na mesma aba.
+        <div className="space-y-4">
+          <RegularizeDteInbox canEdit={regularizeAccess.canEdit} />
+          <RegularizeDtePanel canEdit={regularizeAccess.canEdit} />
+        </div>
+      ) : null}
 
       {activeTab === "catalogs" ? (
         // Regimes e segmentos que a ficha Regularize usa; editar exige Regularize nível 2 (#1740, #1741).

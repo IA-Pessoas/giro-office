@@ -1,5 +1,6 @@
 import type {
   RegularizeClientPfListFilters,
+  RegularizeDteNoticeListFilters,
   RegularizeGuidanceListFilters,
   RegularizeId,
   RegularizeLicenseListFilters,
@@ -26,6 +27,8 @@ export const REGULARIZE_ENDPOINTS = {
   municipalTaxesDetail: "/regularize/municipal-taxes-detail",
   dteImport: "/regularize/dte/import",
   dteImports: "/regularize/dte/imports",
+  dteNotices: "/regularize/dte/notices",
+  dteNoticeReading: "/regularize/dte/notices/reading",
   processes: "/regularize/processes",
   process: "/regularize/process",
   sendToFiscal: "/regularize/process/send-to-fiscal",
@@ -102,6 +105,24 @@ export function buildRegularizeMunicipalTaxesListParams(
     ...(filters.type ? { type: filters.type } : {}),
     ...(filters.page !== undefined ? { page: filters.page } : {}),
     ...(filters.limit !== undefined ? { limit: filters.limit } : {}),
+  };
+}
+
+// Opção "Sem cor" do filtro: a API recebe tipo vazio, que no select já significa "todas".
+export const REGULARIZE_DTE_NO_TIPO_FILTER = "sem-cor";
+
+// O dia escolhido vale inteiro no fuso de quem consulta: início em 00:00 e fim em 23:59:59.999.
+export function buildRegularizeDteNoticeListParams(filters: RegularizeDteNoticeListFilters) {
+  return {
+    ...(filters.from ? { from: new Date(`${filters.from}T00:00:00`).toISOString() } : {}),
+    ...(filters.to ? { to: new Date(`${filters.to}T23:59:59.999`).toISOString() } : {}),
+    ...(filters.tipo
+      ? { tipo: filters.tipo === REGULARIZE_DTE_NO_TIPO_FILTER ? "" : filters.tipo }
+      : {}),
+    ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
+    reading: filters.reading,
+    page: filters.page,
+    limit: filters.limit,
   };
 }
 

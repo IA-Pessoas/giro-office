@@ -14,6 +14,7 @@ import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import {
   regularizePanelClassName,
+  regularizePanelLabelClassName,
   regularizePrimaryButtonClassName,
   regularizeTextareaClassName,
 } from "./regularizeFormControls";
@@ -97,7 +98,7 @@ export function RegularizeDtePanel({ canEdit }: { canEdit: boolean }) {
               void submit();
             }}
           >
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+            <label className={regularizePanelLabelClassName}>
               Formato
               <RegularizeNativeSelect
                 className="mt-1.5 sm:w-48"
@@ -109,7 +110,7 @@ export function RegularizeDtePanel({ canEdit }: { canEdit: boolean }) {
                 <option value="json">JSON</option>
               </RegularizeNativeSelect>
             </label>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+            <label className={regularizePanelLabelClassName}>
               Conteúdo
               <textarea
                 className={`${regularizeTextareaClassName} mt-1.5 min-h-40 font-mono text-xs`}

@@ -891,6 +891,50 @@ export function buildRegularizeServiceOpenApiSpec(
           },
         },
       },
+      "/regularize/dte/notices": {
+        get: {
+          tags: ["DTE"],
+          summary: "Listar avisos DTE importados",
+          description:
+            "Sem `from`, lista os avisos importados nos últimos 45 dias. O período usa a data da importação.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "from", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "to", in: "query", schema: { type: "string", format: "date-time" } },
+            {
+              name: "tipo",
+              in: "query",
+              description: "Trecho da classe do selo (ex.: badge-warning); vazio lista os sem cor.",
+              schema: { type: "string" },
+            },
+            { name: "search", in: "query", schema: { type: "string", default: "" } },
+            {
+              name: "reading",
+              in: "query",
+              schema: { type: "string", enum: ["Todos", "Pendente", "Lido"], default: "Todos" },
+            },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Página de avisos DTE", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/notices/reading": {
+        put: {
+          tags: ["DTE"],
+          summary: "Alterar o estado de leitura de um aviso DTE",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Aviso atualizado", ...successEnvelopeContent() },
+          },
+        },
+      },
       "/regularize/municipal-taxes": {
         get: {
           tags: ["MunicipalTaxes"],

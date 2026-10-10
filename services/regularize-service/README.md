@@ -50,6 +50,8 @@ Exemplos de paths publicos:
 - `/regularize/municipal-taxes`
 - `/regularize/dte/import` - importa avisos DTE colados em HTML ou JSON; leitor verificado só com casos sintéticos
 - `/regularize/dte/imports` - importações da organização, com recusas e duplicatas
+- `/regularize/dte/notices` - caixa de avisos importados; sem `from`, últimos 45 dias pela data da importação
+- `/regularize/dte/notices/reading` - altera o estado de leitura de um aviso, com registro em `logs`
 - `/regularize/process`
 - `/regularize/processes`
 - `/regularize/guidance`
