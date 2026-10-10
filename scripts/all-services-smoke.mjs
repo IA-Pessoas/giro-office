@@ -323,6 +323,7 @@ const state = {
   triagemLinkTypeCode: "",
   triagemUrgentRequestId: "",
   triagemUrgentRequestCompetence: "",
+  triagemSolicitationId: "",
   contabilResponsibleId: "",
   contabilRelationshipId: "",
   pessoalLddId: "",
@@ -5927,6 +5928,56 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/triagem/urgent-requests/${requireState("triagemUrgentRequestId")}/reopen`,
+    });
+  },
+
+  async triagemSolicitationCreate(op) {
+    // Categoria própria do smoke: o catálogo REQUEST_CATEGORY não tem seed.
+    let categoryId = crypto.randomUUID();
+    if (!isBadExpectation(op)) {
+      const category = await httpRequest(op, {
+        method: "POST",
+        path: "/triagem/catalogs",
+        expectedStatus: [201],
+        json: {
+          kind: "REQUEST_CATEGORY",
+          code: `SMOKE_REQUEST_${crypto.randomUUID().slice(0, 8)}`,
+          label: "Categoria de solicitação (smoke)",
+        },
+      });
+      categoryId = pickFirst(category.body, "data.id") ?? findFirstId(category.body?.data);
+    }
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+        category_id: categoryId,
+        description: "Solicitação criada pelo smoke",
+        responsible_id: requireState("session").id,
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemSolicitationId = id;
+  },
+
+  async triagemSolicitationList(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { status: "OPEN" } });
+  },
+
+  async triagemSolicitationGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/solicitations/${requireState("triagemSolicitationId")}`,
+    });
+  },
+
+  async triagemSolicitationClose(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/solicitations/${requireState("triagemSolicitationId")}/close`,
     });
   },
 
