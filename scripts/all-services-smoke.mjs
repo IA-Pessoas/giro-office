@@ -4223,6 +4223,13 @@ const handlers = {
     });
   },
 
+  async regularizeGroupMap(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/regularize/groups/${requireState("clientGroupId")}/map`,
+    });
+  },
+
   async clientRegimesList(op) {
     await httpRequest(op, { expectedStatus: [200], path: "/client/regimes" });
   },

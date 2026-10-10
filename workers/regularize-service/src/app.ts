@@ -13,6 +13,7 @@ import {
   updateClientPfBodySchema,
 } from "@workspace/regularize-service/src/schemas/clientPf.schemas.js";
 import { regularizeDashboardQuerySchema } from "@workspace/regularize-service/src/schemas/dashboard.schemas.js";
+import { groupMapParamsSchema } from "@workspace/regularize-service/src/schemas/groupMap.schemas.js";
 import {
   addGuidanceActivityBodySchema,
   addGuidancePartnerBodySchema,
@@ -67,6 +68,7 @@ import {
 } from "@workspace/regularize-service/src/schemas/process.schemas.js";
 import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/schemas/status.schemas.js";
 import { ClientPfService } from "@workspace/regularize-service/src/services/clientPfService.js";
+import { GroupMapService } from "@workspace/regularize-service/src/services/groupMapService.js";
 import {
   GuidanceService,
   type GuidanceService as GuidanceServiceType,
@@ -150,6 +152,7 @@ export type RegularizePartnersService = Pick<
   PartnersService,
   "create" | "update" | "detail" | "list" | "remove"
 >;
+export type RegularizeGroupMapService = Pick<GroupMapService, "generate">;
 export type RegularizePasswordService = Pick<
   PasswordService,
   "create" | "update" | "list" | "detail" | "createSite" | "updateSite" | "listSites" | "detailSite"
@@ -191,6 +194,7 @@ type RegularizeOptions = {
   municipalTaxesService?: RegularizeMunicipalTaxesService;
   clientPfService?: RegularizeClientPfService;
   partnersService?: RegularizePartnersService;
+  groupMapService?: RegularizeGroupMapService;
   passwordService?: RegularizePasswordService;
   guidanceService?: RegularizeGuidanceService;
   dashboardService?: RegularizeDashboardService;
@@ -474,6 +478,15 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       const prisma = client as never;
       return callback(new PartnersService(prisma, new RegularizeReconciliationServiceImpl(prisma)));
     });
+  };
+  const withGroupMapService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeGroupMapService) => Promise<T>,
+  ) => {
+    if (options.groupMapService) return callback(options.groupMapService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new GroupMapService(client as never)),
+    );
   };
   const withPasswordService = async <T>(
     c: RegularizeContext,
@@ -976,6 +989,16 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       return c.json(
         createSuccessResponse(
           await service.list(c.get("auth").organizationId, query.type, query.client_id),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/groups/:id/map", async (c) =>
+    withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.generate({ organizationId: c.get("auth").organizationId, groupId: id }),
         ),
       );
     }),

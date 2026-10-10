@@ -15,6 +15,7 @@ import type {
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
+  RegularizeGroupMap,
   RegularizeId,
   RegularizePartner,
   RegularizePartnerListFilters,
@@ -155,6 +156,20 @@ export function useDeleteRegularizePartnerMutation(): UseMutationResult<
     mutationFn: (id) => regularizeService.deletePartner(id),
     onSuccess: () => invalidateRegularizePeople(queryClient, scope),
   });
+}
+
+export function useRegularizeGroupMap(
+  groupId: RegularizeId,
+): UseQueryResult<RegularizeGroupMap, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(
+    regularizeQueryKeys.groupMap(groupId, scope),
+    () => regularizeService.getGroupMap(groupId),
+    // Sem cache entre visitas: grupo, cidade e regime mudam em telas do cadastro de clientes,
+    // que não invalidam as chaves do Regularize.
+    { enabled: Boolean(groupId), staleTime: 0 },
+  );
 }
 
 export function useRegularizePartnerDetail(
