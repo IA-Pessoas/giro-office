@@ -12,6 +12,7 @@ import {
   FileKey2,
   Gavel,
   Landmark,
+  Mail,
   Network,
   Loader2,
   Pencil,
@@ -53,6 +54,7 @@ import { RegularizeGuidanceActivityForm } from "./RegularizeGuidanceActivityForm
 import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
 import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
 import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
+import { RegularizeDtePanel } from "./RegularizeDtePanel";
 import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
@@ -241,6 +243,7 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "passwords", label: "Senhas", icon: FileKey2 },
   { id: "sites", label: "Sites", icon: ShieldCheck },
   { id: "taxes", label: "Tributos", icon: Landmark },
+  { id: "dte", label: "DTE", icon: Mail },
   { id: "groups", label: "Grupos", icon: Network },
   { id: "bidders", label: "Licitantes", icon: Gavel },
   { id: "catalogs", label: "Catálogos", icon: Tags },
@@ -2924,6 +2927,8 @@ export function RegularizePage() {
       ) : null}
 
       {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}
+
+      {activeTab === "dte" ? <RegularizeDtePanel canEdit={regularizeAccess.canEdit} /> : null}
 
       {activeTab === "catalogs" ? (
         // Regimes e segmentos que a ficha Regularize usa; editar exige Regularize nível 2 (#1740, #1741).

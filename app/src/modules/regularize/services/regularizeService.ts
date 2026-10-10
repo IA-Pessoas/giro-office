@@ -21,6 +21,9 @@ import type {
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
   RegularizeDashboard,
+  RegularizeDteImport,
+  RegularizeDteImportPayload,
+  RegularizeDteImportsPage,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
@@ -293,6 +296,20 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEntity<RegularizeMunicipalTaxesDetail>(response.data);
+  },
+
+  async importDte(payload: RegularizeDteImportPayload): Promise<RegularizeDteImport> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.dteImport, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteImport>(response.data);
+  },
+
+  async listDteImports(): Promise<RegularizeDteImportsPage> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dteImports);
+
+    return unwrapRegularizeEnvelope<RegularizeDteImportsPage>(response.data);
   },
 
   async createMunicipalTax(

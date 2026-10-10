@@ -18,6 +18,9 @@ import type {
   CreateRegularizeProcessPayload,
   RemoveRegularizeGuidanceActivityPayload,
   RemoveRegularizeGuidancePartnerPayload,
+  RegularizeDteImport,
+  RegularizeDteImportPayload,
+  RegularizeDteImportsPage,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
@@ -91,6 +94,25 @@ export function useRegularizeMunicipalTaxes(
       enabled: Boolean(filters.year) && (options?.enabled ?? true),
     },
   );
+}
+
+export function useRegularizeDteImports(): UseQueryResult<RegularizeDteImportsPage, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(regularizeQueryKeys.dteImports(scope), () => regularizeService.listDteImports());
+}
+
+export function useImportRegularizeDteMutation(): UseMutationResult<
+  RegularizeDteImport,
+  Error,
+  RegularizeDteImportPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.importDte(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
 }
 
 export function useRegularizeMunicipalTaxDetail(
