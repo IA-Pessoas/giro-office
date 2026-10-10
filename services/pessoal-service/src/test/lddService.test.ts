@@ -2,6 +2,7 @@ import "./envBootstrap.js";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LddService } from "../services/lddService.js";
+import { lddPdfBase64 } from "./lddPdfFixtures.js";
 import {
   clientId,
   createAuditMock,
@@ -165,6 +166,51 @@ describe("LddService", () => {
         { organizationId, userId, permission: 2 },
         { client_id: clientId, type: "FGTS" },
       ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+  it("monta a prévia do PDF LDD sem gravar nem auditar", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new LddService(prisma as never, audit);
+
+    const preview = await service.previewImport(
+      { organizationId, userId, permission: 2 },
+      {
+        client_id: clientId,
+        file_name: "ldd.pdf",
+        content_base64: lddPdfBase64(["CP-SEGUR. 01/2024 20/02/2024 10,00 10,00"]),
+      },
+    );
+
+    expect(preview.rows).toEqual([
+      expect.objectContaining({ period: "01/2024", due_date: "2024-02-20", balance_amount: 10 }),
+    ]);
+    expect(prisma.client.findFirst).toHaveBeenCalledWith({
+      where: { id: clientId, organization_id: organizationId },
+      select: { id: true },
+    });
+    expect(prisma.lddPessoal.create).not.toHaveBeenCalled();
+    expect(prisma.lddPessoal.update).not.toHaveBeenCalled();
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
+  it("nega a prévia para Viewer e para cliente de outra organização", async () => {
+    const prisma = createPrismaMock();
+    const service = new LddService(prisma as never, createAuditMock());
+    const body = {
+      client_id: clientId,
+      file_name: "ldd.pdf",
+      content_base64: lddPdfBase64(["CP-SEGUR. 01/2024 20/02/2024 10,00 10,00"]),
+    };
+
+    await expect(
+      service.previewImport({ organizationId, userId, permission: 1 }, body),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prisma.client.findFirst).not.toHaveBeenCalled();
+
+    prisma.client.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      service.previewImport({ organizationId, userId, permission: 2 }, body),
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 });

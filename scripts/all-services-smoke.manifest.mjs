@@ -5053,6 +5053,14 @@ const baseManifest = [
   }),
   op({
     service: "pessoal-service",
+    method: "POST",
+    path: "/pessoal/ldd/import/preview",
+    action: "pessoalLddImportPreview",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
     method: "PATCH",
     path: "/pessoal/ldd/{id}",
     action: "pessoalLddPatch",

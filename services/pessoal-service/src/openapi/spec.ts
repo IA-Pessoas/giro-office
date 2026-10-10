@@ -3,6 +3,7 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { PessoalServiceEnv } from "../config/env.js";
 import { PESSOAL_REPORTING_SOURCES } from "../reporting/pessoalReportingCatalog.js";
+import { LDD_PDF_MAX_BASE64_LENGTH } from "../services/lddPdfImportService.js";
 
 const successJson = {
   content: {
@@ -175,6 +176,20 @@ const updateLddRequestSchema = strictObjectSchema({
   registration_status: nullableTextSchema,
   status: nullableTextSchema,
 });
+
+const previewLddImportRequestSchema = strictObjectSchema(
+  {
+    client_id: uuidSchema,
+    file_name: { type: "string", minLength: 1, maxLength: 255 },
+    content_base64: {
+      type: "string",
+      minLength: 1,
+      maxLength: LDD_PDF_MAX_BASE64_LENGTH,
+      description: "PDF LDD/INSS em base64, até 700 KB.",
+    },
+  },
+  ["client_id", "file_name", "content_base64"],
+);
 
 const createSituationRequestSchema = strictObjectSchema(
   {
@@ -399,6 +414,40 @@ const obligationGenerationResponses = {
   },
 } as const;
 
+const lddImportPreviewResponses = {
+  "200": {
+    description: "Linhas CP- lidas do PDF, para revisão. Nada é gravado.",
+    ...successJsonWithData({
+      type: "object",
+      required: ["file_name", "rows"],
+      properties: {
+        file_name: { type: "string" },
+        rows: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["line", "source", "period", "due_date", "balance_amount", "errors"],
+            properties: {
+              line: { type: "integer", minimum: 1 },
+              source: { type: "string" },
+              period: { type: "string", nullable: true, description: "Competência MM/AAAA." },
+              due_date: { type: "string", format: "date", nullable: true },
+              balance_amount: { type: "number", nullable: true },
+              errors: { type: "array", items: { type: "string" } },
+            },
+          },
+        },
+      },
+    }),
+  },
+  "400": { description: "Bad request", ...errorJson },
+  "401": { description: "Unauthorized", ...errorJson },
+  "403": { description: "Forbidden", ...errorJson },
+  "404": { description: "Cliente não encontrado", ...errorJson },
+  "413": { description: "PDF acima do limite", ...errorJson },
+  "422": { description: "PDF ilegível ou sem linha CP- elegível", ...errorJson },
+} as const;
+
 const optionalDetailResponses = {
   "200": {
     description: "OK; data e null quando o registro ainda nao existe",
@@ -589,6 +638,16 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           operationId: "createPessoalLdd",
           requestBody: jsonRequestBody(createLddRequestSchema),
           responses: obligationGenerationResponses,
+        },
+      },
+      "/pessoal/ldd/import/preview": {
+        post: {
+          tags: ["Pessoal LDD"],
+          security: bearerSecurity,
+          summary: "Prévia da importação de LDD/INSS em PDF",
+          operationId: "previewPessoalLddImport",
+          requestBody: jsonRequestBody(previewLddImportRequestSchema),
+          responses: lddImportPreviewResponses,
         },
       },
       "/pessoal/ldd/{id}": {

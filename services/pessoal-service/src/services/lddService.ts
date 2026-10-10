@@ -1,7 +1,13 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { CreateLddBody, ListLddQuery, UpdateLddBody } from "../schemas/ldd.schemas.js";
+import type {
+  CreateLddBody,
+  ListLddQuery,
+  PreviewLddImportBody,
+  UpdateLddBody,
+} from "../schemas/ldd.schemas.js";
+import { buildLddImportPreview, type LddImportPreview } from "./lddPdfImportService.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
 import {
   omitUndefined,
@@ -79,6 +85,17 @@ export class LddService {
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao criar LDD de pessoal.", err);
     }
+  }
+
+  /** Lê o PDF LDD/INSS e devolve as linhas para revisão; não grava nem audita. */
+  async previewImport(
+    context: PessoalAuthContext,
+    body: PreviewLddImportBody,
+  ): Promise<LddImportPreview> {
+    requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
+    await this.ensureClient(context.organizationId, body.client_id);
+
+    return buildLddImportPreview(body);
   }
 
   async list(

@@ -31,6 +31,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 Exemplos de paths publicos planejados:
 
 - `/pessoal/ldd`
+- `/pessoal/ldd/import/preview` (POST, edição de Pessoal): lê as linhas `CP-` de um PDF LDD/INSS em base64 (até 700 KB) e devolve a prévia, sem gravar
 - `/pessoal/situations`
 - `/pessoal/unions`
 - `/pessoal/groups`

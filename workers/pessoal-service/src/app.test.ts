@@ -80,6 +80,7 @@ function situationService(): PessoalSituationService {
 function lddService(): PessoalLddService {
   return {
     list: vi.fn(async () => []),
+    previewImport: vi.fn(async () => ({ file_name: "ldd.pdf", rows: [] })),
     create: vi.fn(async () => ({ id: LDD_ID, client_id: CLIENT_ID, type: "FGTS" })),
     update: vi.fn(async () => ({ id: LDD_ID, status: "Regular" })),
     delete: vi.fn(async () => ({ id: LDD_ID, client_id: CLIENT_ID })),
@@ -337,6 +338,30 @@ describe("pessoal Worker", () => {
     expect(ldd.delete).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       LDD_ID,
+    );
+  });
+
+  it("previews the LDD PDF import for writers only", async () => {
+    const ldd = lddService();
+    const app = createPessoalWorkerApp({ env: env(), lddService: ldd });
+    const body = { client_id: CLIENT_ID, file_name: "ldd.pdf", content_base64: "JVBERi0=" };
+    const preview = (permission: string, payload: unknown) =>
+      app.request("https://pessoal.test/pessoal/ldd/import/preview", {
+        method: "POST",
+        headers: { ...headers(permission), "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+    const ok = await preview("2", body);
+    const viewer = await preview("1", body);
+    const invalid = await preview("2", { ...body, content_base64: "não é base64" });
+
+    expect([ok.status, viewer.status, invalid.status]).toEqual([200, 403, 400]);
+    expect(await ok.json()).toEqual({ success: true, data: { file_name: "ldd.pdf", rows: [] } });
+    expect(ldd.previewImport).toHaveBeenCalledTimes(1);
+    expect(ldd.previewImport).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      body,
     );
   });
 

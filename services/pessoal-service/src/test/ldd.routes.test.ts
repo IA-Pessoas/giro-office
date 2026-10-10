@@ -107,4 +107,36 @@ describe("LDD routes", () => {
     expect(service.create).not.toHaveBeenCalled();
     expect(service.update).not.toHaveBeenCalled();
   });
+  it("devolve a prévia do PDF LDD e valida o corpo antes do service", async () => {
+    const preview = { file_name: "ldd.pdf", rows: [] };
+    const service = { previewImport: vi.fn(async () => preview) };
+    const app = createRouteTestApp("/pessoal/ldd", createLddRoutes(service as never));
+    const body = { client_id: clientId, file_name: "ldd.pdf", content_base64: "JVBERi0=" };
+
+    const response = await request(app)
+      .post("/pessoal/ldd/import/preview")
+      .set(gatewayHeaders())
+      .send(body);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: preview });
+    expect(service.previewImport).toHaveBeenCalledWith(
+      { organizationId, userId, permission: 2, requestId: expect.any(String) },
+      body,
+    );
+
+    for (const invalid of [
+      { ...body, client_id: "invalido" },
+      { ...body, content_base64: "não é base64" },
+      { ...body, file_name: "" },
+      { ...body, extra: true },
+    ]) {
+      const rejected = await request(app)
+        .post("/pessoal/ldd/import/preview")
+        .set(gatewayHeaders())
+        .send(invalid);
+      expect(rejected.status).toBe(400);
+    }
+    expect(service.previewImport).toHaveBeenCalledTimes(1);
+  });
 });
