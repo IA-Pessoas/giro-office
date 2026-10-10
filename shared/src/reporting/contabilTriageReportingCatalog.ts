@@ -33,6 +33,7 @@ const clientFields = [
   field("status", "Status do cliente", "string", stringOperators),
   field("regime", "Regime", "string", stringOperators),
   field("competence_entry", "Data de entrada", "date", dateOperators),
+  field("deletion_date", "Data de inativação", "date", dateOperators),
   field("contabil", "Serviço Contábil", "boolean", booleanOperators),
   field("fiscal", "Serviço Fiscal", "boolean", booleanOperators),
   field("customer_with_movement", "Cliente com movimento", "boolean", booleanOperators),

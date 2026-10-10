@@ -826,12 +826,7 @@ describe("contabil Worker remainder routes", () => {
     });
     expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          organization_id: ORG,
-          type: "CONTABIL",
-          archived_at: null,
-          client: { deletion_date: null },
-        },
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
       }),
     );
   });
@@ -898,6 +893,8 @@ describe("contabil Worker remainder routes", () => {
   });
 
   it("extrai SGQ e métrica Contábil da Triagem na organização do grant", async () => {
+    // O SGQ vai até o mês corrente: fixa a data para o intervalo ser o das rotinas.
+    vi.useFakeTimers({ now: new Date("2026-01-20T12:00:00.000Z"), toFake: ["Date"] });
     const routines = [
       {
         id: "1",
@@ -968,6 +965,7 @@ describe("contabil Worker remainder routes", () => {
         expect(query.where).toMatchObject({ organization_id: ORG });
       }
     }
+    vi.useRealTimers();
   });
 
   it("usa a permissão efetiva do módulo contábil como o gateway Node encaminha", async () => {

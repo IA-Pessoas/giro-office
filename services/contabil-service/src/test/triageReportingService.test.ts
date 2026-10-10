@@ -1,5 +1,6 @@
 import "./envBootstrap.js";
 
+import { TRIAGE_ACCOUNTING_CHECKLIST_FIELDS } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { InternalReportingService } from "../services/internalReportingService.js";
@@ -114,7 +115,7 @@ describe("extractTriageReportingPage", () => {
     });
     expect(prisma.clients.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: ORG, deletion_date: null },
+        where: { organization_id: ORG },
         orderBy: { id: "asc" },
         skip: 0,
         take: 11,
@@ -153,12 +154,7 @@ describe("extractTriageReportingPage", () => {
       reachedLimit: true,
     });
     expect(prisma.monthly.findMany).toHaveBeenCalledWith({
-      where: {
-        organization_id: ORG,
-        type: "CONTABIL",
-        archived_at: null,
-        client: { deletion_date: null },
-      },
+      where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
       select: { id: true, client_id: true, competence: true, triad_moviment: true },
       orderBy: { id: "asc" },
       skip: 4,
@@ -197,7 +193,7 @@ describe("extractTriageReportingPage: responsáveis", () => {
     });
     expect(prisma.assignments.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: ORG, client: { deletion_date: null } },
+        where: { organization_id: ORG },
         select: { id: true, client_id: true, type: true, user_id: true },
       }),
     );
@@ -265,7 +261,7 @@ describe("extractTriageReportingPage: responsáveis", () => {
     });
     expect(prisma.monthly.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: ORG, archived_at: null, client: { deletion_date: null } },
+        where: { organization_id: ORG, archived_at: null },
       }),
     );
     expect(prisma.competences.findMany).toHaveBeenCalledWith(
@@ -427,18 +423,7 @@ describe("extractTriageReportingPage: métrica Contábil", () => {
         client_id: CLIENT_B,
         competence: "2026-09",
         checklist: Object.fromEntries(
-          [
-            "financial_transactions",
-            "triaged_transactions",
-            "inventory_control",
-            "accounts_payable_report",
-            "accounts_receivable_report",
-            "card_statements",
-            "loan_agreements",
-            "bank_reconciliation",
-            "bank_investments",
-            "card_sales_report",
-          ].map((field) => [field, "NOT_PRESENT"]),
+          TRIAGE_ACCOUNTING_CHECKLIST_FIELDS.map((field) => [field, "NOT_PRESENT"]),
         ),
       },
     ]);
@@ -471,12 +456,7 @@ describe("extractTriageReportingPage: métrica Contábil", () => {
     });
     expect(prisma.monthly.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          organization_id: ORG,
-          type: "CONTABIL",
-          archived_at: null,
-          client: { deletion_date: null },
-        },
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
         select: { id: true, client_id: true, competence: true, checklist: true },
       }),
     );
@@ -519,6 +499,7 @@ describe("SGQ da Triagem", () => {
     },
   ];
   const fields = ["competence", "not_sent", "not_triaged", "triaged", "eligible_clients"];
+  const today = utc("2026-02-20");
 
   it("enumera os meses do intervalo atravessando a virada do ano", () => {
     expect(competencesBetween("2025-11", "2026-02")).toEqual([
@@ -539,6 +520,7 @@ describe("SGQ da Triagem", () => {
       extractTriageReportingPage(prisma, {
         source: "contabil.triage_sgq",
         organizationId: ORG,
+        today,
         fields,
         limit: 10,
       }),
@@ -563,6 +545,26 @@ describe("SGQ da Triagem", () => {
     }
   });
 
+  it("segue até o mês corrente, com quem ainda não enviou, e ignora competência malformada", async () => {
+    const prisma = delegates([...routines, { client_id: CLIENT_C, competence: "02/2026" }]);
+    prisma.clients.findMany.mockResolvedValue(sgqClients);
+
+    const result = await extractTriageReportingPage(prisma, {
+      source: "contabil.triage_sgq",
+      organizationId: ORG,
+      fields: ["competence", "not_sent", "eligible_clients"],
+      limit: 10,
+      today: utc("2026-04-02"),
+    });
+
+    expect(result.rows.slice(-2)).toEqual([
+      { competence: "2026-03", not_sent: 2, eligible_clients: 2 },
+      { competence: "2026-04", not_sent: 2, eligible_clients: 2 },
+    ]);
+    expect(result.rows).toHaveLength(6);
+    expect(competencesBetween("2026-01", "abc")).toEqual([]);
+  });
+
   it("pagina os meses e filtra o intervalo pedido pela Central", async () => {
     const prisma = delegates(routines);
     prisma.clients.findMany.mockResolvedValue(sgqClients);
@@ -571,6 +573,7 @@ describe("SGQ da Triagem", () => {
       extractTriageReportingPage(prisma, {
         source: "contabil.triage_sgq",
         organizationId: ORG,
+        today,
         fields: ["competence"],
         limit: 2,
         offset: 1,
