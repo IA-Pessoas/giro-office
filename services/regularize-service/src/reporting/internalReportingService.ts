@@ -6,6 +6,7 @@ import {
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
+import type { ClientSegmentType } from "@workspace/shared/regularize";
 import {
   canonicalLicenseStatus,
   canonicalProcessStatus,
@@ -374,7 +375,8 @@ const PORTFOLIO_DERIVED_FIELDS = new Set([
 // Filtro DTE do legado (regularize/pages/relatorios/estados.php): cliente ativo ou em
 // inativação, segmento de comércio ou indústria e inscrição estadual diferente de ISENTO.
 const DTE_COLUMNS = ["status", "segment", "state", "state_registration"];
-const DTE_SEGMENT_TYPES: readonly unknown[] = ["comercio", "industria"];
+const DTE_SEGMENT_TYPES: readonly ClientSegmentType[] = ["comercio", "industria"];
+const DTE_EXEMPT_STATE_REGISTRATION = "ISENTO";
 const DTE_STATUSES: readonly unknown[] = [
   REGULARIZE_PORTFOLIO_LEGACY_STATUS.A,
   REGULARIZE_PORTFOLIO_LEGACY_STATUS.P,
@@ -391,18 +393,18 @@ function dteEligibility(
   const exempt =
     String(client.state_registration ?? "")
       .trim()
-      .toUpperCase() === "ISENTO";
+      .toUpperCase() === DTE_EXEMPT_STATE_REGISTRATION;
   // Sem inscrição o PHP listava o cliente (vazio é diferente de ISENTO); sem segmento não
   // dá para dizer o tipo e o cliente fica fora. Os dois casos saem sinalizados.
   const missing = [
-    blank(client.segment) ? "Segmento" : null,
+    blank(client.segment) ? "Segmento" : segmentType === null ? "Segmento fora do catálogo" : null,
     blank(client.state_registration) ? "Inscrição estadual" : null,
     blank(client.state) ? "UF" : null,
   ].filter((item) => item !== null);
   return {
     dte_eligible:
       DTE_STATUSES.includes(portfolioStatus(client.status)) &&
-      DTE_SEGMENT_TYPES.includes(segmentType) &&
+      (DTE_SEGMENT_TYPES as readonly unknown[]).includes(segmentType) &&
       !exempt,
     dte_missing_data: missing.join("; ") || null,
   };
@@ -697,7 +699,7 @@ export class RegularizePortfolioReportingService {
         (segments) =>
           new Map(
             segments.map((segment) => [
-              String(segment.name).toLocaleLowerCase("pt-BR"),
+              String(segment.name).trim().toLocaleLowerCase("pt-BR"),
               segment.type,
             ]),
           ),

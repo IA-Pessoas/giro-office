@@ -340,6 +340,74 @@ describe("RegularizePortfolioReportingService", () => {
       ]);
     });
 
+    it("aplica a mesma regra aos clientes dentro dos grupos e ignora espaços no segmento", async () => {
+      const members = vi.fn().mockResolvedValue([
+        {
+          id: "m1",
+          group: { name: "Grupo Norte", status: true },
+          client: {
+            id: "c1",
+            status: "Ativo",
+            state: "BA",
+            segment: " padaria ",
+            state_registration: "1",
+          },
+        },
+        {
+          id: "m2",
+          group: { name: "Grupo Norte", status: true },
+          client: {
+            id: "c2",
+            status: "Ativo",
+            state: "BA",
+            segment: "Outro",
+            state_registration: "2",
+          },
+        },
+      ]);
+      const service = new RegularizePortfolioReportingService(
+        prismaWith({
+          clientsGroup: { findMany: members },
+          clientSegment: {
+            findMany: vi.fn().mockResolvedValue([{ name: "Padaria ", type: "comercio" }]),
+          },
+        }),
+      );
+
+      await expect(
+        service.extract({
+          organizationId,
+          source: "regularize.client_groups",
+          fields: ["group_name", "dte_eligible", "segment_type", "dte_missing_data"],
+          limit: 10,
+        }),
+      ).resolves.toEqual({
+        rows: [
+          {
+            group_name: "Grupo Norte",
+            dte_eligible: true,
+            segment_type: "comercio",
+            dte_missing_data: null,
+          },
+          // Segmento fora do catálogo: sem tipo, fora da lista e sinalizado.
+          {
+            group_name: "Grupo Norte",
+            dte_eligible: false,
+            segment_type: null,
+            dte_missing_data: "Segmento fora do catálogo",
+          },
+        ],
+        reachedLimit: false,
+      });
+      expect(members.mock.calls[0]?.[0].select.client.select).toEqual({
+        id: true,
+        segment: true,
+        status: true,
+        state: true,
+        state_registration: true,
+      });
+    });
+
     it("filtra por UF e fecha a contagem com a lista", async () => {
       const filters = [
         { field: "dte_eligible", operator: "eq", parameter: "dte", value: true },
