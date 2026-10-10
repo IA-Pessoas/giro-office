@@ -29,6 +29,7 @@ import type {
   RegularizeDteQueryGrid,
   RegularizeDteQueryListsPayload,
   RegularizeDteQueryListsResult,
+  RegularizeVeriComparison,
   RegularizeDteQueryStatusPayload,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
@@ -174,6 +175,15 @@ export function useImportRegularizeDteQueryListsMutation(): UseMutationResult<
     mutationFn: (payload) => regularizeService.importDteQueryLists(payload),
     onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
+}
+
+// Só leitura no servidor: nada a invalidar depois da comparação.
+export function useCompareRegularizeVeriMutation(): UseMutationResult<
+  RegularizeVeriComparison,
+  Error,
+  File
+> {
+  return useMutation({ mutationFn: (file) => regularizeService.compareVeri(file) });
 }
 
 export function useImportRegularizeDteMutation(): UseMutationResult<

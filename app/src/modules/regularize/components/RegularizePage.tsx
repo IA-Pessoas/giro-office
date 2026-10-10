@@ -10,6 +10,7 @@ import {
   Download,
   Eye,
   FileKey2,
+  FileSpreadsheet,
   Gavel,
   Landmark,
   Mail,
@@ -57,6 +58,7 @@ import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
 import { RegularizeDteInbox } from "./RegularizeDteInbox";
 import { RegularizeDtePanel } from "./RegularizeDtePanel";
 import { RegularizeDteQueries } from "./RegularizeDteQueries";
+import { RegularizeVeriComparison } from "./RegularizeVeriComparison";
 import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
@@ -246,6 +248,7 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "sites", label: "Sites", icon: ShieldCheck },
   { id: "taxes", label: "Tributos", icon: Landmark },
   { id: "dte", label: "DTE", icon: Mail },
+  { id: "veri", label: "Veri", icon: FileSpreadsheet },
   { id: "groups", label: "Grupos", icon: Network },
   { id: "bidders", label: "Licitantes", icon: Gavel },
   { id: "catalogs", label: "Catálogos", icon: Tags },
@@ -1990,7 +1993,9 @@ export function RegularizePage() {
         className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
       >
         <div className="overflow-x-auto u-scrollbar-system">
-          <div role="tablist" className="flex min-w-max items-center justify-center gap-1 md:min-w-full">
+          {/* Sem min-w-full: quando as abas não cabem, a largura mínima igual à da tela cortava
+              as primeiras, que ficavam sem clique. Mesmo padrão de Fiscal e Contábil. */}
+          <div role="tablist" className="flex min-w-max items-center justify-center gap-1">
             {REGULARIZE_TABS.map((tab) => (
               <TabButton
                 key={tab.id}
@@ -2939,6 +2944,8 @@ export function RegularizePage() {
           <RegularizeDteQueries canEdit={regularizeAccess.canEdit} />
         </div>
       ) : null}
+
+      {activeTab === "veri" ? <RegularizeVeriComparison canEdit={regularizeAccess.canEdit} /> : null}
 
       {activeTab === "catalogs" ? (
         // Regimes e segmentos que a ficha Regularize usa; editar exige Regularize nível 2 (#1740, #1741).

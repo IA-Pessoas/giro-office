@@ -1076,6 +1076,9 @@ importers:
 
   services/regularize-service:
     dependencies:
+      '@e965/xlsx':
+        specifier: 0.20.3
+        version: 0.20.3
       '@prisma/adapter-pg':
         specifier: 7.9.1
         version: 7.9.1
