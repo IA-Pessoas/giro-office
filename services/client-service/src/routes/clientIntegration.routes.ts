@@ -98,13 +98,10 @@ export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(updateIntegrationBodySchema, request.body);
         const organizationId = resolveOrganizationId(request, undefined);
-        const updated = await updateIntegrationClient(
-          prisma,
-          params.id,
-          organizationId,
-          body,
-          getIntegrationAuthorization(request),
-        );
+        const updated = await updateIntegrationClient(prisma, params.id, organizationId, body, {
+          ...getIntegrationAuthorization(request),
+          marketingLevel: normalizeModulePermission(request.modules?.marketing),
+        });
         response.json(createSuccessResponse(updated));
       } catch (err) {
         logError("Erro ao atualizar cliente (integração)", { err });

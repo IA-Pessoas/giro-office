@@ -1693,8 +1693,8 @@ model ResponsibleContabil {
 model RelationshipContabil {
   id              String       @id @default(uuid())
   client_id       String
-  bidding         Boolean
-  chart_accounts  String
+  bidding         Boolean?
+  chart_accounts  String?
   tool            String
   system          String
   note            String
