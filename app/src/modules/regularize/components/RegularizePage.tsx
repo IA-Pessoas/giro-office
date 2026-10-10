@@ -50,6 +50,7 @@ import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
 import { RegularizeClientPfForm } from "./RegularizeClientPfForm";
 import { RegularizeGuidanceActivityForm } from "./RegularizeGuidanceActivityForm";
+import { RegularizeGroupMap } from "./RegularizeGroupMap";
 import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
 import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
 import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
@@ -2920,7 +2921,10 @@ export function RegularizePage() {
 
       {activeTab === "groups" ? (
         // Mesma origem canônica dos grupos da Integração; edição exige Regularize nível 2 (#1742).
-        <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
+        <div className="space-y-4">
+          <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
+          <RegularizeGroupMap />
+        </div>
       ) : null}
 
       {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}

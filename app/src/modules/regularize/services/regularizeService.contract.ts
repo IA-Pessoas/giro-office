@@ -22,6 +22,7 @@ export const REGULARIZE_ENDPOINTS = {
   partners: "/regularize/partners",
   deletePartner: (id: RegularizeId) => `/regularize/partners/${id}`,
   partner: "/regularize/partner",
+  groupMap: (groupId: RegularizeId) => `/regularize/groups/${groupId}/map`,
   municipalTaxes: "/regularize/municipal-taxes",
   municipalTaxesDetail: "/regularize/municipal-taxes-detail",
   processes: "/regularize/processes",

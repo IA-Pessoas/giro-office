@@ -67,6 +67,9 @@ export const regularizeQueryKeys = {
     ] as const,
   partnerDetail: (id: RegularizeId | undefined | null, scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.people(scope), "partners", "detail", id ?? ""] as const,
+  // Sob "people": mudar sócio ou PF refaz o mapa.
+  groupMap: (groupId: RegularizeId, scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.people(scope), "group-map", groupId] as const,
   operations: (scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.scopedRoot(scope), "operations"] as const,
   municipalTaxes: (filters: RegularizeMunicipalTaxesListFilters, scope: RegularizeQueryScope) =>

@@ -22,6 +22,7 @@ import type {
   RegularizeClientPfListItem,
   RegularizeDashboard,
   RegularizeGuidance,
+  RegularizeGroupMap,
   RegularizeGuidanceListFilters,
   RegularizeId,
   RegularizeLicenseDetail,
@@ -266,6 +267,13 @@ export const regularizeService = {
     const response = await api.put(REGULARIZE_ENDPOINTS.partners, payload);
 
     return unwrapRegularizeEnvelope<RegularizePartner>(response.data);
+  },
+
+  async getGroupMap(groupId: RegularizeId): Promise<RegularizeGroupMap> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.groupMap(groupId));
+
+    return unwrapRegularizeEnvelope<RegularizeGroupMap>(response.data);
   },
 
   async deletePartner(id: RegularizeId): Promise<{ ok: true }> {

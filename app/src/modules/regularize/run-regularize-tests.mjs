@@ -1810,3 +1810,93 @@ await runTest("client picker warns when only active clients are listed (#1347)",
   assert.match(source, /filters\.status === "Ativo"/);
   assert.match(source, /Só clientes ativos aparecem aqui\./);
 });
+
+await runTest("group map tree shows status, address and regime without inventing values (#1748)", async () => {
+  const { buildGroupMapTree, layoutGroupMapTree, wrapGroupMapLine } = await import(
+    "./utils/groupMapTree.ts"
+  );
+  const map = {
+    group: { id: "g1", name: "Grupo Um" },
+    cities: [
+      {
+        name: "Salvador",
+        partners: [
+          {
+            pf_id: "pf1",
+            name: "Ana",
+            companies: [
+              {
+                client_id: "c1",
+                name: "Alfa LTDA",
+                cpf_cnpj: "11111111000111",
+                status: "Inativo",
+                address: "Rua A, 10 (Centro)",
+                regime: null,
+              },
+              {
+                client_id: "c2",
+                name: "Beta LTDA",
+                cpf_cnpj: null,
+                status: "Ativo",
+                address: null,
+                regime: "Simples Nacional",
+              },
+            ],
+          },
+        ],
+      },
+      { name: "", partners: [] },
+    ],
+  };
+
+  const tree = buildGroupMapTree(map);
+  const [city, noCity] = tree.children;
+  const [alfa, beta] = city.children[0].children;
+
+  assert.deepEqual(tree.lines, ["Grupo Um"]);
+  assert.deepEqual(noCity.lines, ["Cidade não informada"]);
+  assert.deepEqual(alfa.lines, ["Empresa: Alfa LTDA", "CNPJ: 11.111.111/0001-11"]);
+  // Empresa inativa aparece com a situação real; campo sem dado diz que não foi informado.
+  assert.deepEqual(alfa.children[0].lines, [
+    "Situação: Inativo",
+    "Sede: Rua A, 10 (Centro)",
+    "Regime: não informado",
+  ]);
+  assert.deepEqual(beta.children[0].lines, [
+    "Situação: Ativo",
+    "Sede: não informado",
+    "Regime: Simples Nacional",
+  ]);
+  assert.doesNotMatch(JSON.stringify(tree), /capital|rbt12/i);
+
+  assert.deepEqual(wrapGroupMapLine("um dois tres quatro", 9), ["um dois", "tres", "quatro"]);
+
+  // Cada nível numa coluna e nenhuma caixa da mesma coluna por cima da outra.
+  const layout = layoutGroupMapTree(tree);
+  assert.equal(layout.boxes.length, 8);
+  assert.equal(layout.links.length, 7);
+  const columns = new Map();
+  for (const box of layout.boxes) {
+    columns.set(box.x, [...(columns.get(box.x) ?? []), box]);
+  }
+  assert.equal(columns.size, 5);
+  for (const boxes of columns.values()) {
+    const sorted = boxes.sort((a, b) => a.y - b.y);
+    for (let index = 1; index < sorted.length; index++) {
+      assert.ok(sorted[index].y >= sorted[index - 1].y + sorted[index - 1].height);
+    }
+  }
+  assert.ok(layout.width > 0 && layout.height > 0);
+});
+
+await runTest("group map screen reads the generated map through the Regularize contract (#1748)", async () => {
+  const [contractSource, pageSource, componentSource] = await Promise.all([
+    readModuleSource("services/regularizeService.contract.ts"),
+    readModuleSource("components/RegularizePage.tsx"),
+    readModuleSource("components/RegularizeGroupMap.tsx"),
+  ]);
+
+  assert.match(contractSource, /\/regularize\/groups\/\$\{groupId\}\/map/);
+  assert.match(pageSource, /<RegularizeGroupMap \/>/);
+  assert.match(componentSource, /useRegularizeGroupMap\(groupId\)/);
+});
