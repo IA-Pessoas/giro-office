@@ -16,6 +16,21 @@ export interface UserItem {
   };
 }
 
+export interface UserDirectoryProfile {
+  id: string;
+  name: string;
+  status: string;
+  photo_url: string | null;
+  department?: { name: string | null } | null;
+}
+
+export interface UserDirectoryProfilesPage {
+  users: UserDirectoryProfile[];
+  total: number;
+  skip: number;
+  take: number;
+}
+
 export type UserType = "user" | "admin" | "owner";
 export type UserPermission = -1 | 0 | 1 | 2;
 

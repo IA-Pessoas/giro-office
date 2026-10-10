@@ -11,11 +11,12 @@ import { useFetch } from "@shared/hooks";
 import { contabilRelationshipService } from "../services";
 import type {
   ContabilRelationship,
+  ContabilRelationshipHistoryPage,
   CreateContabilRelationshipPayload,
   UpdateContabilRelationshipPayload,
 } from "../types";
 import { syncContabilRelationshipQueryCache } from "./contabilQueryCache";
-import { contabilRelationshipQueryKey } from "./queryKeys";
+import { contabilRelationshipHistoryQueryKey, contabilRelationshipQueryKey } from "./queryKeys";
 
 export interface UpdateContabilRelationshipMutationPayload {
   relationshipId: string;
@@ -71,11 +72,29 @@ export function useUpdateContabilRelationshipMutation(): UseMutationResult<
       contabilRelationshipService.updateRelationship(relationshipId, payload),
     onSuccess: async (relationship, variables) => {
       syncContabilRelationshipQueryCache(queryClient, variables.clientId, relationship);
+      void queryClient.invalidateQueries({
+        queryKey: contabilRelationshipHistoryQueryKey(variables.clientId),
+      });
       await queryClient.invalidateQueries({
         queryKey: contabilRelationshipQueryKey(variables.clientId),
       });
     },
   });
+}
+
+export function useContabilRelationshipHistory(
+  filters: { clientId: string; page: number; pageSize: number },
+): UseQueryResult<ContabilRelationshipHistoryPage, Error> {
+  return useFetch(
+    contabilRelationshipHistoryQueryKey(filters.clientId, filters.page),
+    () =>
+      contabilRelationshipService.getRelationshipHistory(
+        filters.clientId,
+        filters.page,
+        filters.pageSize,
+      ),
+    { enabled: Boolean(filters.clientId) },
+  );
 }
 
 export function useDeleteContabilRelationshipMutation(): UseMutationResult<

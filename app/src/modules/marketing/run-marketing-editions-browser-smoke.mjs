@@ -47,6 +47,7 @@ const dashboard = {
     employees: { total: 0, items: [] },
     companies: { total: 0, items: [] },
   },
+  aiUsage: { competence: "2026-10", pendingKnowledge: 0 },
   alerts: [],
 };
 const user = {
@@ -57,7 +58,14 @@ const user = {
   permission: 1,
   organization_id: "marketing-editions-org",
   department_id: "marketing-editions-department",
-  modules: { marketing: 2 },
+  modules: { marketing: process.env.MARKETING_DEPARTMENTS_ONLY === "1" ? 3 : 2 },
+};
+let department = {
+  id: "marketing-departments-dep",
+  name: "Operações",
+  color: "#2563eb",
+  status: "Ativo",
+  solution: false,
 };
 
 await mkdir(outputDirectory, { recursive: true });
@@ -72,6 +80,9 @@ async function run() {
   ]);
   const page = await context.newPage();
   page.on("pageerror", (error) => apiRequests.push(`pageerror:${error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") apiRequests.push(`console:${message.text()}`);
+  });
   await page.route("**/socket.io/**", (route) => route.fulfill({ status: 200, contentType: "text/plain", body: "ok" }));
   await page.route("**/api/**", async (route) => {
     const request = route.request();
@@ -80,10 +91,18 @@ async function run() {
     const method = request.method();
     let data = [];
     let status = 200;
-    apiRequests.push(`${method} ${pathname}`);
+    apiRequests.push(`${method} ${pathname}${url.search}`);
 
     if (pathname.endsWith("/user/me")) data = user;
-    else if (pathname.endsWith("/marketing/dashboard")) data = dashboard;
+    else if (pathname.endsWith("/department/list")) data = [department];
+    else if (pathname.endsWith("/department") && method === "PUT") {
+      const payload = request.postDataJSON();
+      assert.deepEqual(Object.keys(payload).sort(), ["color", "dep_id"]);
+      assert.equal(payload.dep_id, department.id);
+      assert.equal(request.headers()["x-csrf-token"], "M".repeat(43));
+      department = { ...department, color: payload.color };
+      data = department;
+    } else if (pathname.endsWith("/marketing/dashboard")) data = dashboard;
     else if (pathname.endsWith("/marketing/events/list")) data = [event];
     else if (pathname.endsWith(`/marketing/events/${event.id}/editions`) && method === "GET") data = [edition];
     else if (pathname.endsWith(`/marketing/events/${event.id}/editions/${edition.id}`) && method === "PUT") {
@@ -120,6 +139,26 @@ async function run() {
   try {
     const response = await page.goto("/marketing", { waitUntil: "networkidle", timeout: 120_000 });
     assert.equal(response?.status(), 200, "/marketing should render successfully");
+    const departments = page.getByRole("region", { name: "Departamentos da organização" });
+    await expect(departments.getByText("Operações", { exact: true })).toBeVisible();
+    if (process.env.MARKETING_DEPARTMENTS_ONLY === "1") {
+      await departments.getByRole("button", { name: "Selecionar cor Verde" }).click();
+      await departments.getByRole("button", { name: "Salvar cor" }).click();
+      await expect(departments.getByText("Cor salva.")).toBeVisible();
+      assert.equal(department.color, "#059669");
+    } else {
+      await expect(departments.getByText("Cor: #2563eb")).toBeVisible();
+      await expect(departments.getByRole("button", { name: "Salvar cor" })).toHaveCount(0);
+    }
+    await departments.screenshot({ path: path.join(outputDirectory, "issue-1675-marketing-departments.png") });
+    if (process.env.MARKETING_DEPARTMENTS_ONLY === "1") {
+      assert.deepEqual(apiRequests.filter((entry) => entry.startsWith("pageerror:")), []);
+      assert.ok(apiRequests.includes("GET /department/list"));
+      assert.ok(apiRequests.includes("GET /department/list?marketing=true"));
+      console.log("PASS departamentos Marketing: listagem scoped e atualização exclusiva de cor");
+      console.log(`Screenshot: ${path.join(outputDirectory, "issue-1675-marketing-departments.png")}`);
+      return;
+    }
     await page.getByRole("row", { name: /Encontro de validação/ }).waitFor();
     await page.getByRole("button", { name: "Ver edições de Encontro de validação" }).click();
     const editionsDialog = page.getByRole("dialog", { name: /Edições · Encontro de validação/ });
@@ -195,11 +234,16 @@ async function run() {
     assert.ok(apiRequests.includes(`POST /marketing/events/${event.id}/editions/${edition.id}/feedback`));
     assert.ok(apiRequests.includes(`GET /marketing/events/${event.id}/editions/${edition.id}/report`));
     assert.deepEqual(apiRequests.filter((entry) => entry.startsWith("pageerror:")), []);
+    assert.ok(apiRequests.includes("GET /department/list"));
+    assert.ok(apiRequests.some((entry) => entry.startsWith("GET /department/list?marketing=true")));
+    console.log("PASS /marketing: departamentos no escopo da organização e edição isolada da cor");
     console.log("PASS /marketing: período, avaliação única e relatório autorizado na UI");
     console.log("PASS relatório em media=print: conteúdo visível, chrome do diálogo oculto e sem recorte");
-    console.log(`Screenshots: ${path.join(outputDirectory, "issue-1544-feedback-editions.png")}`);
+    console.log(`Screenshots: ${path.join(outputDirectory, "issue-1675-marketing-departments.png")}`);
+    console.log(`            ${path.join(outputDirectory, "issue-1544-feedback-editions.png")}`);
     console.log(`            ${path.join(outputDirectory, "issue-1544-printable-edition-report.png")}`);
   } catch (error) {
+    console.error(apiRequests.filter((entry) => entry.startsWith("pageerror:") || entry.startsWith("console:")));
     await page.screenshot({ path: path.join(outputDirectory, "issue-1544-feedback-editions-failure.png"), fullPage: true }).catch(() => {});
     throw error;
   } finally {
@@ -208,28 +252,32 @@ async function run() {
   }
 }
 
-const server = spawn(
-  process.execPath,
-  ["node_modules/next/dist/bin/next", "dev", "--webpack", "--port", "3121", "--hostname", "127.0.0.1"],
-  { cwd: appRoot, env: browserSmokeEnv(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
-);
-let output = "";
-server.stdout.on("data", (chunk) => { output += chunk; });
-server.stderr.on("data", (chunk) => { output += chunk; });
-try {
-  let ready = false;
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (server.exitCode !== null) throw new Error(output);
-    try {
-      if ((await fetch(`${baseUrl}/login`)).status < 500) {
-        ready = true;
-        break;
-      }
-    } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  assert.ok(ready, `Next dev server did not start. Output: ${output}`);
+if (process.env.MARKETING_EDITIONS_EXTERNAL_SERVER === "1") {
   await run();
-} finally {
-  server.kill();
+} else {
+  const server = spawn(
+    process.execPath,
+    ["node_modules/next/dist/bin/next", "dev", "--webpack", "--port", "3121", "--hostname", "127.0.0.1"],
+    { cwd: appRoot, env: browserSmokeEnv(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
+  );
+  let output = "";
+  server.stdout.on("data", (chunk) => { output += chunk; });
+  server.stderr.on("data", (chunk) => { output += chunk; });
+  try {
+    let ready = false;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      if (server.exitCode !== null) throw new Error(output);
+      try {
+        if ((await fetch(`${baseUrl}/login`)).status < 500) {
+          ready = true;
+          break;
+        }
+      } catch {}
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    assert.ok(ready, `Next dev server did not start. Output: ${output}`);
+    await run();
+  } finally {
+    server.kill();
+  }
 }
