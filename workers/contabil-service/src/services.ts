@@ -1,8 +1,10 @@
 import {
   executeReportingQuery,
   getContabilReportingFields,
+  normalizeTriageDocumentStatus,
   type ReportingQuery,
   ServiceError,
+  TRIAGE_FISCAL_SPECIAL_FIELDS,
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
@@ -784,22 +786,10 @@ function validStatus(value: unknown): value is TriageDocumentStatus {
   return typeof value === "string" && (triageDocumentStatuses as readonly string[]).includes(value);
 }
 
-// Estados gravados pelo sistema legado (`TriageStatus`): vazio é pendente.
-const LEGACY_DOCUMENT_STATUSES: Record<string, TriageDocumentStatus> = {
-  "": "PENDING",
-  "nao possui": "NOT_PRESENT",
-  atenção: "ATTENTION",
-  atencao: "ATTENTION",
-  concluido: "COMPLETED",
-};
-
 function documentStatus(value: unknown): TriageDocumentStatus {
-  if (validStatus(value)) return value;
-  if (typeof value === "string" && Object.hasOwn(LEGACY_DOCUMENT_STATUSES, value))
-    return LEGACY_DOCUMENT_STATUSES[value] as TriageDocumentStatus;
   // Item ausente do checklist legado não fazia parte do movimento; o legado ainda deixava
   // gravá-lo depois, então segue editável (sem `required: false`).
-  return "NOT_APPLICABLE";
+  return normalizeTriageDocumentStatus(value) ?? "NOT_APPLICABLE";
 }
 
 function checklist(
@@ -819,12 +809,31 @@ function disabledItem(notes: JsonRecord, field: string, type: "CONTABIL" | "FISC
   return type === "CONTABIL" && jsonObject(notes[field]).required === false;
 }
 
-/** Itens contábeis ativos de `active_items` (nomes ou `{ field }`), na ordem do checklist. */
-function activeContabilFields(value: unknown): string[] {
+/** Itens ativos de `active_items` (nomes ou `{ field }`) entre `fields`, na ordem deles. */
+function activeFields(value: unknown, fields: readonly string[]): string[] {
   const configured = initialItems(value);
-  return triageDocumentFields.filter(
-    (field) => jsonObject(configured[field]).required !== false && field in configured,
+  return fields.filter(
+    (field) => field in configured && jsonObject(configured[field]).required !== false,
   );
+}
+
+/** Configuráveis por rotina: Contábil escolhe todos os itens; Fiscal, só os especiais. */
+function configurableFields(type: "CONTABIL" | "FISCAL"): readonly string[] {
+  return type === "FISCAL" ? TRIAGE_FISCAL_SPECIAL_FIELDS : triageDocumentFields;
+}
+
+/**
+ * Novo `active_items`: troca só os itens configuráveis e mantém o resto (na Fiscal, itens com
+ * prioridade ou meio de envio por documento e entradas que esta tela não edita).
+ */
+function nextActiveItems(current: unknown, selected: string[], type: "CONTABIL" | "FISCAL") {
+  if (type === "CONTABIL") return selected;
+  const configurable = new Set<string>(configurableFields(type));
+  const kept = (Array.isArray(current) ? current : []).filter((item) => {
+    const field = typeof item === "string" ? item : jsonObject(item).field;
+    return typeof field !== "string" || !configurable.has(field);
+  });
+  return [...kept, ...selected];
 }
 
 function dateOnly(value: unknown): Date | null | undefined {
@@ -1599,6 +1608,8 @@ export function createDocumentsService(
     },
     async getConfig(input, auth) {
       const type = routineType(input.type);
+      if (type === "FISCAL" && Number(auth.modules?.fiscal ?? auth.permission ?? 0) < 1)
+        throw new ServiceError(403, "Permissão insuficiente para consultar a Triagem Fiscal.");
       const config = await prisma.triageConfig.findFirst({
         where: { client_id: input.client_id, organization_id: auth.organizationId, type },
         select: { active_items: true },
@@ -1607,13 +1618,13 @@ export function createDocumentsService(
         client_id: input.client_id,
         type,
         configured: Boolean(config),
-        active_items: activeContabilFields(config?.active_items),
+        active_items: activeFields(config?.active_items, configurableFields(type)),
       };
     },
     async saveConfig(input, auth) {
       const type = routineType(input.type);
       const clientId = String(input.client_id);
-      const activeItems = activeContabilFields(input.active_items);
+      const activeItems = activeFields(input.active_items, configurableFields(type));
       const identity = { organization_id: auth.organizationId, client_id: clientId, type };
       const result = await prisma.$transaction(async (transaction) => {
         await lock(transaction, `triagem.configs:${auth.organizationId}:${clientId}:${type}`);
@@ -1623,10 +1634,11 @@ export function createDocumentsService(
           where: identity,
           select: { active_items: true },
         });
+        const stored = nextActiveItems(current?.active_items, activeItems, type);
         const updated = await transaction.triageConfig.upsert({
           where: { organization_id_client_id_type: identity },
-          create: { ...identity, active_items: activeItems },
-          update: { active_items: activeItems },
+          create: { ...identity, active_items: stored },
+          update: { active_items: stored },
         });
         return { current, updated };
       });
@@ -1635,10 +1647,15 @@ export function createDocumentsService(
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Configurar movimento padrão",
+        action:
+          type === "FISCAL"
+            ? "Configurar documentos fiscais especiais"
+            : "Configurar movimento padrão",
         referring: "triagem.configs",
         referringId: clientId,
-        oldData: { active_items: activeContabilFields(changed.current?.active_items) },
+        oldData: {
+          active_items: activeFields(changed.current?.active_items, configurableFields(type)),
+        },
         updatedData: { active_items: activeItems },
       });
       return { client_id: clientId, type, configured: true, active_items: activeItems };

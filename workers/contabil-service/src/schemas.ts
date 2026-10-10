@@ -1,5 +1,6 @@
 import {
   TRIAGE_FISCAL_CHECKLIST_FIELDS,
+  TRIAGE_FISCAL_SPECIAL_FIELDS,
   TRIAGE_PORTFOLIO_DOCUMENT_STATUSES,
   TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS,
   TRIAGE_PORTFOLIO_PRIORITY_FILTERS,
@@ -122,8 +123,8 @@ export const monthlyUpdateSchema = z
   .refine((body) => Object.keys(body).some((key) => key !== "type"), {
     message: "Informe ao menos um campo do movimento mensal.",
   });
-// Movimento padrão: por ora só a rotina contábil é configurável por aqui.
-const configType = z.enum(["CONTABIL"] as const).default("CONTABIL");
+// Contábil configura o movimento padrão; Fiscal, os documentos especiais aplicáveis.
+const configType = z.enum(["CONTABIL", "FISCAL"] as const).default("CONTABIL");
 export const triageConfigQuerySchema = z
   .object({ client_id: uuid("client_id"), type: configType })
   .strict();
@@ -138,8 +139,20 @@ export const fiscalSettingsBodySchema = fiscalSettingsQuerySchema
     message: "Informe a prioridade ou o meio de envio.",
   });
 export const triageConfigBodySchema = triageConfigQuerySchema
-  .extend({ active_items: z.array(z.enum(documentFields)).max(documentFields.length) })
-  .strict();
+  .extend({ active_items: z.array(z.string()).max(documentFields.length) })
+  .strict()
+  .superRefine((body, context) => {
+    // Fiscal só configura os documentos especiais; os demais itens seguem a rotina.
+    const allowed: readonly string[] =
+      body.type === "FISCAL" ? TRIAGE_FISCAL_SPECIAL_FIELDS : documentFields;
+    for (const item of body.active_items)
+      if (!allowed.includes(item))
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["active_items"],
+          message: `Item ${item} não é configurável na rotina ${body.type === "FISCAL" ? "fiscal" : "contábil"}.`,
+        });
+  });
 export const documentItemSchema = z
   .object({
     type: monthlySchema.shape.type,
