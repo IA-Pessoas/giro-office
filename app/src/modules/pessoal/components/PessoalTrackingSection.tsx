@@ -510,7 +510,11 @@ export function PessoalTrackingSection({
 
         <div className="mt-6">
           {activeTrackingTab === "ldd" && canEdit ? (
-            <PessoalLddImportPreview key={selectedClientId} clientId={selectedClientId} />
+            <PessoalLddImportPreview
+              key={selectedClientId}
+              clientId={selectedClientId}
+              existingLdd={lddRows}
+            />
           ) : null}
           {activeTrackingTab === "ldd" ? (
             <TrackingListCard

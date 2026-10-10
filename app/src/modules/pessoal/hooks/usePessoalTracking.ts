@@ -10,8 +10,10 @@ import { useFetch } from "@shared/hooks";
 import { pessoalService } from "../services/pessoalService";
 import type {
   PessoalLdd,
+  PessoalLddImportPayload,
   PessoalLddImportPreview,
   PessoalLddImportPreviewPayload,
+  PessoalLddImportResult,
   PessoalLddPayload,
   PessoalLddUpdatePayload,
   PessoalSituation,
@@ -71,6 +73,24 @@ export function usePreviewPessoalLddImportMutation(): UseMutationResult<
 > {
   return useMutation({
     mutationFn: (payload) => pessoalService.previewLddImport(payload),
+  });
+}
+
+export function useConfirmPessoalLddImportMutation(): UseMutationResult<
+  PessoalLddImportResult,
+  Error,
+  PessoalLddImportPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => pessoalService.confirmLddImport(payload),
+    onSettled: async (_result, _error, payload) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: trackingKey(payload.client_id) }),
+        queryClient.invalidateQueries({ queryKey: lddKey("") }),
+      ]);
+    },
   });
 }
 

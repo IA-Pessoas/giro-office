@@ -35,9 +35,11 @@ import {
 } from "./utils/obligationPortfolio.ts";
 import {
   buildLddImportDraftRows,
+  buildLddImportRows,
   editLddImportDraftRow,
   lddImportDraftRowErrors,
   lddImportDraftTotal,
+  summarizeLddImportByKey,
   validateLddPdfFile,
 } from "./utils/lddImportPreview.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
@@ -63,6 +65,7 @@ runTest("pessoal endpoints match the gateway public contract", () => {
   assert.equal(PESSOAL_ENDPOINTS.ldd, "/pessoal/ldd");
   assert.equal(PESSOAL_ENDPOINTS.lddDetail("ldd-1"), "/pessoal/ldd/ldd-1");
   assert.equal(PESSOAL_ENDPOINTS.lddImportPreview, "/pessoal/ldd/import/preview");
+  assert.equal(PESSOAL_ENDPOINTS.lddImport, "/pessoal/ldd/import");
   assert.equal(PESSOAL_ENDPOINTS.overview, "/pessoal/overview");
   assert.equal(PESSOAL_ENDPOINTS.groups, "/pessoal/groups");
   assert.equal(PESSOAL_ENDPOINTS.groupDetail("group-1"), "/pessoal/groups/group-1");
@@ -942,6 +945,8 @@ runTest("ficha edits refresh ficha, portfolio and history under one prefix", () 
 runTest("LDD import preview keeps read errors until the row is edited", () => {
   const rows = buildLddImportDraftRows({
     file_name: "ldd.pdf",
+    file_hash: "a".repeat(64),
+    already_imported_at: null,
     rows: [
       {
         line: 1,
@@ -979,15 +984,48 @@ runTest("LDD import preview keeps read errors until the row is edited", () => {
     lddImportDraftTotal([rows[0], fixed, editLddImportDraftRow(fixed, "balance_amount", "0,20")]),
     1234.86,
   );
-  assert.deepEqual(editLddImportDraftRow(fixed, "balance_amount", "0,00").errors, []);
+  assert.deepEqual(editLddImportDraftRow(fixed, "balance_amount", "0,00").errors, [
+    "Informe um valor maior que zero.",
+  ]);
   assert.deepEqual(
     lddImportDraftRowErrors({ period: "14/2023", due_date: "2023-02-31", balance_amount: "" }),
     [
       "Informe a competência no formato MM/AAAA.",
       "Informe um vencimento válido.",
-      "Informe o valor.",
+      "Informe um valor maior que zero.",
     ],
   );
+});
+
+runTest("LDD import shows existing balance and increase per key and sends only valid rows", () => {
+  const draft = (line, period, due_date, balance_amount, errors = []) => ({
+    line,
+    source: "",
+    period,
+    due_date,
+    balance_amount,
+    errors,
+  });
+  const rows = [
+    draft(1, "01/2024", "2024-02-20", "0,10"),
+    draft(2, "01/2024", "2024-02-20", "0,20"),
+    draft(3, "02/2024", "2024-03-20", "5,00"),
+    draft(4, "03/2024", "", "9,00", ["Informe um vencimento válido."]),
+  ];
+  const existing = [
+    { type: "INSS", period: "01/2024", due_date: "2024-02-20T00:00:00.000Z", balance_amount: 100.1 },
+    { type: "FGTS", period: "02/2024", due_date: "2024-03-20T00:00:00.000Z", balance_amount: 50 },
+  ];
+
+  assert.deepEqual(buildLddImportRows(rows), [
+    { period: "01/2024", due_date: "2024-02-20", balance_amount: 0.1 },
+    { period: "01/2024", due_date: "2024-02-20", balance_amount: 0.2 },
+    { period: "02/2024", due_date: "2024-03-20", balance_amount: 5 },
+  ]);
+  assert.deepEqual(summarizeLddImportByKey(rows, existing), [
+    { period: "01/2024", due_date: "2024-02-20", existing: 100.1, increase: 0.3, total: 100.4 },
+    { period: "02/2024", due_date: "2024-03-20", existing: 0, increase: 5, total: 5 },
+  ]);
 });
 
 runTest("LDD import refuses non-PDF, empty and oversized files before upload", () => {

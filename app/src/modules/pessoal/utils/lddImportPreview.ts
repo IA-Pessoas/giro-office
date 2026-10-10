@@ -3,7 +3,10 @@ import {
   parseBrlDecimalInput,
 } from "../../../shared/utils/inputFormatting.ts";
 
-import type { PessoalLddImportPreview } from "../types/tracking";
+import type { PessoalLdd, PessoalLddImportPreview, PessoalLddImportRow } from "../types/tracking";
+
+/** Tipo que o importador grava no servidor (`LDD_IMPORT_TYPE`): só ele compõe o saldo existente. */
+export const LDD_IMPORT_TYPE = "INSS";
 
 /** Mesmo teto do pessoal-service: cabe em base64 no corpo JSON de 1 MB do gateway. */
 export const LDD_PDF_MAX_BYTES = 700 * 1024;
@@ -60,7 +63,8 @@ export function lddImportDraftRowErrors(
     errors.push("Informe a competência no formato MM/AAAA.");
   }
   if (!isCalendarDate(row.due_date)) errors.push("Informe um vencimento válido.");
-  if (parseBrlDecimalInput(row.balance_amount) === null) errors.push("Informe o valor.");
+  const amount = parseBrlDecimalInput(row.balance_amount);
+  if (amount === null || amount <= 0) errors.push("Informe um valor maior que zero.");
   return errors;
 }
 
@@ -80,4 +84,61 @@ export function lddImportDraftTotal(rows: LddImportDraftRow[]): number {
     .filter((row) => row.errors.length === 0)
     .reduce((sum, row) => sum + Math.round((parseBrlDecimalInput(row.balance_amount) ?? 0) * 100), 0);
   return cents / 100;
+}
+
+const toCents = (value: number) => Math.round(value * 100);
+
+/** Linhas sem erro, no formato da confirmação. */
+export function buildLddImportRows(rows: LddImportDraftRow[]): PessoalLddImportRow[] {
+  return rows
+    .filter((row) => row.errors.length === 0)
+    .map((row) => ({
+      period: row.period.trim(),
+      due_date: row.due_date,
+      balance_amount: parseBrlDecimalInput(row.balance_amount) ?? 0,
+    }));
+}
+
+export interface LddImportKeySummary {
+  period: string;
+  due_date: string;
+  /** Saldo já cadastrado para a chave. */
+  existing: number;
+  /** Soma das linhas válidas da prévia para a chave. */
+  increase: number;
+  total: number;
+}
+
+/**
+ * Saldo existente e acréscimo proposto por chave (competência, vencimento), como o servidor
+ * grava: linhas da mesma chave somam e acrescem ao LDD previdenciário já cadastrado.
+ */
+export function summarizeLddImportByKey(
+  rows: LddImportDraftRow[],
+  existingLdd: Pick<PessoalLdd, "type" | "period" | "due_date" | "balance_amount">[],
+): LddImportKeySummary[] {
+  const increases = new Map<string, number>();
+  for (const row of buildLddImportRows(rows)) {
+    const key = `${row.period}|${row.due_date}`;
+    increases.set(key, (increases.get(key) ?? 0) + toCents(row.balance_amount));
+  }
+
+  return [...increases].map(([key, increase]) => {
+    const [period = "", due_date = ""] = key.split("|");
+    const existing = toCents(
+      existingLdd.find(
+        (ldd) =>
+          ldd.type === LDD_IMPORT_TYPE &&
+          ldd.period === period &&
+          ldd.due_date?.slice(0, 10) === due_date,
+      )?.balance_amount ?? 0,
+    );
+    return {
+      period,
+      due_date,
+      existing: existing / 100,
+      increase: increase / 100,
+      total: (existing + increase) / 100,
+    };
+  });
 }
