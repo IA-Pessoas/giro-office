@@ -19,6 +19,17 @@ export function useTriageSolicitations(status: TriageSolicitationStatus) {
   );
 }
 
+export function useTriageSolicitationIndicators(
+  competence: string,
+  status?: TriageSolicitationStatus,
+) {
+  return useFetch(
+    ["triagem", "solicitations", "indicators", competence, status ?? "all"],
+    () => triagemSolicitationService.indicators(competence, status),
+    { enabled: Boolean(competence) },
+  );
+}
+
 // Contadores são do cliente+competência: a chave usa esse par, não o ID do pedido,
 // para que pedidos da mesma competência compartilhem o cache.
 export function triagemNoteCountsQueryKey(clientId: string, competence: string) {
@@ -34,7 +45,10 @@ export function useTriageNoteCounts(solicitation: TriageSolicitation) {
   const update = useMutation({
     mutationFn: (input: TriageNoteCountsInput) =>
       triagemSolicitationService.updateNoteCounts(solicitation.id, input),
-    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKey, data);
+      return queryClient.invalidateQueries({ queryKey: ["triagem", "solicitations", "indicators"] });
+    },
   });
   return { query, update };
 }

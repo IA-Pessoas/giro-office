@@ -9,6 +9,7 @@ import { useAssignableUsers } from "@modules/rh";
 import { useTriageCatalogs, useTriageSolicitationMutations, useTriageSolicitations } from "../hooks";
 import type { TriageSolicitation, TriageSolicitationStatus } from "../services";
 import { TriageSolicitationDetail } from "./TriageSolicitationDetail";
+import { TriageSolicitationIndicators } from "./TriageSolicitationIndicators";
 
 import {
   TRIAGE_BUTTON_CLASSNAME as BUTTON_CLASSNAME,
@@ -133,6 +134,8 @@ export function TriageSolicitationsSection({
           ))}
         </div>
       </div>
+
+      <TriageSolicitationIndicators status={status} />
 
       {canEdit && client ? (
         <form className="mt-4 grid gap-3 sm:grid-cols-3" onSubmit={createSolicitation} noValidate>
