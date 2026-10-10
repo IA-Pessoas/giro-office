@@ -43,6 +43,7 @@ import {
   validateLddPdfFile,
 } from "./utils/lddImportPreview.ts";
 import { buildLddSheet } from "./utils/lddSheet.ts";
+import { buildPayrollSheetRows, sortSituationsForSheet } from "./utils/payrollSheet.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
   cancelUnionDeletion,
@@ -735,7 +736,7 @@ runTest("pessoal shell wires access, active client selector, and functional tabs
   assert.match(shell, /useModuleAccess\("pessoal"\)/);
   assert.match(shell, /PessoalUnionsSection canEdit=\{access\.canEdit\}/);
   assert.match(shell, /PessoalGroupsSection canEdit=\{access\.canEdit\}/);
-  assert.match(shell, /PessoalPayrollSection selectedClientId=\{selectedClientId\}/);
+  assert.match(shell, /PessoalPayrollSection\s+selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalObligationsSection selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalTrackingSection\s+selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalPasswordsSection[\s\S]*selectedClientId=\{selectedClientId\}/);
@@ -1100,6 +1101,84 @@ runTest("LDD sheet prints without a competence filter and the manual form offers
   assert.match(styles, /\.print-report \*/);
   // PGFN manual: inscrição e situação são texto livre, como na ficha.
   assert.match(tracking, /isPgfnDetail \? \(field\.name === "registration_status" \? "Inscrição" : "Situação"\)/);
+});
+
+runTest("payroll sheet lists the legacy fields and keeps empty ones readable", () => {
+  const payroll = {
+    id: "payroll-1",
+    client_id: "client-1",
+    responsible_id: null,
+    advance: true,
+    advance_type: "Percentual",
+    advance_amount: 40,
+    info: "",
+    previous: false,
+    onvio: true,
+    group_id: "group-1",
+    group: { id: "group-1", name: "Mensal", archived_at: null },
+    vt: true,
+    vt_value: 220.5,
+    vt_type: null,
+    va: false,
+    assistance_fee: true,
+    union_id: "union-1",
+    bem_mais: false,
+    bsf: true,
+    reinf: false,
+    employees: 12,
+    contact: null,
+  };
+
+  assert.deepEqual(buildPayrollSheetRows(payroll, [{ id: "union-1", name: "Sindicato A" }]), [
+    ["Grupo", "Mensal"],
+    ["Adiantamento", "Sim - Percentual - R$ 40,00"],
+    ["Prévia", "Não"],
+    ["Onvio", "Sim"],
+    ["Vale transporte", "Sim - R$ 220,50"],
+    ["Vale alimentação", "Não"],
+    ["Taxa assistencial", "Sim"],
+    ["Bem Mais", "Não"],
+    ["BSF", "Sim"],
+    ["Quantidade de funcionários", "12"],
+    ["REINF", "Não"],
+    ["Sindicato", "Sindicato A"],
+    ["Contato", "Não informado"],
+  ]);
+
+  const bare = buildPayrollSheetRows(
+    { ...payroll, group: null, advance: false, vt: false, union_id: null },
+    [],
+  );
+  assert.deepEqual(
+    [bare[0], bare[1], bare[4], bare[11]],
+    [
+      ["Grupo", "Não informado"],
+      ["Adiantamento", "Não"],
+      ["Vale transporte", "Não"],
+      ["Sindicato", "Não informado"],
+    ],
+  );
+  // Sindicato fora da lista carregada não vira "undefined".
+  assert.deepEqual(buildPayrollSheetRows(payroll, [])[11], ["Sindicato", "Não informado"]);
+});
+
+runTest("payroll sheet orders situations by registration date and prints through the shared helper", () => {
+  const situation = (id, registration_date) => ({ id, registration_date });
+  assert.deepEqual(
+    sortSituationsForSheet([
+      situation("b", "2026-03-02T10:00:00.000Z"),
+      situation("a", "2026-01-15T10:00:00.000Z"),
+    ]).map((item) => item.id),
+    ["a", "b"],
+  );
+
+  const sheet = readFileSync(
+    new URL("./components/PessoalPayrollSheet.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(sheet, /className="print-report/);
+  assert.match(sheet, /printReport\("pessoal-payroll-sheet"\)/);
+  assert.match(sheet, /usePessoalSituations\(clientId, open\)/);
 });
 
 console.log("pessoal contract tests passed");

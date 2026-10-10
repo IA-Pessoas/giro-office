@@ -13,6 +13,7 @@ import {
 } from "../hooks/usePessoalPayroll";
 import { usePessoalGroups } from "../hooks/usePessoalGroups";
 import { usePessoalUnions } from "../hooks/usePessoalUnions";
+import type { PessoalClientOption } from "../types";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
@@ -22,11 +23,14 @@ import {
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
+import { PessoalPayrollSheet } from "./PessoalPayrollSheet";
 import { optional } from "./pessoalFormValueHelpers";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalPayrollSectionProps {
   selectedClientId: string;
+  /** Nome e documento do cliente, para o cabeçalho da ficha de folha. */
+  selectedClient: PessoalClientOption | null;
   canEdit: boolean;
 }
 
@@ -180,6 +184,7 @@ function buildPayrollFormPayload(
 
 export function PessoalPayrollSection({
   selectedClientId,
+  selectedClient,
   canEdit,
 }: PessoalPayrollSectionProps) {
   const hasClient = selectedClientId.length > 0;
@@ -294,6 +299,13 @@ export function PessoalPayrollSection({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <PessoalPayrollSheet
+              client={selectedClient}
+              clientId={selectedClientId}
+              payroll={payroll}
+              ready={payrollQuery.isSuccess && !payrollQuery.isFetching}
+              unions={unionsQuery.data ?? []}
+            />
             <button
               type="button"
               onClick={() => payrollQuery.refetch()}
