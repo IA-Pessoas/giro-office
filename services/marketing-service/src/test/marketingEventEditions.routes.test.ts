@@ -21,6 +21,7 @@ import type {
 } from "../services/marketingEventEditionsService.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
+const userId = "00000000-0000-4000-8000-000000000001";
 const eventId = "20000000-0000-4000-8000-000000000001";
 const editionId = "30000000-0000-4000-8000-000000000001";
 const body = {
@@ -86,7 +87,7 @@ function createTestApp(editionsService: MarketingEventEditionsProvider) {
 function headers(permission = 1): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "marketing-service-internal-token-test",
-    [FORWARDED_AUTH_USER_ID_HEADER]: "00000000-0000-4000-8000-000000000001",
+    [FORWARDED_AUTH_USER_ID_HEADER]: userId,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
   };
@@ -146,7 +147,7 @@ describe("Marketing event editions routes", () => {
       .set(headers(2))
       .send(body);
     expect(response.status).toBe(201);
-    expect(provider.createEdition).toHaveBeenCalledWith(organizationId, eventId, body);
+    expect(provider.createEdition).toHaveBeenCalledWith(organizationId, eventId, body, userId);
 
     const invalid = await request(app)
       .post(`/marketing/events/${eventId}/editions`)
@@ -165,7 +166,13 @@ describe("Marketing event editions routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, data: editionResponse });
-    expect(provider.updateEdition).toHaveBeenCalledWith(organizationId, eventId, editionId, body);
+    expect(provider.updateEdition).toHaveBeenCalledWith(
+      organizationId,
+      eventId,
+      editionId,
+      body,
+      userId,
+    );
   });
 
   it("requires edit permission and hides editions not in the organization or event", async () => {
@@ -183,7 +190,13 @@ describe("Marketing event editions routes", () => {
       .set(headers(2))
       .send(body);
     expect(missing.status).toBe(404);
-    expect(provider.updateEdition).toHaveBeenCalledWith(organizationId, eventId, editionId, body);
+    expect(provider.updateEdition).toHaveBeenCalledWith(
+      organizationId,
+      eventId,
+      editionId,
+      body,
+      userId,
+    );
   });
 
   it("rejects a partial or reversed feedback period before writing", async () => {
@@ -248,6 +261,7 @@ describe("Marketing event editions routes", () => {
         rating: 5,
         observation: "Boa edição",
       },
+      userId,
     );
 
     provider.createEditionFeedback.mockRejectedValueOnce(

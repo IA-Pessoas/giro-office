@@ -36,11 +36,16 @@ export interface MarketingEvent {
 
 export interface MarketingEventsProvider {
   listEvents(organizationId: string): Promise<MarketingEvent[]>;
-  createEvent(organizationId: string, input: CreateMarketingEventInput): Promise<MarketingEvent>;
+  createEvent(
+    organizationId: string,
+    input: CreateMarketingEventInput,
+    actorUserId: string,
+  ): Promise<MarketingEvent>;
   updateEvent(
     organizationId: string,
     eventId: string,
     input: UpdateMarketingEventInput,
+    actorUserId: string,
   ): Promise<MarketingEvent | null>;
 }
 
@@ -72,9 +77,10 @@ export function createMarketingEventsRoutes(
     requireMarketingPermission(MarketingPermissionLevel.Editor),
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { organization_id: organizationId, user_id: userId } =
+          requireAuthenticatedRequestContext(request);
         const body = parseWithZod(createMarketingEventBodySchema, request.body);
-        const event = await eventsService.createEvent(organizationId, body);
+        const event = await eventsService.createEvent(organizationId, body, userId);
         response.status(201).json(createSuccessResponse(event));
       } catch (error: unknown) {
         logError("Falha ao cadastrar evento do Marketing.", { err: error });
@@ -89,10 +95,11 @@ export function createMarketingEventsRoutes(
     requireMarketingPermission(MarketingPermissionLevel.Editor),
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { organization_id: organizationId, user_id: userId } =
+          requireAuthenticatedRequestContext(request);
         const { id: eventId } = parseWithZod(marketingEventIdParamsSchema, request.params);
         const body = parseWithZod(updateMarketingEventBodySchema, request.body);
-        const event = await eventsService.updateEvent(organizationId, eventId, body);
+        const event = await eventsService.updateEvent(organizationId, eventId, body, userId);
         if (!event) {
           throw new ServiceError(404, "Evento não encontrado.");
         }

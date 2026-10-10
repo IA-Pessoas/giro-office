@@ -5,7 +5,10 @@
   "workers_dev": false,
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat"],
-  "services": [{ "binding": "USER_SERVICE", "service": "giro-user-service" }],
+  "services": [
+    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
+    { "binding": "USER_SERVICE", "service": "giro-user-service" }
+  ],
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
   "vars": { "NODE_ENV": "production" },
   "observability": {
