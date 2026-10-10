@@ -53,6 +53,30 @@ export interface PessoalObligationPortfolioPage {
   page_size: number;
 }
 
+export interface PessoalObligationHistoryChange {
+  field: PessoalObligationItem | "responsavel_id";
+  from: boolean | string | null;
+  to: boolean | string | null;
+}
+
+export interface PessoalObligationHistoryItem {
+  id: string;
+  at: string;
+  actor: { id: string; name: string | null } | null;
+  action: string | null;
+  changes: PessoalObligationHistoryChange[];
+}
+
+export interface PessoalObligationHistoryPage {
+  obligation_id: string;
+  client_id: string;
+  competence: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  items: PessoalObligationHistoryItem[];
+}
+
 export interface PessoalObligationCreatePayload {
   client_id: string;
   competence: string;

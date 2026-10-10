@@ -29,6 +29,7 @@ import {
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
 import { optional } from "./pessoalFormValueHelpers";
+import { PessoalObligationHistory } from "./PessoalObligationHistory";
 import { PessoalObligationPortfolio } from "./PessoalObligationPortfolio";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
@@ -379,6 +380,8 @@ export function PessoalObligationsSection({
                 </button>
               ) : null}
             </form>
+
+            <PessoalObligationHistory key={obligation.id} obligationId={obligation.id} />
           </>
         ) : null}
 

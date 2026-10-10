@@ -1,5 +1,5 @@
 // Histórico de campos lido da auditoria (`audit_requests`), que guarda cada alteração com
-// valor anterior e novo e não tem prazo de retenção. Usado pelo serviço Node e pelo Worker.
+// valor anterior e novo e não tem prazo de retenção. Usado pelos serviços Node e Workers.
 
 type AuditRow = {
   id: string;

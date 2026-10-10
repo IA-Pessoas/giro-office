@@ -28,7 +28,11 @@ import {
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 import { PESSOAL_GROUP_POLICY_LABELS } from "./types/groups.ts";
 import { formatPessoalObligationGenerationSummary } from "./utils/obligationGenerationSummary.ts";
-import { obligationItemState, obligationItemValue } from "./utils/obligationPortfolio.ts";
+import {
+  formatObligationHistoryValue,
+  obligationItemState,
+  obligationItemValue,
+} from "./utils/obligationPortfolio.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
   cancelUnionDeletion,
@@ -902,6 +906,28 @@ runTest("portfolio edits share the individual obligation PATCH and invalidate bo
     /useUpdatePessoalPortfolioObligationMutation[\s\S]*?pessoalService\.updateObligationField\(id, payload\)[\s\S]*?pessoalQueryKey\("obligations"\)/,
   );
   assert.match(hooks, /pessoalQueryKey\("obligations", "portfolio"\)/);
+});
+
+runTest("obligation history formats item states and responsible names", () => {
+  assert.equal(
+    PESSOAL_ENDPOINTS.obligationHistory("ob-1"),
+    "/pessoal/obrigations/ob-1/history",
+  );
+  const names = new Map([["user-1", "Ana"]]);
+  assert.equal(formatObligationHistoryValue("va", false, names), "Pendente");
+  assert.equal(formatObligationHistoryValue("va", true, names), "Concluído");
+  assert.equal(formatObligationHistoryValue("va", null, names), "Não possui");
+  assert.equal(formatObligationHistoryValue("responsavel_id", "user-1", names), "Ana");
+  assert.equal(formatObligationHistoryValue("responsavel_id", null, names), "Sem responsável");
+});
+
+runTest("obligation edits refresh the item history", () => {
+  const hooks = readFileSync("src/modules/pessoal/hooks/usePessoalObligations.ts", "utf8");
+
+  assert.match(
+    hooks,
+    /useUpdatePessoalObligationMutation[\s\S]*?invalidateQueries\(\{ queryKey: obligationHistoryKey\(id\) \}\)/,
+  );
 });
 
 console.log("pessoal contract tests passed");

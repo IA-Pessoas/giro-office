@@ -5205,6 +5205,14 @@ const baseManifest = [
   }),
   op({
     service: "pessoal-service",
+    method: "GET",
+    path: "/pessoal/obrigations/{id}/history",
+    action: "pessoalObligationHistory",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
     method: "POST",
     path: "/pessoal/obrigations/competences/{competence}/generate",
     action: "pessoalObligationGenerate",
