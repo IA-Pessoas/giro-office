@@ -200,7 +200,11 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/passwords/import",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(importMarketingPasswordsBodySchema, await readJson(c));
-      return ok(c, await s.passwords().importLegacyRecords(org, body.records), 201);
+      return ok(
+        c,
+        await s.passwords().importLegacyRecords(org, body.records, c.get("auth").userId),
+        201,
+      );
     }),
   );
   app.get(

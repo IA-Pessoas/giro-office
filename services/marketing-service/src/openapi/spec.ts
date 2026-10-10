@@ -287,7 +287,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         post: auditedOperation("Exportar uma credencial após confirmação explícita."),
       },
       "/marketing/passwords/import": {
-        post: protectedOperation(
+        post: auditedOperation(
           "Importar segredos legados verificáveis e colocar casos inseguros em quarentena.",
         ),
       },
