@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { error as logError, ServiceError } from "@workspace/shared";
 import { extractPdfText } from "@workspace/shared/pdf";
 
-import type { ConfirmLddImportBody } from "../schemas/ldd.schemas.js";
+import { type ConfirmLddImportBody, isCalendarDate } from "../schemas/ldd.schemas.js";
 import type { PessoalAuthContext } from "./pessoalServiceTypes.js";
 import { requireUserId } from "./pessoalServiceTypes.js";
 
@@ -21,6 +21,8 @@ import { requireUserId } from "./pessoalServiceTypes.js";
 
 /** Tipo gravado pelo importador de PDF; PGFN segue pelo cadastro manual. */
 export const LDD_IMPORT_TYPE = "INSS";
+/** Tipo do débito previdenciário nos registros migrados do legado (`tb_pessoal.ldd.tipo = 1`). */
+export const LDD_LEGACY_PREVIDENCIARIO_TYPE = "1";
 export const LDD_IMPORT_AUDIT_REFERRING = "pessoal.ldd_import";
 
 export const SIEF_LIMIT = "Débito com Exigibilidade Suspensa (SIEF)";
@@ -84,7 +86,11 @@ export type LddImportStore = {
   };
   lddPessoal: {
     findFirst(args: {
-      where: LddImportScope & { type: string; period: string; due_date: { gte: Date; lt: Date } };
+      where: LddImportScope & {
+        OR: [{ type: { equals: string; mode: "insensitive" } }, { type: string }];
+        period: string;
+        due_date: { gte: Date; lt: Date };
+      };
       orderBy: { id: "asc" };
       select: { id: true; balance_amount: true };
     }): Promise<{ id: string; balance_amount: number | null } | null>;
@@ -119,9 +125,7 @@ function parseDueDate(line: string): string | null {
   if (!match) return null;
   const [, day, month, year] = match;
   const iso = `${year}-${month}-${day}`;
-  const date = new Date(`${iso}T00:00:00Z`);
-  // 31/02 vira março no Date: só vale a data que volta igual.
-  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(iso) ? iso : null;
+  return isCalendarDate(iso) ? iso : null;
 }
 
 function parseAmount(line: string): number | null {
@@ -243,7 +247,9 @@ export async function findLddImportDate(
  * saldos entram juntos ou não entram. As importações do mesmo cliente rodam uma por vez (trava
  * de transação), então duas confirmações simultâneas não perdem acréscimo nem duplicam a chave;
  * o índice único do arquivo continua sendo a garantia final contra o reenvio.
- * Havendo mais de um LDD cadastrado à mão na mesma chave, o acréscimo vai no de menor id.
+ * O saldo existente da chave é o do LDD previdenciário já cadastrado: tipo `INSS` (manual ou
+ * importado, sem diferenciar caixa) ou `1` (migrado do legado). Havendo mais de um, o acréscimo
+ * vai no de menor id.
  * O servidor confia no `file_hash` da prévia: quem confirma já pode cadastrar LDD à mão.
  * ponytail: edição manual do mesmo LDD no meio da importação ainda pode se sobrepor; se
  * acontecer, travar a linha (SELECT ... FOR UPDATE) ou versionar o saldo.
@@ -296,7 +302,10 @@ export async function confirmLddImport(
     const existing = await store.lddPessoal.findFirst({
       where: {
         ...scope,
-        type: LDD_IMPORT_TYPE,
+        OR: [
+          { type: { equals: LDD_IMPORT_TYPE, mode: "insensitive" } },
+          { type: LDD_LEGACY_PREVIDENCIARIO_TYPE },
+        ],
         period,
         due_date: { gte: dayStart, lt: new Date(dayStart.getTime() + 24 * 60 * 60 * 1000) },
       },
