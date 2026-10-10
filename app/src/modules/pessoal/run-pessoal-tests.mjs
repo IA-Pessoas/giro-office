@@ -11,6 +11,7 @@ import {
   buildPessoalLddListParams,
   buildPessoalGroupPayload,
   buildPessoalObligationParams,
+  buildPessoalObligationPortfolioParams,
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
   buildPessoalUnionPayload,
@@ -27,6 +28,7 @@ import {
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 import { PESSOAL_GROUP_POLICY_LABELS } from "./types/groups.ts";
 import { formatPessoalObligationGenerationSummary } from "./utils/obligationGenerationSummary.ts";
+import { obligationItemState, obligationItemValue } from "./utils/obligationPortfolio.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
   cancelUnionDeletion,
@@ -840,6 +842,66 @@ runTest("password UI keeps secrets behind detail and explicit reveal", () => {
   assert.match(passwords, /getSecretText\(detail/);
   assert.match(passwords, /type="password"/);
   assert.doesNotMatch(passwords, /password\.senha_main|password\.senha_secondary/);
+});
+
+runTest("obligation portfolio sends only server-side filters and maps item states", () => {
+  assert.equal(PESSOAL_ENDPOINTS.obligationPortfolio, "/pessoal/obrigations/portfolio");
+  assert.deepEqual(
+    buildPessoalObligationPortfolioParams({ competence: "2026-09", page: 1, page_size: 25 }),
+    { competence: "2026-09", page: 1, page_size: 25 },
+  );
+  assert.deepEqual(
+    buildPessoalObligationPortfolioParams({
+      competence: "2026-09",
+      responsavel_id: "user-1",
+      group_id: "group-1",
+      item: "va",
+      state: "none",
+      page: 2,
+      page_size: 25,
+    }),
+    {
+      competence: "2026-09",
+      responsavel_id: "user-1",
+      group_id: "group-1",
+      item: "va",
+      state: "none",
+      page: 2,
+      page_size: 25,
+    },
+  );
+  assert.equal(
+    buildPessoalObligationPortfolioParams({
+      competence: "2026-09",
+      state: "done",
+      page: 1,
+      page_size: 25,
+    }).state,
+    undefined,
+  );
+  assert.equal(
+    buildPessoalObligationPortfolioParams({
+      competence: "2026-09",
+      state: "pending",
+      page: 1,
+      page_size: 25,
+    }).state,
+    "pending",
+  );
+  for (const value of [false, true, null]) {
+    assert.equal(obligationItemValue(obligationItemState(value)), value);
+  }
+  assert.equal(obligationItemState(null), "none");
+});
+
+runTest("portfolio edits share the individual obligation PATCH and invalidate both views", () => {
+  const hooks = readFileSync("src/modules/pessoal/hooks/usePessoalObligations.ts", "utf8");
+
+  assert.match(
+    hooks,
+    /useUpdatePessoalPortfolioObligationMutation[\s\S]*?pessoalService\.updateObligationField\(id, payload\)[\s\S]*?pessoalQueryKey\("obligations"\)/,
+  );
+  assert.match(hooks, /pessoalQueryKey\("obligations", "portfolio"\)/);
 });
 
 console.log("pessoal contract tests passed");

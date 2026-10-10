@@ -19,6 +19,7 @@ export const PESSOAL_ENDPOINTS = {
   payroll: "/pessoal/payroll",
   payrollDetail: (clientId: string) => `/pessoal/payroll/${clientId}`,
   obligations: "/pessoal/obrigations",
+  obligationPortfolio: "/pessoal/obrigations/portfolio",
   obligationDetail: (id: string) => `/pessoal/obrigations/${id}`,
   obligationGenerate: (competence: string) =>
     `/pessoal/obrigations/competences/${competence}/generate`,

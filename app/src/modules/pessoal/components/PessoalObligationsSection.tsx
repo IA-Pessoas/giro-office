@@ -29,6 +29,7 @@ import {
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
 import { optional } from "./pessoalFormValueHelpers";
+import { PessoalObligationPortfolio } from "./PessoalObligationPortfolio";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalObligationsSectionProps {
@@ -390,6 +391,10 @@ export function PessoalObligationsSection({
         {successMessage ? (
           <p className="text-sm text-emerald-700 dark:text-emerald-300">{successMessage}</p>
         ) : null}
+
+        <div className="border-t border-gray-200 pt-6 dark:border-gray-700">
+          <PessoalObligationPortfolio competence={competence} canEdit={canEdit} />
+        </div>
       </div>
     </section>
   );

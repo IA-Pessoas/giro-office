@@ -11,6 +11,8 @@ import type {
   PessoalObligationCreatePayload,
   PessoalObligationCreateResult,
   PessoalObligationGenerationResult,
+  PessoalObligationPortfolioFilters,
+  PessoalObligationPortfolioPage,
   PessoalObligationUpdatePayload,
 } from "../types/obligations";
 import type {
@@ -121,6 +123,24 @@ export function buildPessoalObligationParams(
     client_id: clientId,
     competence,
   };
+}
+
+/** Remove filtros vazios; estado sem item só vale para "pendente em qualquer item". */
+export function buildPessoalObligationPortfolioParams(
+  filters: PessoalObligationPortfolioFilters,
+): Record<string, string | number> {
+  const params: Record<string, string | number> = {
+    competence: filters.competence,
+    page: filters.page,
+    page_size: filters.page_size,
+  };
+  if (filters.responsavel_id) params.responsavel_id = filters.responsavel_id;
+  if (filters.group_id) params.group_id = filters.group_id;
+  if (filters.item) params.item = filters.item;
+  if (filters.state && (filters.item || filters.state === "pending")) {
+    params.state = filters.state;
+  }
+  return params;
 }
 
 export function buildPessoalLddListParams(clientId?: string): PessoalLddListParams {
@@ -354,6 +374,17 @@ export const pessoalService = {
 
       throw error;
     }
+  },
+
+  async listObligationPortfolio(
+    filters: PessoalObligationPortfolioFilters,
+  ): Promise<PessoalObligationPortfolioPage> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.obligationPortfolio, {
+      params: buildPessoalObligationPortfolioParams(filters),
+    });
+
+    return unwrapPessoalEnvelope<PessoalObligationPortfolioPage>(response.data);
   },
 
   async createObligation(
