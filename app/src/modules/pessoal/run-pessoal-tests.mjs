@@ -1094,8 +1094,10 @@ runTest("LDD sheet prints without a competence filter and the manual form offers
   );
   const styles = readFileSync(new URL("../../styles/global.css", import.meta.url), "utf8");
 
-  assert.match(sheet, /className="print-report/);
-  assert.match(sheet, /printReport\("pessoal-ldd-sheet"\)/);
+  const shell = readFileSync(new URL("./components/PessoalPrintSheet.tsx", import.meta.url), "utf8");
+  assert.match(shell, /className="print-report/);
+  assert.match(shell, /printReport\(id\)/);
+  assert.match(sheet, /id="pessoal-ldd-sheet"/);
   assert.doesNotMatch(sheet, /Competência/);
   assert.match(tracking, /lddTypeOptions = \["INSS", "PGFN", "FGTS", "IRRF", "ISS"\]/);
   assert.match(styles, /\.print-report \*/);
@@ -1131,10 +1133,10 @@ runTest("payroll sheet lists the legacy fields and keeps empty ones readable", (
 
   assert.deepEqual(buildPayrollSheetRows(payroll, [{ id: "union-1", name: "Sindicato A" }]), [
     ["Grupo", "Mensal"],
-    ["Adiantamento", "Sim - Percentual - R$ 40,00"],
+    ["Adiantamento", "Sim - Percentual - 40,00"],
     ["Prévia", "Não"],
     ["Onvio", "Sim"],
-    ["Vale transporte", "Sim - R$ 220,50"],
+    ["Vale transporte", "Sim - 220,50"],
     ["Vale alimentação", "Não"],
     ["Taxa assistencial", "Sim"],
     ["Bem Mais", "Não"],
@@ -1176,8 +1178,8 @@ runTest("payroll sheet orders situations by registration date and prints through
     new URL("./components/PessoalPayrollSheet.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(sheet, /className="print-report/);
-  assert.match(sheet, /printReport\("pessoal-payroll-sheet"\)/);
+  assert.match(sheet, /<PessoalPrintSheet/);
+  assert.match(sheet, /id="pessoal-payroll-sheet"/);
   assert.match(sheet, /usePessoalSituations\(clientId, open\)/);
 });
 

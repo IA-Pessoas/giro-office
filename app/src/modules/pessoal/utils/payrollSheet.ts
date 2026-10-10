@@ -1,15 +1,17 @@
-import { formatBrlAmount } from "../../../shared/utils/inputFormatting.ts";
-
 import type { PessoalPayroll } from "../types/payroll";
 import type { PessoalSituation } from "../types/tracking";
 
-const EMPTY = "Não informado";
+export const PAYROLL_SHEET_EMPTY = "Não informado";
+const EMPTY = PAYROLL_SHEET_EMPTY;
+// Sem "R$": o tipo (percentual, valor fixo…) é texto livre e diz a unidade, como na ficha antiga.
+const formatAmount = (value: number) =>
+  value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const yesNo = (value: boolean) => (value ? "Sim" : "Não");
 
 /** "Sim" seguido do tipo e do valor quando existem, como na ficha antiga. */
 function yesWithDetail(active: boolean, type: string | null, amount: number | null): string {
   if (!active) return "Não";
-  return ["Sim", type?.trim(), amount === null ? null : formatBrlAmount(amount)]
+  return ["Sim", type?.trim(), amount === null ? null : formatAmount(amount)]
     .filter(Boolean)
     .join(" - ");
 }

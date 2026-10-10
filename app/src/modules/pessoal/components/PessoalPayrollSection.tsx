@@ -303,7 +303,13 @@ export function PessoalPayrollSection({
               client={selectedClient}
               clientId={selectedClientId}
               payroll={payroll}
-              ready={payrollQuery.isSuccess && !payrollQuery.isFetching}
+              unavailableReason={
+                payrollQuery.isError || unionsQuery.isError
+                  ? "Não foi possível carregar a folha ou os sindicatos. Use Atualizar."
+                  : payrollQuery.isSuccess && !payrollQuery.isFetching && unionsQuery.isSuccess
+                    ? null
+                    : "Aguardando a folha e os sindicatos do cliente."
+              }
               unions={unionsQuery.data ?? []}
             />
             <button
