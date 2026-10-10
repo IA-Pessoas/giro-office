@@ -1,4 +1,4 @@
-import { ACTIVE_MODULE_KEYS, zNonEmptyText } from "@workspace/shared";
+import { ACTIVE_MODULE_KEYS, zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
 export const AGENDA_STATUSES = ["Pendente", "Realizado", "Cancelado"] as const;
@@ -8,7 +8,7 @@ const optionalText = (max: number) => z.string().trim().max(max).nullish();
 
 const eventFields = {
   agenda: zNonEmptyText("agenda").max(200),
-  date: z.coerce.date(),
+  date: zIsoDate("date"),
   status: z.enum(AGENDA_STATUSES),
   obs: optionalText(2000),
   location: optionalText(200),
@@ -33,7 +33,11 @@ export const agendaCreateBodySchema = z
 export const agendaUpdateBodySchema = z
   .object({ module: moduleKey, agenda_id: zNonEmptyText("agenda_id") })
   .extend(z.object(eventFields).partial().shape)
-  .strict();
+  .strict()
+  .refine(
+    ({ module: _module, agenda_id: _id, ...fields }) => Object.keys(fields).length > 0,
+    "Informe ao menos um campo para atualizar.",
+  );
 
 export const agendaDeleteBodySchema = z
   .object({ module: moduleKey, agenda_id: zNonEmptyText("agenda_id") })

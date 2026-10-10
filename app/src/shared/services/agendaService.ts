@@ -15,7 +15,11 @@ export const agendaService = {
   async create(module: AgendaModule, payload: AgendaEventPayload): Promise<void> {
     await setupAPIClient().post(AGENDA_ENDPOINT, { module, ...payload });
   },
-  async update(module: AgendaModule, agendaId: string, payload: AgendaEventPayload): Promise<void> {
+  async update(
+    module: AgendaModule,
+    agendaId: string,
+    payload: Partial<AgendaEventPayload>,
+  ): Promise<void> {
     await setupAPIClient().put(AGENDA_ENDPOINT, { module, agenda_id: agendaId, ...payload });
   },
   async remove(module: AgendaModule, agendaId: string): Promise<void> {

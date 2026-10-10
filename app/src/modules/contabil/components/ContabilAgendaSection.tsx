@@ -34,10 +34,16 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: contabilAgendaQueryKey() });
 
   const save = useMutation({
-    mutationFn: (payload: AgendaEventPayload) =>
-      editing && editing !== "new"
-        ? agendaService.update("contabil", editing.id, payload)
-        : agendaService.create("contabil", payload),
+    mutationFn: (payload: AgendaEventPayload) => {
+      if (!editing || editing === "new") return agendaService.create("contabil", payload);
+      // Só o que mudou: evento legado mantém o horário e o estado que já tinha.
+      const { date, status, ...rest } = payload;
+      return agendaService.update("contabil", editing.id, {
+        ...rest,
+        ...(agendaDay(date) === agendaDay(editing.date) ? {} : { date }),
+        ...(status === editing.status ? {} : { status }),
+      });
+    },
     onSuccess: async () => {
       setEditing(null);
       await refresh();
@@ -128,10 +134,11 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
               id="contabil-agenda-status"
               name="status"
               className={CONTABIL_SELECT_CLASS}
-              defaultValue={
-                AGENDA_STATUSES.find((status) => status === current?.status) ?? "Pendente"
-              }
+              defaultValue={current?.status ?? "Pendente"}
             >
+              {current?.status && !AGENDA_STATUSES.some((status) => status === current.status) && (
+                <option value={current.status}>{current.status}</option>
+              )}
               {AGENDA_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {status}

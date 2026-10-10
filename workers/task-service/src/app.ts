@@ -88,6 +88,7 @@ import {
 } from "@workspace/task-service/src/schemas/taskModelList.schemas.js";
 import { parseTaskModelResponsibleSequence } from "@workspace/task-service/src/schemas/taskModelResponsibleSequence.schemas.js";
 import { taskOperationalNotificationReadBodySchema } from "@workspace/task-service/src/schemas/taskOperationalNotification.schemas.js";
+import { AGENDA_LEVEL } from "@workspace/task-service/src/services/agendaService.js";
 import {
   TASK_ATTACHMENT_MIME_TYPES,
   type TaskAttachmentMimeType,
@@ -182,7 +183,7 @@ function agendaScope(r: TaskRequest, module: ModulePermissionKey) {
     userId: user_id,
     organizationId: organization_id,
     module,
-    level: isOwner(r) ? 3 : normalizeModulePermission(r.modules?.[module]),
+    level: isOwner(r) ? AGENDA_LEVEL.OWNER : normalizeModulePermission(r.modules?.[module]),
   };
 }
 
