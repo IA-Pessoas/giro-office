@@ -6,6 +6,7 @@ import {
   reportingQueryOpenApiSchema,
 } from "@workspace/shared";
 
+import { GROUP_MAP_TREE_LIMITS } from "../schemas/groupMap.schemas.js";
 import {
   CANONICAL_GUIDANCE_STATUSES,
   CANONICAL_LICENSE_STATUSES,
@@ -876,12 +877,43 @@ export function buildRegularizeServiceOpenApiSpec(
         put: {
           tags: ["Partners"],
           summary: "Salvar a versão editada do mapa de um grupo",
-          description:
-            "Substitui a versão do grupo pela árvore enviada (até 2.000 itens e 12 níveis). Gerar o mapa de novo não altera a versão salva.",
+          description: `Substitui a versão do grupo pela árvore enviada (até ${GROUP_MAP_TREE_LIMITS.maxNodes} itens e ${GROUP_MAP_TREE_LIMITS.maxDepth} níveis). Gerar o mapa de novo não altera a versão salva.`,
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
           ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["tree"],
+                  properties: {
+                    tree: {
+                      type: "object",
+                      description:
+                        "Item raiz do mapa; cada item em `children` tem o mesmo formato.",
+                      additionalProperties: false,
+                      required: ["id", "lines", "children"],
+                      properties: {
+                        id: { type: "string", maxLength: GROUP_MAP_TREE_LIMITS.maxIdLength },
+                        lines: {
+                          type: "array",
+                          minItems: 1,
+                          maxItems: GROUP_MAP_TREE_LIMITS.maxLines,
+                          items: { type: "string", maxLength: GROUP_MAP_TREE_LIMITS.maxLineLength },
+                        },
+                        color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" },
+                        children: { type: "array", items: { type: "object" } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
           responses: { "200": { description: "Versão salva", ...successEnvelopeContent() } },
         },
       },

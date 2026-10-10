@@ -22,8 +22,10 @@ export type GroupMapLayout = {
 
 const MISSING = "não informado";
 const MAX_LINE_LENGTH = 50;
-// Mesmo teto da API (GROUP_MAP_TREE_LIMITS.maxLines).
+// Mesmos tetos da API (GROUP_MAP_TREE_LIMITS).
 const MAX_LINES = 20;
+export const GROUP_MAP_MAX_NODES = 2_000;
+export const GROUP_MAP_MAX_DEPTH = 12;
 
 // Medidas do desenho em px; a largura do texto é estimada pela quantidade de caracteres.
 export const GROUP_MAP_METRICS = {
@@ -77,11 +79,23 @@ function formatDocument(document: string | null): string {
   return document?.trim() || MISSING;
 }
 
-// Quebra em palavras para caber na caixa, como o Painel::quebrarTexto do legado.
+// Caracteres de controle e metades soltas de emoji: a API recusa, e o SVG serializado deixaria
+// de ser XML válido na hora de gerar o PNG.
+const UNSAFE_TEXT =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: é o que se quer tirar do texto
+  /[\u0000-\u001f\u007f]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+
+// Quebra em palavras para caber na caixa, como o Painel::quebrarTexto do legado. Palavra maior
+// que a caixa (um link, por exemplo) é cortada em pedaços.
 export function wrapGroupMapLine(text: string, maxLength = MAX_LINE_LENGTH): string[] {
   const lines: string[] = [];
   let current = "";
-  for (const word of text.split(/\s+/).filter(Boolean)) {
+  const words = text
+    .replace(UNSAFE_TEXT, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .flatMap((word) => word.match(new RegExp(`.{1,${maxLength}}`, "gu")) ?? []);
+  for (const word of words) {
     if (current && current.length + 1 + word.length > maxLength) {
       lines.push(current);
       current = word;
@@ -105,7 +119,11 @@ export function groupMapLinesFromText(text: string): string[] {
 }
 
 function node(id: string, texts: string[], children: GroupMapNode[] = []): GroupMapNode {
-  return { id, lines: texts.flatMap((text) => wrapGroupMapLine(text)), children };
+  return {
+    id,
+    lines: texts.flatMap((text) => wrapGroupMapLine(text)).slice(0, MAX_LINES),
+    children,
+  };
 }
 
 export function buildGroupMapTree(map: RegularizeGroupMap): GroupMapNode {
@@ -149,6 +167,16 @@ export function findGroupMapNode(root: GroupMapNode, id: string): GroupMapNode |
     if (found) return found;
   }
   return null;
+}
+
+// Nível do item na árvore (a raiz é 1), ou 0 quando o item não está nela.
+export function groupMapNodeDepth(root: GroupMapNode, id: string): number {
+  if (root.id === id) return 1;
+  for (const child of root.children) {
+    const depth = groupMapNodeDepth(child, id);
+    if (depth > 0) return depth + 1;
+  }
+  return 0;
 }
 
 export function countGroupMapNodes(root: GroupMapNode): number {

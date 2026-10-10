@@ -113,7 +113,7 @@ model RegularizeGroupSavedMap {
   updated_by_user_id String
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
-  group              Group    @relation(fields: [group_id], references: [id])
+  group              Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
 
   @@unique([organization_id, group_id], map: "uq_regularize_group_map_group")
   @@map("regularize.group_maps")

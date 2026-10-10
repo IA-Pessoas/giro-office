@@ -11,8 +11,11 @@ function node(id: string, children: GroupMapTreeNode[] = []): GroupMapTreeNode {
 }
 
 describe("parseSaveGroupMapBody", () => {
-  it("aceita a árvore editada com cor", () => {
-    const tree = { ...node("raiz", [node("filho")]), color: "#ff0000" };
+  it("aceita a árvore editada com cor, acentos e emoji inteiro", () => {
+    const tree = {
+      ...node("raiz", [{ id: "filho", lines: ["Ação 😀 & <teste>"], children: [] }]),
+      color: "#ff0000",
+    };
 
     expect(parseSaveGroupMapBody({ tree })).toEqual({ tree });
   });
@@ -23,6 +26,9 @@ describe("parseSaveGroupMapBody", () => {
     ["item sem linhas", { id: "raiz", lines: [], children: [] }],
     ["linha longa demais", { id: "raiz", lines: ["a".repeat(201)], children: [] }],
     ["campo desconhecido", { ...node("raiz"), onclick: "alert(1)" }],
+    ["caractere nulo no texto", { id: "raiz", lines: ["a\u0000b"], children: [] }],
+    ["caractere de controle no texto", { id: "raiz", lines: ["a\u0001b"], children: [] }],
+    ["metade solta de emoji", { id: "raiz", lines: ["a\ud83d"], children: [] }],
     ["filhos que não são lista", { id: "raiz", lines: ["a"], children: "x" }],
   ])("recusa %s", (_name, tree) => {
     expect(() => parseSaveGroupMapBody({ tree })).toThrow();

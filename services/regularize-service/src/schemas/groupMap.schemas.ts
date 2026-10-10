@@ -23,24 +23,62 @@ export type GroupMapTreeNode = {
   children: GroupMapTreeNode[];
 };
 
+// Caracteres de controle e metades soltas de par substituto: o Postgres recusa parte deles em
+// JSONB e o restante quebraria o SVG do mapa na hora de exportar.
+const UNSAFE_TEXT =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: é exatamente o que se recusa
+  /[\u0000-\u001f\u007f]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+const UNSAFE_TEXT_MESSAGE = "O texto do mapa tem caracteres inválidos.";
+function isSafeText(value: string): boolean {
+  return !UNSAFE_TEXT.test(value);
+}
+
+const ITEM_ID_MESSAGE = "Item do mapa sem identificação válida.";
+const ITEM_LINES_MESSAGE = "Todo item do mapa precisa de ao menos uma linha de texto.";
+const ITEM_CHILDREN_MESSAGE = "Os itens abaixo de um item do mapa precisam vir em lista.";
+
 const groupMapTreeNodeSchema: z.ZodType<GroupMapTreeNode> = z.lazy(() =>
   z
     .object({
-      id: z.string().min(1).max(GROUP_MAP_TREE_LIMITS.maxIdLength),
+      id: z
+        .string({ required_error: ITEM_ID_MESSAGE, invalid_type_error: ITEM_ID_MESSAGE })
+        .min(1, ITEM_ID_MESSAGE)
+        .max(GROUP_MAP_TREE_LIMITS.maxIdLength, ITEM_ID_MESSAGE)
+        .refine(isSafeText, ITEM_ID_MESSAGE),
       lines: z
-        .array(z.string().max(GROUP_MAP_TREE_LIMITS.maxLineLength))
-        .min(1)
-        .max(GROUP_MAP_TREE_LIMITS.maxLines),
+        .array(
+          z
+            .string({ invalid_type_error: "Texto do item inválido." })
+            .max(
+              GROUP_MAP_TREE_LIMITS.maxLineLength,
+              `Cada linha de um item tem até ${GROUP_MAP_TREE_LIMITS.maxLineLength} caracteres.`,
+            )
+            .refine(isSafeText, UNSAFE_TEXT_MESSAGE),
+          { required_error: ITEM_LINES_MESSAGE, invalid_type_error: ITEM_LINES_MESSAGE },
+        )
+        .min(1, ITEM_LINES_MESSAGE)
+        .max(
+          GROUP_MAP_TREE_LIMITS.maxLines,
+          `Cada item tem até ${GROUP_MAP_TREE_LIMITS.maxLines} linhas.`,
+        ),
       color: z
-        .string()
+        .string({ invalid_type_error: "Cor inválida." })
         .regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida.")
         .optional(),
-      children: z.array(groupMapTreeNodeSchema),
+      children: z.array(groupMapTreeNodeSchema, {
+        required_error: ITEM_CHILDREN_MESSAGE,
+        invalid_type_error: ITEM_CHILDREN_MESSAGE,
+      }),
     })
     .strict(),
 );
 
-const saveGroupMapBodySchema = z.object({ tree: groupMapTreeNodeSchema }).strict();
+const saveGroupMapBodySchema = z
+  .object(
+    { tree: groupMapTreeNodeSchema },
+    { required_error: "Envie o mapa.", invalid_type_error: "Envie o mapa." },
+  )
+  .strict();
 
 // Conta nós e profundidade sem recursão, antes do Zod: uma árvore com milhares de níveis
 // estouraria a pilha na validação recursiva.

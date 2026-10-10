@@ -1908,6 +1908,7 @@ await runTest("group map edits change text, colour and items without touching th
     findGroupMapNode,
     GROUP_MAP_COLORS,
     groupMapLinesFromText,
+    groupMapNodeDepth,
     groupMapTextColor,
     removeGroupMapNode,
     updateGroupMapNode,
@@ -1953,6 +1954,14 @@ await runTest("group map edits change text, colour and items without touching th
   assert.deepEqual(groupMapLinesFromText("  Linha um \n\n linha dois  "), ["Linha um", "linha dois"]);
   assert.deepEqual(groupMapLinesFromText(" \n "), []);
   assert.equal(groupMapLinesFromText("a\n".repeat(30)).length, 20);
+  // O que a API recusaria não sai da tela: palavra maior que a linha é cortada e caractere de
+  // controle vira espaço.
+  const longWord = groupMapLinesFromText("x".repeat(120));
+  assert.deepEqual(longWord.map((line) => line.length), [50, 50, 20]);
+  assert.deepEqual(groupMapLinesFromText("a\u0001b\u0000c"), ["a b c"]);
+  assert.equal(groupMapNodeDepth(tree, "raiz"), 1);
+  assert.equal(groupMapNodeDepth(tree, "a1"), 3);
+  assert.equal(groupMapNodeDepth(tree, "não existe"), 0);
 
   // Texto legível sobre qualquer cor do seletor, como no legado.
   assert.equal(GROUP_MAP_COLORS.length, 8);
@@ -1980,6 +1989,11 @@ await runTest("group map PNG comes from the on-screen SVG and saving is explicit
   assert.doesNotMatch(componentSource, /className="(?:fill|stroke)-/);
   // Só o botão Salvar grava; gerar de novo e descartar mexem apenas no rascunho.
   assert.equal(componentSource.match(/saveMutation\.mutateAsync/g)?.length, 1);
+  // O rascunho só nasce com as consultas terminadas, e descartá-lo com alterações pede
+  // confirmação.
+  assert.match(componentSource, /savedQuery\.isSuccess && !savedQuery\.isFetching/);
+  assert.match(componentSource, /if \(current\?\.dirty\) setPending\(\{ kind: "group"/);
+  assert.match(componentSource, /if \(current\?\.dirty\) setPending\(\{ kind: "regenerate" \}\)/);
   assert.match(hooksSource, /regularizeService\.saveGroupMap\(groupId, tree\)/);
 
   assert.equal(groupMapFileName("Mapa do grupo São João & Cia"), "mapa-do-grupo-sao-joao-cia.png");

@@ -15,10 +15,13 @@ import {
   findGroupMapNode,
   GROUP_MAP_COLORS,
   GROUP_MAP_DEFAULT_COLOR,
+  GROUP_MAP_MAX_DEPTH,
+  GROUP_MAP_MAX_NODES,
   GROUP_MAP_METRICS,
   type GroupMapLayout,
   type GroupMapNode,
   groupMapLinesFromText,
+  groupMapNodeDepth,
   groupMapTextColor,
   layoutGroupMapTree,
   removeGroupMapNode,
@@ -32,9 +35,6 @@ import {
   regularizeTextareaClassName,
 } from "./regularizeFormControls";
 
-// Mesmo teto da API (GROUP_MAP_TREE_LIMITS.maxNodes).
-const MAX_NODES = 2_000;
-
 const messageClassName = "mt-4 text-sm text-slate-600 dark:text-slate-400";
 const alertClassName = "mt-4 text-sm text-rose-700 dark:text-rose-300";
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-slate-200";
@@ -46,6 +46,9 @@ type Draft = {
   origin: "saved" | "generated";
   dirty: boolean;
 };
+
+// Ação que descartaria alterações não salvas e espera a confirmação da pessoa.
+type PendingAction = { kind: "group"; groupId: string } | { kind: "regenerate" };
 
 // Cores e fonte nos atributos, sem classes: o PNG é este mesmo SVG serializado.
 function GroupMapDiagram({
@@ -72,7 +75,9 @@ function GroupMapDiagram({
     titleFontSize,
     titleHeight,
   } = GROUP_MAP_METRICS;
-  const width = layout.width + margin * 2;
+  // O título em negrito pode ser mais largo que a árvore de um grupo pequeno.
+  const titleWidth = title.length * titleFontSize * 0.62;
+  const width = Math.max(layout.width, titleWidth) + margin * 2;
   const height = layout.height + titleHeight + margin * 2;
 
   return (
@@ -184,6 +189,7 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
   const [editColor, setEditColor] = useState<string>(GROUP_MAP_DEFAULT_COLOR);
   const [newText, setNewText] = useState("");
   const [exportError, setExportError] = useState("");
+  const [pending, setPending] = useState<PendingAction | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   const refetchMap = mapQuery.refetch;
@@ -199,11 +205,14 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
   const generatedMap = mapQuery.data?.group.id === groupId ? mapQuery.data : undefined;
   // Ao abrir um grupo: a versão salva, se houver; senão o mapa gerado. Só na primeira vez,
   // para as recargas das consultas não apagarem o que a pessoa está editando.
+  // Espera as consultas terminarem: o que está em cache pode ser de antes de outra pessoa salvar.
+  const savedReady = savedQuery.isSuccess && !savedQuery.isFetching;
+  const generatedReady = !mapQuery.isFetching;
   useEffect(() => {
-    if (!groupId || current || !savedQuery.isSuccess) return;
+    if (!groupId || current || !savedReady) return;
     if (savedMap) {
       setDraft({ groupId, tree: savedMap.tree, origin: "saved", dirty: false });
-    } else if (generatedMap) {
+    } else if (generatedMap && generatedReady) {
       setDraft({
         groupId,
         tree: buildGroupMapTree(generatedMap),
@@ -211,22 +220,42 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
         dirty: false,
       });
     }
-  }, [groupId, current, savedQuery.isSuccess, savedMap, generatedMap]);
+  }, [groupId, current, savedReady, generatedReady, savedMap, generatedMap]);
 
   const layout = useMemo(() => (current ? layoutGroupMapTree(current.tree) : null), [current]);
   const selected = current && selectedId ? findGroupMapNode(current.tree, selectedId) : null;
   const groupName =
     groupsQuery.data?.find((group) => group.id === groupId)?.name ?? generatedMap?.group.name ?? "";
   const title = groupName ? `Mapa do grupo ${groupName}` : "Mapa do grupo";
-  const isLoading = Boolean(groupId) && !current && (savedQuery.isLoading || mapQuery.isLoading);
+  const isLoading = Boolean(groupId) && !current && (savedQuery.isFetching || mapQuery.isFetching);
   const loadFailed = !current && (savedQuery.isError || mapQuery.isError);
 
-  function selectGroup(nextGroupId: string) {
+  function openGroup(nextGroupId: string) {
     setGroupId(nextGroupId);
+    setDraft(null);
     setSelectedId("");
     setNewText("");
     setExportError("");
     saveMutation.reset();
+  }
+
+  // Trocar de grupo ou gerar de novo joga fora o rascunho: com alterações não salvas, a tela
+  // pede confirmação antes.
+  function selectGroup(nextGroupId: string) {
+    if (current?.dirty) setPending({ kind: "group", groupId: nextGroupId });
+    else openGroup(nextGroupId);
+  }
+
+  function requestRegenerate() {
+    if (current?.dirty) setPending({ kind: "regenerate" });
+    else void regenerate();
+  }
+
+  function confirmPending() {
+    const action = pending;
+    setPending(null);
+    if (action?.kind === "group") openGroup(action.groupId);
+    else if (action?.kind === "regenerate") void regenerate();
   }
 
   function selectNode(id: string) {
@@ -267,7 +296,12 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
     if (!current) return;
     const { data } = await refetchMap();
     if (!data) return;
-    setDraft({ groupId, tree: buildGroupMapTree(data), origin: "generated", dirty: true });
+    // Se a pessoa trocou de grupo enquanto a consulta voltava, o rascunho de agora não é este.
+    setDraft((draftNow) =>
+      draftNow?.groupId === data.group.id
+        ? { ...draftNow, tree: buildGroupMapTree(data), origin: "generated", dirty: true }
+        : draftNow,
+    );
     setSelectedId("");
   }
 
@@ -275,13 +309,20 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
   function discard() {
     setDraft(null);
     setSelectedId("");
+    void savedQuery.refetch();
   }
 
   async function save() {
     if (!current) return;
+    const sent = current;
     try {
-      const saved = await saveMutation.mutateAsync({ groupId, tree: current.tree });
-      setDraft({ groupId, tree: saved.tree, origin: "saved", dirty: false });
+      const saved = await saveMutation.mutateAsync({ groupId: sent.groupId, tree: sent.tree });
+      // Só marca como salvo se o rascunho ainda é o que foi enviado.
+      setDraft((draftNow) =>
+        draftNow?.groupId === sent.groupId && draftNow.tree === sent.tree
+          ? { ...draftNow, tree: saved.tree, origin: "saved", dirty: false }
+          : draftNow,
+      );
     } catch {
       // O erro aparece pelo estado da mutation.
     }
@@ -297,8 +338,13 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  const isSaving = saveMutation.isPending;
   const isRoot = selected?.id === current?.tree.id;
-  const isFull = current ? countGroupMapNodes(current.tree) >= MAX_NODES : false;
+  const isFull = current ? countGroupMapNodes(current.tree) >= GROUP_MAP_MAX_NODES : false;
+  const isTooDeep =
+    current && selected
+      ? groupMapNodeDepth(current.tree, selected.id) >= GROUP_MAP_MAX_DEPTH
+      : false;
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
@@ -349,33 +395,32 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
 
           <div className="mt-3 flex flex-wrap gap-2">
             {canEdit ? (
-              <>
-                <button
-                  type="button"
-                  className={regularizePrimaryButtonClassName}
-                  disabled={saveMutation.isPending || (!current.dirty && current.origin === "saved")}
-                  onClick={() => void save()}
-                >
-                  {saveMutation.isPending ? "Salvando…" : "Salvar mapa"}
-                </button>
-                <button
-                  type="button"
-                  className={regularizeSecondaryButtonClassName}
-                  disabled={mapQuery.isFetching}
-                  onClick={() => void regenerate()}
-                >
-                  Gerar de novo do cadastro
-                </button>
-                <button
-                  type="button"
-                  className={regularizeSecondaryButtonClassName}
-                  disabled={!current.dirty}
-                  onClick={discard}
-                >
-                  Descartar alterações
-                </button>
-              </>
+              <button
+                type="button"
+                className={regularizePrimaryButtonClassName}
+                disabled={isSaving || (!current.dirty && current.origin === "saved")}
+                onClick={() => void save()}
+              >
+                {isSaving ? "Salvando…" : "Salvar mapa"}
+              </button>
             ) : null}
+            {/* Quem só consulta também pode ver o mapa atual do cadastro; só não salva. */}
+            <button
+              type="button"
+              className={regularizeSecondaryButtonClassName}
+              disabled={isSaving || mapQuery.isFetching}
+              onClick={requestRegenerate}
+            >
+              Gerar de novo do cadastro
+            </button>
+            <button
+              type="button"
+              className={regularizeSecondaryButtonClassName}
+              disabled={isSaving || !current.dirty}
+              onClick={discard}
+            >
+              Descartar alterações
+            </button>
             <button
               type="button"
               className={regularizeSecondaryButtonClassName}
@@ -384,6 +429,33 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
               Baixar PNG
             </button>
           </div>
+
+          {pending ? (
+            <div
+              role="alert"
+              className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              <span>
+                {pending.kind === "group"
+                  ? "Trocar de grupo descarta as alterações não salvas deste mapa."
+                  : "Gerar de novo descarta as alterações não salvas deste mapa."}
+              </span>
+              <button
+                type="button"
+                className={regularizeSecondaryButtonClassName}
+                onClick={confirmPending}
+              >
+                Descartar e continuar
+              </button>
+              <button
+                type="button"
+                className={regularizeSecondaryButtonClassName}
+                onClick={() => setPending(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : null}
 
           {saveMutation.isError ? (
             <p role="alert" className={alertClassName}>
@@ -429,7 +501,7 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
                     <button
                       type="button"
                       className={regularizeSecondaryButtonClassName}
-                      disabled={groupMapLinesFromText(editText).length === 0}
+                      disabled={isSaving || groupMapLinesFromText(editText).length === 0}
                       onClick={applyEdit}
                     >
                       Atualizar item
@@ -437,7 +509,7 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
                     <button
                       type="button"
                       className={regularizeSecondaryButtonClassName}
-                      disabled={isRoot}
+                      disabled={isSaving || isRoot}
                       onClick={removeSelected}
                     >
                       Remover item
@@ -461,14 +533,23 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
                   <button
                     type="button"
                     className={regularizeSecondaryButtonClassName}
-                    disabled={isFull || groupMapLinesFromText(newText).length === 0}
+                    disabled={
+                      isSaving ||
+                      isFull ||
+                      isTooDeep ||
+                      groupMapLinesFromText(newText).length === 0
+                    }
                     onClick={addChild}
                   >
                     Adicionar item
                   </button>
                   {isFull ? (
                     <p className="text-xs text-slate-600 dark:text-slate-400">
-                      O mapa chegou ao limite de {MAX_NODES} itens.
+                      O mapa chegou ao limite de {GROUP_MAP_MAX_NODES} itens.
+                    </p>
+                  ) : isTooDeep ? (
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      O mapa vai até {GROUP_MAP_MAX_DEPTH} níveis; este item já está no último.
                     </p>
                   ) : null}
                 </div>

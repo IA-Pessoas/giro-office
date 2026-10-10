@@ -6,6 +6,8 @@ const PNG_SCALE = 2;
 // ponytail: o canvas tem teto de lado nos navegadores; mapa maior que isso sai com menos
 // resolução. Fatiar em várias imagens se algum grupo passar muito disso.
 const MAX_CANVAS_SIDE = 8192;
+// Teto de área do canvas no Safari do iOS.
+const MAX_CANVAS_AREA = 16_000_000;
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -37,7 +39,11 @@ export async function downloadGroupMapPng(svg: SVGSVGElement, title: string): Pr
   const svgUrl = URL.createObjectURL(new Blob([markup], { type: "image/svg+xml;charset=utf-8" }));
   try {
     const image = await loadImage(svgUrl);
-    const scale = Math.min(PNG_SCALE, MAX_CANVAS_SIDE / Math.max(width, height));
+    const scale = Math.min(
+      PNG_SCALE,
+      MAX_CANVAS_SIDE / Math.max(width, height),
+      Math.sqrt(MAX_CANVAS_AREA / (width * height)),
+    );
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(width * scale);
     canvas.height = Math.round(height * scale);
@@ -52,7 +58,8 @@ export async function downloadGroupMapPng(svg: SVGSVGElement, title: string): Pr
     link.href = pngUrl;
     link.download = groupMapFileName(title);
     link.click();
-    URL.revokeObjectURL(pngUrl);
+    // Liberar na hora pode cancelar o download em alguns navegadores.
+    setTimeout(() => URL.revokeObjectURL(pngUrl), 10_000);
   } finally {
     URL.revokeObjectURL(svgUrl);
   }
