@@ -6547,6 +6547,23 @@ const handlers = {
       findFirstId(response.body?.data);
   },
 
+  // Conteúdo fixo: a chave de duplicata impede que cada rodada crie um aviso novo.
+  async regularizeDteImport(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        format: "json",
+        content: JSON.stringify([
+          { tipo: "", cell3: "QA_ smoke aviso DTE", cell4: "00000000000191", cell5: "QA_ smoke" },
+        ]),
+      },
+    });
+  },
+
+  async regularizeDteImportsList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
   async taskIntegrationCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

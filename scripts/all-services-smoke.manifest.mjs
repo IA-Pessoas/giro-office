@@ -23,6 +23,7 @@ export const EXEMPT_SPEC_OPERATION_KEYS = new Set([
 const GOOD_STATUS_OVERRIDES = new Map([
   ["userStartConfig", [200, 409]],
   ["userCreate", [201]],
+  ["regularizeDteImport", [201]],
   ["organizationCreate", [201]],
   ["clientCreate", [201]],
   ["clientIntegrationCreate", [201]],
@@ -3302,6 +3303,22 @@ const baseManifest = [
     target: "gateway",
     auth: "bearer",
     specOperation: false,
+  }),
+  op({
+    service: "regularize-service",
+    method: "POST",
+    path: "/regularize/dte/import",
+    action: "regularizeDteImport",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "regularize-service",
+    method: "GET",
+    path: "/regularize/dte/imports",
+    action: "regularizeDteImportsList",
+    target: "gateway",
+    auth: "bearer",
   }),
   op({
     service: "task-service",
