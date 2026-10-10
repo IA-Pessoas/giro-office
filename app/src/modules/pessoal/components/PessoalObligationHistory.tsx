@@ -10,6 +10,8 @@ import { formatObligationHistoryValue } from "../utils/obligationPortfolio";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import { pessoalSecondaryButtonClassName } from "./pessoalFormControls";
 
+const HISTORY_PAGE_SIZE = 20;
+
 const FIELD_LABELS = new Map<string, string>([
   ...PESSOAL_OBLIGATION_ITEMS.map((item) => [item.name, item.label] as const),
   ["responsavel_id", "Responsável"],
@@ -22,7 +24,7 @@ interface PessoalObligationHistoryProps {
 /** Quem alterou cada item da obrigação, quando e de qual estado para qual. */
 export function PessoalObligationHistory({ obligationId }: PessoalObligationHistoryProps) {
   const [page, setPage] = useState(1);
-  const historyQuery = usePessoalObligationHistory(obligationId, page);
+  const historyQuery = usePessoalObligationHistory(obligationId, page, HISTORY_PAGE_SIZE);
   const usersQuery = useAssignableUsers({ module: "pessoal" });
   const userNames = new Map((usersQuery.data ?? []).map((user) => [user.id, user.name]));
   const data = historyQuery.data;

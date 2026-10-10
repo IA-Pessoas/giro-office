@@ -36,7 +36,7 @@ export interface PessoalObligationPortfolioFilters {
   item?: PessoalObligationItem;
   state?: PessoalObligationItemState;
   page: number;
-  page_size: number;
+  pageSize: number;
 }
 
 export interface PessoalObligationPortfolioItem extends PessoalObligation {
@@ -50,7 +50,7 @@ export interface PessoalObligationPortfolioPage {
   items: PessoalObligationPortfolioItem[];
   total: number;
   page: number;
-  page_size: number;
+  pageSize: number;
 }
 
 export interface PessoalObligationHistoryChange {
