@@ -220,8 +220,16 @@ describe("AgendaService", () => {
       expect(prisma.client.count).toHaveBeenCalledWith({
         where: { id: "cli-1", organization_id: ORG },
       });
+      // Usuário ativo da organização, direto ou pelo departamento, como no catálogo de responsáveis.
       expect(prisma.user.count).toHaveBeenCalledWith({
-        where: { id: "user-2", organization_id: ORG },
+        where: {
+          id: "user-2",
+          status: "active",
+          OR: [
+            { organization_id: ORG },
+            { organization_id: null, department: { organization_id: ORG } },
+          ],
+        },
       });
       expect(prisma.agenda.create).toHaveBeenCalledWith(
         expect.objectContaining({

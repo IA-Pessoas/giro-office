@@ -171,6 +171,14 @@ describe("matriz de regressão das políticas modulares", () => {
     );
   });
 
+  // #1774: o Pessoal escolhe o responsável do evento e da carteira no catálogo operacional.
+  it("libera o catálogo de responsáveis para quem só tem Pessoal", () => {
+    const policy = requiredRoutePolicy("GET", "/rh/operational-users");
+
+    expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), policy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { pessoal: 0, fiscal: 3 } }), policy)).toBe(false);
+  });
+
   // #1699: a agenda é de departamento, não da Integração; o task-service confere o módulo pedido.
   it("libera a agenda compartilhada para Contábil ou Triagem, sem exigir Integração", () => {
     const read = requiredRoutePolicy("GET", "/task/agenda");

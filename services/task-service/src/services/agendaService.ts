@@ -129,15 +129,23 @@ export class AgendaService {
     scope: AgendaScope,
     { client_id, participant_id }: Pick<AgendaEventInput, "client_id" | "participant_id">,
   ): Promise<void> {
-    const inOrganization = (id: string) => ({
-      where: { id, organization_id: scope.organizationId },
-    });
-    if (client_id && (await this.prisma.client.count(inOrganization(client_id))) === 0) {
+    const organization_id = scope.organizationId;
+    if (
+      client_id &&
+      (await this.prisma.client.count({ where: { id: client_id, organization_id } })) === 0
+    ) {
       throw new ServiceError(404, "Cliente não encontrado.");
     }
-    if (participant_id && (await this.prisma.user.count(inOrganization(participant_id))) === 0) {
-      throw new ServiceError(404, "Responsável não encontrado.");
-    }
+    if (!participant_id) return;
+    // Mesmo recorte do catálogo de responsáveis: ativo e da organização, direto ou pelo departamento.
+    const responsible = await this.prisma.user.count({
+      where: {
+        id: participant_id,
+        status: "active",
+        OR: [{ organization_id }, { organization_id: null, department: { organization_id } }],
+      },
+    });
+    if (responsible === 0) throw new ServiceError(404, "Responsável não encontrado.");
   }
 
   private log(scope: AgendaScope, action: string, id: string, changes: Record<string, unknown>) {

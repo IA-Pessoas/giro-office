@@ -53,6 +53,7 @@ export function DepartmentAgendaSection({
   const [editing, setEditing] = useState<AgendaEvent | "new" | null>(null);
   const [removing, setRemoving] = useState<AgendaEvent | null>(null);
   const [client, setClient] = useState<ClientPickerOption | null>(null);
+  const [participantId, setParticipantId] = useState("");
   const users = useAssignableUsers({ module, enabled: assignable && canEdit });
   const queryClient = useQueryClient();
   const events = useFetch(departmentAgendaQueryKey(module, month, mine), () =>
@@ -99,6 +100,7 @@ export function DepartmentAgendaSection({
   const openForm = (target: AgendaEvent | "new" | null) => {
     save.reset();
     setClient(target && target !== "new" ? target.client : null);
+    setParticipantId((target && target !== "new" && target.participant?.id) || "");
     setEditing(target);
   };
 
@@ -114,7 +116,7 @@ export function DepartmentAgendaSection({
       ...(assignable
         ? {
             client_id: client?.id ?? null,
-            participant_id: String(form.get("participant_id")) || null,
+            participant_id: participantId || null,
           }
         : {}),
     });
@@ -227,9 +229,8 @@ export function DepartmentAgendaSection({
                   id={`${module}-agenda-participant`}
                   name="participant_id"
                   className={CONTABIL_SELECT_CLASS}
-                  // A lista chega depois do formulário: a chave remonta o select já com o valor.
-                  key={users.data?.length ?? 0}
-                  defaultValue={current?.participant?.id ?? ""}
+                  value={participantId}
+                  onChange={(event) => setParticipantId(event.target.value)}
                 >
                   <option value="">Sem responsável</option>
                   {current?.participant &&
@@ -242,6 +243,11 @@ export function DepartmentAgendaSection({
                     </option>
                   ))}
                 </select>
+                {users.isError && (
+                  <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                    Não foi possível carregar os responsáveis.
+                  </p>
+                )}
               </div>
               {/* O seletor abre uma busca dentro do formulário: Enter nela não salva o evento. */}
               <div
