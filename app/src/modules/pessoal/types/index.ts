@@ -6,7 +6,8 @@ export type PessoalTabId =
   | "payroll"
   | "obligations"
   | "tracking"
-  | "passwords";
+  | "passwords"
+  | "agenda";
 
 export interface PessoalTab {
   id: PessoalTabId;

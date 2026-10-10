@@ -18,6 +18,7 @@ export const agendaListQuerySchema = z
   .object({
     module: moduleKey,
     month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u, "month deve ser AAAA-MM."),
+    mine: z.enum(["true", "false"]).optional(),
   })
   .strict();
 

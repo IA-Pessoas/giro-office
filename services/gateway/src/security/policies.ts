@@ -140,6 +140,14 @@ const financeiroTaskAdminPolicy: AuthPolicy = {
   },
 };
 const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
+// Agenda compartilhada: módulos com tela de agenda; o task-service confere o nível do módulo pedido.
+const agendaModules = ["contabil", "pessoal", "triagem"];
+const agendaViewPolicy: AuthPolicy = {
+  anyModulePermission: { modules: agendaModules, minPermission: moduleAccessPermission },
+};
+const agendaEditPolicy: AuthPolicy = {
+  anyModulePermission: { modules: agendaModules, minPermission: moduleEditPermission },
+};
 /**
  * Rotas cuja matriz do task-service admite o responsável em nível 0/1; o escopo de
  * responsável continua sendo validado no serviço.
@@ -365,6 +373,8 @@ const routePolicyMatchers: Array<{
     path: /^\/task\/(?:complete-request(?:\/list)?|postponement(?:\/list)?|attachment(?:\/list|\/access)?|conclusion)$/,
     policy: integracaoResponsibleTaskPolicy,
   },
+  { method: "GET", path: /^\/task\/agenda$/, policy: agendaViewPolicy },
+  { method: "ANY", path: /^\/task\/agenda$/, policy: agendaEditPolicy },
   { method: "GET", path: /^\/task(?:\/list)?$/, policy: integracaoResponsibleTaskPolicy },
   { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },
   { method: "ANY", path: /^\/task(?:\/|$)/, policy: integracaoEditPolicy },

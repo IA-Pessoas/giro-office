@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Pencil, Plus, Trash2, UserCheck } from "lucide-react";
 
 import { ConfirmationDialog } from "@shared/components";
 import { useFetch } from "@shared/hooks";
@@ -11,12 +11,13 @@ import {
   agendaDay,
   type AgendaEvent,
   type AgendaEventPayload,
+  type AgendaModule,
   type AgendaStatus,
 } from "@shared/services/agendaService.contract";
 import { Input } from "@shared/ui/newLayout/input";
 import { formatCivilDate } from "@shared/utils/dateFormat";
 
-import { contabilAgendaQueryKey } from "../hooks/queryKeys";
+import { departmentAgendaQueryKey } from "../hooks/queryKeys";
 import { getContabilErrorMessage } from "../services/contabilError";
 import type { ContabilCompetence } from "../types";
 import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
@@ -24,21 +25,43 @@ import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 
-/** Visão Contábil da agenda compartilhada: o serviço filtra pelo departamento do módulo. */
-export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
+/** Nome do departamento nos textos da tela. */
+const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
+  contabil: "Contábil",
+  pessoal: "Pessoal",
+  triagem: "Triagem",
+};
+
+interface DepartmentAgendaSectionProps {
+  module: AgendaModule;
+  canEdit: boolean;
+  /** Oferece a alternância entre a agenda geral e a do usuário atual. */
+  allowMine?: boolean;
+}
+
+/** Visão de um departamento na agenda compartilhada: o serviço filtra pelo módulo pedido. */
+export function DepartmentAgendaSection({
+  module,
+  canEdit,
+  allowMine = false,
+}: DepartmentAgendaSectionProps) {
+  const departmentLabel = DEPARTMENT_LABEL[module];
   const [month, setMonth] = useState<ContabilCompetence>(getCurrentContabilCompetence);
+  const [mine, setMine] = useState(false);
   const [editing, setEditing] = useState<AgendaEvent | "new" | null>(null);
   const [removing, setRemoving] = useState<AgendaEvent | null>(null);
   const queryClient = useQueryClient();
-  const events = useFetch(contabilAgendaQueryKey(month), () => agendaService.list("contabil", month));
-  const refresh = () => queryClient.invalidateQueries({ queryKey: contabilAgendaQueryKey() });
+  const events = useFetch(departmentAgendaQueryKey(module, month, mine), () =>
+    agendaService.list(module, month, mine),
+  );
+  const refresh = () => queryClient.invalidateQueries({ queryKey: departmentAgendaQueryKey(module) });
 
   const save = useMutation({
     mutationFn: (payload: AgendaEventPayload) => {
-      if (!editing || editing === "new") return agendaService.create("contabil", payload);
+      if (!editing || editing === "new") return agendaService.create(module, payload);
       // Só o que mudou: evento legado mantém o horário e o estado que já tinha.
       const { date, status, ...rest } = payload;
-      return agendaService.update("contabil", editing.id, {
+      return agendaService.update(module, editing.id, {
         ...rest,
         ...(agendaDay(date) === agendaDay(editing.date) ? {} : { date }),
         ...(status === editing.status ? {} : { status }),
@@ -50,7 +73,7 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
     },
   });
   const remove = useMutation({
-    mutationFn: (event: AgendaEvent) => agendaService.remove("contabil", event.id),
+    mutationFn: (event: AgendaEvent) => agendaService.remove(module, event.id),
     onSuccess: async () => {
       setRemoving(null);
       await refresh();
@@ -76,15 +99,36 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
   const current = editing && editing !== "new" ? editing : null;
 
   return (
-    <section className="space-y-5" aria-label="Agenda do Contábil" aria-busy={events.isLoading}>
+    <section
+      className="space-y-5"
+      aria-label={`Agenda do departamento ${departmentLabel}`}
+      aria-busy={events.isLoading}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Agenda</h2>
           <p className="text-sm text-gray-600 dark:text-slate-400">
-            Eventos do departamento Contábil na agenda compartilhada.
+            {mine ? "Seus eventos e os sem responsável do" : "Eventos do"} departamento{" "}
+            {departmentLabel} na agenda compartilhada.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {allowMine && (
+            // Mesmo padrão do "Meus clientes" da carteira: desligado, é a agenda geral.
+            <button
+              type="button"
+              aria-pressed={mine}
+              onClick={() => setMine((current) => !current)}
+              className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                mine
+                  ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              <UserCheck aria-hidden="true" className="h-4 w-4" />
+              Minha agenda
+            </button>
+          )}
           <ContabilCompetenceSelect value={month} onChange={setMonth} label="Mês da agenda" />
           {canEdit && (
             <button
@@ -125,13 +169,13 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
           </label>
           <div className="flex flex-col gap-1">
             <label
-              htmlFor="contabil-agenda-status"
+              htmlFor={`${module}-agenda-status`}
               className="text-sm font-medium text-gray-700 dark:text-slate-300"
             >
               Estado
             </label>
             <select
-              id="contabil-agenda-status"
+              id={`${module}-agenda-status`}
               name="status"
               className={CONTABIL_SELECT_CLASS}
               defaultValue={current?.status ?? "Pendente"}
@@ -199,6 +243,12 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
                 {event.obs && (
                   <p className="break-words text-sm text-gray-600 dark:text-slate-400">
                     {event.obs}
+                  </p>
+                )}
+                {(event.client || event.participant || allowMine) && (
+                  <p className="break-words text-xs text-gray-500 dark:text-slate-400">
+                    {event.client?.name && `Cliente: ${event.client.name} · `}
+                    Responsável: {event.participant?.name ?? "Sem responsável"}
                   </p>
                 )}
               </div>

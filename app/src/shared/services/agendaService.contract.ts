@@ -4,7 +4,7 @@ export const AGENDA_STATUSES = ["Pendente", "Realizado", "Cancelado"] as const;
 export type AgendaStatus = (typeof AGENDA_STATUSES)[number];
 
 /** Módulo cujo departamento filtra a agenda compartilhada. */
-export type AgendaModule = "contabil" | "triagem";
+export type AgendaModule = "contabil" | "pessoal" | "triagem";
 
 export interface AgendaEvent {
   id: string;
@@ -14,6 +14,9 @@ export interface AgendaEvent {
   status: string | null;
   obs: string | null;
   location: string | null;
+  client: { id: string; name: string } | null;
+  /** Responsável pelo evento; sem ele, o evento entra na "minha agenda" de todos. */
+  participant: { id: string; name: string } | null;
 }
 
 export interface AgendaEventPayload {

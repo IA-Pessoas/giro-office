@@ -66,6 +66,21 @@ describe("agenda compartilhada por departamento (#1727)", () => {
     });
   });
 
+  it("minha agenda filtra pelo usuário autenticado e pelos eventos sem responsável (#1773)", async () => {
+    const { prisma, send } = setup();
+
+    const response = await send("GET", "/task/agenda?module=contabil&month=2026-12&mine=true");
+
+    expect(response.status).toBe(200);
+    expect(prisma.agenda.findMany.mock.calls[0][0].where).toMatchObject({
+      organization_id: ORG,
+      OR: [{ participant_id: "user-1" }, { participant_id: null }],
+    });
+    expect((await send("GET", "/task/agenda?module=contabil&month=2026-12&mine=1")).status).toBe(
+      400,
+    );
+  });
+
   it("usa o nível do módulo pedido, não o de outro módulo", async () => {
     const { prisma, send } = setup();
 

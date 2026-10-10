@@ -171,6 +171,26 @@ describe("matriz de regressão das políticas modulares", () => {
     );
   });
 
+  // #1699: a agenda é de departamento, não da Integração; o task-service confere o módulo pedido.
+  it("libera a agenda compartilhada para Contábil ou Triagem, sem exigir Integração", () => {
+    const read = requiredRoutePolicy("GET", "/task/agenda");
+
+    expect(canAccessRoute(authContext({ modules: { triagem: 1 } }), read)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { contabil: 1 } }), read)).toBe(true);
+    // #1773: o Pessoal consulta o próprio recorte da agenda.
+    expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), read)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), read)).toBe(false);
+
+    for (const method of ["POST", "PUT", "DELETE"]) {
+      const write = requiredRoutePolicy(method, "/task/agenda");
+
+      expect(canAccessRoute(authContext({ modules: { triagem: 2 } }), write)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { contabil: 2 } }), write)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { triagem: 1 } }), write)).toBe(false);
+      expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), write)).toBe(false);
+    }
+  });
+
   it("deixa a atribuição de Triagem decidir a escrita no serviço", () => {
     const policy = requiredRoutePolicy("PATCH", "/triagem/monthly/monthly-1/item");
 
