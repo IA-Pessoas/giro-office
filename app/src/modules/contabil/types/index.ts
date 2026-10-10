@@ -1,3 +1,5 @@
+import type { TriageFiscalConfigurableField } from "@workspace/shared/triagem/documents";
+
 export type ContabilCompetence = `${number}-${number}`;
 export type TriageRoutineType = "CONTABIL" | "FISCAL";
 
@@ -228,6 +230,14 @@ export type TriageMonthlyUpdate = Partial<{
   download_date: string | null;
   settlement_date: string | null;
 }>;
+
+/** Documentos fiscais especiais aplicáveis ao cliente (`active_items` da config FISCAL). */
+export interface TriageFiscalSpecialConfig {
+  client_id: string;
+  type: "FISCAL";
+  configured: boolean;
+  active_items: TriageFiscalConfigurableField[];
+}
 
 /** Prioridade e meio de envio do cliente lidos pelo Fiscal. */
 export interface TriageFiscalSettings {

@@ -28,6 +28,10 @@ export function triageMovementConfigQueryKey(clientId: string) {
   return [...CONTABIL_QUERY_KEY, "triage", "movement-config", clientId] as const;
 }
 
+export function triageFiscalSpecialConfigQueryKey(clientId: string) {
+  return [...CONTABIL_QUERY_KEY, "triage", "fiscal-special-config", clientId] as const;
+}
+
 export function triageFiscalSettingsQueryKey(clientId: string) {
   return [...CONTABIL_QUERY_KEY, "triage", "fiscal-settings", clientId] as const;
 }

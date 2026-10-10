@@ -30,6 +30,7 @@ import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { FiscalClientSettingsPanel } from "./FiscalClientSettingsPanel";
+import { FiscalSpecialDocumentsPanel } from "./FiscalSpecialDocumentsPanel";
 import { TriageMovementPanel } from "./TriageMovementPanel";
 import { CONTABIL_DOCUMENTS, FISCAL_DOCUMENTS, STATUSES } from "./triageDocumentLabels";
 
@@ -244,7 +245,10 @@ export function TriageDocumentsSection({
         </div>
       ) : null}
       {documentType === "FISCAL" ? (
-        <FiscalClientSettingsPanel key={clientId} clientId={clientId} canEdit={canEdit} />
+        <>
+          <FiscalClientSettingsPanel key={clientId} clientId={clientId} canEdit={canEdit} />
+          <FiscalSpecialDocumentsPanel key={`special-${clientId}`} clientId={clientId} canEdit={canEdit} />
+        </>
       ) : null}
       {documentType === "CONTABIL" ? (
         <TriageMovementPanel
@@ -281,7 +285,11 @@ export function TriageDocumentsSection({
             {record.summary.completed}/{record.summary.applicable} aplicáveis ·{" "}
             {record.summary.attention} em atenção
           </div>
-          {documentType === "FISCAL" ? (
+          {documentType === "FISCAL" && record.item_notes.billing_amount?.required === false ? (
+            <p className="text-sm text-gray-600 dark:text-slate-400">
+              Faturamento não se aplica a este cliente nesta competência.
+            </p>
+          ) : documentType === "FISCAL" ? (
             <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
                 Faturamento

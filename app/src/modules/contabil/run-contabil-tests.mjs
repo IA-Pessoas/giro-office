@@ -284,6 +284,16 @@ await (async () => {
     assert.match(panel, /updateMonthly/);
   });
 
+  await runTest("triagem fiscal configura documentos especiais e faturamento do shared (#1693)", () => {
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+    const section = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    assert.match(labels, /from "@workspace\/shared\/triagem\/documents"/);
+    assert.match(labels, /TRIAGE_FISCAL_CONFIGURABLE_FIELDS\.map/);
+    assert.match(section, /<FiscalSpecialDocumentsPanel/);
+    assert.match(section, /Faturamento não se aplica a este cliente/);
+    assert.equal(CONTABIL_ENDPOINTS.triageConfig, "/triagem/config");
+  });
+
   await runTest("triagem fiscal apresenta os 14 campos e controla revisão e entrega", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
     const pageSource = readWorkspaceSource("../../pages/triagem.tsx");

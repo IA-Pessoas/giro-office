@@ -11,6 +11,7 @@ import type {
   TriageClosingStatus,
   TriageDocumentField,
   TriageFiscalSettings,
+  TriageFiscalSpecialConfig,
   TriageMonthlyUpdate,
   TriageMovementConfig,
   TriageRoutineType,
@@ -107,6 +108,23 @@ export const triageDocumentsService = {
   ): Promise<TriageMovementConfig> {
     const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageConfig, {
       client_id: clientId,
+      active_items: activeItems,
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getFiscalSpecialConfig(clientId: string): Promise<TriageFiscalSpecialConfig> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageConfig, {
+      params: { client_id: clientId, type: "FISCAL" },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async saveFiscalSpecialConfig(
+    clientId: string,
+    activeItems: TriageFiscalSpecialConfig["active_items"],
+  ): Promise<TriageFiscalSpecialConfig> {
+    const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageConfig, {
+      client_id: clientId,
+      type: "FISCAL",
       active_items: activeItems,
     });
     return unwrapContabilEnvelope(response.data);
