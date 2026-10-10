@@ -15,7 +15,11 @@ export interface LddImportDraftRow {
   period: string;
   due_date: string;
   balance_amount: string;
+  /** Erros de leitura vindos do servidor; depois de editada, os da validação dos campos. */
+  errors: string[];
 }
+
+export type LddImportDraftField = "period" | "due_date" | "balance_amount";
 
 export function validateLddPdfFile(file: { name: string; type: string; size: number }): string | null {
   if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -34,6 +38,7 @@ export function buildLddImportDraftRows(preview: PessoalLddImportPreview): LddIm
     due_date: row.due_date ?? "",
     balance_amount:
       row.balance_amount === null ? "" : formatBrlDecimalInput(row.balance_amount.toFixed(2)),
+    errors: row.errors,
   }));
 }
 
@@ -44,8 +49,10 @@ function isCalendarDate(value: string): boolean {
     : false;
 }
 
-/** Erros da linha com os valores atuais: somem conforme o operador corrige. */
-export function lddImportDraftRowErrors(row: LddImportDraftRow): string[] {
+/** Erros dos campos editados: somem conforme o operador corrige. */
+export function lddImportDraftRowErrors(
+  row: Pick<LddImportDraftRow, LddImportDraftField>,
+): string[] {
   const errors: string[] = [];
   const period = /^(\d{2})\/\d{4}$/u.exec(row.period.trim());
   // 13 é a competência do 13º.
@@ -53,15 +60,24 @@ export function lddImportDraftRowErrors(row: LddImportDraftRow): string[] {
     errors.push("Informe a competência no formato MM/AAAA.");
   }
   if (!isCalendarDate(row.due_date)) errors.push("Informe um vencimento válido.");
-  const amount = parseBrlDecimalInput(row.balance_amount);
-  if (amount === null || amount <= 0) errors.push("Informe um valor maior que zero.");
+  if (parseBrlDecimalInput(row.balance_amount) === null) errors.push("Informe o valor.");
   return errors;
+}
+
+/** Aplica a edição de um campo e troca os erros de leitura pelos da validação. */
+export function editLddImportDraftRow(
+  row: LddImportDraftRow,
+  field: LddImportDraftField,
+  value: string,
+): LddImportDraftRow {
+  const edited = { ...row, [field]: value };
+  return { ...edited, errors: lddImportDraftRowErrors(edited) };
 }
 
 /** Soma em centavos das linhas sem erro, para o total exibido não acumular erro de ponto flutuante. */
 export function lddImportDraftTotal(rows: LddImportDraftRow[]): number {
   const cents = rows
-    .filter((row) => lddImportDraftRowErrors(row).length === 0)
+    .filter((row) => row.errors.length === 0)
     .reduce((sum, row) => sum + Math.round((parseBrlDecimalInput(row.balance_amount) ?? 0) * 100), 0);
   return cents / 100;
 }

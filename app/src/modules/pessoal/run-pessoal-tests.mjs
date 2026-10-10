@@ -35,6 +35,7 @@ import {
 } from "./utils/obligationPortfolio.ts";
 import {
   buildLddImportDraftRows,
+  editLddImportDraftRow,
   lddImportDraftRowErrors,
   lddImportDraftTotal,
   validateLddPdfFile,
@@ -938,9 +939,7 @@ runTest("ficha edits refresh ficha, portfolio and history under one prefix", () 
   assert.match(hooks, /pessoalQueryKey\("obligations", "history"/);
 });
 
-console.log("pessoal contract tests passed");
-
-runTest("LDD import preview rows are editable and revalidated", () => {
+runTest("LDD import preview keeps read errors until the row is edited", () => {
   const rows = buildLddImportDraftRows({
     file_name: "ldd.pdf",
     rows: [
@@ -954,11 +953,11 @@ runTest("LDD import preview rows are editable and revalidated", () => {
       },
       {
         line: 2,
-        source: "CP-SEGUR. 10,10",
-        period: null,
-        due_date: null,
+        source: "CP-SEGUR. 13/2023 20/12/2023",
+        period: "13/2023",
+        due_date: "2023-12-20",
         balance_amount: null,
-        errors: ["Competência não identificada na linha."],
+        errors: ["Valor não identificado na linha."],
       },
     ],
   });
@@ -969,22 +968,26 @@ runTest("LDD import preview rows are editable and revalidated", () => {
     period: "01/2024",
     due_date: "2024-02-20",
     balance_amount: "R$ 1.234,56",
+    errors: [],
   });
-  assert.deepEqual(lddImportDraftRowErrors(rows[0]), []);
-  assert.deepEqual(lddImportDraftRowErrors(rows[1]), [
-    "Informe a competência no formato MM/AAAA.",
-    "Informe um vencimento válido.",
-    "Informe um valor maior que zero.",
-  ]);
+  assert.deepEqual(rows[1].errors, ["Valor não identificado na linha."]);
   assert.equal(lddImportDraftTotal(rows), 1234.56);
 
-  const fixed = { ...rows[1], period: "13/2023", due_date: "2023-12-20", balance_amount: "0,10" };
-  assert.deepEqual(lddImportDraftRowErrors(fixed), []);
-  assert.equal(lddImportDraftTotal([rows[0], fixed, { ...fixed, balance_amount: "0,20" }]), 1234.86);
-  assert.deepEqual(lddImportDraftRowErrors({ ...fixed, period: "14/2023", due_date: "2023-02-31" }), [
-    "Informe a competência no formato MM/AAAA.",
-    "Informe um vencimento válido.",
-  ]);
+  const fixed = editLddImportDraftRow(rows[1], "balance_amount", "0,10");
+  assert.deepEqual(fixed.errors, []);
+  assert.equal(
+    lddImportDraftTotal([rows[0], fixed, editLddImportDraftRow(fixed, "balance_amount", "0,20")]),
+    1234.86,
+  );
+  assert.deepEqual(editLddImportDraftRow(fixed, "balance_amount", "0,00").errors, []);
+  assert.deepEqual(
+    lddImportDraftRowErrors({ period: "14/2023", due_date: "2023-02-31", balance_amount: "" }),
+    [
+      "Informe a competência no formato MM/AAAA.",
+      "Informe um vencimento válido.",
+      "Informe o valor.",
+    ],
+  );
 });
 
 runTest("LDD import refuses non-PDF, empty and oversized files before upload", () => {
@@ -997,3 +1000,5 @@ runTest("LDD import refuses non-PDF, empty and oversized files before upload", (
     "O PDF excede o limite de 700 KB.",
   );
 });
+
+console.log("pessoal contract tests passed");

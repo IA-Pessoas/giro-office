@@ -4,6 +4,7 @@ import { ServiceError } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import { createLddRoutes } from "../routes/ldd.routes.js";
+import { LDD_PDF_MAX_BASE64_LENGTH, previewLddImportBodySchema } from "../schemas/ldd.schemas.js";
 import {
   clientId,
   createRouteTestApp,
@@ -138,5 +139,16 @@ describe("LDD routes", () => {
       expect(rejected.status).toBe(400);
     }
     expect(service.previewImport).toHaveBeenCalledTimes(1);
+  });
+
+  it("barra no schema o PDF acima de 700 KB", () => {
+    const body = { client_id: clientId, file_name: "ldd.pdf" };
+    const parse = (length: number) =>
+      previewLddImportBodySchema.safeParse({ ...body, content_base64: "A".repeat(length) });
+
+    expect(parse(LDD_PDF_MAX_BASE64_LENGTH).success).toBe(true);
+    expect(parse(LDD_PDF_MAX_BASE64_LENGTH + 4).error?.issues[0]?.message).toBe(
+      "O PDF excede o limite de 700 KB.",
+    );
   });
 });

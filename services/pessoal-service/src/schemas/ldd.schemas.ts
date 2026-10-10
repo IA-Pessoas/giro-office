@@ -1,7 +1,9 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
-import { LDD_PDF_MAX_BASE64_LENGTH } from "../services/lddPdfImportService.js";
+/** PDF LDD/INSS de até 700 KB: em base64, cabe no limite de 1 MB de corpo JSON do gateway. */
+export const LDD_PDF_MAX_BYTES = 700 * 1024;
+export const LDD_PDF_MAX_BASE64_LENGTH = Math.ceil(LDD_PDF_MAX_BYTES / 3) * 4;
 
 export const lddIdParamsSchema = z
   .object({

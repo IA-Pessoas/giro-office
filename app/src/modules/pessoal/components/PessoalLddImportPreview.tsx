@@ -7,15 +7,14 @@ import { formatBrlDecimalInput } from "@shared/utils/inputFormatting";
 import { usePreviewPessoalLddImportMutation } from "../hooks/usePessoalTracking";
 import {
   buildLddImportDraftRows,
-  lddImportDraftRowErrors,
+  editLddImportDraftRow,
   lddImportDraftTotal,
   validateLddPdfFile,
+  type LddImportDraftField,
   type LddImportDraftRow,
 } from "../utils/lddImportPreview";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import { pessoalSecondaryButtonClassName, pessoalTextFieldClassName } from "./pessoalFormControls";
-
-type EditableField = "period" | "due_date" | "balance_amount";
 
 /**
  * Envia o PDF LDD/INSS e mostra as linhas lidas para revisão. Nada é gravado: as edições ficam
@@ -60,10 +59,12 @@ export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
     }
   }
 
-  function updateRow(line: number, field: EditableField, value: string) {
+  function updateRow(line: number, field: LddImportDraftField, value: string) {
     setRows(
       (current) =>
-        current?.map((row) => (row.line === line ? { ...row, [field]: value } : row)) ?? null,
+        current?.map((row) =>
+          row.line === line ? editLddImportDraftRow(row, field, value) : row,
+        ) ?? null,
     );
   }
 
@@ -71,7 +72,7 @@ export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
     setRows((current) => current?.filter((row) => row.line !== line) ?? null);
   }
 
-  const rowsWithErrors = rows?.filter((row) => lddImportDraftRowErrors(row).length > 0).length ?? 0;
+  const rowsWithErrors = rows?.filter((row) => row.errors.length > 0).length ?? 0;
 
   return (
     <div className="mb-6 space-y-3">
@@ -149,7 +150,7 @@ export function PessoalLddImportPreview({ clientId }: { clientId: string }) {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {rows.map((row) => {
-                    const errors = lddImportDraftRowErrors(row);
+                    const { errors } = row;
 
                     return (
                       <tr key={row.line} className="align-top">

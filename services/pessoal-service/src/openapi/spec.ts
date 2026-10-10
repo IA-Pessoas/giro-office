@@ -3,7 +3,7 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { PessoalServiceEnv } from "../config/env.js";
 import { PESSOAL_REPORTING_SOURCES } from "../reporting/pessoalReportingCatalog.js";
-import { LDD_PDF_MAX_BASE64_LENGTH } from "../services/lddPdfImportService.js";
+import { LDD_PDF_MAX_BASE64_LENGTH } from "../schemas/ldd.schemas.js";
 
 const successJson = {
   content: {
@@ -440,11 +440,10 @@ const lddImportPreviewResponses = {
       },
     }),
   },
-  "400": { description: "Bad request", ...errorJson },
+  "400": { description: "Corpo inválido ou PDF acima do limite", ...errorJson },
   "401": { description: "Unauthorized", ...errorJson },
   "403": { description: "Forbidden", ...errorJson },
   "404": { description: "Cliente não encontrado", ...errorJson },
-  "413": { description: "PDF acima do limite", ...errorJson },
   "422": { description: "PDF ilegível ou sem linha CP- elegível", ...errorJson },
 } as const;
 

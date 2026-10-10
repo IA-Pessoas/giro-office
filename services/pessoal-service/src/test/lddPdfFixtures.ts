@@ -21,5 +21,3 @@ export function lddPdf(lines: string[]): Buffer {
 }
 
 export const lddPdfBase64 = (lines: string[]): string => lddPdf(lines).toString("base64");
-
-export const SIEF_MARKER = "Débito com Exigibilidade Suspensa (SIEF)";

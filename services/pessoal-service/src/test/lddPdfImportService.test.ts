@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildLddImportPreview,
-  LDD_PDF_MAX_BYTES,
+  lddRowsFromPdfText,
   parseLddText,
+  SIEF_LIMIT as SIEF_MARKER,
 } from "../services/lddPdfImportService.js";
-import { lddPdfBase64, SIEF_MARKER } from "./lddPdfFixtures.js";
+import { lddPdfBase64 } from "./lddPdfFixtures.js";
 
 describe("parseLddText", () => {
   it("extrai competência, vencimento e o segundo valor das linhas CP-", () => {
@@ -53,6 +54,47 @@ describe("parseLddText", () => {
     ]);
 
     expect(rows.map((row) => row.balance_amount)).toEqual([10, 5]);
+  });
+
+  it("junta as células quando o PDF traz uma por linha de texto", () => {
+    const rows = parseLddText([
+      [
+        "CP-SEGUR.",
+        "01/2024",
+        "20/02/2024",
+        "1.500,00",
+        "1.234,56",
+        "CP-TERC. 02/2024 20/03/2024 5,00 5,00",
+        "Total 99,00 99,00",
+      ].join("\n"),
+    ]);
+
+    expect(rows).toEqual([
+      {
+        line: 1,
+        source: "CP-SEGUR. 01/2024 20/02/2024 1.500,00 1.234,56",
+        period: "01/2024",
+        due_date: "2024-02-20",
+        balance_amount: 1234.56,
+        errors: [],
+      },
+      expect.objectContaining({ line: 2, period: "02/2024", balance_amount: 5, errors: [] }),
+    ]);
+  });
+
+  it("não puxa dados da linha CP- seguinte para completar a anterior", () => {
+    const [incomplete, complete] = parseLddText([
+      "CP-SEGUR. 01/2024\nCP-TERC. 02/2024 20/03/2024 5,00 5,00",
+    ]);
+
+    expect(incomplete).toMatchObject({ source: "CP-SEGUR. 01/2024", due_date: null });
+    expect(complete).toMatchObject({ period: "02/2024", errors: [] });
+  });
+
+  it("ignora MM/AAAA com mês inválido e usa a competência seguinte da linha", () => {
+    const [row] = parseLddText(["CP-SEGUR. 99/2024 01/2024 20/02/2024 10,00 10,00"]);
+
+    expect(row).toMatchObject({ period: "01/2024", errors: [] });
   });
 
   it("aponta o campo ilegível da linha sem descartá-la", () => {
@@ -110,7 +152,7 @@ describe("buildLddImportPreview", () => {
     });
   });
 
-  it("recusa arquivo que não é PDF, ilegível, sem linha elegível ou acima do limite", () => {
+  it("recusa arquivo que não é PDF, ilegível ou sem linha elegível", () => {
     const cases: [string, number, RegExp][] = [
       [Buffer.from("planilha").toString("base64"), 422, /não é PDF/],
       [
@@ -124,7 +166,6 @@ describe("buildLddImportPreview", () => {
         422,
         /Nenhuma linha CP-/,
       ],
-      [Buffer.alloc(LDD_PDF_MAX_BYTES + 1, 0x20).toString("base64"), 413, /limite de 700 KB/],
     ];
 
     for (const [content_base64, statusCode, message] of cases) {
@@ -135,6 +176,18 @@ describe("buildLddImportPreview", () => {
         thrown = err;
       }
       expect(thrown).toMatchObject({ statusCode, message: expect.stringMatching(message) });
+    }
+  });
+
+  it("recusa página ilegível só quando ela vem antes do limite SIEF", () => {
+    const line = "CP-SEGUR. 01/2024 20/02/2024 10,00 10,00";
+
+    expect(lddRowsFromPdfText([line, SIEF_MARKER, ""], [3])).toHaveLength(1);
+    for (const pages of [
+      [line, "", SIEF_MARKER],
+      [line, ""],
+    ]) {
+      expect(() => lddRowsFromPdfText(pages, [2])).toThrow(/Página\(s\) 2 sem texto legível/);
     }
   });
 });
