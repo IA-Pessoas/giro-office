@@ -6,7 +6,7 @@ const competenceSchema = z
 
 export const createTriageSolicitationBodySchema = z
   .object({
-    client_id: z.string().uuid("Cliente inválido."),
+    client_id: z.string({ required_error: "Cliente é obrigatório." }).uuid("Cliente inválido."),
     competence: competenceSchema,
     category_id: z
       .string({ required_error: "Categoria é obrigatória." })
