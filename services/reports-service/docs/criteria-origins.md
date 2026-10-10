@@ -21,7 +21,7 @@ A implementação usa consultas Prisma parametrizadas e allowlists; não concate
 
 ## Matriz de cobertura
 
-28 adapters publicam 33 áreas. Cada linha abaixo usa o mesmo contrato executável, com operadores específicos do catálogo. Os campos internos que não constam abaixo continuam indisponíveis. As capacidades por tipo descritas acima valem para cada campo publicado.
+28 adapters publicam 35 áreas. Cada linha abaixo usa o mesmo contrato executável, com operadores específicos do catálogo. Os campos internos que não constam abaixo continuam indisponíveis. As capacidades por tipo descritas acima valem para cada campo publicado.
 
 | Área | Adapter | Origem | Campos publicados (tipo) | Operadores publicados |
 | --- | --- | --- | --- | --- |
@@ -35,6 +35,8 @@ A implementação usa consultas Prisma parametrizadas e allowlists; não concate
 | contabil.triage_movement | contabilTriageAdapter.ts | contabil-service | competence (string), sends_movement (boolean), name (string), company_name (string), cpf_cnpj (string), status (string), regime (string), competence_entry (date), contabil (boolean), fiscal (boolean), customer_with_movement (boolean) | eq, neq, contains, in, gt, gte, lt, lte, between |
 | contabil.triage_responsibles | contabilTriageAdapter.ts | contabil-service | type (string), responsible_name (string), name (string), company_name (string), cpf_cnpj (string), status (string), regime (string), competence_entry (date), contabil (boolean), fiscal (boolean), customer_with_movement (boolean) | eq, neq, contains, in, gt, gte, lt, lte, between |
 | contabil.triage_competence_responsibles | contabilTriageAdapter.ts | contabil-service | competence (string), type (string), responsible_name (string), name (string), company_name (string), cpf_cnpj (string), status (string), regime (string), competence_entry (date), contabil (boolean), fiscal (boolean), customer_with_movement (boolean) | eq, neq, contains, in, gt, gte, lt, lte, between |
+| contabil.triage_accounting_metric | contabilTriageAdapter.ts | contabil-service | competence (string), completion_percent (number), completed_items (number), applicable_items (number), responsible_name (string), name (string), company_name (string), cpf_cnpj (string), status (string), regime (string), competence_entry (date), contabil (boolean), fiscal (boolean), customer_with_movement (boolean) | eq, neq, contains, in, gt, gte, lt, lte, between |
+| contabil.triage_sgq | contabilTriageAdapter.ts | contabil-service | competence (string), not_sent (number), not_triaged (number), triaged (number), eligible_clients (number) | eq, neq, contains, in, gt, gte, lt, lte, between |
 | fiscal.icms | fiscalIcmsAdapter.ts | fiscal-service | state (string), item_number (string), cest_code (string), description (string), interstate_agreement (string), applied_original_mva (string), adjusted_mva (string), original_mva (string) | eq, neq, contains, in |
 | fiscal.ipi | fiscalIpiAdapter.ts | fiscal-service | ncm (string), ex (string), description (string), aliquot (string) | eq, neq, contains, in |
 | fiscal.ncm | fiscalNcmAdapter.ts | fiscal-service | tax_regime (string), ncm_code (string), federal_taxation_type (string), cst_pis_outgoing (string), cst_cofins_outgoing (string), product_group (string), description (string), validity_start_date (date), validity_end_date (date) | eq, neq, contains, in, gt, gte, lt, lte, between |

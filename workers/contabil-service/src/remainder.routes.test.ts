@@ -897,6 +897,79 @@ describe("contabil Worker remainder routes", () => {
     }
   });
 
+  it("extrai SGQ e métrica Contábil da Triagem na organização do grant", async () => {
+    const routines = [
+      {
+        id: "1",
+        client_id: CLIENT,
+        competence: "2025-12",
+        checklist: { triaged_transactions: "COMPLETED", financial_transactions: "NOT_PRESENT" },
+      },
+      { id: "2", client_id: CLIENT, competence: "2026-01", checklist: {} },
+    ];
+    const prisma = {
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(
+            async ({ skip = 0, take = routines.length }: { skip?: number; take?: number }) =>
+              routines.slice(skip, skip + take),
+          ),
+      },
+      client: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: CLIENT,
+            status: "Ativo",
+            competence_entry: null,
+            competence_output: null,
+            deletion_date: null,
+          },
+        ]),
+      },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const extract = async (body: { source: string; fields: string[]; limit: number }) => {
+      const response = await app.request("https://contabil.test/internal/reporting/extract", {
+        method: "POST",
+        headers: {
+          ...(await signedReportingHeaders(body, "extract", body)),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(200);
+      return ((await response.json()) as { data: { rows: unknown[] } }).data.rows;
+    };
+
+    await expect(
+      extract({
+        source: "contabil.triage_sgq",
+        fields: ["competence", "not_sent", "not_triaged", "triaged"],
+        limit: 10,
+      }),
+    ).resolves.toEqual([
+      { competence: "2025-12", not_sent: 0, not_triaged: 0, triaged: 1 },
+      { competence: "2026-01", not_sent: 0, not_triaged: 0, triaged: 1 },
+    ]);
+    await expect(
+      extract({
+        source: "contabil.triage_accounting_metric",
+        fields: ["competence", "completion_percent"],
+        limit: 1,
+      }),
+    ).resolves.toEqual([{ competence: "2025-12", completion_percent: 100 }]);
+    for (const delegate of [prisma.triageMonthly, prisma.client]) {
+      for (const [query] of delegate.findMany.mock.calls) {
+        expect(query.where).toMatchObject({ organization_id: ORG });
+      }
+    }
+  });
+
   it("usa a permissão efetiva do módulo contábil como o gateway Node encaminha", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });

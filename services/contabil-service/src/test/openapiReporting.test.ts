@@ -66,6 +66,8 @@ describe("contabil-service OpenAPI reporting", () => {
         "contabil.triage_movement",
         "contabil.triage_responsibles",
         "contabil.triage_competence_responsibles",
+        "contabil.triage_accounting_metric",
+        "contabil.triage_sgq",
       ],
     });
   });

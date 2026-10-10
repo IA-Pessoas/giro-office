@@ -3,11 +3,14 @@ import { reportingAggregations } from "./reportingCapabilities.js";
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const dateOperators = ["eq", "gt", "gte", "lt", "lte", "between"] as const;
 const booleanOperators = ["eq", "neq"] as const;
+const numberOperators = ["eq", "neq", "gt", "gte", "lt", "lte", "between"] as const;
+// Competência é YYYY-MM: a ordem do texto é a do calendário, então intervalo funciona.
+const competenceOperators = [...stringOperators, "gte", "lte", "between"] as const;
 
 function field(
   key: string,
   label: string,
-  value_type: "string" | "boolean" | "date",
+  value_type: "string" | "boolean" | "date" | "number",
   filter_operators: readonly string[],
 ) {
   return {
@@ -40,6 +43,8 @@ export const CONTABIL_TRIAGE_REPORTING_SOURCES = [
   "contabil.triage_movement",
   "contabil.triage_responsibles",
   "contabil.triage_competence_responsibles",
+  "contabil.triage_accounting_metric",
+  "contabil.triage_sgq",
 ] as const;
 export type ContabilTriageReportingSource = (typeof CONTABIL_TRIAGE_REPORTING_SOURCES)[number];
 
@@ -64,7 +69,7 @@ export const contabilTriageReportingCatalog = {
       minimum_permission: 1,
       keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
       fields: [
-        field("competence", "Competência", "string", stringOperators),
+        field("competence", "Competência", "string", competenceOperators),
         field("sends_movement", "Movimento enviado", "boolean", booleanOperators),
         ...clientFields,
       ],
@@ -88,10 +93,39 @@ export const contabilTriageReportingCatalog = {
       minimum_permission: 1,
       keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
       fields: [
-        field("competence", "Competência", "string", stringOperators),
+        field("competence", "Competência", "string", competenceOperators),
         field("type", "Serviço da Triagem", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
         ...clientFields,
+      ],
+    },
+    {
+      key: "contabil.triage_accounting_metric",
+      label: "Métrica Contábil por competência",
+      module: "triagem",
+      minimum_permission: 1,
+      keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
+      fields: [
+        field("competence", "Competência", "string", competenceOperators),
+        field("completion_percent", "Concluído (%)", "number", numberOperators),
+        field("completed_items", "Itens concluídos", "number", numberOperators),
+        field("applicable_items", "Itens aplicáveis", "number", numberOperators),
+        field("responsible_name", "Responsável", "string", stringOperators),
+        ...clientFields,
+      ],
+    },
+    {
+      key: "contabil.triage_sgq",
+      label: "SGQ da Triagem por mês",
+      module: "triagem",
+      minimum_permission: 1,
+      keys: [],
+      fields: [
+        field("competence", "Mês", "string", competenceOperators),
+        field("not_sent", "Clientes não enviado", "number", numberOperators),
+        field("not_triaged", "Clientes não triado", "number", numberOperators),
+        field("triaged", "Clientes triado", "number", numberOperators),
+        field("eligible_clients", "Clientes na carteira", "number", numberOperators),
       ],
     },
   ],

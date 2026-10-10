@@ -1,6 +1,9 @@
 import {
   CONTABIL_TRIAGE_REPORTING_SOURCES,
   type ContabilTriageReportingSource,
+  normalizeTriageDocumentStatus,
+  TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
+  type TriageDocumentStatus,
 } from "@workspace/shared";
 
 type Row = Record<string, unknown>;
@@ -41,10 +44,13 @@ type RowSource = {
   columns: Readonly<Record<string, string>>;
   /** Colunas lidas a mais para descobrir o responsável da linha. */
   responsibleColumns?: readonly string[];
+  /** Campos calculados a partir de uma coluna da linha. */
+  derived?: { column: string; fields: readonly string[]; values(raw: unknown): Row };
 };
+type RowSourceKey = Exclude<ContabilTriageReportingSource, "contabil.triage_sgq">;
 // Inativos ficam: o filtro de status é de quem monta o relatório. Removidos, não.
 const ofLiveClient = { client: { deletion_date: null } };
-const rowSources: Readonly<Record<ContabilTriageReportingSource, RowSource>> = {
+const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
   "contabil.triage_clouds": { delegate: "clients", where: { deletion_date: null }, columns: {} },
   // "Movimento enviado" é da rotina Contábil; a Fiscal não usa o marcador.
   "contabil.triage_movement": {
@@ -64,7 +70,154 @@ const rowSources: Readonly<Record<ContabilTriageReportingSource, RowSource>> = {
     columns: { competence: "competence", type: "type" },
     responsibleColumns: ["responsible_id", "competence", "type"],
   },
+  "contabil.triage_accounting_metric": {
+    delegate: "monthly",
+    where: { type: "CONTABIL", archived_at: null, ...ofLiveClient },
+    columns: { competence: "competence" },
+    responsibleColumns: ["responsible_id", "competence", "type"],
+    derived: {
+      column: "checklist",
+      fields: ["completion_percent", "completed_items", "applicable_items"],
+      values: accountingMetric,
+    },
+  },
 };
+
+/** Status do cadastro de cliente inativado (client-service, `inactivate`). */
+const CLIENT_INACTIVE_STATUS = "Inativo";
+
+function accountingStatuses(checklist: unknown): TriageDocumentStatus[] {
+  const items = checklist && typeof checklist === "object" ? (checklist as Row) : {};
+  // Item ausente do checklist não fazia parte do movimento, como na tela da rotina.
+  return TRIAGE_ACCOUNTING_CHECKLIST_FIELDS.map(
+    (field) => normalizeTriageDocumentStatus(items[field]) ?? "NOT_APPLICABLE",
+  );
+}
+
+/**
+ * Métrica Contábil da rotina: concluídos sobre os itens que o cliente tem. "Não possui" e
+ * item desativado pelo movimento padrão saem do denominador; sem item aplicável não há
+ * percentual.
+ */
+function accountingMetric(checklist: unknown): Row {
+  const statuses = accountingStatuses(checklist);
+  const applicable = statuses.filter(
+    (status) => status !== "NOT_PRESENT" && status !== "NOT_APPLICABLE",
+  ).length;
+  const completed = statuses.filter((status) => status === "COMPLETED").length;
+  return {
+    completed_items: completed,
+    applicable_items: applicable,
+    completion_percent: applicable ? Math.round((completed / applicable) * 10_000) / 100 : null,
+  };
+}
+
+/** Meses de `first` a `last` (YYYY-MM), inclusive, atravessando viradas de ano. */
+export function competencesBetween(first: string, last: string): string[] {
+  const months: string[] = [];
+  let [year, month] = first.split("-").map(Number);
+  while (`${year}-${String(month).padStart(2, "0")}` <= last) {
+    months.push(`${year}-${String(month).padStart(2, "0")}`);
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return months;
+}
+
+/**
+ * SGQ: uma linha por mês com os clientes do Contábil na carteira daquele mês, separados
+ * em não enviado (sem rotina), não triado (movimento pendente) e triado.
+ */
+async function extractSgqPage(
+  prisma: TriageReportingPrisma,
+  input: { organizationId: string; fields: readonly string[]; limit: number; offset?: number },
+): Promise<{ rows: Row[]; reachedLimit: boolean }> {
+  const routines = {
+    organization_id: input.organizationId,
+    type: "CONTABIL",
+    archived_at: null,
+  };
+  // ponytail: o período é o das rotinas existentes; mês fora dele não gera linha. Se
+  // precisar de mês sem nenhuma rotina, passar o intervalo do filtro até aqui.
+  const known = (
+    await prisma.monthly.findMany({
+      where: routines,
+      select: { competence: true },
+      distinct: ["competence"],
+      orderBy: { competence: "asc" },
+    })
+  )
+    .map((row) => String(row.competence))
+    .filter((competence) => /^\d{4}-(0[1-9]|1[0-2])$/u.test(competence))
+    .sort();
+  const offset = input.offset ?? 0;
+  const page = known.length
+    ? competencesBetween(known[0], known[known.length - 1]).slice(offset, offset + input.limit + 1)
+    : [];
+  const months = page.slice(0, input.limit);
+  if (!months.length) return { rows: [], reachedLimit: false };
+
+  // ponytail: carrega todos os clientes do Contábil a cada página; cabe em centenas de
+  // empresas. Agregar no banco se a carteira chegar a milhares.
+  const [clients, monthly] = await Promise.all([
+    prisma.clients.findMany({
+      where: { organization_id: input.organizationId, contabil: true },
+      select: {
+        id: true,
+        status: true,
+        competence_entry: true,
+        competence_output: true,
+        deletion_date: true,
+      },
+    }),
+    prisma.monthly.findMany({
+      where: { ...routines, competence: { in: months } },
+      select: { client_id: true, competence: true, checklist: true },
+    }),
+  ]);
+  const movementIndex = TRIAGE_ACCOUNTING_CHECKLIST_FIELDS.indexOf("triaged_transactions");
+  const movement = new Map(
+    monthly.map((row) => [
+      `${row.client_id}|${row.competence}`,
+      accountingStatuses(row.checklist)[movementIndex],
+    ]),
+  );
+  const time = (value: unknown) => (value == null ? null : new Date(value as string).getTime());
+
+  return {
+    rows: months.map((competence) => {
+      const [year, month] = competence.split("-").map(Number);
+      const start = Date.UTC(year, month - 1, 1);
+      const end = Date.UTC(year, month, 0, 23, 59, 59, 999);
+      const counts = { not_sent: 0, not_triaged: 0, triaged: 0 };
+      for (const client of clients) {
+        const entry = time(client.competence_entry);
+        const output = time(client.competence_output);
+        const deletion = time(client.deletion_date);
+        // Mesma janela da carteira: entrou até o fim do mês e não saiu antes do início.
+        const inPortfolio =
+          (entry === null || entry <= end) &&
+          (output === null || output >= start) &&
+          (deletion === null ? client.status !== CLIENT_INACTIVE_STATUS : deletion >= start);
+        if (!inPortfolio) continue;
+        const status = movement.get(`${client.id}|${competence}`);
+        counts[
+          status === undefined ? "not_sent" : status === "PENDING" ? "not_triaged" : "triaged"
+        ] += 1;
+      }
+      const row: Row = {
+        competence,
+        ...counts,
+        eligible_clients: counts.not_sent + counts.not_triaged + counts.triaged,
+      };
+      return Object.fromEntries(input.fields.map((field) => [field, row[field]]));
+    }),
+    reachedLimit: page.length > input.limit,
+  };
+}
 
 export function isTriageReportingSource(source: string): source is ContabilTriageReportingSource {
   return (CONTABIL_TRIAGE_REPORTING_SOURCES as readonly string[]).includes(source);
@@ -102,10 +255,9 @@ function inheritedResponsible(
 
 /**
  * Página das áreas da Triagem na Central de Relatórios. A linha é o cliente em
- * `contabil.triage_clouds`, a rotina mensal em `contabil.triage_movement` e
- * `contabil.triage_competence_responsibles`, e a atribuição atual em
- * `contabil.triage_responsibles`. Quem chama já validou os campos contra o catálogo; a
- * organização vem do grant e limita todas as consultas.
+ * `contabil.triage_clouds`, a atribuição atual em `contabil.triage_responsibles`, o mês em
+ * `contabil.triage_sgq` e a rotina mensal nas demais. Quem chama já validou os campos
+ * contra o catálogo; a organização vem do grant e limita todas as consultas.
  */
 export async function extractTriageReportingPage(
   prisma: TriageReportingPrisma,
@@ -117,7 +269,11 @@ export async function extractTriageReportingPage(
     offset?: number;
   },
 ): Promise<{ rows: Row[]; reachedLimit: boolean }> {
+  if (input.source === "contabil.triage_sgq") return extractSgqPage(prisma, input);
   const base = rowSources[input.source];
+  const derived = base.derived?.fields.some((field) => input.fields.includes(field))
+    ? base.derived
+    : undefined;
   const organization = { organization_id: input.organizationId };
   const wanted = (field: string) => input.fields.includes(field);
   const clientIsRow = base.delegate === "clients";
@@ -139,6 +295,7 @@ export async function extractTriageReportingPage(
                 .filter(wanted)
                 .map((field) => base.columns[field]),
               ...(wantsResponsible ? (base.responsibleColumns ?? []) : []),
+              ...(derived ? [derived.column] : []),
             ].map((column) => [column, true]),
           ),
         },
@@ -207,7 +364,9 @@ export async function extractTriageReportingPage(
       const clientId = clientIdOf(row);
       const client = clientIsRow ? row : (clientById.get(clientId) ?? {});
       const clientClouds = cloudsByClient.get(clientId) ?? [];
+      const derivedValues = derived?.values(row[derived.column]) ?? {};
       const value = (field: string): unknown => {
+        if (field in derivedValues) return derivedValues[field];
         if (field in base.columns) {
           const column = row[base.columns[field]];
           return field === "type" ? (serviceLabels[String(column)] ?? column) : column;
