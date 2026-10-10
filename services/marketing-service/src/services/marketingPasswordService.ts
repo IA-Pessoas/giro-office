@@ -45,6 +45,17 @@ const METADATA_SELECT = {
   password: true,
 } as const;
 
+/** Só nome e código: a mensagem de erro do Prisma repete os dados da chamada, inclusive o cifrado. */
+function safeErrorContext(error: unknown): Record<string, unknown> {
+  return {
+    errorName: error instanceof Error ? error.name : typeof error,
+    errorCode:
+      error && typeof error === "object" && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined,
+  };
+}
+
 function isUniqueConstraintError(error: unknown): boolean {
   return Boolean(
     error &&
@@ -147,7 +158,7 @@ export class MarketingPasswordService {
         return record;
       }, AUDITED_TRANSACTION);
     } catch (error: unknown) {
-      logError("Falha ao gravar credencial de Marketing.", { err: error });
+      logError("Falha ao gravar credencial de Marketing.", safeErrorContext(error));
       if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Já existe uma credencial para este local e usuário.");
       }
@@ -170,6 +181,7 @@ export class MarketingPasswordService {
     const local = input.local?.trim() || existing.local;
     const user = input.user?.trim() || existing.user;
     await this.assertIdentityAvailable(local, user, id);
+    let clearLegacyNotes = false;
     if (input.notes !== undefined) {
       let currentSecret: string;
       try {
@@ -181,6 +193,11 @@ export class MarketingPasswordService {
     } else if (input.password !== undefined) {
       // A nova senha não pode passar a constar da observação que fica.
       this.assertNotesDoNotContainSecret(existing.notes, input.password);
+      // Observação legada com a senha antiga já aparecia vazia (redigida); depois da troca ela
+      // deixaria de ser redigida e exporia a senha antiga. Descartá-la mantém o que se via.
+      if (this.safeMetadata(existing).notes === null && existing.notes !== null) {
+        clearLegacyNotes = true;
+      }
     }
 
     try {
@@ -195,6 +212,7 @@ export class MarketingPasswordService {
                 ? { password: this.encryption.encrypt(input.password) }
                 : {}),
               ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
+              ...(clearLegacyNotes ? { notes: null } : {}),
             },
             select: { ...METADATA_SELECT },
           })) as PasswordRecord,
@@ -218,7 +236,7 @@ export class MarketingPasswordService {
         return record;
       }, AUDITED_TRANSACTION);
     } catch (error: unknown) {
-      logError("Falha ao gravar credencial de Marketing.", { err: error });
+      logError("Falha ao gravar credencial de Marketing.", safeErrorContext(error));
       if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Já existe uma credencial para este local e usuário.");
       }

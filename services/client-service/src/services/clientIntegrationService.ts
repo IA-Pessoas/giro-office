@@ -6,7 +6,11 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { auditUnavailable, type ClientEntityAudit } from "../integrations/audit.js";
+import {
+  AUDITED_TRANSACTION,
+  auditUnavailable,
+  type ClientEntityAudit,
+} from "../integrations/audit.js";
 import type {
   CreateIntegrationBody,
   UpdateIntegrationBody,
@@ -290,27 +294,24 @@ export async function updateIntegrationClient(
   if (instagramChanged && !audit) throw auditUnavailable();
 
   try {
-    const updated = await prisma.$transaction(
-      async (tx) => {
-        const row = await tx.client.update({
-          where: { id: clientId },
-          data,
-          select: hasMarketingInstagramEditAccess ? marketingProfileSelect : select,
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.client.update({
+        where: { id: clientId },
+        data,
+        select: hasMarketingInstagramEditAccess ? marketingProfileSelect : select,
+      });
+      if (instagramChanged && audit) {
+        await audit({
+          organizationId,
+          userId: authorization.userId,
+          action: "update",
+          referring: "clients",
+          referringId: clientId,
+          changes: { instagram: { from: exists.instagram ?? null, to: data.instagram ?? null } },
         });
-        if (instagramChanged && audit) {
-          await audit({
-            organizationId,
-            userId: authorization.userId,
-            action: "update",
-            referring: "clients",
-            referringId: clientId,
-            changes: { instagram: { from: exists.instagram ?? null, to: data.instagram ?? null } },
-          });
-        }
-        return row;
-      },
-      { maxWait: 5_000, timeout: 15_000 },
-    );
+      }
+      return row;
+    }, AUDITED_TRANSACTION);
 
     return updated as Record<string, unknown>;
   } catch (error) {
