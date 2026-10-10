@@ -1,18 +1,17 @@
-import { useState, type ReactNode } from "react";
-import { Printer } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { Dialog } from "@shared/components";
-import { formatCivilDate, formatDateTime } from "@shared/utils/dateFormat";
-import { formatBrlAmount, formatCpfCnpjInput } from "@shared/utils/inputFormatting";
-import { printReport } from "@shared/utils/printReport";
+import { formatCivilDate } from "@shared/utils/dateFormat";
+import { formatBrlAmount } from "@shared/utils/inputFormatting";
 
 import type { PessoalClientOption } from "../types";
 import type { PessoalLdd } from "../types/tracking";
 import { buildLddSheet, type LddSheetSection } from "../utils/lddSheet";
 import {
-  pessoalPrimaryButtonClassName,
-  pessoalSecondaryButtonClassName,
-} from "./pessoalFormControls";
+  PessoalPrintSheet,
+  pessoalSheetBodyClassName,
+  pessoalSheetHeadCellClassName,
+  pessoalSheetHeadClassName,
+} from "./PessoalPrintSheet";
 
 interface SheetColumn {
   label: string;
@@ -56,11 +55,11 @@ function SheetSection({
         <p className="text-sm text-gray-600 dark:text-slate-300">{emptyMessage}</p>
       ) : (
         <table aria-label={title} className="w-full text-left text-sm">
-          <thead className="border-b border-gray-300 dark:border-slate-600">
+          <thead className={pessoalSheetHeadClassName}>
             <tr>
               {columns.map((column, index) => (
                 <th
-                  className={`py-2 pr-3 font-medium ${index === columns.length - 1 ? "text-right" : ""}`}
+                  className={`${pessoalSheetHeadCellClassName} ${index === columns.length - 1 ? "text-right" : ""}`}
                   key={column.label}
                   scope="col"
                 >
@@ -69,7 +68,7 @@ function SheetSection({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+          <tbody className={pessoalSheetBodyClassName}>
             {section.rows.map((row) => (
               <tr key={row.id}>
                 {columns.map((column, index) => (
@@ -109,95 +108,41 @@ export function PessoalLddSheet({
   /** LDD do cliente; `null` enquanto a lista não está carregada. */
   ldd: PessoalLdd[] | null;
 }) {
-  const [open, setOpen] = useState(false);
-  const [issuedAt, setIssuedAt] = useState("");
   const sheet = buildLddSheet(ldd ?? []);
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setIssuedAt(formatDateTime(new Date()));
-          setOpen(true);
-        }}
-        disabled={!ldd}
-        title={ldd ? undefined : "Aguardando a lista de LDD do cliente."}
-        className={pessoalSecondaryButtonClassName}
-      >
-        <Printer className="h-4 w-4" />
-        Ficha LDD
-      </button>
-
-      <Dialog
-        contentClassName="w-[min(96vw,900px)]"
-        description="Débitos previdenciários e PGFN do cliente, para impressão"
-        onOpenChange={setOpen}
-        open={open}
-        title="Ficha LDD"
-      >
-        <article
-          aria-label={`Ficha LDD de ${client?.name ?? "cliente"}`}
-          className="print-report space-y-6 text-gray-900 dark:text-slate-100"
-          id="pessoal-ldd-sheet"
-        >
-          <div className="hide-on-print flex justify-end">
-            <button
-              type="button"
-              onClick={() => printReport("pessoal-ldd-sheet")}
-              className={pessoalPrimaryButtonClassName}
-            >
-              <Printer aria-hidden="true" className="h-4 w-4" />
-              Imprimir ficha
-            </button>
-          </div>
-
-          <header className="space-y-1 border-b border-gray-300 pb-4 dark:border-slate-600">
-            <h2 className="text-xl font-semibold uppercase">
-              Levantamento de débitos previdenciários
-            </h2>
-            <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
-              <div>
-                <dt className="font-medium">Razão social</dt>
-                <dd>{client?.name ?? "-"}</dd>
-              </div>
-              <div>
-                <dt className="font-medium">CNPJ/CPF</dt>
-                <dd>{client?.document ? formatCpfCnpjInput(client.document) : "-"}</dd>
-              </div>
-              <div>
-                <dt className="font-medium">Data de emissão</dt>
-                <dd>{issuedAt}</dd>
-              </div>
-            </dl>
-          </header>
-
-          <SheetSection
-            columns={previdenciarioColumns}
-            emptyMessage="Nenhum débito previdenciário cadastrado."
-            section={sheet.previdenciario}
-            title="Discriminação dos débitos do INSS - Receita Federal do Brasil"
-          />
-          <SheetSection
-            columns={pgfnColumns}
-            emptyMessage="Nenhum débito em dívida ativa cadastrado."
-            section={sheet.pgfn}
-            title="Discriminação dos débitos do INSS - Dívida ativa (PGFN)"
-          />
-          <p className="flex justify-between border-t border-gray-300 pt-3 text-base font-semibold dark:border-slate-600">
-            <span>Total geral</span>
-            <span>{formatBrlAmount(sheet.total)}</span>
-          </p>
-          <p className="text-xs">
-            Os valores poderão sofrer alterações devido à incidência de juros e multas diárias.
-          </p>
-          {sheet.excluded > 0 ? (
-            <p className="hide-on-print text-xs text-gray-600 dark:text-slate-300">
-              {sheet.excluded} LDD de outros tipos (FGTS, IRRF, ISS) não entram nesta ficha.
-            </p>
-          ) : null}
-        </article>
-      </Dialog>
-    </>
+    <PessoalPrintSheet
+      client={client}
+      description="Débitos previdenciários e PGFN do cliente, para impressão"
+      heading="Levantamento de débitos previdenciários"
+      id="pessoal-ldd-sheet"
+      title="Ficha LDD"
+      unavailableReason={ldd ? null : "Aguardando a lista de LDD do cliente."}
+    >
+      <SheetSection
+        columns={previdenciarioColumns}
+        emptyMessage="Nenhum débito previdenciário cadastrado."
+        section={sheet.previdenciario}
+        title="Discriminação dos débitos do INSS - Receita Federal do Brasil"
+      />
+      <SheetSection
+        columns={pgfnColumns}
+        emptyMessage="Nenhum débito em dívida ativa cadastrado."
+        section={sheet.pgfn}
+        title="Discriminação dos débitos do INSS - Dívida ativa (PGFN)"
+      />
+      <p className="flex justify-between border-t border-gray-300 pt-3 text-base font-semibold dark:border-slate-600">
+        <span>Total geral</span>
+        <span>{formatBrlAmount(sheet.total)}</span>
+      </p>
+      <p className="text-xs">
+        Os valores poderão sofrer alterações devido à incidência de juros e multas diárias.
+      </p>
+      {sheet.excluded > 0 ? (
+        <p className="hide-on-print text-xs text-gray-600 dark:text-slate-300">
+          {sheet.excluded} LDD de outros tipos (FGTS, IRRF, ISS) não entram nesta ficha.
+        </p>
+      ) : null}
+    </PessoalPrintSheet>
   );
 }
