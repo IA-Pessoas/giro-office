@@ -7,6 +7,14 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import { AUDIT_CREATE_ACTION, AUDIT_UPDATE_ACTION } from "./auditActions.js";
+import {
+  listRelationshipHistory,
+  RELATIONSHIP_AUDIT_REFERRING,
+  type RelationshipHistoryInput,
+  type RelationshipHistoryPrisma,
+} from "./relationshipHistoryService.js";
+import { assertChartAccountsState } from "./relationshipStates.js";
 
 export type RelationshipServicePrisma = typeof prismaClient;
 
@@ -27,8 +35,8 @@ export interface RelationshipAuthContext {
 
 export interface CreateRelationshipRequest {
   client_id: string;
-  bidding: boolean;
-  chart_accounts: string;
+  bidding: boolean | null;
+  chart_accounts: string | null;
   tool: string;
   system: string;
   note: string;
@@ -36,8 +44,8 @@ export interface CreateRelationshipRequest {
 
 export interface UpdateRelationshipRequest {
   client_id?: string;
-  bidding?: boolean;
-  chart_accounts?: string;
+  bidding?: boolean | null;
+  chart_accounts?: string | null;
   tool?: string;
   system?: string;
   note?: string;
@@ -54,6 +62,7 @@ export class RelationshipService {
     auth: RelationshipAuthContext,
   ): Promise<RelationshipContabilEntity> {
     try {
+      assertChartAccountsState(data.chart_accounts);
       const duplicate = await this.prisma.relationshipContabil.findFirst({
         where: {
           client_id: data.client_id,
@@ -77,14 +86,16 @@ export class RelationshipService {
         },
       });
 
-      await this.audit.createLog({
+      // Diff contra objeto vazio: o histórico mostra os valores iniciais como `null → valor`.
+      await this.audit.logUpdateIfChanged({
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Cadastro",
-        referring: "contabil.relationship",
+        action: AUDIT_CREATE_ACTION,
+        referring: RELATIONSHIP_AUDIT_REFERRING,
         referringId: relationship.id,
-        changes: "{}",
+        oldData: {},
+        updatedData: relationship as unknown as Record<string, unknown>,
       });
 
       return relationship;
@@ -110,11 +121,12 @@ export class RelationshipService {
       if (!exists) {
         throw new ServiceError(404, "Não está cadastrado.");
       }
+      assertChartAccountsState(data.chart_accounts, exists.chart_accounts);
 
       const updatePayload: {
         client_id?: string;
-        bidding?: boolean;
-        chart_accounts?: string;
+        bidding?: boolean | null;
+        chart_accounts?: string | null;
         tool?: string;
         system?: string;
         note?: string;
@@ -148,8 +160,8 @@ export class RelationshipService {
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Atualização",
-        referring: "contabil.relationship",
+        action: AUDIT_UPDATE_ACTION,
+        referring: RELATIONSHIP_AUDIT_REFERRING,
         referringId: id,
         oldData: exists as unknown as Record<string, unknown>,
         updatedData: updated as unknown as Record<string, unknown>,
@@ -163,6 +175,10 @@ export class RelationshipService {
       }
       throw new ServiceError(500, "Erro ao atualizar relacionamento contábil.", err);
     }
+  }
+
+  history(input: RelationshipHistoryInput) {
+    return listRelationshipHistory(this.prisma as unknown as RelationshipHistoryPrisma, input);
   }
 
   async getByClientId(

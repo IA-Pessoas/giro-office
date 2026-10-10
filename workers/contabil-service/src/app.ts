@@ -11,6 +11,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
 import {
   controlCompetenceBodySchema,
+  controlHistoryQuerySchema,
   controlIdParamsSchema,
   createControlBodySchema,
   createYearControlsBodySchema,
@@ -21,6 +22,7 @@ import {
 import {
   createRelationshipBodySchema,
   relationshipClientIdParamsSchema,
+  relationshipHistoryQuerySchema,
   relationshipIdParamsSchema,
   updateRelationshipBodySchema,
 } from "../../../services/contabil-service/src/schemas/relationship.schemas.js";
@@ -30,6 +32,14 @@ import {
   responsibleIdParamsSchema,
   updateResponsibleBodySchema,
 } from "../../../services/contabil-service/src/schemas/responsible.schemas.js";
+import {
+  type ControlHistoryPrisma,
+  listControlHistory,
+} from "../../../services/contabil-service/src/services/controlHistoryService.js";
+import {
+  listRelationshipHistory,
+  type RelationshipHistoryPrisma,
+} from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
 import { createContabilAudit } from "./audit.js";
 import {
   authenticateContabilRequest,
@@ -342,6 +352,21 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     return c.json(createSuccessResponse(data));
   });
 
+  app.get("/contabil/controls/history", async (c) => {
+    const query = parseWithZod(controlHistoryQuerySchema, c.req.query());
+    const auth = c.get("auth");
+    const data = await withPrisma(c, options, (prisma) =>
+      listControlHistory(prisma as unknown as ControlHistoryPrisma, {
+        organizationId: auth.organizationId,
+        clientId: query.client_id,
+        competence: query.competence,
+        page: query.page,
+        pageSize: query.pageSize,
+      }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
   app.patch("/contabil/controls/:id/items", async (c) => {
     executeAuthWrite(c);
     const params = parseWithZod(controlIdParamsSchema, { id: c.req.param("id") });
@@ -394,6 +419,22 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       : await withPrisma(c, options, (prisma) =>
           invoke(createRelationshipService(prisma, createContabilAudit(options.env ?? c.env))),
         );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/contabil/relationships/client/:clientId/history", async (c) => {
+    const params = parseWithZod(relationshipClientIdParamsSchema, {
+      clientId: c.req.param("clientId"),
+    });
+    const query = parseWithZod(relationshipHistoryQuerySchema, c.req.query());
+    const auth = c.get("auth");
+    const data = await withPrisma(c, options, (prisma) =>
+      listRelationshipHistory(prisma as unknown as RelationshipHistoryPrisma, {
+        organizationId: auth.organizationId,
+        clientId: params.clientId,
+        page: query.page,
+        pageSize: query.pageSize,
+      }),
+    );
     return c.json(createSuccessResponse(data));
   });
   app.get("/contabil/relationships/client/:clientId", async (c) => {
