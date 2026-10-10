@@ -805,6 +805,13 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
         action: "Cadastro",
         referring: LDD_IMPORT_AUDIT_REFERRING,
         referringId: result.import_id,
+        // Mesmos metadados que o serviço Express audita; nada do conteúdo do PDF.
+        changes: {
+          client_id: body.client_id,
+          rows_count: result.rows_count,
+          total_amount: result.total_amount,
+          ldd_ids: result.records.map((record) => record.id),
+        },
         department: "pessoal",
       });
       return result;

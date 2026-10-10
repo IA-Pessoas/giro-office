@@ -297,7 +297,8 @@ describe("confirmLddImport", () => {
         where: {
           organization_id: organizationId,
           client_id: clientId,
-          type: LDD_IMPORT_TYPE,
+          // INSS manual ou importado e o tipo 1 dos registros migrados do legado.
+          OR: [{ type: { equals: LDD_IMPORT_TYPE, mode: "insensitive" } }, { type: "1" }],
           period: "01/2024",
           due_date: {
             gte: new Date("2024-02-20T00:00:00.000Z"),
