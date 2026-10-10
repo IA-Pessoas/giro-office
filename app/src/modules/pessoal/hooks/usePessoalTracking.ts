@@ -10,6 +10,8 @@ import { useFetch } from "@shared/hooks";
 import { pessoalService } from "../services/pessoalService";
 import type {
   PessoalLdd,
+  PessoalLddImportPreview,
+  PessoalLddImportPreviewPayload,
   PessoalLddPayload,
   PessoalLddUpdatePayload,
   PessoalSituation,
@@ -58,6 +60,17 @@ export function useCreatePessoalLddMutation(): UseMutationResult<
         queryClient.invalidateQueries({ queryKey: lddKey("") }),
       ]);
     },
+  });
+}
+
+/** Só leitura do PDF: nada é gravado, então não há cache a invalidar. */
+export function usePreviewPessoalLddImportMutation(): UseMutationResult<
+  PessoalLddImportPreview,
+  Error,
+  PessoalLddImportPreviewPayload
+> {
+  return useMutation({
+    mutationFn: (payload) => pessoalService.previewLddImport(payload),
   });
 }
 

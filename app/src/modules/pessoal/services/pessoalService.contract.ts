@@ -4,6 +4,7 @@ import type { PaginatedResult } from "@shared/pagination/pagination";
 export const PESSOAL_ENDPOINTS = {
   ldd: "/pessoal/ldd",
   lddDetail: (id: string) => `/pessoal/ldd/${id}`,
+  lddImportPreview: "/pessoal/ldd/import/preview",
   overview: "/pessoal/overview",
   groups: "/pessoal/groups",
   groupDetail: (id: string) => `/pessoal/groups/${id}`,

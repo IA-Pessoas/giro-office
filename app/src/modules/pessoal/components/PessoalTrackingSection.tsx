@@ -43,6 +43,7 @@ import {
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
 import { optional } from "./pessoalFormValueHelpers";
+import { PessoalLddImportPreview } from "./PessoalLddImportPreview";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalTrackingSectionProps {
@@ -508,6 +509,9 @@ export function PessoalTrackingSection({
         </div>
 
         <div className="mt-6">
+          {activeTrackingTab === "ldd" && canEdit ? (
+            <PessoalLddImportPreview key={selectedClientId} clientId={selectedClientId} />
+          ) : null}
           {activeTrackingTab === "ldd" ? (
             <TrackingListCard
               icon={FileText}
