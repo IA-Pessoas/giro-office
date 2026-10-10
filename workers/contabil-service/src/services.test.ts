@@ -163,6 +163,55 @@ describe("contabil services tenant and catalog seams", () => {
     ).resolves.toBeNull();
   });
 
+  it("relacionamento aceita estados não selecionados e só mantém texto livre legado (#1721)", async () => {
+    const legacy = {
+      id: "rel-1",
+      client_id: CLIENT,
+      bidding: true,
+      chart_accounts: "Plano próprio",
+    };
+    const database = {
+      relationshipContabil: {
+        findFirst: vi.fn(),
+        create: vi.fn(async ({ data }) => ({ id: "rel-1", ...data })),
+        update: vi.fn(async ({ data }) => ({ ...legacy, ...data })),
+      },
+    };
+    const trail = audit();
+    const service = createRelationshipService(database as never, trail);
+    const base = { client_id: CLIENT, tool: "t", system: "s", note: "" };
+
+    database.relationshipContabil.findFirst.mockResolvedValue(null);
+    await service.create({ ...base, bidding: null, chart_accounts: "Não — Jonrick" }, auth);
+    expect(trail.logUpdateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Cadastro",
+        referring: "contabil.relationship",
+        oldData: {},
+        updatedData: expect.objectContaining({ chart_accounts: "Não — Jonrick" }),
+      }),
+    );
+    expect(database.relationshipContabil.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ bidding: null, chart_accounts: "Não — Jonrick" }),
+    });
+    await expect(
+      service.create({ ...base, bidding: false, chart_accounts: "Plano próprio" }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    database.relationshipContabil.findFirst.mockResolvedValue(legacy);
+    await service.update("rel-1", { chart_accounts: "Plano próprio", bidding: null }, auth);
+    expect(trail.logUpdateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oldData: legacy,
+        updatedData: { ...legacy, bidding: null },
+      }),
+    );
+    await expect(
+      service.update("rel-1", { chart_accounts: "Outro plano" }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(database.relationshipContabil.update).toHaveBeenCalledTimes(1);
+  });
+
   it("grava responsáveis ausentes como null em vez do default '' que viola a FK", async () => {
     const database = {
       responsibleContabil: {

@@ -77,13 +77,16 @@ describe("ResponsibleService", () => {
         customer_with_movement: true,
       },
     });
-    expect(audit.createLog).toHaveBeenCalledWith(
+    expect(audit.logUpdateIfChanged).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: USER_ID,
         organizationId: ORG_ID,
         permission: 1,
+        action: "Cadastro",
         referring: "contabil.responsibles",
         referringId: RESPONSIBLE_ID,
+        oldData: {},
+        updatedData: baseRow,
       }),
     );
   });

@@ -60,6 +60,12 @@ export const departmentService = {
     return extractDepartmentList(response.data);
   },
 
+  listForMarketing: async (ctx?: unknown): Promise<DepItem[]> => {
+    const api = setupAPIClient(ctx);
+    const response = await api.get('/department/list', { params: { marketing: 'true' } });
+    return extractDepartmentList(response.data);
+  },
+
   getById: async (id: string, ctx?: unknown): Promise<DepItem> => {
     const api = setupAPIClient(ctx);
     const response = await api.get('/department', {
