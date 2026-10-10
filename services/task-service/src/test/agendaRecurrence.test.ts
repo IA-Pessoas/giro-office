@@ -94,7 +94,7 @@ function setup() {
     service
       .list(viewer, month, new Date(now))
       .then((rows) => rows.map((row) => `${row.date.toISOString().slice(0, 10)} ${row.agenda}`));
-  return { prisma, rules, events, service, days };
+  return { prisma, audit, rules, events, service, days };
 }
 
 const noon = (day: string) => new Date(`${day}T12:00:00.000Z`);
@@ -295,11 +295,38 @@ describe("recorrência mensal da agenda (#1700)", () => {
     const plain = await service.create(editor, { agenda: "Reunião", date: noon("2026-11-09") });
     expect(rules).toEqual([]);
 
-    await service.update(editor, plain.id, { recurrent: true });
-    await service.update(editor, plain.id, { recurrent: true });
+    const now = new Date("2026-11-20T12:00:00.000Z");
+    await service.update(editor, plain.id, { recurrent: true }, now);
+    await service.update(editor, plain.id, { recurrent: true }, now);
 
     expect(rules).toHaveLength(1);
     expect(await days("2026-12", "2026-12-10T12:00:00.000Z")).toEqual(["2026-12-09 Reunião"]);
+  });
+
+  it("religar a recorrência em uma ocorrência antiga não duplica o mês corrente", async () => {
+    const { events, service, days } = setup();
+    const first = await service.create(editor, monthly);
+    await days("2026-12", "2026-12-10T12:00:00.000Z");
+    const now = new Date("2026-12-12T12:00:00.000Z");
+
+    // Desligar solta a ocorrência de dezembro; religar na de novembro recomeça em janeiro.
+    await service.update(editor, first.id, { recurrent: false }, now);
+    await service.update(editor, first.id, { recurrent: true }, now);
+
+    expect(await days("2026-12", "2026-12-13T12:00:00.000Z")).toEqual(["2026-12-16 Fechamento"]);
+    expect(await days("2027-01", "2027-01-20T12:00:00.000Z")).toEqual(["2027-01-15 Fechamento"]);
+    expect(events).toHaveLength(3);
+  });
+
+  it("edição que não muda nada não grava nem deixa trilha", async () => {
+    const { prisma, audit, service } = setup();
+    const first = await service.create(editor, monthly);
+    audit.createLog.mockClear();
+
+    await service.update(editor, first.id, { recurrent: true });
+
+    expect(prisma.agenda.updateMany).not.toHaveBeenCalled();
+    expect(audit.createLog).not.toHaveBeenCalled();
   });
 
   it("não deixa regra sem evento quando a edição perde a corrida ou falha", async () => {
