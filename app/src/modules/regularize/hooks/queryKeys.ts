@@ -70,6 +70,8 @@ export const regularizeQueryKeys = {
   // Sob "people": mudar sócio ou PF refaz o mapa.
   groupMap: (groupId: RegularizeId, scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.people(scope), "group-map", groupId] as const,
+  groupMapSaved: (groupId: RegularizeId, scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.people(scope), "group-map-saved", groupId] as const,
   operations: (scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.scopedRoot(scope), "operations"] as const,
   municipalTaxes: (filters: RegularizeMunicipalTaxesListFilters, scope: RegularizeQueryScope) =>

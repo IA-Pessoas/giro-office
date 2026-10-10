@@ -16,9 +16,11 @@ import type {
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
   RegularizeGroupMap,
+  RegularizeGroupMapTreeNode,
   RegularizeId,
   RegularizePartner,
   RegularizePartnerListFilters,
+  RegularizeSavedGroupMap,
   UpdateRegularizeClientPfPayload,
   UpdateRegularizePartnerPayload,
 } from "../types";
@@ -170,6 +172,34 @@ export function useRegularizeGroupMap(
     // que não invalidam as chaves do Regularize.
     { enabled: Boolean(groupId), staleTime: 0 },
   );
+}
+
+export function useRegularizeSavedGroupMap(
+  groupId: RegularizeId,
+): UseQueryResult<RegularizeSavedGroupMap | null, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(
+    regularizeQueryKeys.groupMapSaved(groupId, scope),
+    () => regularizeService.getSavedGroupMap(groupId),
+    { enabled: Boolean(groupId), staleTime: 0 },
+  );
+}
+
+export function useSaveRegularizeGroupMapMutation(): UseMutationResult<
+  RegularizeSavedGroupMap,
+  Error,
+  { groupId: RegularizeId; tree: RegularizeGroupMapTreeNode }
+> {
+  const queryClient = useQueryClient();
+  const scope = useRegularizeQueryScope();
+
+  return useMutation({
+    mutationFn: ({ groupId, tree }) => regularizeService.saveGroupMap(groupId, tree),
+    // A resposta já é a versão salva: entra direto no cache, sem nova consulta.
+    onSuccess: (saved, { groupId }) =>
+      queryClient.setQueryData(regularizeQueryKeys.groupMapSaved(groupId, scope), saved),
+  });
 }
 
 export function useRegularizePartnerDetail(

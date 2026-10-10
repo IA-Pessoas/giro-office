@@ -213,6 +213,20 @@ export type RegularizeGroupMap = {
   }>;
 };
 
+// Item do mapa como é desenhado e salvo (#1749). color é a cor de fundo em #rrggbb.
+export type RegularizeGroupMapTreeNode = {
+  id: string;
+  lines: string[];
+  color?: string;
+  children: RegularizeGroupMapTreeNode[];
+};
+
+export type RegularizeSavedGroupMap = {
+  tree: RegularizeGroupMapTreeNode;
+  updated_at: string;
+  updated_by_user_id: RegularizeId;
+};
+
 export type RegularizePartner = {
   id: RegularizeId;
   pj_id: RegularizeId;
