@@ -94,6 +94,7 @@ describe("activityCatalog", () => {
     ],
     ["POST", "/pessoal/group-assignments/previews", "gerou", "uma prévia de atribuição de grupo"],
     ["POST", "/pessoal/group-assignments/apply", "aplicou", "uma atribuição de grupo"],
+    ["POST", "/pessoal/ldd/import/preview", "gerou", "uma prévia de importação de LDD em PDF"],
     ["GET", "/triagem/editability", "consultou", "a permissão de edição da triagem"],
     ["GET", "/triagem/competencies", "consultou", "a lista de competências mensais da Triagem"],
     ["POST", "/triagem/competencies", "cadastrou", "uma nova competência mensal da Triagem"],

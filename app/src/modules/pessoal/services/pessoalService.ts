@@ -25,6 +25,8 @@ import type {
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import type {
   PessoalLdd,
+  PessoalLddImportPreview,
+  PessoalLddImportPreviewPayload,
   PessoalLddListParams,
   PessoalLddPayload,
   PessoalLddUpdatePayload,
@@ -457,6 +459,15 @@ export const pessoalService = {
     const response = await api.delete(PESSOAL_ENDPOINTS.lddDetail(id));
 
     return unwrapPessoalEnvelope<PessoalLdd>(response.data);
+  },
+
+  async previewLddImport(
+    payload: PessoalLddImportPreviewPayload,
+  ): Promise<PessoalLddImportPreview> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.lddImportPreview, payload);
+
+    return unwrapPessoalEnvelope<PessoalLddImportPreview>(response.data);
   },
 
   async listSituations(clientId: string): Promise<PessoalSituation[]> {

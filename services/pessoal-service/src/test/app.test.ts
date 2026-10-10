@@ -47,4 +47,14 @@ describe("pessoal-service app", () => {
 
     expect(response.headers["x-request-id"]).toBe("req-pessoal-1");
   });
+  it("aceita o corpo do PDF LDD em base64 acima do limite padrão de 100 kB", async () => {
+    const app = createPessoalApp({ env: getPessoalServiceEnv(), logger: createTestLogger() });
+
+    const response = await request(app)
+      .post("/pessoal/ldd/import/preview")
+      .send({ content_base64: "A".repeat(900 * 1024) });
+
+    // Passou do parser de JSON (não é 413) e parou na autenticação.
+    expect(response.status).toBe(401);
+  });
 });

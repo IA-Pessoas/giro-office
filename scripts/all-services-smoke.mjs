@@ -6166,6 +6166,31 @@ const handlers = {
     state.pessoalLddId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
+  async pessoalLddImportPreview(op) {
+    // PDF mínimo de uma página (Helvetica, sem compressão) com uma linha CP- elegível.
+    const content = "BT /F1 10 Tf 40 700 Td (CP-SEGUR. 01/2024 20/02/2024 10,00 10,00) Tj ET";
+    const pdf = [
+      "%PDF-1.4",
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+      `4 0 obj << /Length ${content.length} >>\nstream\n${content}\nendstream endobj`,
+      "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      "trailer << /Root 1 0 R >>",
+    ].join("\n");
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        file_name: "ldd.pdf",
+        content_base64: Buffer.from(pdf, "latin1").toString("base64"),
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.rows?.[0]?.balance_amount !== 10) {
+      throw new Error(`Prévia de LDD inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
   async pessoalLddPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],

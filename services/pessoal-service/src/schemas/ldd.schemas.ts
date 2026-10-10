@@ -1,6 +1,10 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+/** PDF LDD/INSS de até 700 KB: em base64, cabe no limite de 1 MB de corpo JSON do gateway. */
+export const LDD_PDF_MAX_BYTES = 700 * 1024;
+export const LDD_PDF_MAX_BASE64_LENGTH = Math.ceil(LDD_PDF_MAX_BYTES / 3) * 4;
+
 export const lddIdParamsSchema = z
   .object({
     id: z.string().uuid({ message: "id inválido." }),
@@ -46,6 +50,19 @@ export const updateLddBodySchema = z
     message: "Informe ao menos um campo para atualizar.",
   });
 
+export const previewLddImportBodySchema = z
+  .object({
+    client_id: z.string().uuid({ message: "client_id inválido." }),
+    file_name: z.string().trim().min(1, "file_name é obrigatório.").max(255),
+    content_base64: z
+      .string()
+      .min(1, "content_base64 é obrigatório.")
+      .max(LDD_PDF_MAX_BASE64_LENGTH, "O PDF excede o limite de 700 KB.")
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/, "content_base64 inválido."),
+  })
+  .strict();
+
+export type PreviewLddImportBody = z.infer<typeof previewLddImportBodySchema>;
 export type CreateLddBody = z.infer<typeof createLddBodySchema>;
 export type UpdateLddBody = z.infer<typeof updateLddBodySchema>;
 export type ListLddQuery = z.infer<typeof listLddQuerySchema>;

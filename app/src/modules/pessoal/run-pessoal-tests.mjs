@@ -33,6 +33,13 @@ import {
   obligationItemState,
   obligationItemValue,
 } from "./utils/obligationPortfolio.ts";
+import {
+  buildLddImportDraftRows,
+  editLddImportDraftRow,
+  lddImportDraftRowErrors,
+  lddImportDraftTotal,
+  validateLddPdfFile,
+} from "./utils/lddImportPreview.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
   cancelUnionDeletion,
@@ -55,6 +62,7 @@ function runTest(name, fn) {
 runTest("pessoal endpoints match the gateway public contract", () => {
   assert.equal(PESSOAL_ENDPOINTS.ldd, "/pessoal/ldd");
   assert.equal(PESSOAL_ENDPOINTS.lddDetail("ldd-1"), "/pessoal/ldd/ldd-1");
+  assert.equal(PESSOAL_ENDPOINTS.lddImportPreview, "/pessoal/ldd/import/preview");
   assert.equal(PESSOAL_ENDPOINTS.overview, "/pessoal/overview");
   assert.equal(PESSOAL_ENDPOINTS.groups, "/pessoal/groups");
   assert.equal(PESSOAL_ENDPOINTS.groupDetail("group-1"), "/pessoal/groups/group-1");
@@ -929,6 +937,68 @@ runTest("ficha edits refresh ficha, portfolio and history under one prefix", () 
     /useUpdatePessoalObligationMutation\([\s\S]*?invalidateQueries\(\{ queryKey: pessoalQueryKey\("obligations"\) \}\)/,
   );
   assert.match(hooks, /pessoalQueryKey\("obligations", "history"/);
+});
+
+runTest("LDD import preview keeps read errors until the row is edited", () => {
+  const rows = buildLddImportDraftRows({
+    file_name: "ldd.pdf",
+    rows: [
+      {
+        line: 1,
+        source: "CP-SEGUR. 01/2024 20/02/2024 1.500,00 1.234,56",
+        period: "01/2024",
+        due_date: "2024-02-20",
+        balance_amount: 1234.56,
+        errors: [],
+      },
+      {
+        line: 2,
+        source: "CP-SEGUR. 13/2023 20/12/2023",
+        period: "13/2023",
+        due_date: "2023-12-20",
+        balance_amount: null,
+        errors: ["Valor não identificado na linha."],
+      },
+    ],
+  });
+
+  assert.deepEqual(rows[0], {
+    line: 1,
+    source: "CP-SEGUR. 01/2024 20/02/2024 1.500,00 1.234,56",
+    period: "01/2024",
+    due_date: "2024-02-20",
+    balance_amount: "R$ 1.234,56",
+    errors: [],
+  });
+  assert.deepEqual(rows[1].errors, ["Valor não identificado na linha."]);
+  assert.equal(lddImportDraftTotal(rows), 1234.56);
+
+  const fixed = editLddImportDraftRow(rows[1], "balance_amount", "0,10");
+  assert.deepEqual(fixed.errors, []);
+  assert.equal(
+    lddImportDraftTotal([rows[0], fixed, editLddImportDraftRow(fixed, "balance_amount", "0,20")]),
+    1234.86,
+  );
+  assert.deepEqual(editLddImportDraftRow(fixed, "balance_amount", "0,00").errors, []);
+  assert.deepEqual(
+    lddImportDraftRowErrors({ period: "14/2023", due_date: "2023-02-31", balance_amount: "" }),
+    [
+      "Informe a competência no formato MM/AAAA.",
+      "Informe um vencimento válido.",
+      "Informe o valor.",
+    ],
+  );
+});
+
+runTest("LDD import refuses non-PDF, empty and oversized files before upload", () => {
+  const pdf = { name: "ldd.PDF", type: "", size: 10 };
+  assert.equal(validateLddPdfFile(pdf), null);
+  assert.equal(validateLddPdfFile({ ...pdf, name: "ldd.xlsx" }), "Selecione um arquivo PDF.");
+  assert.equal(validateLddPdfFile({ ...pdf, size: 0 }), "O arquivo está vazio.");
+  assert.equal(
+    validateLddPdfFile({ ...pdf, size: 700 * 1024 + 1 }),
+    "O PDF excede o limite de 700 KB.",
+  );
 });
 
 console.log("pessoal contract tests passed");

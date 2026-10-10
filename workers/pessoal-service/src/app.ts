@@ -16,6 +16,7 @@ import {
   createLddBodySchema,
   lddIdParamsSchema,
   listLddQuerySchema,
+  previewLddImportBodySchema,
   updateLddBodySchema,
 } from "@workspace/pessoal-service/src/schemas/ldd.schemas.js";
 import {
@@ -52,6 +53,7 @@ import {
   unionIdParamsSchema,
   updateUnionBodySchema,
 } from "@workspace/pessoal-service/src/schemas/union.schemas.js";
+import { buildLddImportPreview } from "@workspace/pessoal-service/src/services/lddPdfImportService.js";
 import {
   listObligationHistory,
   OBLIGATION_AUDIT_REFERRING,
@@ -143,6 +145,10 @@ export type PessoalSituationService = {
 };
 export type PessoalLddService = {
   list(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  previewImport(
+    context: Record<string, unknown>,
+    body: { client_id: string; file_name: string; content_base64: string },
+  ): Promise<unknown>;
   create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
   update(
     context: Record<string, unknown>,
@@ -754,6 +760,14 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
         select,
         orderBy: { due_date: "asc" },
       }),
+    async previewImport(context, body) {
+      const client = await prisma.client.findFirst({
+        where: { id: body.client_id, organization_id: String(context.organizationId) },
+        select: { id: true },
+      });
+      if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
+      return buildLddImportPreview(body);
+    },
     async create(context, body) {
       const organizationId = String(context.organizationId);
       const client = await prisma.client.findFirst({
@@ -1868,6 +1882,13 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       requirePessoalPermission(c.get("auth"), 2);
       const body = parseWithZod(createLddBodySchema, await c.req.json());
       return c.json(createSuccessResponse(await service.create(domainContext(c), body)), 201);
+    }),
+  );
+  app.post("/pessoal/ldd/import/preview", (c) =>
+    withLddService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(previewLddImportBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.previewImport(domainContext(c), body)));
     }),
   );
   app.patch("/pessoal/ldd/:id", (c) =>

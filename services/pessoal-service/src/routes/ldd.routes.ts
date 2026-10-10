@@ -5,6 +5,7 @@ import {
   createLddBodySchema,
   lddIdParamsSchema,
   listLddQuerySchema,
+  previewLddImportBodySchema,
   updateLddBodySchema,
 } from "../schemas/ldd.schemas.js";
 import type { LddService } from "../services/lddService.js";
@@ -35,6 +36,19 @@ export function createLddRoutes(service: LddService): Router {
       response.status(201).json(createSuccessResponse(result));
     } catch (err: unknown) {
       logError("Erro ao criar LDD de pessoal", { err });
+      next(err);
+    }
+  });
+
+  router.post("/import/preview", async (request, response, next) => {
+    try {
+      const context = getPessoalRouteContext(request);
+      const body = parseWithZod(previewLddImportBodySchema, request.body);
+      const result = await service.previewImport(context, body);
+
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao gerar prévia de importação de LDD", { err });
       next(err);
     }
   });
