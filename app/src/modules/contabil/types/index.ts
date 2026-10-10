@@ -62,8 +62,8 @@ export interface ContabilResponsible {
 export interface ContabilRelationship {
   id: string;
   client_id: string;
-  bidding: boolean;
-  chart_accounts: string;
+  bidding: boolean | null;
+  chart_accounts: string | null;
   tool: string;
   system: string;
   note: string;
@@ -90,6 +90,40 @@ export interface ContabilControlPortfolioItem {
 export interface ContabilControlPortfolio {
   competence: ContabilCompetence;
   items: ContabilControlPortfolioItem[];
+}
+
+export interface ContabilHistoryEntry<F extends string> {
+  id: string;
+  at: string;
+  actor: { id: string; name: string | null } | null;
+  action: string | null;
+  changes: Array<{ field: F; from: boolean | string | null; to: boolean | string | null }>;
+}
+
+export type ContabilControlHistoryEntry = ContabilHistoryEntry<ContabilControlField>;
+
+export type ContabilRelationshipHistoryField =
+  | "bidding"
+  | "chart_accounts"
+  | "tool"
+  | "system"
+  | "note";
+
+export interface ContabilRelationshipHistoryPage {
+  client_id: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  items: ContabilHistoryEntry<ContabilRelationshipHistoryField>[];
+}
+
+export interface ContabilControlHistoryPage {
+  client_id: string;
+  competence: ContabilCompetence;
+  page: number;
+  pageSize: number;
+  total: number;
+  items: ContabilControlHistoryEntry[];
 }
 
 export interface CreateOrGetContabilControlPayload {
@@ -134,16 +168,16 @@ export interface DeleteContabilResponsiblePayload {
 
 export interface CreateContabilRelationshipPayload {
   client_id: string;
-  bidding: boolean;
-  chart_accounts: string;
+  bidding: boolean | null;
+  chart_accounts: string | null;
   tool: string;
   system: string;
   note: string;
 }
 
 export interface UpdateContabilRelationshipPayload {
-  bidding?: boolean;
-  chart_accounts?: string;
+  bidding?: boolean | null;
+  chart_accounts?: string | null;
   tool?: string;
   system?: string;
   note?: string;
