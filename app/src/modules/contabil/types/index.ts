@@ -303,7 +303,10 @@ export interface FiscalTriagePortfolioItem {
   can_edit: boolean;
   has_competence: boolean;
   planned_checklist: Record<TriageFiscalChecklistField, TriageDocumentStatus> | null;
-  monthly: Pick<TriageDocumentsMonthly, "id" | "checklist" | "item_notes"> | null;
+  monthly: Pick<
+    TriageDocumentsMonthly,
+    "id" | "checklist" | "item_notes" | "billing_amount" | "justification" | "notes"
+  > | null;
 }
 
 export interface FiscalTriagePortfolio {

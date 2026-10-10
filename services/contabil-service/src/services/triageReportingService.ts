@@ -101,12 +101,7 @@ const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
   "contabil.triage_accounting_documents": {
     delegate: "monthly",
     where: { type: "CONTABIL", archived_at: null },
-    columns: {
-      competence: "competence",
-      justification: "justification",
-      notes: "notes",
-      sends_movement: "triad_moviment",
-    },
+    columns: { competence: "competence", justification: "justification", notes: "notes" },
     responsibleColumns: ["responsible_id", "competence", "type"],
     derived: {
       columns: ["checklist"],
@@ -436,7 +431,10 @@ export async function extractTriageReportingPage(
   const configByClient = byClient(configs);
   // Meio de envio e justificativa guardam o código do catálogo da organização; o relatório
   // mostra o rótulo, como a tela. Código sem item no catálogo sai como está.
-  const catalogLabels = async (kind: string, values: readonly unknown[]) => {
+  const catalogLabels = async (
+    kind: "DELIVERY_METHOD" | "JUSTIFICATION",
+    values: readonly unknown[],
+  ) => {
     const codes = [...new Set(values.filter((code) => code != null))];
     const items = codes.length
       ? await prisma.catalogItems.findMany({

@@ -1085,13 +1085,26 @@ await (async () => {
         id: "m1",
         checklist: { inbound_report: "COMPLETED", sped_fiscal: "NOT_PRESENT" },
         item_notes: {},
+        billing_amount: "12500,00",
+        justification: "SEM_MOVIMENTO",
+        notes: "Aguardando XML de setembro",
       },
       ...overrides,
     });
-    const deliveryLabel = (code) => (code === "EMAIL" ? "E-mail" : "Não informado");
+    const deliveryLabel = {
+      delivery: (code) => (code === "EMAIL" ? "E-mail" : "Não informado"),
+      justification: (code) => (code === "SEM_MOVIMENTO" ? "Sem movimento no mês" : ""),
+    };
     const rows = [
       row({}),
-      row({ client_id: "c2", legal_name: '=Beta "SA"', priority: false, delivery_method: null }),
+      // Rotina ainda não iniciada: sem faturamento, justificativa nem observação.
+      row({
+        client_id: "c2",
+        legal_name: '=Beta "SA"',
+        priority: false,
+        delivery_method: null,
+        monthly: null,
+      }),
     ];
 
     const table = fiscalTriagePortfolioExportTable(rows, deliveryLabel);
@@ -1104,7 +1117,15 @@ await (async () => {
       "Meio de envio",
       "Relatório de entradas",
     ]);
-    assert.equal(table.columns.length, 6 + 13);
+    // Colunas do CSV/PDF do legado que a carteira não exportava.
+    assert.deepEqual(table.columns.slice(-3), ["Faturamento", "Justificativa", "Observação"]);
+    assert.deepEqual(table.body[0].slice(-3), [
+      "12500,00",
+      "Sem movimento no mês",
+      "Aguardando XML de setembro",
+    ]);
+    assert.deepEqual(table.body[1].slice(-3), ["", "", ""]);
+    assert.ok(table.body.every((line) => line.length === table.columns.length));
     assert.deepEqual(table.body[0].slice(0, 7), [
       "Alfa Ltda",
       "11222333000181",

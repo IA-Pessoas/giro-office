@@ -370,11 +370,15 @@ try {
   await page.getByRole("button", { name: "CSV" }).click();
   const csv = await csvDownload;
   assert.equal(csv.suggestedFilename(), `triagem-fiscal-${competence}.csv`);
-  assert.match(readFileSync(await csv.path(), "utf8"), /Empresa sem rotina/);
+  const csvText = readFileSync(await csv.path(), "utf8");
+  assert.match(csvText, /Empresa sem rotina/);
+  // O total é o das linhas filtradas, o mesmo conjunto da tela (#1705).
+  assert.match(csvText, /"Total","\d+ empresas?"$/);
   const popup = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Imprimir / PDF" }).click();
   const pdfPage = await popup;
   await expect(pdfPage.getByRole("heading", { name: `Triagem Fiscal · ${competence}` })).toBeVisible();
+  await expect(pdfPage.getByText(/^Total: \d+ empresas?$/)).toBeVisible();
   await pdfPage.close();
   await page.bringToFront();
   await page.getByRole("button", { name: "Selecionar cliente" }).click();

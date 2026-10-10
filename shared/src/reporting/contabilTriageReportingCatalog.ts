@@ -180,7 +180,6 @@ export const contabilTriageReportingCatalog = {
         field("card_sales_report", "Relatório de vendas de cartão", "string", stringOperators),
         field("justification", "Justificativa", "string", stringOperators),
         field("notes", "Observação", "string", stringOperators),
-        field("sends_movement", "Movimento enviado", "boolean", booleanOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
         ...clientFields,
       ],

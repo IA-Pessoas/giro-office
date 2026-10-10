@@ -816,8 +816,14 @@ describe("extractTriageReportingPage: grade Contábil do painel", () => {
     },
   ];
 
+  const withRegime = [
+    { ...clientRows[0], regime: "Simples Nacional" },
+    { ...clientRows[1], regime: "Lucro Presumido" },
+  ];
+
   it("mostra o estado de cada item, a justificativa do catálogo e a observação", async () => {
     const prisma = delegates(routines);
+    prisma.clients.findMany.mockResolvedValue(withRegime);
     prisma.catalogItems.findMany.mockResolvedValue([
       { code: "SEM_MOVIMENTO", label: "Sem movimento no mês" },
     ]);
@@ -838,7 +844,6 @@ describe("extractTriageReportingPage: grade Contábil do painel", () => {
           "inventory_control",
           "justification",
           "notes",
-          "sends_movement",
         ],
         limit: 1,
       }),
@@ -846,7 +851,7 @@ describe("extractTriageReportingPage: grade Contábil do painel", () => {
       rows: [
         {
           company_name: "Alfa Comércio Ltda",
-          regime: null,
+          regime: "Simples Nacional",
           responsible_name: "Ana Souza",
           competence: "2026-09",
           financial_transactions: "Concluído",
@@ -856,7 +861,6 @@ describe("extractTriageReportingPage: grade Contábil do painel", () => {
           inventory_control: "Não aplicável",
           justification: "Sem movimento no mês",
           notes: "Aguardando extrato de setembro",
-          sends_movement: true,
         },
       ],
       reachedLimit: true,
@@ -875,7 +879,7 @@ describe("extractTriageReportingPage: grade Contábil do painel", () => {
 
   it("filtra por competência, responsável, estado do item e justificativa, e totaliza", async () => {
     const database = {
-      client: { findMany: vi.fn().mockResolvedValue(clientRows) },
+      client: { findMany: vi.fn().mockResolvedValue(withRegime) },
       triageMonthly: {
         findMany: vi
           .fn()
@@ -906,6 +910,7 @@ describe("extractTriageReportingPage: grade Contábil do painel", () => {
     const filters = [
       { field: "competence", operator: "eq", parameter: "competencia", value: "2026-09" },
       { field: "responsible_name", operator: "eq", parameter: "responsavel", value: "Ana Souza" },
+      { field: "regime", operator: "eq", parameter: "regime", value: "Simples Nacional" },
       { field: "triaged_transactions", operator: "eq", parameter: "estado", value: "Pendente" },
       {
         field: "justification",
