@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { TRIAGE_DOCUMENT_HISTORY_QUERY_KEY } from "@modules/contabil";
 import { useFetch } from "@shared/hooks";
 
 import {
@@ -18,8 +19,12 @@ export function useTriageClouds(clientId: string) {
 
 export function useTriageCloudMutations(clientId: string) {
   const queryClient = useQueryClient();
+  // Cadastro e alteração de Cloud entram no histórico documental da página.
   const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: triagemCloudsQueryKey(clientId) });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: triagemCloudsQueryKey(clientId) }),
+      queryClient.invalidateQueries({ queryKey: TRIAGE_DOCUMENT_HISTORY_QUERY_KEY }),
+    ]);
 
   return {
     create: useMutation({

@@ -611,13 +611,22 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         statements: result[2].count,
         closings: result[3].count,
       };
-      await auditCreate(
-        audit,
-        auth,
-        CONTROL_AUDIT_REFERRING,
-        String(input.clientId),
-        "Restaurar competência contábil",
-      );
+      // Mesmo objeto do arquivamento (o controle), com as contagens: é o que o histórico
+      // documental da Triagem lê.
+      const restored = await prisma.controlContabil.findFirst({
+        where: identity,
+        select: { id: true },
+      });
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Restaurar competência contábil",
+        referring: CONTROL_AUDIT_REFERRING,
+        referringId: String(restored?.id ?? input.clientId),
+        oldData: null,
+        updatedData: counts,
+      });
       return counts;
     },
   };

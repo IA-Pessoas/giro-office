@@ -15,6 +15,7 @@ export {
   triageMonthlyQueryKey,
   triageStatementsQueryKey,
   CONTABIL_QUERY_KEY,
+  TRIAGE_DOCUMENT_HISTORY_QUERY_KEY,
 } from "./queryKeys";
 export {
   useContabilControlBootstrapMutation,

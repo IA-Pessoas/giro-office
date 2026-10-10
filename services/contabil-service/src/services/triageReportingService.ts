@@ -211,7 +211,12 @@ async function extractSgqPage(
     .map((row) => String(row.competence))
     .filter((competence) => COMPETENCE.test(competence))
     .sort();
-  const currentMonth = (input.today ?? new Date()).toISOString().slice(0, 7);
+  // Mês corrente em Brasília: em UTC o mês seguinte apareceria às 21h do último dia.
+  const currentMonth = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+  }).format(input.today ?? new Date());
   const lastKnown = known[known.length - 1] ?? "";
   const last = lastKnown > currentMonth ? lastKnown : currentMonth;
   const offset = input.offset ?? 0;
@@ -414,7 +419,7 @@ export async function extractTriageReportingPage(
     ),
   ]);
   const responsibleIdOf = (row: Row) =>
-    row.user_id ?? row.responsible_id ?? inheritedResponsible(snapshots, assignments, row);
+    row.user_id || row.responsible_id || inheritedResponsible(snapshots, assignments, row);
   const userIds = wantsResponsible
     ? [...new Set(rows.map(responsibleIdOf).filter((id) => typeof id === "string"))]
     : [];

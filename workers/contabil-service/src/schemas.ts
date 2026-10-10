@@ -23,21 +23,7 @@ export const closingUpdateSchema = closingQuerySchema
   .strict();
 
 const documentFields = TRIAGE_ACCOUNTING_CHECKLIST_FIELDS;
-const fiscalChecklistFields = [
-  "inbound_report",
-  "outbound_report",
-  "nfse_provided",
-  "nfse_received",
-  "cte_documents",
-  "mei_documents",
-  "nfce_documents",
-  "sped_fiscal",
-  "sped_contributions",
-  "nfce_received",
-  "model_21_invoice",
-  "cte_as_issuer",
-  "services_provided_as_mei",
-] as const;
+const fiscalChecklistFields = TRIAGE_FISCAL_CHECKLIST_FIELDS;
 export const triageDocumentFields = documentFields;
 export const triageFiscalFields = [...fiscalChecklistFields, "billing_amount"] as const;
 export const triageDocumentStatuses = [

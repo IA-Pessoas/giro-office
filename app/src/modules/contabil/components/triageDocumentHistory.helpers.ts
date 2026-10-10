@@ -42,6 +42,7 @@ const OBJECT_LABELS: Record<string, string> = {
   "triagem.bank_statements": "Extrato bancário",
   "triagem.closings": "Fechamento recebido",
   "clientes.clouds": "Cloud do cliente",
+  "triagem.configs": "Configuração da Triagem",
   "contabil.control": "Competência contábil",
 };
 
@@ -56,6 +57,17 @@ export function formatTriageHistoryField(field: string): string {
   }
   return FIELD_LABELS[field] ?? field;
 }
+
+// Datas chegam em ISO: o arquivamento é um instante; download e baixa são dias.
+const DATE_FORMATS: Record<string, Intl.DateTimeFormat> = {
+  archived_at: new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  }),
+  download_date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }),
+  settlement_date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "UTC" }),
+};
 
 /** Itens configurados chegam como JSON (nomes ou `{ field, required }`): saem pelos rótulos. */
 function formatConfiguredItems(value: string): string {
@@ -78,6 +90,9 @@ function formatConfiguredItems(value: string): string {
 export function formatTriageHistoryValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "(vazio)";
   if (field === "active_items" && typeof value === "string") return formatConfiguredItems(value);
+  if (field in DATE_FORMATS && typeof value === "string" && !Number.isNaN(Date.parse(value))) {
+    return DATE_FORMATS[field].format(new Date(value));
+  }
   if (value === true) return "Sim";
   if (value === false) return "Não";
   if (field === "status" || field.startsWith("checklist.")) {
@@ -93,8 +108,6 @@ export function describeTriageHistoryEntry(entry: TriageDocumentHistoryEntry): s
   const object =
     kind === "triagem.monthly"
       ? `Rotina ${routine ?? "documental"}`
-      : kind === "triagem.configs"
-        ? `Configuração ${routine ?? "da Triagem"}`
-        : (OBJECT_LABELS[kind] ?? kind);
+      : (OBJECT_LABELS[kind] ?? kind);
   return [client_name, competence, object, entry.action].filter(Boolean).join(" · ");
 }

@@ -19,6 +19,7 @@ export {
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
+  TRIAGE_DOCUMENT_HISTORY_QUERY_KEY,
   getContabilCardState,
   shouldShowContabilNav,
   syncContabilRelationshipQueryCache,
