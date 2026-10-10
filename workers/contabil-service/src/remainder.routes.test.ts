@@ -608,7 +608,7 @@ describe("contabil Worker remainder routes", () => {
       triageBankStatement: none,
       triageClosing: none,
       clientCloud: none,
-      triageConfig: none,
+      controlContabil: none,
     };
     const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
     const get = (query: string, init?: RequestInit) =>
@@ -653,23 +653,25 @@ describe("contabil Worker remainder routes", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organization_id: ORG,
-          referring_id: { in: ["monthly-1"] },
+          OR: [{ referring: "triagem.monthly", referring_id: { in: ["monthly-1"] } }],
         }),
         skip: 20,
         take: 20,
       }),
     );
 
-    const recent = await get("", withModules({ contabil: 0, triagem: 3 }));
-    expect(recent.status).toBe(200);
-    expect(prisma.auditRequest.findMany).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        where: expect.not.objectContaining({ referring_id: expect.anything() }),
-      }),
-    );
-    expect(prisma.auditRequest.findMany.mock.calls.at(-1)?.[0].where).toMatchObject({
-      organization_id: ORG,
-    });
+    // Administrador da Triagem, administrador do Contábil e dono da organização.
+    const admins = await Promise.all([
+      get("", withModules({ contabil: 0, triagem: 3 })),
+      get("", withModules({ contabil: 3, triagem: 0 })),
+      get("", { headers: { ...headers("0"), "x-auth-type": "owner", "x-auth-modules": "{}" } }),
+    ]);
+    expect(admins.map((response) => response.status)).toEqual([200, 200, 200]);
+    const recentWhere = prisma.auditRequest.findMany.mock.calls.at(-1)?.[0].where;
+    expect(recentWhere).toMatchObject({ organization_id: ORG });
+    // Sem recorte por objeto: nenhum dos ramos filtra `referring_id`.
+    expect(recentWhere.OR).toHaveLength(6);
+    for (const branch of recentWhere.OR) expect(branch).not.toHaveProperty("referring_id");
   });
 
   it("nuvens do cliente validam link e usam a organização do token (#1695)", async () => {

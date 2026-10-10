@@ -41,9 +41,10 @@ export function ContabilHistoryPanel<
   formatValue,
   describeEntry,
 }: ContabilHistoryPanelProps<F, E>) {
-  // Resposta fora do formato (sem `items`) vira histórico vazio: o painel é secundário e não
-  // pode derrubar a tela que o hospeda.
-  const history = Array.isArray(query.data?.items) ? query.data : undefined;
+  // Resposta fora do formato (sem `items`) é erro de carga, não histórico vazio; e o painel,
+  // que é secundário, não pode derrubar a tela que o hospeda ao lê-la.
+  const malformed = query.data !== undefined && !Array.isArray(query.data?.items);
+  const history = malformed ? undefined : query.data;
   const pageCount = getContabilHistoryPageCount(history?.total ?? 0, pageSize);
 
   return (
@@ -67,18 +68,20 @@ export function ContabilHistoryPanel<
         </ContabilStateBox>
       ) : null}
 
-      {!query.isLoading && query.error ? (
+      {!query.isLoading && (query.error || malformed) ? (
         <ContabilStateBox
           icon={AlertCircle}
           tone="danger"
           title="Não foi possível carregar o histórico"
           compact
         >
-          {getContabilErrorMessage(query.error)}
+          {query.error
+            ? getContabilErrorMessage(query.error)
+            : "O servidor devolveu uma resposta inesperada."}
         </ContabilStateBox>
       ) : null}
 
-      {!query.isLoading && !query.error && (!history || history.items.length === 0) ? (
+      {history && history.items.length === 0 ? (
         <p className="text-sm text-gray-600 dark:text-slate-400">{emptyMessage}</p>
       ) : null}
 

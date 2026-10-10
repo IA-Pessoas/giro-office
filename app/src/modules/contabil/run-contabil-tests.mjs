@@ -1170,6 +1170,17 @@ await (async () => {
     assert.equal(formatTriageHistoryValue("triad_moviment", true), "Sim");
     assert.equal(formatTriageHistoryValue("notes", null), "(vazio)");
     assert.equal(formatTriageHistoryValue("link", "https://drive.test/a"), "https://drive.test/a");
+    // Itens configurados chegam como JSON da auditoria e saem pelos rótulos.
+    assert.equal(
+      formatTriageHistoryValue(
+        "active_items",
+        '["sped_fiscal",{"field":"nfce_documents","required":true},{"field":"billing_amount","required":false}]',
+      ),
+      "SPED Fiscal, Documentos NFCe",
+    );
+    assert.equal(formatTriageHistoryValue("active_items", "[]"), "(vazio)");
+    assert.equal(formatTriageHistoryValue("active_items", "texto solto"), "texto solto");
+    assert.equal(formatTriageHistoryField("monthly"), "Rotinas");
 
     const entry = (object, action = "Atualizar pendência documental") => ({
       id: "e1",
@@ -1221,11 +1232,10 @@ await (async () => {
     assert.match(timeline, /useTriageAudit\(competenceId, open, page\)/);
     assert.match(timeline, /aria-label="Paginação do histórico da competência"/);
     assert.match(read("../triagem/hooks/useTriageAudit.ts"), /listTimeline\(competenceId, page\)/);
-    // Resposta sem `items` não derruba a tela que hospeda o painel.
-    assert.match(
-      read("./components/ContabilHistoryPanel.tsx"),
-      /Array\.isArray\(query\.data\?\.items\) \? query\.data : undefined/,
-    );
+    // Resposta sem `items` vira erro visível, sem derrubar a tela que hospeda o painel.
+    const panel = read("./components/ContabilHistoryPanel.tsx");
+    assert.match(panel, /query\.data !== undefined && !Array\.isArray\(query\.data\?\.items\)/);
+    assert.match(panel, /O servidor devolveu uma resposta inesperada\./);
   });
 
   await runTest("agenda compartilhada: a data não muda de dia com o fuso (#1727)", () => {

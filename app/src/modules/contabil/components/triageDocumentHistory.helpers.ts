@@ -22,6 +22,11 @@ const FIELD_LABELS: Record<string, string> = {
   priority: "Prioridade",
   delivery_method: "Meio de envio",
   active_items: "Itens configurados",
+  // Arquivar ou restaurar a competência: quantos registros foram junto.
+  controls: "Controles",
+  monthly: "Rotinas",
+  statements: "Extratos",
+  closings: "Fechamentos",
 };
 
 // Campos das notas de um item do checklist.
@@ -37,6 +42,7 @@ const OBJECT_LABELS: Record<string, string> = {
   "triagem.bank_statements": "Extrato bancário",
   "triagem.closings": "Fechamento recebido",
   "clientes.clouds": "Cloud do cliente",
+  "contabil.control": "Competência contábil",
 };
 
 const ROUTINE_LABELS: Record<string, string> = { CONTABIL: "Contábil", FISCAL: "Fiscal" };
@@ -51,8 +57,27 @@ export function formatTriageHistoryField(field: string): string {
   return FIELD_LABELS[field] ?? field;
 }
 
+/** Itens configurados chegam como JSON (nomes ou `{ field, required }`): saem pelos rótulos. */
+function formatConfiguredItems(value: string): string {
+  let items: unknown;
+  try {
+    items = JSON.parse(value);
+  } catch {
+    return value;
+  }
+  if (!Array.isArray(items)) return value;
+  const labels = items.flatMap((item) => {
+    const field = typeof item === "string" ? item : item?.field;
+    return typeof field === "string" && item?.required !== false
+      ? [ITEM_LABELS.get(field) ?? field]
+      : [];
+  });
+  return labels.length ? labels.join(", ") : "(vazio)";
+}
+
 export function formatTriageHistoryValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "(vazio)";
+  if (field === "active_items" && typeof value === "string") return formatConfiguredItems(value);
   if (value === true) return "Sim";
   if (value === false) return "Não";
   if (field === "status" || field.startsWith("checklist.")) {

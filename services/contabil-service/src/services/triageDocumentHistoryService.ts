@@ -17,21 +17,45 @@ export type TriageDocumentHistoryPrisma = {
   triageBankStatement: Finder;
   triageClosing: Finder;
   clientCloud: Finder;
-  triageConfig: Finder;
+  controlContabil: Finder;
+};
+
+type HistoryObject = {
+  referring: string;
+  /** Tabela do objeto; sem ela, o evento é auditado com o id do cliente. */
+  delegate?:
+    | "triageMonthly"
+    | "triageBankStatement"
+    | "triageClosing"
+    | "clientCloud"
+    | "controlContabil";
+  /** O objeto pertence a uma competência (senão, ao cliente). */
+  byCompetence: boolean;
+  /** Só estas ações do `referring` são documentais. */
+  actions?: readonly string[];
 };
 
 /**
- * Objetos documentais da Triagem na auditoria. Quem grava (rotina, extrato, fechamento, Cloud
- * e configuração, no Worker e no serviço) usa estes `referring`; `byCompetence` diz se o
- * objeto pertence a uma competência ou ao cliente.
+ * Objetos documentais da Triagem na auditoria, com o `referring` e o `referring_id` que quem
+ * grava usa (Worker e serviço).
  */
-export const TRIAGE_DOCUMENT_HISTORY_OBJECTS = [
+export const TRIAGE_DOCUMENT_HISTORY_OBJECTS: readonly HistoryObject[] = [
   { referring: "triagem.monthly", delegate: "triageMonthly", byCompetence: true },
   { referring: "triagem.bank_statements", delegate: "triageBankStatement", byCompetence: true },
   { referring: "triagem.closings", delegate: "triageClosing", byCompetence: true },
   { referring: "clientes.clouds", delegate: "clientCloud", byCompetence: false },
-  { referring: "triagem.configs", delegate: "triageConfig", byCompetence: false },
-] as const;
+  // Movimento padrão, documentos especiais, prioridade e meio de envio: `referring_id` é o
+  // id do cliente, não o da linha de configuração.
+  { referring: "triagem.configs", byCompetence: false },
+  // Arquivar ou restaurar a competência leva junto rotina, extratos e fechamento e é
+  // auditado uma vez, no controle contábil.
+  {
+    referring: "contabil.control",
+    delegate: "controlContabil",
+    byCompetence: true,
+    actions: ["Arquivar competência contábil", "Restaurar competência contábil"],
+  },
+];
 
 export type TriageDocumentHistoryInput = {
   organizationId: string;
@@ -44,15 +68,33 @@ export type TriageDocumentHistoryInput = {
 type Scalar = boolean | string | null;
 type Change = { field: string; from: Scalar; to: Scalar };
 
-// Identidade e carimbos da linha: não são alteração para quem lê o histórico.
-const IGNORED_FIELDS = new Set([
-  "id",
-  "organization_id",
-  "client_id",
-  "competence",
-  "bank_id",
-  "created_at",
-  "updated_at",
+// Só estes campos saem no histórico: coluna nova dessas tabelas não aparece sem entrar aqui.
+const HISTORY_FIELDS = new Set([
+  // rotina mensal
+  "checklist",
+  "item_notes",
+  "billing_amount",
+  "triad_moviment",
+  "notes",
+  "justification",
+  "responsible_id",
+  "download_date",
+  "settlement_date",
+  // extrato e fechamento
+  "status",
+  "archived_at",
+  // Cloud
+  "type",
+  "link",
+  // configuração
+  "active_items",
+  "priority",
+  "delivery_method",
+  // arquivar ou restaurar a competência: quantos registros foram junto
+  "controls",
+  "monthly",
+  "statements",
+  "closings",
 ]);
 
 function isRecord(value: unknown): value is Row {
@@ -83,7 +125,7 @@ function nestedChanges(prefix: string, from: unknown, to: unknown, depth: number
 export function triageDocumentChanges(changes: unknown): Change[] {
   if (!isRecord(changes)) return [];
   return Object.entries(changes)
-    .filter(([field]) => !IGNORED_FIELDS.has(field))
+    .filter(([field]) => HISTORY_FIELDS.has(field))
     .flatMap(([field, value]) => {
       const update = isRecord(value) && ("from" in value || "to" in value);
       const from = update ? (value as Row).from : null;
@@ -117,31 +159,39 @@ export async function listTriageDocumentHistory(
   // Com cliente ou competência, o recorte é pelos objetos deles; sem nenhum, é a organização.
   // ponytail: só competência (sem cliente) lista os ids de todas as rotinas do mês, centenas
   // por organização; guardar client_id/competence no evento se isso passar de milhares.
-  let objectIds: string[] | undefined;
-  if (input.clientId || input.competence) {
-    const found = await Promise.all(
-      TRIAGE_DOCUMENT_HISTORY_OBJECTS.map((object) =>
-        // Cloud e configuração são do cliente, sem competência: ficam fora do filtro por mês.
-        input.competence && !object.byCompetence
-          ? []
-          : prisma[object.delegate].findMany({
+  const scoped = Boolean(input.clientId || input.competence);
+  const scopes = await Promise.all(
+    TRIAGE_DOCUMENT_HISTORY_OBJECTS.map(async (object) => {
+      const event = {
+        referring: object.referring,
+        ...(object.actions ? { action: { in: [...object.actions] } } : {}),
+      };
+      if (!scoped) return event;
+      // Cloud e configuração são do cliente, sem competência: ficam fora do filtro por mês.
+      if (input.competence && !object.byCompetence) return null;
+      const ids = object.delegate
+        ? (
+            await prisma[object.delegate].findMany({
               where: {
                 ...organization,
                 ...(input.clientId ? { client_id: input.clientId } : {}),
                 ...(input.competence ? { competence: input.competence } : {}),
               },
               select: { id: true },
-            }),
-      ),
-    );
-    objectIds = found.flat().map((row) => String(row.id));
-    if (!objectIds.length) return { ...echo, total: 0, items: [] };
-  }
+            })
+          ).map((row) => String(row.id))
+        : input.clientId
+          ? [input.clientId]
+          : [];
+      return ids.length ? { ...event, referring_id: { in: ids } } : null;
+    }),
+  );
+  const matching = scopes.filter((scope) => scope !== null);
+  if (!matching.length) return { ...echo, total: 0, items: [] };
 
   const where = {
     ...organization,
-    referring: { in: TRIAGE_DOCUMENT_HISTORY_OBJECTS.map((object) => object.referring) },
-    ...(objectIds ? { referring_id: { in: objectIds } } : {}),
+    OR: matching,
     // logUpdateIfChanged grava `{}` quando nada mudou.
     NOT: { changes_json: { equals: {} } },
   };
@@ -168,22 +218,25 @@ export async function listTriageDocumentHistory(
   const objects = new Map<string, Row>();
   await Promise.all(
     TRIAGE_DOCUMENT_HISTORY_OBJECTS.map(async (object) => {
-      const ids = events
-        .filter((event) => event.referring === object.referring)
-        .map((event) => String(event.referring_id));
+      const ids = [
+        ...new Set(
+          events
+            .filter((event) => event.referring === object.referring)
+            .map((event) => String(event.referring_id)),
+        ),
+      ];
       if (!ids.length) return;
-      const rows = await prisma[object.delegate].findMany({
-        where: { ...organization, id: { in: [...new Set(ids)] } },
-        select: {
-          id: true,
-          client_id: true,
-          ...(object.byCompetence ? { competence: true } : {}),
-          ...(object.delegate === "triageBankStatement" ? { bank_id: true } : {}),
-          ...(object.delegate === "triageMonthly" || object.delegate === "triageConfig"
-            ? { type: true }
-            : {}),
-        },
-      });
+      const rows = object.delegate
+        ? await prisma[object.delegate].findMany({
+            where: { ...organization, id: { in: ids } },
+            select: {
+              id: true,
+              client_id: true,
+              ...(object.byCompetence ? { competence: true } : {}),
+              ...(object.delegate === "triageMonthly" ? { type: true } : {}),
+            },
+          })
+        : ids.map((id) => ({ id, client_id: id }));
       for (const row of rows) objects.set(`${object.referring}:${row.id}`, row);
     }),
   );
@@ -191,7 +244,20 @@ export async function listTriageDocumentHistory(
     ...new Set(rows.map((row) => row[key]).filter((id): id is string => typeof id === "string")),
   ];
   const clientIds = idsOf([...objects.values()], "client_id");
-  const userIds = idsOf(events, "user_id");
+  const changesOf = new Map(
+    events.map((event) => [event.id, triageDocumentChanges(event.changes_json)]),
+  );
+  // Quem alterou e quem aparece como responsável anterior ou novo.
+  const userIds = [
+    ...new Set([
+      ...idsOf(events, "user_id"),
+      ...[...changesOf.values()]
+        .flat()
+        .filter((change) => change.field === "responsible_id")
+        .flatMap((change) => [change.from, change.to])
+        .filter((id): id is string => typeof id === "string"),
+    ]),
+  ];
   const [clients, users] = await Promise.all([
     clientIds.length
       ? prisma.client.findMany({
@@ -236,7 +302,15 @@ export async function listTriageDocumentHistory(
             competence: object?.competence ?? null,
             routine_type: object?.type ?? null,
           },
-          changes: triageDocumentChanges(event.changes_json),
+          changes: (changesOf.get(event.id) ?? []).map((change) =>
+            change.field === "responsible_id"
+              ? {
+                  ...change,
+                  from: userNames.get(change.from) ?? change.from,
+                  to: userNames.get(change.to) ?? change.to,
+                }
+              : change,
+          ),
         };
       })
       .filter((item) => item.changes.length > 0),

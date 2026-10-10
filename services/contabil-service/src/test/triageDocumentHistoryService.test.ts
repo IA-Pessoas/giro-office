@@ -13,6 +13,10 @@ const USER = "11111111-1111-4111-8111-111111111111";
 const MONTHLY = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const STATEMENT = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const CLOUD = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const CONTROL = "99999999-9999-4999-8999-999999999999";
+const ARCHIVE_ACTIONS = {
+  in: ["Arquivar competência contábil", "Restaurar competência contábil"],
+};
 
 function database() {
   const events = [
@@ -86,7 +90,11 @@ function database() {
     },
     triageClosing: { findMany: vi.fn().mockResolvedValue([]) },
     clientCloud: { findMany: vi.fn().mockResolvedValue([{ id: CLOUD, client_id: CLIENT }]) },
-    triageConfig: { findMany: vi.fn().mockResolvedValue([]) },
+    controlContabil: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([{ id: CONTROL, client_id: CLIENT, competence: "2026-09" }]),
+    },
   };
 }
 
@@ -111,6 +119,16 @@ describe("triageDocumentChanges", () => {
       { field: "item_notes.a.note", from: null, to: "Recebido por e-mail" },
       { field: "triad_moviment", from: false, to: true },
     ]);
+  });
+
+  it("só publica os campos conhecidos: coluna nova não vaza pelo histórico", () => {
+    expect(
+      triageDocumentChanges({
+        status: { from: "PENDING", to: "COMPLETED" },
+        token_interno: { from: "a", to: "b" },
+        organization_id: { from: "x", to: "y" },
+      }),
+    ).toEqual([{ field: "status", from: "PENDING", to: "COMPLETED" }]);
   });
 
   it("trata o registro criado como valor novo, sem anterior", () => {
@@ -189,7 +207,18 @@ describe("listTriageDocumentHistory", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organization_id: ORG,
-          referring_id: { in: [MONTHLY, STATEMENT, CLOUD] },
+          OR: [
+            { referring: "triagem.monthly", referring_id: { in: [MONTHLY] } },
+            { referring: "triagem.bank_statements", referring_id: { in: [STATEMENT] } },
+            { referring: "clientes.clouds", referring_id: { in: [CLOUD] } },
+            // Configuração é auditada com o id do cliente.
+            { referring: "triagem.configs", referring_id: { in: [CLIENT] } },
+            {
+              referring: "contabil.control",
+              action: ARCHIVE_ACTIONS,
+              referring_id: { in: [CONTROL] },
+            },
+          ],
         }),
         skip: 3,
         take: 3,
@@ -217,8 +246,16 @@ describe("listTriageDocumentHistory", () => {
         expect(query.where).toMatchObject({ organization_id: ORG });
       }
     }
-    // Sem cliente nem competência não há recorte por objeto: é a organização inteira.
-    expect(prisma.auditRequest.findMany.mock.calls[0][0].where).not.toHaveProperty("referring_id");
+    // Sem cliente nem competência não há recorte por objeto: é a organização inteira, e do
+    // controle contábil só entram arquivar e restaurar a competência.
+    expect(prisma.auditRequest.findMany.mock.calls[0][0].where.OR).toEqual([
+      { referring: "triagem.monthly" },
+      { referring: "triagem.bank_statements" },
+      { referring: "triagem.closings" },
+      { referring: "clientes.clouds" },
+      { referring: "triagem.configs" },
+      { referring: "contabil.control", action: ARCHIVE_ACTIONS },
+    ]);
     expect(prisma.auditRequest.count).toHaveBeenCalledWith({
       where: expect.objectContaining({ organization_id: ORG }),
     });
@@ -258,30 +295,110 @@ describe("listTriageDocumentHistory", () => {
         where: { organization_id: ORG, client_id: CLIENT, competence: "2026-09" },
       }),
     );
-    expect(prisma.auditRequest.findMany.mock.calls[0][0].where.referring_id).toEqual({
-      in: [MONTHLY, STATEMENT],
-    });
+    expect(prisma.auditRequest.findMany.mock.calls[0][0].where.OR).toEqual([
+      { referring: "triagem.monthly", referring_id: { in: [MONTHLY] } },
+      { referring: "triagem.bank_statements", referring_id: { in: [STATEMENT] } },
+      { referring: "contabil.control", action: ARCHIVE_ACTIONS, referring_id: { in: [CONTROL] } },
+    ]);
     // As consultas de Cloud aqui são só as que resolvem o objeto dos eventos da página.
     for (const [query] of prisma.clientCloud.findMany.mock.calls) {
       expect(query.where).toHaveProperty("id");
     }
-    expect(prisma.triageConfig.findMany).not.toHaveBeenCalled();
   });
 
   it("sem objeto no recorte devolve vazio sem ler a auditoria", async () => {
     const prisma = database();
-    for (const delegate of [prisma.triageMonthly, prisma.triageBankStatement, prisma.clientCloud]) {
+    for (const delegate of [
+      prisma.triageMonthly,
+      prisma.triageBankStatement,
+      prisma.controlContabil,
+    ]) {
       delegate.findMany.mockResolvedValue([]);
     }
 
     await expect(
       listTriageDocumentHistory(prisma, {
         organizationId: ORG,
-        clientId: CLIENT,
+        competence: "2026-09",
         page: 1,
         pageSize: 20,
       }),
     ).resolves.toMatchObject({ total: 0, items: [] });
     expect(prisma.auditRequest.findMany).not.toHaveBeenCalled();
+  });
+
+  it("mostra configuração (auditada pelo cliente) e arquivamento da competência (auditado no controle)", async () => {
+    const prisma = database();
+    prisma.auditRequest.findMany.mockResolvedValue([
+      {
+        id: "event-5",
+        user_id: USER,
+        created_at: new Date("2026-09-20T12:00:00.000Z"),
+        action: "Arquivar competência contábil",
+        referring: "contabil.control",
+        referring_id: CONTROL,
+        changes_json: {
+          archived_at: { from: null, to: "2026-09-20T12:00:00.000Z" },
+          monthly: { from: undefined, to: 1 },
+          statements: { from: undefined, to: 2 },
+        },
+      },
+      {
+        id: "event-4",
+        user_id: USER,
+        created_at: new Date("2026-09-19T12:00:00.000Z"),
+        action: "Configurar documentos fiscais especiais",
+        referring: "triagem.configs",
+        referring_id: CLIENT,
+        changes_json: {
+          active_items: { from: ["sped_fiscal"], to: ["sped_fiscal", "nfce_documents"] },
+        },
+      },
+      {
+        id: "event-3b",
+        user_id: USER,
+        created_at: new Date("2026-09-18T12:00:00.000Z"),
+        action: "Atualizar movimento mensal da triagem",
+        referring: "triagem.monthly",
+        referring_id: MONTHLY,
+        changes_json: { responsible_id: { from: null, to: USER } },
+      },
+    ]);
+
+    const result = await listTriageDocumentHistory(prisma, {
+      organizationId: ORG,
+      clientId: CLIENT,
+      page: 1,
+      pageSize: 20,
+    });
+
+    expect(result.items).toMatchObject([
+      {
+        action: "Arquivar competência contábil",
+        object: {
+          kind: "contabil.control",
+          client_name: "Alfa Comércio Ltda",
+          competence: "2026-09",
+        },
+        changes: [
+          { field: "archived_at", from: null, to: "2026-09-20T12:00:00.000Z" },
+          { field: "monthly", from: null, to: "1" },
+          { field: "statements", from: null, to: "2" },
+        ],
+      },
+      {
+        action: "Configurar documentos fiscais especiais",
+        object: { kind: "triagem.configs", client_id: CLIENT, client_name: "Alfa Comércio Ltda" },
+        changes: [
+          {
+            field: "active_items",
+            from: '["sped_fiscal"]',
+            to: '["sped_fiscal","nfce_documents"]',
+          },
+        ],
+      },
+      // Responsável sai pelo nome, não pelo id.
+      { changes: [{ field: "responsible_id", from: null, to: "Ana Souza" }] },
+    ]);
   });
 });
