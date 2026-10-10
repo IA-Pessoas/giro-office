@@ -81,3 +81,20 @@ runTest("detalhe usa checklist Fiscal da competência e contadores do cliente (#
   assert.match(hooks, /\["triagem", "note-counts", clientId, competence\]/);
   assert.doesNotMatch(detail, /canônic|snapshot|legados/i);
 });
+
+runTest("agenda da Triagem usa a agenda compartilhada, com escrita só para quem edita (#1699)", () => {
+  const page = readSource("../../pages/triagem/agenda.tsx");
+  assert.match(page, /useModuleAccess\("triagem"\)/);
+  assert.match(
+    page,
+    /<DepartmentAgendaSection module="triagem" departmentLabel="Triagem" canEdit=\{access\.canEdit\} \/>/,
+  );
+  assert.match(readSource("../../pages/triagem.tsx"), /href="\/triagem\/agenda"/);
+
+  const section = readSource("../contabil/components/DepartmentAgendaSection.tsx");
+  // O departamento sai do módulo pedido: nenhum ID fixo e nenhuma cópia local de eventos.
+  assert.match(section, /agendaService\.list\(module, month\)/);
+  assert.match(section, /departmentAgendaQueryKey\(module, month\)/);
+  assert.doesNotMatch(section, /department_id|departamento\s*[:=]\s*\d/);
+  assert.doesNotMatch(section, /canônic|snapshot|legados/i);
+});

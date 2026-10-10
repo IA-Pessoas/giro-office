@@ -1073,12 +1073,15 @@ await (async () => {
 
   await runTest("agenda compartilhada: a aba do Contábil usa a agenda canônica (#1727)", () => {
     const shell = readFileSync(new URL("./components/ContabilShell.tsx", import.meta.url), "utf8");
-    assert.match(shell, /<ContabilAgendaSection canEdit=\{canEdit\} \/>/);
+    assert.match(
+      shell,
+      /<DepartmentAgendaSection module="contabil" departmentLabel="Contábil" canEdit=\{canEdit\} \/>/,
+    );
     const section = readFileSync(
-      new URL("./components/ContabilAgendaSection.tsx", import.meta.url),
+      new URL("./components/DepartmentAgendaSection.tsx", import.meta.url),
       "utf8",
     );
-    assert.match(section, /agendaService\.list\("contabil", month\)/);
+    assert.match(section, /agendaService\.list\(module, month\)/);
   });
 })();
 

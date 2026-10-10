@@ -27,8 +27,8 @@ export function contabilRelationshipHistoryQueryKey(clientId: string, page?: num
 }
 
 /** Sem `month`, é o prefixo de todos os meses (invalidação após escrita). */
-export function contabilAgendaQueryKey(month?: string) {
-  const key = [...CONTABIL_QUERY_KEY, "agenda"] as const;
+export function departmentAgendaQueryKey(module: string, month?: string) {
+  const key = [...CONTABIL_QUERY_KEY, "agenda", module] as const;
   return month === undefined ? key : ([...key, month] as const);
 }
 
