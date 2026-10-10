@@ -34,34 +34,35 @@ const clientColumns = [
 const clientFlags = new Set(["contabil", "fiscal"]);
 const serviceLabels: Readonly<Record<string, string>> = { CONTABIL: "Contábil", FISCAL: "Fiscal" };
 
-type Base = {
+type RowSource = {
   delegate: keyof TriageReportingPrisma;
   where: Row;
   /** Campo publicado -> coluna da tabela de origem. */
   columns: Readonly<Record<string, string>>;
-  /** Colunas que identificam o responsável da linha. */
-  responsible?: readonly string[];
+  /** Colunas lidas a mais para descobrir o responsável da linha. */
+  responsibleColumns?: readonly string[];
 };
-const bases: Readonly<Record<ContabilTriageReportingSource, Base>> = {
-  // Inativos ficam: o filtro de status é de quem monta o relatório. Removidos, não.
+// Inativos ficam: o filtro de status é de quem monta o relatório. Removidos, não.
+const ofLiveClient = { client: { deletion_date: null } };
+const rowSources: Readonly<Record<ContabilTriageReportingSource, RowSource>> = {
   "contabil.triage_clouds": { delegate: "clients", where: { deletion_date: null }, columns: {} },
   // "Movimento enviado" é da rotina Contábil; a Fiscal não usa o marcador.
   "contabil.triage_movement": {
     delegate: "monthly",
-    where: { type: "CONTABIL", archived_at: null },
+    where: { type: "CONTABIL", archived_at: null, ...ofLiveClient },
     columns: { competence: "competence", sends_movement: "triad_moviment" },
   },
   "contabil.triage_responsibles": {
     delegate: "assignments",
-    where: {},
+    where: ofLiveClient,
     columns: { type: "type" },
-    responsible: ["user_id"],
+    responsibleColumns: ["user_id"],
   },
   "contabil.triage_competence_responsibles": {
     delegate: "monthly",
-    where: { archived_at: null },
+    where: { archived_at: null, ...ofLiveClient },
     columns: { competence: "competence", type: "type" },
-    responsible: ["responsible_id", "competence", "type"],
+    responsibleColumns: ["responsible_id", "competence", "type"],
   },
 };
 
@@ -78,16 +79,25 @@ function byClient(rows: readonly Row[]): Map<string, Row[]> {
   return grouped;
 }
 
-/** Responsável congelado na abertura da competência, para o serviço da rotina. */
-function snapshotResponsible(snapshots: readonly Row[], row: Row): unknown {
+/**
+ * Responsável da rotina mensal sem responsável próprio, como na carteira da Triagem: com
+ * competência aberta vale o congelado nela; sem, a atribuição atual do serviço.
+ */
+function inheritedResponsible(
+  snapshots: readonly Row[],
+  assignments: readonly Row[],
+  row: Row,
+): unknown {
   const snapshot = snapshots.find(
     (candidate) => candidate.client_id === row.client_id && candidate.competence === row.competence,
   );
-  const responsibles = (snapshot?.responsible_snapshot as { responsibles?: unknown } | null)
+  const frozen = (snapshot?.responsible_snapshot as { responsibles?: unknown } | null)
     ?.responsibles;
-  return Array.isArray(responsibles)
-    ? (responsibles as Row[]).find((entry) => entry?.type === row.type)?.user_id
-    : undefined;
+  const candidates = snapshot ? (Array.isArray(frozen) ? (frozen as Row[]) : []) : assignments;
+  return candidates.find(
+    (entry) =>
+      entry?.type === row.type && (snapshot !== undefined || entry.client_id === row.client_id),
+  )?.user_id;
 }
 
 /**
@@ -107,11 +117,11 @@ export async function extractTriageReportingPage(
     offset?: number;
   },
 ): Promise<{ rows: Row[]; reachedLimit: boolean }> {
-  const base = bases[input.source];
+  const base = rowSources[input.source];
   const organization = { organization_id: input.organizationId };
   const wanted = (field: string) => input.fields.includes(field);
   const clientIsRow = base.delegate === "clients";
-  const wantsResponsible = Boolean(base.responsible) && wanted("responsible_name");
+  const wantsResponsible = Boolean(base.responsibleColumns) && wanted("responsible_name");
   const clientSelect = {
     id: true,
     ...Object.fromEntries(clientColumns.filter(wanted).map((column) => [column, true])),
@@ -128,7 +138,7 @@ export async function extractTriageReportingPage(
               ...Object.keys(base.columns)
                 .filter(wanted)
                 .map((field) => base.columns[field]),
-              ...(wantsResponsible ? (base.responsible ?? []) : []),
+              ...(wantsResponsible ? (base.responsibleColumns ?? []) : []),
             ].map((column) => [column, true]),
           ),
         },
@@ -147,7 +157,10 @@ export async function extractTriageReportingPage(
         })
       : Promise.resolve([]);
 
-  const [clients, clouds, responsibles, snapshots] = await Promise.all([
+  // Só a rotina mensal sem responsável próprio herda da competência ou da atribuição.
+  const inherits =
+    wantsResponsible && rows.some((row) => "responsible_id" in row && !row.responsible_id);
+  const [clients, clouds, responsibles, snapshots, assignments] = await Promise.all([
     clientIsRow
       ? rows
       : rows.length && clientColumns.some(wanted)
@@ -163,16 +176,18 @@ export async function extractTriageReportingPage(
     related(prisma.responsibles, wanted("customer_with_movement"), {
       select: { client_id: true, customer_with_movement: true },
     }),
-    // Só a rotina sem responsável próprio cai no congelado da competência.
     related(
       prisma.competences,
-      wantsResponsible && rows.some((row) => "responsible_id" in row && !row.responsible_id),
+      inherits,
       { select: { client_id: true, competence: true, responsible_snapshot: true } },
       { archived_at: null, competence: { in: [...new Set(rows.map((row) => row.competence))] } },
     ),
+    related(prisma.assignments, inherits, {
+      select: { client_id: true, type: true, user_id: true },
+    }),
   ]);
   const responsibleIdOf = (row: Row) =>
-    row.user_id ?? row.responsible_id ?? snapshotResponsible(snapshots, row);
+    row.user_id ?? row.responsible_id ?? inheritedResponsible(snapshots, assignments, row);
   const userIds = wantsResponsible
     ? [...new Set(rows.map(responsibleIdOf).filter((id) => typeof id === "string"))]
     : [];

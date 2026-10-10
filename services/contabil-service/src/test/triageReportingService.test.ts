@@ -150,7 +150,12 @@ describe("extractTriageReportingPage", () => {
       reachedLimit: true,
     });
     expect(prisma.monthly.findMany).toHaveBeenCalledWith({
-      where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      where: {
+        organization_id: ORG,
+        type: "CONTABIL",
+        archived_at: null,
+        client: { deletion_date: null },
+      },
       select: { id: true, client_id: true, competence: true, triad_moviment: true },
       orderBy: { id: "asc" },
       skip: 4,
@@ -189,8 +194,13 @@ describe("extractTriageReportingPage: responsáveis", () => {
     });
     expect(prisma.assignments.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: ORG },
+        where: { organization_id: ORG, client: { deletion_date: null } },
         select: { id: true, client_id: true, type: true, user_id: true },
+      }),
+    );
+    expect(prisma.clients.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, id: { in: [CLIENT_A, CLIENT_B] } },
       }),
     );
     expect(prisma.users.findMany).toHaveBeenCalledWith(
@@ -204,7 +214,7 @@ describe("extractTriageReportingPage: responsáveis", () => {
     expect(prisma.competences.findMany).not.toHaveBeenCalled();
   });
 
-  it("por competência usa o responsável da rotina e, sem ele, o congelado na abertura", async () => {
+  it("por competência usa o responsável da rotina, depois o congelado e por fim o atual", async () => {
     const prisma = delegates([
       {
         id: "1",
@@ -228,6 +238,12 @@ describe("extractTriageReportingPage: responsáveis", () => {
         },
       },
     ]);
+    // Cliente B não tem competência aberta: vale a atribuição atual do mesmo serviço.
+    prisma.assignments.findMany.mockResolvedValue([
+      { client_id: CLIENT_B, type: "CONTABIL", user_id: USER_BRUNO },
+      { client_id: CLIENT_B, type: "FISCAL", user_id: USER_ANA },
+      { client_id: CLIENT_A, type: "FISCAL", user_id: USER_ANA },
+    ]);
 
     await expect(
       extractTriageReportingPage(prisma, {
@@ -240,12 +256,14 @@ describe("extractTriageReportingPage: responsáveis", () => {
       rows: [
         { competence: "2026-09", type: "Contábil", responsible_name: "Ana Souza" },
         { competence: "2026-09", type: "Fiscal", responsible_name: "Bruno Lima" },
-        { competence: "2026-09", type: "Fiscal", responsible_name: null },
+        { competence: "2026-09", type: "Fiscal", responsible_name: "Ana Souza" },
       ],
       reachedLimit: false,
     });
     expect(prisma.monthly.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { organization_id: ORG, archived_at: null } }),
+      expect.objectContaining({
+        where: { organization_id: ORG, archived_at: null, client: { deletion_date: null } },
+      }),
     );
     expect(prisma.competences.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
