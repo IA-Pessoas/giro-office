@@ -28,7 +28,7 @@ export function createMarketingWorkerAudit(env: MarketingWorkerEnv): MarketingAu
       if (!response.ok) throw new Error(`AUDIT_SERVICE respondeu ${response.status}`);
     } catch (error) {
       console.warn("[marketing-service] auditoria exigida falhou.", error);
-      throw new ServiceError(503, AUDIT_UNAVAILABLE_MESSAGE, error);
+      throw new ServiceError(503, AUDIT_UNAVAILABLE_MESSAGE, error, undefined, { expose: true });
     }
   };
 }
