@@ -6246,6 +6246,13 @@ const handlers = {
     });
   },
 
+  async pessoalObligationPortfolio(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: requireState("pessoalCompetence"), state: "pending" },
+    });
+  },
+
   async pessoalObligationPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],
