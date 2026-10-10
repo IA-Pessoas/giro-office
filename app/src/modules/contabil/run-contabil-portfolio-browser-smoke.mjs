@@ -99,7 +99,29 @@ async function runBrowserProof() {
     if (!apiPath) return route.continue();
 
     const method = request.method();
-    requests.push({ method, path: apiPath, body: request.postDataJSON?.() });
+    requests.push({
+      method, path: apiPath,
+      body: request.headers()["content-type"]?.includes("application/json") ? request.postDataJSON() : null,
+    });
+    if (method === "POST" && apiPath === "/contabil/contingency") {
+      const parameters = Object.fromEntries(url.searchParams);
+      return json(route, {
+        id: "d1000000-0000-4000-8000-000000000001", content_hash: "a".repeat(64),
+        parameters: { ...parameters, rate: Number(parameters.rate) },
+        classification: "legacy_hypothesis", identity: "not_found", extraction: [],
+        differenceCents: 8000000, internalTransfersCents: 2200000,
+        minimum: { baseCents: 2000000, taxCents: 220000, penaltyCents: 165000, interestCents: 13200, totalCents: 398200 },
+        maximum: { baseCents: 4800000, taxCents: 528000, penaltyCents: 396000, interestCents: 31680, totalCents: 955680 },
+      });
+    }
+    if (method === "POST" && apiPath.endsWith("/review")) {
+      return json(route, { reviewed_by: user.id, reviewed_at: "2026-10-10T00:00:00Z", reviewed_hash: "a".repeat(64) });
+    }
+    if (method === "GET" && apiPath.endsWith("/export")) {
+      return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({
+        success: false, error: "A simulação mudou. Confira novamente.", code: "CONFLICT",
+      }) });
+    }
     if (method === "GET" && apiPath === "/user/me") return json(route, user);
     if (method === "GET" && apiPath === "/contabil/controls/list") {
       return json(route, { competence, items: portfolioItems });
@@ -184,6 +206,23 @@ async function runBrowserProof() {
     await page.getByRole("tab", { name: "Documentos" }).click();
     await expect(page.getByLabel("Empresa")).toHaveValue(betaId);
     await expect(page.getByRole("heading", { name: "Pendências documentais" })).toBeVisible();
+
+    // Outra sessão recalculou o rascunho: o 409 binário precisa invalidar a confirmação local.
+    await page.getByRole("tab", { name: "Contingência", exact: true }).click();
+    await page.getByLabel("Arquivo XLS", { exact: true }).setInputFiles(
+      fileURLToPath(new URL("../../../../scripts/fixtures/contingency/synthetic.xls", import.meta.url)),
+    );
+    await page.getByRole("button", { name: "Simular contingência", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Resultado da simulação", exact: true })).toBeVisible();
+    const exportButton = page.getByRole("button", { name: "Exportar conclusão imprimível", exact: true });
+    await expect(exportButton).toBeDisabled();
+    await page.getByRole("button", { name: "Confirmar valores e parâmetros", exact: true }).click();
+    await expect(exportButton).toBeEnabled();
+    await exportButton.click();
+    await expect(page.getByText("A simulação mudou. Confira novamente.", { exact: true })).toBeVisible();
+    await expect(exportButton).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Confirmar valores e parâmetros", exact: true })).toBeDisabled();
+    console.log("PASS exportação de Contingência invalida confirmação local após conflito 409");
 
     console.log(JSON.stringify({ url: page.url(), requestCount: requests.length, screenshotPath }));
   } finally {

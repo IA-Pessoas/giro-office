@@ -4586,6 +4586,23 @@ const baseManifest = [
   op({
     service: "contabil-service",
     method: "POST",
+    path: "/contabil/contingency/{id}/review",
+    action: "contabilContingencyReview",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "contabil-service",
+    method: "GET",
+    path: "/contabil/contingency/{id}/export",
+    action: "contabilContingencyExport",
+    target: "gateway",
+    auth: "bearer",
+    expectEnvelope: false,
+  }),
+  op({
+    service: "contabil-service",
+    method: "POST",
     path: "/contabil/controls",
     action: "contabilControlCreateInvalid",
     target: "gateway",

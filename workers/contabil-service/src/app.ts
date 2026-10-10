@@ -10,7 +10,11 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
-import { contingencyQuerySchema } from "../../../services/contabil-service/src/schemas/contingency.schemas.js";
+import {
+  contingencyIdParamsSchema,
+  contingencyQuerySchema,
+  contingencyReviewSchema,
+} from "../../../services/contabil-service/src/schemas/contingency.schemas.js";
 import {
   controlCompetenceBodySchema,
   controlIdParamsSchema,
@@ -93,7 +97,7 @@ type ContabilOptions = {
   env?: ContabilWorkerEnv;
   prisma?: ContabilPrisma;
   controlService?: ControlService;
-  contingencyService?: Pick<ContingencyService, "simulate">;
+  contingencyService?: Pick<ContingencyService, "simulate" | "review" | "export">;
   relationshipService?: RelationshipService;
   responsibleService?: ResponsibleService;
   triageClosingService?: ClosingService;
@@ -317,6 +321,41 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       return c.json(createSuccessResponse(result));
     },
   );
+
+  app.post("/contabil/contingency/:id/review", async (c) => {
+    requireContabilWrite(c.get("auth"));
+    const { id } = parseWithZod(contingencyIdParamsSchema, { id: c.req.param("id") });
+    const { content_hash } = parseWithZod(contingencyReviewSchema, await readJson(c));
+    const auth = contabilAuthContext(c.get("auth"));
+    const invoke = (service: Pick<ContingencyService, "review">) =>
+      service.review(id, content_hash, auth);
+    const result = options.contingencyService
+      ? await invoke(options.contingencyService)
+      : await withPrisma(c, options, (prisma) => invoke(new ContingencyService(prisma)));
+    c.header("Cache-Control", "no-store");
+    return c.json(createSuccessResponse(result));
+  });
+
+  app.get("/contabil/contingency/:id/export", async (c) => {
+    requireContabilWrite(c.get("auth"));
+    const { id } = parseWithZod(contingencyIdParamsSchema, { id: c.req.param("id") });
+    const { content_hash } = parseWithZod(contingencyReviewSchema, c.req.query());
+    const auth = contabilAuthContext(c.get("auth"));
+    const invoke = (service: Pick<ContingencyService, "export">) =>
+      service.export(id, content_hash, auth);
+    const html = options.contingencyService
+      ? await invoke(options.contingencyService)
+      : await withPrisma(c, options, (prisma) => invoke(new ContingencyService(prisma)));
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename="contingencia-${id}.html"`,
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  });
 
   app.get("/contabil/controls/list", async (c) => {
     const query = parseWithZod(listControlQuerySchema, c.req.query());

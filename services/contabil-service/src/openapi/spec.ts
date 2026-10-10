@@ -177,9 +177,16 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           tags: ["Contingency"],
           summary: "Simula contingência a partir de XLS temporário",
           description:
-            "Exige edição no Contábil. Analisa a primeira planilha XLS/BIFF8 (até 5 MiB, 10.000 linhas e 256 colunas). Valores em centavos; classificação é hipótese legada, sem exportação ou alteração de lançamentos.",
+            "Exige edição no Contábil. Analisa a primeira planilha XLS/BIFF8 (até 5 MiB, 10.000 linhas e 256 colunas). Valores em centavos; classificação é hipótese legada, sem alteração de lançamentos. Persiste o resultado com id e content_hash; simulation_id recalcula um rascunho da organização e invalida a revisão anterior.",
           security: [{ bearerAuth: [] }],
           parameters: [
+            {
+              name: "simulation_id",
+              in: "query",
+              required: false,
+              description: "Rascunho da organização a recalcular; limpa a revisão anterior.",
+              schema: { type: "string", format: "uuid" },
+            },
             {
               name: "client_id",
               in: "query",
@@ -259,6 +266,76 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             "409": { description: "Empresa ou CNPJ divergente." },
             "413": { description: "XLS maior que 5 MiB." },
             "415": { description: "Tipo de mídia diferente de application/vnd.ms-excel." },
+          },
+        },
+      },
+      "/contabil/contingency/{id}/review": {
+        post: {
+          tags: ["Contingency"],
+          summary: "Confirmar valores e parâmetros da simulação atual",
+          description:
+            "Exige edição no Contábil e hash atual. Registra reviewed_by da sessão, reviewed_at UTC e reviewed_hash; recálculo invalida a confirmação.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["content_hash"],
+                  properties: { content_hash: { type: "string", pattern: "^[a-f0-9]{64}$" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Ator, instante e hash da confirmação; no-store.",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Id, hash ou corpo inválido." },
+            "401": { description: "Não autenticado." },
+            "403": { description: "Sem edição no Contábil." },
+            "404": { description: "Simulação ou cliente não encontrado na organização." },
+            "409": { description: "Conteúdo desatualizado ou identidade da empresa divergente." },
+          },
+        },
+      },
+      "/contabil/contingency/{id}/export": {
+        get: {
+          tags: ["Contingency"],
+          summary: "Exportar conclusão imprimível da simulação revisada",
+          description:
+            "Exige edição, organização e hash atual conferido. HTML sem scripts, com identificação da simulação legada, hipóteses, valores, parâmetros e confirmação. Pode ser impresso ou salvo como PDF pelo navegador.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "content_hash",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[a-f0-9]{64}$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "HTML attachment; no-store; CSP sem scripts; nosniff.",
+              content: { "text/html": { schema: { type: "string" } } },
+            },
+            "400": { description: "Id ou hash inválido." },
+            "401": { description: "Não autenticado." },
+            "403": { description: "Sem edição no Contábil." },
+            "404": { description: "Simulação ou cliente não encontrado na organização." },
+            "409": {
+              description:
+                "Revisão ausente, hash desatualizado ou identidade da empresa divergente.",
+            },
           },
         },
       },

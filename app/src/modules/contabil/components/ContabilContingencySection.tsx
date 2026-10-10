@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
-import { Calculator } from "lucide-react";
+import { isAxiosError } from "axios";
+import { Calculator, Download } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Input } from "@shared/ui/newLayout/input";
 import { useContabilControlPortfolio } from "../hooks";
-import { contabilContingencyService } from "../services/contabilContingencyService";
+import {
+  contabilContingencyService,
+  type ContingencySimulation,
+} from "../services/contabilContingencyService";
 import { getContabilErrorMessage } from "../services/contabilError";
 import type { ContabilControlPortfolioItem } from "../types";
 import { CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
@@ -64,18 +68,42 @@ function ContingencyForm({
   const [annex, setAnnex] = useState("III");
   const [rate, setRate] = useState("11");
   const [file, setFile] = useState<File | null>(null);
-  const simulation = useMutation({ mutationFn: contabilContingencyService.simulate });
+  const [simulationId, setSimulationId] = useState<string>();
+  const simulation = useMutation({
+    mutationFn: contabilContingencyService.simulate,
+    onSuccess: (result) => setSimulationId(result.id),
+  });
+  const review = useMutation({ mutationFn: contabilContingencyService.review });
+  const download = useMutation({
+    mutationFn: async (result: ContingencySimulation) => {
+      const blob = await contabilContingencyService.download(result);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `contingencia-${result.id}.html`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: (error) => {
+      if (isAxiosError(error) && error.response?.status === 409) {
+        review.reset();
+        simulation.reset();
+      }
+    },
+  });
+  const busy = simulation.isPending || review.isPending || download.isPending;
+  const mutationError = simulation.error ?? review.error ?? download.error;
   const fileError =
     file && (!/\.xls$/i.test(file.name) || !file.size || file.size > 5 * 1024 * 1024)
       ? "Selecione um XLS de até 5 MiB, não vazio."
       : null;
-  const error = fileError ?? (simulation.error ? getContabilErrorMessage(simulation.error) : null);
+  const error = fileError ?? (mutationError ? getContabilErrorMessage(mutationError) : null);
 
   return (
     <section
       className="space-y-5 text-gray-900 dark:text-slate-100"
       aria-label="Simulação de Contingência"
-      aria-busy={simulation.isPending}
+      aria-busy={busy}
     >
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Simulação de Contingência</h2>
@@ -92,12 +120,19 @@ function ContingencyForm({
       </div>
       <form
         className="space-y-4"
-        onChange={() => simulation.reset()}
+        onChange={() => {
+          simulation.reset();
+          review.reset();
+          download.reset();
+        }}
         onSubmit={(event) => {
           event.preventDefault();
-          if (!file || !canEdit || fileError || simulation.isPending) return;
+          if (!file || !canEdit || fileError || busy) return;
+          review.reset();
+          download.reset();
           simulation.mutate({
             file,
+            simulationId,
             parameters: {
               client_id: company.client_id,
               company_name: company.legal_name,
@@ -112,7 +147,7 @@ function ContingencyForm({
         }}
       >
         <fieldset
-          disabled={!canEdit || simulation.isPending}
+          disabled={!canEdit || busy}
           className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3"
         >
           <legend className="sr-only">Parâmetros da simulação</legend>
@@ -199,7 +234,7 @@ function ContingencyForm({
         <button
           type="submit"
           className={CONTABIL_OUTLINE_ACTION_CLASS}
-          disabled={!canEdit || !file || Boolean(fileError) || simulation.isPending}
+          disabled={!canEdit || !file || Boolean(fileError) || busy}
         >
           <Calculator className="h-4 w-4" aria-hidden="true" />
           {simulation.isPending ? "Calculando..." : "Simular contingência"}
@@ -211,6 +246,49 @@ function ContingencyForm({
         </p>
       )}
       {simulation.data && <ContabilContingencyResult result={simulation.data} />}
+      <div className="space-y-3 border-t border-gray-200 pt-4 text-sm dark:border-slate-700">
+        <p>
+          Confira os valores extraídos, a empresa e todos os parâmetros antes de confirmar.
+          Qualquer alteração exige novo cálculo e nova conferência.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            className={CONTABIL_OUTLINE_ACTION_CLASS}
+            disabled={!canEdit || !simulation.data || busy || Boolean(review.data)}
+            onClick={() => {
+              if (simulation.data) review.mutate(simulation.data);
+            }}
+          >
+            {review.isPending ? "Registrando conferência..." : "Confirmar valores e parâmetros"}
+          </button>
+          <button
+            type="button"
+            className={CONTABIL_OUTLINE_ACTION_CLASS}
+            disabled={
+              !canEdit || !simulation.data || !review.data ||
+              review.data.reviewed_hash !== simulation.data.content_hash || busy
+            }
+            onClick={() => {
+              if (simulation.data) download.mutate(simulation.data);
+            }}
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            {download.isPending ? "Exportando..." : "Exportar conclusão imprimível"}
+          </button>
+        </div>
+        {review.data ? (
+          <p role="status" className="break-words text-gray-600 dark:text-slate-400">
+            Conferência registrada em {new Date(review.data.reviewed_at).toLocaleString("pt-BR")}.
+            Ator: {review.data.reviewed_by}. Hash: {review.data.reviewed_hash}.
+          </p>
+        ) : (
+          <p className="text-gray-600 dark:text-slate-400">Exportação bloqueada até a conferência autorizada.</p>
+        )}
+        <p className="text-xs text-gray-500 dark:text-slate-400">
+          Abra o arquivo HTML exportado no navegador para imprimir ou salvar como PDF.
+        </p>
+      </div>
     </section>
   );
 }

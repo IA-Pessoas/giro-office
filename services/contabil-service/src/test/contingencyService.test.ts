@@ -1,8 +1,9 @@
 import { parseWithZod } from "@workspace/shared";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { contingencyQuerySchema } from "../schemas/contingency.schemas.js";
 import { ContingencyService } from "../services/contingencyService.js";
 import { contingencyXls } from "./contingencyFixtures.js";
+import { contingencyDatabase } from "./contingencyReviewFixtures.js";
 
 const organizationId = "a0000000-0000-4000-8000-000000000001";
 const clientId = "b0000000-0000-4000-8000-000000000001";
@@ -19,17 +20,7 @@ const input = {
 };
 
 function setup() {
-  const findFirst = vi.fn().mockImplementation(async ({ where }) =>
-    where.organization_id === organizationId && where.id === clientId
-      ? {
-          name: "Empresa Sintética",
-          company_name: null,
-          cpf_cnpj: "11.222.333/0001-81",
-          contabil: true,
-        }
-      : null,
-  );
-  return new ContingencyService({ client: { findFirst } } as never);
+  return new ContingencyService(contingencyDatabase(organizationId).prisma);
 }
 
 describe("ContingencyService", () => {

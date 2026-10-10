@@ -116,7 +116,23 @@ origem; diferença, transferências internas, cenários mínimo/máximo e parâm
 Tributo usa a alíquota informada; multa 75%, juros 6%. Arredondamento de cada saída
 ocorre depois do cálculo, como no PHP. As classificações são hipóteses do modelo
 legado e não comprovam irregularidade. Não cria lançamentos nem altera Controle.
-Revisão e exportação fazem parte da #1726.
+O resultado é persistido em `contabil.contingency_drafts`, com `id` e `content_hash`.
+A query opcional `simulation_id` recalcula esse rascunho da organização e limpa a
+revisão anterior. Cada cálculo gera nova revisão do conteúdo, inclusive quando os
+valores se repetem, impedindo confirmação atrasada de uma versão anterior.
+
+`POST /contabil/contingency/:id/review`, JSON `{ "content_hash": "<sha256>" }`,
+confirma os valores e parâmetros atuais e registra ator da sessão, instante UTC e
+hash. `GET /contabil/contingency/:id/export?content_hash=<sha256>` retorna HTML
+imprimível apenas com confirmação correspondente. Ambos exigem edição e revalidam
+organização, identidade da empresa e contratação contábil. Hash desatualizado ou
+revisão ausente retorna 409. O HTML inclui hipóteses, parâmetros, cálculos e
+confirmação; o navegador permite imprimir/salvar como PDF. Nenhuma cidade é presumida.
+
+A migration `20261010004500_contabil_contingency_reviews` deve ser aplicada pelo
+processo de publicação antes de usar simulação/revisão. O XLS continua temporário;
+o resultado extraído e os parâmetros ficam persistidos. Esta entrega não aplica
+migrations nem comprova persistência com banco real.
 
 A fixture e os valores esperados ficam em `scripts/fixtures/contingency/README.md`.
 Amostras reais anonimizadas não estão disponíveis (#1716); compatibilidade real

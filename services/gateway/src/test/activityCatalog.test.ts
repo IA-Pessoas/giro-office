@@ -4,6 +4,18 @@ import { classifyActivity, describeActivity } from "../audit/activityCatalog.js"
 
 describe("activityCatalog", () => {
   it.each([
+    [
+      "POST",
+      "/contabil/contingency/draft/review",
+      "conferiu",
+      "valores e parâmetros da Contingência",
+    ],
+    [
+      "GET",
+      "/contabil/contingency/draft/export",
+      "exportou",
+      "uma conclusão revisada da Contingência",
+    ],
     ["POST", "/contabil/noah?filename=arquivo.zip", "converteu", "comprovantes Noah em CSV"],
     [
       "GET",
