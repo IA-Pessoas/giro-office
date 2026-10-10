@@ -13,10 +13,12 @@ import {
   AUDIT_CREATE_ACTION,
   AUDIT_UPDATE_ACTION,
 } from "../../../services/contabil-service/src/services/auditActions.js";
+import type { ContingencyPrisma } from "../../../services/contabil-service/src/services/contingencyService.js";
 import {
   CONTROL_AUDIT_ACTIONS,
   CONTROL_AUDIT_REFERRING,
 } from "../../../services/contabil-service/src/services/controlHistoryService.js";
+import type { NoahServicePrisma } from "../../../services/contabil-service/src/services/noahService.js";
 import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
@@ -47,7 +49,9 @@ export type ContabilPrisma = {
     input: readonly Promise<unknown>[] | ((transaction: ContabilPrisma) => Promise<T>),
     options?: QueryArgs,
   ): Promise<T | unknown[]>;
-  client: Delegate;
+  client: Delegate & Pick<ContingencyPrisma["client"], "findFirst">;
+  noahConversion: NoahServicePrisma["noahConversion"];
+  contingencyDraft: ContingencyPrisma["contingencyDraft"];
   controlContabil: Delegate;
   triageClosing: Delegate;
   relationshipContabil: Delegate;

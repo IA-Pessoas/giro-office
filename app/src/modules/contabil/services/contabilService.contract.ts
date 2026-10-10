@@ -9,6 +9,11 @@ import type {
 } from "../types";
 
 export const CONTABIL_ENDPOINTS = {
+  noah: "/contabil/noah",
+  noahCsv: (id: string) => `/contabil/noah/${id}/csv`,
+  contingency: "/contabil/contingency",
+  contingencyReview: (id: string) => `/contabil/contingency/${id}/review`,
+  contingencyExport: (id: string) => `/contabil/contingency/${id}/export`,
   controls: "/contabil/controls",
   controlsList: "/contabil/controls/list",
   controlsHistory: "/contabil/controls/history",

@@ -4,6 +4,31 @@ import { classifyActivity, describeActivity } from "../audit/activityCatalog.js"
 
 describe("activityCatalog", () => {
   it.each([
+    [
+      "POST",
+      "/contabil/contingency/draft/review",
+      "conferiu",
+      "valores e parâmetros da Contingência",
+    ],
+    [
+      "GET",
+      "/contabil/contingency/draft/export",
+      "exportou",
+      "uma conclusão revisada da Contingência",
+    ],
+    ["POST", "/contabil/noah?filename=arquivo.zip", "converteu", "comprovantes Noah em CSV"],
+    [
+      "GET",
+      "/contabil/noah/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/csv",
+      "baixou",
+      "um CSV da conversão Noah",
+    ],
+    [
+      "POST",
+      "/contabil/contingency?filename=balancete.xls",
+      "simulou",
+      "uma contingência contábil",
+    ],
     ["GET", "/client/groups", "consultou", "a lista de grupos de empresas"],
     ["POST", "/client/groups", "cadastrou", "um novo grupo de empresas"],
     ["GET", "/client/regimes", "consultou", "a lista de regimes"],

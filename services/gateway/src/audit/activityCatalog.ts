@@ -1195,6 +1195,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "marcou", item: "notificações de solicitações de RH como lidas" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/contabil\/noah$/,
+    description: { action: "converteu", item: "comprovantes Noah em CSV" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/noah\/[^/]+\/csv$/,
+    description: { action: "baixou", item: "um CSV da conversão Noah" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/contabil\/responsibles\/client\/[^/]+$/,
     description: { action: "consultou", item: "o responsável contábil de um cliente" },
@@ -1288,6 +1298,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PATCH"],
     pattern: /^\/triagem\/urgent-requests\/[^/]+\/reopen\/?$/,
     description: { action: "reabriu", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/contingency\/[^/]+\/review$/,
+    description: { action: "conferiu", item: "valores e parâmetros da Contingência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/contingency\/[^/]+\/export$/,
+    description: { action: "exportou", item: "uma conclusão revisada da Contingência" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/contingency$/,
+    description: { action: "simulou", item: "uma contingência contábil" },
   },
   {
     methods: ["POST"],

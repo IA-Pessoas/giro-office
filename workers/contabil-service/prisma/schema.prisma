@@ -39,6 +39,38 @@ model User {
   @@map("users")
 }
 
+model ContingencyDraft {
+  id              String   @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime @default(now())
+  snapshot        String
+  content_hash    String
+  reviewed_by     String?
+  reviewed_at     DateTime?
+  reviewed_hash   String?
+
+  @@index([organization_id, created_at])
+  @@map("contabil.contingency_drafts")
+}
+
+model NoahConversion {
+  id              String   @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime @default(now())
+  source_name     String
+  source_sha256   String
+  result_sha256   String
+  csv             String
+  row_count       Int
+  file_count      Int
+  rejections      Json
+
+  @@index([organization_id, created_at])
+  @@map("contabil.noah_conversions")
+}
+
 // Só leitura: históricos do Controle (#1722) e da Relação Contábil (#1723).
 model AuditRequest {
   id              String   @id @default(uuid())
