@@ -62,6 +62,44 @@ export const previewLddImportBodySchema = z
   })
   .strict();
 
+const isCalendarDate = (value: string) => {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
+};
+
+export const LDD_IMPORT_MAX_ROWS = 500;
+
+export const confirmLddImportBodySchema = z
+  .object({
+    client_id: z.string().uuid({ message: "client_id inválido." }),
+    file_name: z.string().trim().min(1, "file_name é obrigatório.").max(255),
+    file_hash: z.string().regex(/^[0-9a-f]{64}$/, "file_hash inválido."),
+    rows: z
+      .array(
+        z
+          .object({
+            // 13 é a competência do 13º.
+            period: z
+              .string()
+              .regex(/^(0[1-9]|1[0-3])\/\d{4}$/, "period deve estar no formato MM/AAAA."),
+            due_date: z
+              .string()
+              .regex(/^\d{4}-\d{2}-\d{2}$/, "due_date deve estar no formato AAAA-MM-DD.")
+              .refine(isCalendarDate, "due_date inválido."),
+            balance_amount: z
+              .number()
+              .finite()
+              .positive("balance_amount deve ser maior que zero.")
+              .max(999_999_999.99, "balance_amount acima do permitido."),
+          })
+          .strict(),
+      )
+      .min(1, "Informe ao menos uma linha.")
+      .max(LDD_IMPORT_MAX_ROWS, `Importe no máximo ${LDD_IMPORT_MAX_ROWS} linhas por PDF.`),
+  })
+  .strict();
+
+export type ConfirmLddImportBody = z.infer<typeof confirmLddImportBodySchema>;
 export type PreviewLddImportBody = z.infer<typeof previewLddImportBodySchema>;
 export type CreateLddBody = z.infer<typeof createLddBodySchema>;
 export type UpdateLddBody = z.infer<typeof updateLddBodySchema>;

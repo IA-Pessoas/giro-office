@@ -1,12 +1,26 @@
+import { createHash } from "node:crypto";
+
 import { ServiceError } from "@workspace/shared";
 import { extractPdfText } from "@workspace/shared/pdf";
+
+import type { ConfirmLddImportBody } from "../schemas/ldd.schemas.js";
+import type { PessoalAuthContext } from "./pessoalServiceTypes.js";
+import { requireUserId } from "./pessoalServiceTypes.js";
 
 /**
  * Prévia da importação de LDD/INSS em PDF, com as regras de `Pdf::lerLdd` do legado: só as linhas
  * com `CP-` antes de "Débito com Exigibilidade Suspensa (SIEF)"; competência é o primeiro
  * `MM/AAAA`, vencimento o primeiro `DD/MM/AAAA` e o valor é o segundo valor monetário da linha.
- * Nada é gravado aqui. Sem amostra real de PDF, a paridade com o legado é só estrutural.
+ * A prévia não grava nada. Sem amostra real de PDF, a paridade com o legado é só estrutural.
+ *
+ * A confirmação grava as linhas revisadas como LDD previdenciário: linhas da mesma chave
+ * (cliente, tipo, competência, vencimento) somam, e a soma acresce ao saldo já cadastrado, como
+ * em `Pessoal::cadastrarLdd`. O hash do arquivo fica em `pessoal.ldd_imports`, único por
+ * organização e cliente: o mesmo PDF não soma duas vezes.
  */
+
+/** Tipo gravado pelo importador de PDF; PGFN segue pelo cadastro manual. */
+export const LDD_IMPORT_TYPE = "INSS";
 
 export const SIEF_LIMIT = "Débito com Exigibilidade Suspensa (SIEF)";
 const LINE_MARKER = "CP-";
@@ -28,7 +42,64 @@ export type LddImportPreviewRow = {
 
 export type LddImportPreview = {
   file_name: string;
+  /** SHA-256 do arquivo: identifica o PDF na confirmação e no bloqueio de reenvio. */
+  file_hash: string;
   rows: LddImportPreviewRow[];
+};
+
+export type LddImportedRecord = {
+  id: string;
+  period: string;
+  due_date: string;
+  balance_amount: number;
+};
+
+export type LddImportResult = {
+  import_id: string;
+  rows_count: number;
+  total_amount: number;
+  records: LddImportedRecord[];
+};
+
+type LddImportScope = { organization_id: string; client_id: string };
+
+/** O que a confirmação usa do Prisma (cliente ou transação), no serviço e no Worker. */
+export type LddImportStore = {
+  lddImportPessoal: {
+    findFirst(args: {
+      where: LddImportScope & { file_hash: string };
+      select: { created_at: true };
+    }): Promise<{ created_at: Date } | null>;
+    create(args: {
+      data: LddImportScope & {
+        file_hash: string;
+        file_name: string;
+        rows_count: number;
+        total_amount: number;
+        imported_by_id: string;
+      };
+    }): Promise<{ id: string }>;
+  };
+  lddPessoal: {
+    findFirst(args: {
+      where: LddImportScope & { type: string; period: string; due_date: { gte: Date; lt: Date } };
+      select: { id: true; balance_amount: true };
+    }): Promise<{ id: string; balance_amount: number | null } | null>;
+    create(args: {
+      data: LddImportScope & {
+        type: string;
+        period: string;
+        due_date: Date;
+        balance_amount: number;
+      };
+      select: { id: true };
+    }): Promise<{ id: string }>;
+    update(args: {
+      where: { id: string };
+      data: { balance_amount: number };
+      select: { id: true };
+    }): Promise<{ id: string }>;
+  };
 };
 
 function parsePeriod(line: string): string | null {
@@ -93,6 +164,7 @@ export function parseLddText(pages: string[]): LddImportPreviewRow[] {
     if (parsed.period === null) errors.push("Competência não identificada na linha.");
     if (parsed.due_date === null) errors.push("Vencimento não identificado na linha.");
     if (parsed.balance_amount === null) errors.push("Valor não identificado na linha.");
+    if (parsed.balance_amount === 0) errors.push("Valor zerado na linha.");
 
     rows.push({ line: rows.length + 1, source, ...parsed, errors });
   }
@@ -131,13 +203,121 @@ export function buildLddImportPreview(input: {
   file_name: string;
   content_base64: string;
 }): LddImportPreview {
-  const text = extractPdfText(Buffer.from(input.content_base64, "base64"));
+  const pdf = Buffer.from(input.content_base64, "base64");
+  const text = extractPdfText(pdf);
   if (text.kind === "unsupported") {
     throw new ServiceError(422, text.message);
   }
 
   return {
     file_name: input.file_name,
+    file_hash: createHash("sha256").update(pdf).digest("hex"),
     rows: lddRowsFromPdfText(text.pages, text.unreadable_pages),
+  };
+}
+
+const ALREADY_IMPORTED = "Este PDF já foi importado para este cliente; o saldo não foi alterado.";
+const toCents = (value: number) => Math.round(value * 100);
+
+/** Quando o mesmo arquivo já foi importado para o cliente, a data da importação. */
+export async function findLddImportDate(
+  store: Pick<LddImportStore, "lddImportPessoal">,
+  key: { organizationId: string; clientId: string; fileHash: string },
+): Promise<Date | null> {
+  const previous = await store.lddImportPessoal.findFirst({
+    where: {
+      organization_id: key.organizationId,
+      client_id: key.clientId,
+      file_hash: key.fileHash,
+    },
+    select: { created_at: true },
+  });
+  return previous?.created_at ?? null;
+}
+
+/**
+ * Grava a importação confirmada. Chame dentro de uma transação: o registro do arquivo e os
+ * saldos entram juntos ou não entram. O índice único do arquivo decide a corrida entre duas
+ * confirmações do mesmo PDF.
+ * ponytail: dois PDFs diferentes confirmados ao mesmo tempo para a mesma chave nova podem criar
+ * dois LDD; se acontecer, índice único em (cliente, tipo, competência, vencimento).
+ */
+export async function confirmLddImport(
+  store: LddImportStore,
+  context: PessoalAuthContext,
+  body: ConfirmLddImportBody,
+): Promise<LddImportResult> {
+  const userId = requireUserId(context);
+  const scope = { organization_id: context.organizationId, client_id: body.client_id };
+  const imported = await findLddImportDate(store, {
+    organizationId: context.organizationId,
+    clientId: body.client_id,
+    fileHash: body.file_hash,
+  });
+  if (imported) throw new ServiceError(409, ALREADY_IMPORTED);
+
+  // Soma em centavos por chave: linhas distintas do mesmo documento compõem o total.
+  const centsByKey = new Map<string, number>();
+  for (const row of body.rows) {
+    const key = `${row.period}|${row.due_date}`;
+    centsByKey.set(key, (centsByKey.get(key) ?? 0) + toCents(row.balance_amount));
+  }
+  const totalCents = [...centsByKey.values()].reduce((sum, cents) => sum + cents, 0);
+
+  let created: { id: string };
+  try {
+    created = await store.lddImportPessoal.create({
+      data: {
+        ...scope,
+        file_hash: body.file_hash,
+        file_name: body.file_name,
+        rows_count: body.rows.length,
+        total_amount: totalCents / 100,
+        imported_by_id: userId,
+      },
+    });
+  } catch (err: unknown) {
+    if ((err as { code?: unknown }).code === "P2002") throw new ServiceError(409, ALREADY_IMPORTED);
+    throw err;
+  }
+
+  const records: LddImportedRecord[] = [];
+  for (const [key, cents] of centsByKey) {
+    const [period = "", dueDate = ""] = key.split("|");
+    const dayStart = new Date(`${dueDate}T00:00:00.000Z`);
+    const existing = await store.lddPessoal.findFirst({
+      where: {
+        ...scope,
+        type: LDD_IMPORT_TYPE,
+        period,
+        due_date: { gte: dayStart, lt: new Date(dayStart.getTime() + 24 * 60 * 60 * 1000) },
+      },
+      select: { id: true, balance_amount: true },
+    });
+    const balance = (toCents(existing?.balance_amount ?? 0) + cents) / 100;
+    const saved = existing
+      ? await store.lddPessoal.update({
+          where: { id: existing.id },
+          data: { balance_amount: balance },
+          select: { id: true },
+        })
+      : await store.lddPessoal.create({
+          data: {
+            ...scope,
+            type: LDD_IMPORT_TYPE,
+            period,
+            due_date: dayStart,
+            balance_amount: balance,
+          },
+          select: { id: true },
+        });
+    records.push({ id: saved.id, period, due_date: dueDate, balance_amount: balance });
+  }
+
+  return {
+    import_id: created.id,
+    rows_count: body.rows.length,
+    total_amount: totalCents / 100,
+    records,
   };
 }

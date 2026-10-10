@@ -81,6 +81,7 @@ function lddService(): PessoalLddService {
   return {
     list: vi.fn(async () => []),
     previewImport: vi.fn(async () => ({ file_name: "ldd.pdf", rows: [] })),
+    confirmImport: vi.fn(async () => ({ import_id: "import-1", rows_count: 1, records: [] })),
     create: vi.fn(async () => ({ id: LDD_ID, client_id: CLIENT_ID, type: "FGTS" })),
     update: vi.fn(async () => ({ id: LDD_ID, status: "Regular" })),
     delete: vi.fn(async () => ({ id: LDD_ID, client_id: CLIENT_ID })),
@@ -360,6 +361,34 @@ describe("pessoal Worker", () => {
     expect(await ok.json()).toEqual({ success: true, data: { file_name: "ldd.pdf", rows: [] } });
     expect(ldd.previewImport).toHaveBeenCalledTimes(1);
     expect(ldd.previewImport).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      body,
+    );
+  });
+
+  it("confirms the LDD import for writers only and validates rows", async () => {
+    const ldd = lddService();
+    const app = createPessoalWorkerApp({ env: env(), lddService: ldd });
+    const body = {
+      client_id: CLIENT_ID,
+      file_name: "ldd.pdf",
+      file_hash: "a".repeat(64),
+      rows: [{ period: "01/2024", due_date: "2024-02-20", balance_amount: 10 }],
+    };
+    const confirm = (permission: string, payload: unknown) =>
+      app.request("https://pessoal.test/pessoal/ldd/import", {
+        method: "POST",
+        headers: { ...headers(permission), "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+    const ok = await confirm("2", body);
+    const viewer = await confirm("1", body);
+    const invalid = await confirm("2", { ...body, rows: [] });
+
+    expect([ok.status, viewer.status, invalid.status]).toEqual([201, 403, 400]);
+    expect(ldd.confirmImport).toHaveBeenCalledTimes(1);
+    expect(ldd.confirmImport).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       body,
     );

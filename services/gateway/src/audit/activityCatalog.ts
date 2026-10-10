@@ -253,6 +253,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/pessoal\/ldd\/import$/,
+    description: { action: "importou", item: "débitos de LDD de um PDF" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/pessoal\/ldd\/import\/preview$/,
     description: { action: "gerou", item: "uma prévia de importação de LDD em PDF" },
   },

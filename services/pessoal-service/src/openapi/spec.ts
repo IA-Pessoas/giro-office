@@ -3,7 +3,7 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { PessoalServiceEnv } from "../config/env.js";
 import { PESSOAL_REPORTING_SOURCES } from "../reporting/pessoalReportingCatalog.js";
-import { LDD_PDF_MAX_BASE64_LENGTH } from "../schemas/ldd.schemas.js";
+import { LDD_IMPORT_MAX_ROWS, LDD_PDF_MAX_BASE64_LENGTH } from "../schemas/ldd.schemas.js";
 
 const successJson = {
   content: {
@@ -189,6 +189,32 @@ const previewLddImportRequestSchema = strictObjectSchema(
     },
   },
   ["client_id", "file_name", "content_base64"],
+);
+
+const confirmLddImportRequestSchema = strictObjectSchema(
+  {
+    client_id: uuidSchema,
+    file_name: { type: "string", minLength: 1, maxLength: 255 },
+    file_hash: {
+      type: "string",
+      pattern: "^[0-9a-f]{64}$",
+      description: "SHA-256 do PDF, devolvido pela prévia.",
+    },
+    rows: {
+      type: "array",
+      minItems: 1,
+      maxItems: LDD_IMPORT_MAX_ROWS,
+      items: strictObjectSchema(
+        {
+          period: { type: "string", pattern: "^(0[1-9]|1[0-3])/\\d{4}$" },
+          due_date: { type: "string", format: "date" },
+          balance_amount: { type: "number", exclusiveMinimum: 0 },
+        },
+        ["period", "due_date", "balance_amount"],
+      ),
+    },
+  },
+  ["client_id", "file_name", "file_hash", "rows"],
 );
 
 const createSituationRequestSchema = strictObjectSchema(
@@ -419,9 +445,16 @@ const lddImportPreviewResponses = {
     description: "Linhas CP- lidas do PDF, para revisão. Nada é gravado.",
     ...successJsonWithData({
       type: "object",
-      required: ["file_name", "rows"],
+      required: ["file_name", "file_hash", "already_imported_at", "rows"],
       properties: {
         file_name: { type: "string" },
+        file_hash: { type: "string", description: "SHA-256 do PDF; enviar na confirmação." },
+        already_imported_at: {
+          type: "string",
+          format: "date-time",
+          nullable: true,
+          description: "Quando este mesmo PDF já foi importado para o cliente.",
+        },
         rows: {
           type: "array",
           items: {
@@ -445,6 +478,39 @@ const lddImportPreviewResponses = {
   "403": { description: "Forbidden", ...errorJson },
   "404": { description: "Cliente não encontrado", ...errorJson },
   "422": { description: "PDF ilegível ou sem linha CP- elegível", ...errorJson },
+} as const;
+
+const lddImportConfirmResponses = {
+  "201": {
+    description: "Importação gravada: linhas da mesma chave somadas ao saldo.",
+    ...successJsonWithData({
+      type: "object",
+      required: ["import_id", "rows_count", "total_amount", "records"],
+      properties: {
+        import_id: { type: "string", format: "uuid" },
+        rows_count: { type: "integer", minimum: 1 },
+        total_amount: { type: "number" },
+        records: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["id", "period", "due_date", "balance_amount"],
+            properties: {
+              id: { type: "string", format: "uuid" },
+              period: { type: "string" },
+              due_date: { type: "string", format: "date" },
+              balance_amount: { type: "number", description: "Saldo depois da importação." },
+            },
+          },
+        },
+      },
+    }),
+  },
+  "400": { description: "Bad request", ...errorJson },
+  "401": { description: "Unauthorized", ...errorJson },
+  "403": { description: "Forbidden", ...errorJson },
+  "404": { description: "Cliente não encontrado", ...errorJson },
+  "409": { description: "PDF já importado para o cliente", ...errorJson },
 } as const;
 
 const optionalDetailResponses = {
@@ -637,6 +703,16 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           operationId: "createPessoalLdd",
           requestBody: jsonRequestBody(createLddRequestSchema),
           responses: obligationGenerationResponses,
+        },
+      },
+      "/pessoal/ldd/import": {
+        post: {
+          tags: ["Pessoal LDD"],
+          security: bearerSecurity,
+          summary: "Confirmar a importação de LDD/INSS revisada",
+          operationId: "confirmPessoalLddImport",
+          requestBody: jsonRequestBody(confirmLddImportRequestSchema),
+          responses: lddImportConfirmResponses,
         },
       },
       "/pessoal/ldd/import/preview": {

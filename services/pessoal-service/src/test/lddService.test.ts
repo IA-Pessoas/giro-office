@@ -21,14 +21,21 @@ function createPrismaMock() {
         }),
       ),
     },
+    lddImportPessoal: {
+      findFirst: vi.fn(async (): Promise<{ created_at: Date } | null> => null),
+      create: vi.fn(async ({ data }) => ({ id: "import-1", ...data })),
+    },
+    $transaction: vi.fn(),
     lddPessoal: {
       create: vi.fn(async ({ data }) => ({ id: recordId, ...data })),
       findMany: vi.fn(async () => []),
-      findFirst: vi.fn(async () => ({
-        id: recordId,
-        client_id: clientId,
-        organization_id: organizationId,
-      })),
+      findFirst: vi.fn(
+        async (): Promise<Record<string, unknown> | null> => ({
+          id: recordId,
+          client_id: clientId,
+          organization_id: organizationId,
+        }),
+      ),
       update: vi.fn(async ({ data }) => ({ id: recordId, client_id: clientId, ...data })),
       delete: vi.fn(async () => ({
         id: recordId,
@@ -212,5 +219,82 @@ describe("LddService", () => {
     await expect(
       service.previewImport({ organizationId, userId, permission: 2 }, body),
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("avisa na prévia quando o mesmo PDF já foi importado para o cliente", async () => {
+    const prisma = createPrismaMock();
+    const importedAt = new Date("2026-10-01T12:00:00.000Z");
+    prisma.lddImportPessoal.findFirst.mockResolvedValueOnce({ created_at: importedAt });
+    const service = new LddService(prisma as never, createAuditMock());
+
+    const preview = await service.previewImport(
+      { organizationId, userId, permission: 2 },
+      {
+        client_id: clientId,
+        file_name: "ldd.pdf",
+        content_base64: lddPdfBase64(["CP-SEGUR. 01/2024 20/02/2024 10,00 10,00"]),
+      },
+    );
+
+    expect(preview.already_imported_at).toEqual(importedAt);
+    expect(prisma.lddImportPessoal.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: organizationId,
+          client_id: clientId,
+          file_hash: preview.file_hash,
+        },
+      }),
+    );
+  });
+
+  describe("confirmImport", () => {
+    const body = {
+      client_id: clientId,
+      file_name: "ldd.pdf",
+      file_hash: "a".repeat(64),
+      rows: [{ period: "01/2024", due_date: "2024-02-20", balance_amount: 10 }],
+    };
+
+    it("grava em transação e audita só metadados", async () => {
+      const prisma = createPrismaMock();
+      prisma.lddPessoal.findFirst.mockResolvedValue(null);
+      prisma.$transaction.mockImplementation(async (callback) => callback(prisma));
+      const audit = createAuditMock();
+      const service = new LddService(prisma as never, audit);
+
+      const result = await service.confirmImport({ organizationId, userId, permission: 2 }, body);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ import_id: "import-1", rows_count: 1, total_amount: 10 });
+      expect(audit.recordChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          referring: "pessoal.ldd_import",
+          referringId: "import-1",
+          changes: { client_id: clientId, rows_count: 1, total_amount: 10, ldd_ids: [recordId] },
+        }),
+      );
+    });
+
+    it("não audita quando a transação falha e nega Viewer e cliente de fora", async () => {
+      const prisma = createPrismaMock();
+      prisma.$transaction.mockRejectedValueOnce(new Error("conexão caiu"));
+      const audit = createAuditMock();
+      const service = new LddService(prisma as never, audit);
+
+      await expect(
+        service.confirmImport({ organizationId, userId, permission: 2 }, body),
+      ).rejects.toMatchObject({ statusCode: 500 });
+      await expect(
+        service.confirmImport({ organizationId, userId, permission: 1 }, body),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      prisma.client.findFirst.mockResolvedValueOnce(null);
+      await expect(
+        service.confirmImport({ organizationId, userId, permission: 2 }, body),
+      ).rejects.toMatchObject({ statusCode: 404 });
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(audit.recordChange).not.toHaveBeenCalled();
+    });
   });
 });

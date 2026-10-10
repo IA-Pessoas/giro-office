@@ -151,4 +151,43 @@ describe("LDD routes", () => {
       "O PDF excede o limite de 700 KB.",
     );
   });
+
+  it("confirma a importação com 201 e valida as linhas antes do service", async () => {
+    const result = { import_id: "import-1", rows_count: 1, total_amount: 10, records: [] };
+    const service = { confirmImport: vi.fn(async () => result) };
+    const app = createRouteTestApp("/pessoal/ldd", createLddRoutes(service as never));
+    const row = { period: "13/2023", due_date: "2023-12-20", balance_amount: 10 };
+    const body = {
+      client_id: clientId,
+      file_name: "ldd.pdf",
+      file_hash: "a".repeat(64),
+      rows: [row],
+    };
+    const post = (payload: unknown) =>
+      request(app)
+        .post("/pessoal/ldd/import")
+        .set(gatewayHeaders())
+        .send(payload as object);
+
+    const response = await post(body);
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ success: true, data: result });
+    expect(service.confirmImport).toHaveBeenCalledWith(
+      { organizationId, userId, permission: 2, requestId: expect.any(String) },
+      body,
+    );
+
+    for (const invalid of [
+      { ...body, rows: [] },
+      { ...body, file_hash: "abc" },
+      { ...body, rows: [{ ...row, period: "14/2023" }] },
+      { ...body, rows: [{ ...row, due_date: "2023-02-31" }] },
+      { ...body, rows: [{ ...row, balance_amount: 0 }] },
+      { ...body, rows: [{ ...row, organization_id: organizationId }] },
+    ]) {
+      expect((await post(invalid)).status).toBe(400);
+    }
+    expect(service.confirmImport).toHaveBeenCalledTimes(1);
+  });
 });

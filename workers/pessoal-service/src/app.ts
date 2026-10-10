@@ -13,6 +13,8 @@ import {
   groupAssignmentPreviewQuerySchema,
 } from "@workspace/pessoal-service/src/schemas/groupAssignment.schemas.js";
 import {
+  type ConfirmLddImportBody,
+  confirmLddImportBodySchema,
   createLddBodySchema,
   lddIdParamsSchema,
   listLddQuerySchema,
@@ -53,7 +55,12 @@ import {
   unionIdParamsSchema,
   updateUnionBodySchema,
 } from "@workspace/pessoal-service/src/schemas/union.schemas.js";
-import { buildLddImportPreview } from "@workspace/pessoal-service/src/services/lddPdfImportService.js";
+import {
+  buildLddImportPreview,
+  confirmLddImport,
+  findLddImportDate,
+  type LddImportStore,
+} from "@workspace/pessoal-service/src/services/lddPdfImportService.js";
 import {
   listObligationHistory,
   OBLIGATION_AUDIT_REFERRING,
@@ -148,6 +155,10 @@ export type PessoalLddService = {
   previewImport(
     context: Record<string, unknown>,
     body: { client_id: string; file_name: string; content_base64: string },
+  ): Promise<unknown>;
+  confirmImport(
+    context: { organizationId: string; userId: string; permission: number },
+    body: ConfirmLddImportBody,
   ): Promise<unknown>;
   create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
   update(
@@ -766,7 +777,36 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
         select: { id: true },
       });
       if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
-      return buildLddImportPreview(body);
+      const preview = buildLddImportPreview(body);
+      const already_imported_at = await findLddImportDate(prisma as unknown as LddImportStore, {
+        organizationId: String(context.organizationId),
+        clientId: body.client_id,
+        fileHash: preview.file_hash,
+      });
+      return { ...preview, already_imported_at };
+    },
+    // `prisma` aqui já é a transação da rota (withDomainClient): arquivo, saldos e auditoria
+    // confirmam juntos.
+    async confirmImport(context, body) {
+      const client = await prisma.client.findFirst({
+        where: { id: body.client_id, organization_id: context.organizationId },
+        select: { id: true },
+      });
+      if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
+      const result = await confirmLddImport(prisma as unknown as LddImportStore, context, body);
+      await audit(env, {
+        organizationId: context.organizationId,
+        userId: context.userId,
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.ldd_import",
+        referringId: result.import_id,
+        department: "pessoal",
+      });
+      return result;
     },
     async create(context, body) {
       const organizationId = String(context.organizationId);
@@ -1882,6 +1922,16 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       requirePessoalPermission(c.get("auth"), 2);
       const body = parseWithZod(createLddBodySchema, await c.req.json());
       return c.json(createSuccessResponse(await service.create(domainContext(c), body)), 201);
+    }),
+  );
+  app.post("/pessoal/ldd/import", (c) =>
+    withLddService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(confirmLddImportBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(await service.confirmImport(domainContext(c), body)),
+        201,
+      );
     }),
   );
   app.post("/pessoal/ldd/import/preview", (c) =>
