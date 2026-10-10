@@ -42,6 +42,7 @@ import {
   summarizeLddImportByKey,
   validateLddPdfFile,
 } from "./utils/lddImportPreview.ts";
+import { buildLddSheet } from "./utils/lddSheet.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
   cancelUnionDeletion,
@@ -736,7 +737,7 @@ runTest("pessoal shell wires access, active client selector, and functional tabs
   assert.match(shell, /PessoalGroupsSection canEdit=\{access\.canEdit\}/);
   assert.match(shell, /PessoalPayrollSection selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalObligationsSection selectedClientId=\{selectedClientId\}/);
-  assert.match(shell, /PessoalTrackingSection selectedClientId=\{selectedClientId\}/);
+  assert.match(shell, /PessoalTrackingSection\s+selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalPasswordsSection[\s\S]*selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalPasswordsSection\s+key=\{selectedClientId\}/);
   assert.match(shell, /PessoalOverviewSection onSelectTab=\{setActiveTab\}/);
@@ -1038,6 +1039,67 @@ runTest("LDD import refuses non-PDF, empty and oversized files before upload", (
     validateLddPdfFile({ ...pdf, size: 700 * 1024 + 1 }),
     "O PDF excede o limite de 700 KB.",
   );
+});
+
+runTest("LDD sheet separates previdenciário and PGFN with subtotals and total", () => {
+  const ldd = (id, type, due_date, balance_amount, extra = {}) => ({
+    id,
+    client_id: "client-1",
+    type,
+    period: null,
+    due_date,
+    balance_amount,
+    registration_status: null,
+    status: null,
+    ...extra,
+  });
+  const sheet = buildLddSheet([
+    ldd("1", "INSS", "2024-02-20T00:00:00.000Z", 0.1, { period: "01/2024" }),
+    // Registro migrado do legado: tipo 1 é previdenciário, tipo 0 é PGFN.
+    ldd("2", "1", "2024-03-20T00:00:00.000Z", 0.2, { period: "02/2024" }),
+    ldd("3", "INSS", null, null, { period: "03/2024" }),
+    ldd("4", "PGFN", null, 50, { registration_status: "12.3.45.678901-23", status: "Ativa" }),
+    ldd("5", "0", null, 25.5),
+    ldd("6", "FGTS", "2024-01-07T00:00:00.000Z", 10),
+  ]);
+
+  // Vencimento mais recente primeiro, como na ficha antiga; sem vencimento vai para o fim.
+  assert.deepEqual(
+    sheet.previdenciario.rows.map((row) => row.id),
+    ["2", "1", "3"],
+  );
+  assert.equal(sheet.previdenciario.subtotal, 0.3);
+  assert.deepEqual(
+    sheet.pgfn.rows.map((row) => row.id),
+    ["4", "5"],
+  );
+  assert.equal(sheet.pgfn.subtotal, 75.5);
+  // FGTS, IRRF e ISS não entram na ficha nem no total, como na ficha antiga.
+  assert.equal(sheet.excluded, 1);
+  assert.equal(sheet.total, 75.8);
+
+  const empty = buildLddSheet([]);
+  assert.deepEqual(
+    [empty.previdenciario.rows, empty.pgfn.rows, empty.excluded, empty.total],
+    [[], [], 0, 0],
+  );
+});
+
+runTest("LDD sheet prints without a competence filter and the manual form offers PGFN", () => {
+  const sheet = readFileSync(new URL("./components/PessoalLddSheet.tsx", import.meta.url), "utf8");
+  const tracking = readFileSync(
+    new URL("./components/PessoalTrackingSection.tsx", import.meta.url),
+    "utf8",
+  );
+  const styles = readFileSync(new URL("../../styles/global.css", import.meta.url), "utf8");
+
+  assert.match(sheet, /className="print-report/);
+  assert.match(sheet, /printReport\("pessoal-ldd-sheet"\)/);
+  assert.doesNotMatch(sheet, /Competência/);
+  assert.match(tracking, /lddTypeOptions = \["INSS", "PGFN", "FGTS", "IRRF", "ISS"\]/);
+  assert.match(styles, /\.print-report \*/);
+  // PGFN manual: inscrição e situação são texto livre, como na ficha.
+  assert.match(tracking, /isPgfnDetail \? \(field\.name === "registration_status" \? "Inscrição" : "Situação"\)/);
 });
 
 console.log("pessoal contract tests passed");

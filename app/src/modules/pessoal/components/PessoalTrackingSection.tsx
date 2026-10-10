@@ -30,6 +30,7 @@ import {
   useUpdatePessoalLddMutation,
   useUpdatePessoalSituationMutation,
 } from "../hooks/usePessoalTracking";
+import type { PessoalClientOption } from "../types";
 import type {
   PessoalLdd,
   PessoalLddPayload,
@@ -44,10 +45,13 @@ import {
 } from "./pessoalFormControls";
 import { optional } from "./pessoalFormValueHelpers";
 import { PessoalLddImportPreview } from "./PessoalLddImportPreview";
+import { PessoalLddSheet } from "./PessoalLddSheet";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalTrackingSectionProps {
   selectedClientId: string;
+  /** Nome e documento do cliente, para o cabeçalho da ficha LDD. */
+  selectedClient: PessoalClientOption | null;
   canEdit: boolean;
 }
 
@@ -82,9 +86,9 @@ const emptySituationFormValues: SituationFormValues = {
 };
 
 const LDD_DESCRIPTION =
-  "LDD é o acompanhamento de um débito do cliente (INSS, FGTS, IRRF ou ISS), com período, vencimento, saldo e situação.";
+  "LDD é o acompanhamento de um débito do cliente (INSS, dívida ativa na PGFN, FGTS, IRRF ou ISS), com período, vencimento, saldo e situação.";
 
-const lddTypeOptions = ["INSS", "FGTS", "IRRF", "ISS"] as const;
+const lddTypeOptions = ["INSS", "PGFN", "FGTS", "IRRF", "ISS"] as const;
 const lddRegistrationStatusOptions = ["Pendente", "Cadastrado"] as const;
 const lddStatusOptions = ["Pendente", "Pago", "Vencido"] as const;
 
@@ -159,6 +163,7 @@ function buildSituationFormValues(situation: PessoalSituation | null): Situation
 
 export function PessoalTrackingSection({
   selectedClientId,
+  selectedClient,
   canEdit,
 }: PessoalTrackingSectionProps) {
   const hasClient = selectedClientId.length > 0;
@@ -525,16 +530,22 @@ export function PessoalTrackingSection({
               empty={lddRows.length === 0}
               emptyMessage="Nenhum LDD cadastrado para este cliente."
               actions={
-                canEdit ? (
-                  <button
-                    type="button"
-                    onClick={startNewLdd}
-                    className={pessoalPrimaryButtonClassName}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Criar LDD
-                  </button>
-                ) : null
+                <>
+                  <PessoalLddSheet
+                    client={selectedClient}
+                    ldd={lddQuery.isSuccess && !lddQuery.isFetching ? lddRows : null}
+                  />
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      onClick={startNewLdd}
+                      className={pessoalPrimaryButtonClassName}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Criar LDD
+                    </button>
+                  ) : null}
+                </>
               }
             >
               {lddRows.map((ldd) => (
@@ -726,9 +737,14 @@ export function PessoalTrackingSection({
               <div className="grid gap-3 sm:grid-cols-2">
                 {lddFields.map((field) => {
                   const fieldValue = lddFormValues[field.name];
-                  const fieldOptions = "options" in field ? field.options : null;
+                  // PGFN (dívida ativa) guarda inscrição e situação em texto livre, como no legado.
+                  const isPgfnDetail =
+                    lddFormValues.type === "PGFN" &&
+                    (field.name === "registration_status" || field.name === "status");
+                  const label = isPgfnDetail ? (field.name === "registration_status" ? "Inscrição" : "Situação") : field.label;
+                  const fieldOptions = !isPgfnDetail && "options" in field ? field.options : null;
                   const isMoney = "money" in field && field.money;
-                  const helpText = "help" in field ? field.help : undefined;
+                  const helpText = !isPgfnDetail && "help" in field ? field.help : undefined;
                   const customOption =
                     fieldOptions &&
                     fieldValue &&
@@ -742,8 +758,8 @@ export function PessoalTrackingSection({
                       className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
                     >
                       <span className="inline-flex items-center gap-1">
-                        <span>{field.label}</span>
-                        {helpText ? <FieldHelp label={field.label} description={helpText} /> : null}
+                        <span>{label}</span>
+                        {helpText ? <FieldHelp label={label} description={helpText} /> : null}
                       </span>
                       {fieldOptions ? (
                         <div className="relative">

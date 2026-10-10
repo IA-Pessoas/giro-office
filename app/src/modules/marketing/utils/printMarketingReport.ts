@@ -1,9 +1,2 @@
-/** Rola o relatório (dentro do Dialog) ao topo e abre a impressão; o CSS de `@media print` isola o id. */
-export function printMarketingReport(reportId: string): void {
-  const report = document.getElementById(reportId);
-  for (let element = report; element; element = element.parentElement) element.scrollTop = 0;
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-  window.scrollTo(0, 0);
-  window.print();
-}
+/** Impressão dos relatórios do Marketing: o helper é o compartilhado do app. */
+export { printReport as printMarketingReport } from "@shared/utils/printReport";
