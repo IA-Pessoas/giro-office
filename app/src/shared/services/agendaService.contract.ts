@@ -14,6 +14,8 @@ export interface AgendaEvent {
   status: string | null;
   obs: string | null;
   location: string | null;
+  /** Preenchido quando o evento é ocorrência de uma recorrência mensal. */
+  recurring_agenda_id: string | null;
 }
 
 export interface AgendaEventPayload {
@@ -21,6 +23,8 @@ export interface AgendaEventPayload {
   date: string;
   status: AgendaStatus;
   obs: string | null;
+  /** Repete todo mês; desligar encerra a série e mantém os eventos já criados. */
+  recurrent?: boolean;
 }
 
 /** Evento de dia inteiro: meio-dia UTC mantém o dia escolhido em qualquer fuso do Brasil. */
