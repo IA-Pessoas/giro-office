@@ -276,4 +276,30 @@ describe("MarketingPasswordService", () => {
     expect(JSON.stringify(quarantine)).not.toContain(noteSecret);
     expect(JSON.stringify(quarantine)).not.toContain("other-tenant-secret");
   });
+
+  it("never copies a secret kept in legacy notes into the trail when the notes change", async () => {
+    const prisma = createPrisma();
+    const encryption = new EncryptionService(encryptionKey);
+    const audit = vi.fn(async () => {});
+    const service = new MarketingPasswordService(prisma as never, encryption, audit);
+    prisma.passwordMkt.findFirst
+      .mockResolvedValueOnce({
+        id: "credential-1",
+        local: "Instagram",
+        user: "acme",
+        notes: "Senha antiga: legacy-secret",
+        password: encryption.encrypt("legacy-secret"),
+      } as never)
+      .mockResolvedValueOnce(null);
+
+    await service.update(organizationId, "credential-1", { notes: "Conta oficial" }, actorUserId);
+
+    expect(JSON.stringify(audit.mock.calls)).not.toContain("legacy-secret");
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Edição",
+        changes: { notes: { from: null, to: "Conta oficial" } },
+      }),
+    );
+  });
 });

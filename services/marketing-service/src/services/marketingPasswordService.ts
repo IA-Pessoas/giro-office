@@ -192,8 +192,9 @@ export class MarketingPasswordService {
             select: { ...METADATA_SELECT },
           })) as PasswordMetadata,
         );
+        // Observação legada pode conter a senha: a trilha usa a versão já redigida.
         const changes: Record<string, unknown> = changedFields(
-          auditedIdentity(existing),
+          auditedIdentity(this.safeMetadata(existing)),
           auditedIdentity(record),
         );
         if (input.password !== undefined) changes.password = SECRET_CHANGED;
