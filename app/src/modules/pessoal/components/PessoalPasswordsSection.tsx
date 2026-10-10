@@ -38,6 +38,7 @@ import type {
 } from "../types/passwords";
 import {
   isPessoalPasswordKnownService,
+  normalizePessoalText,
   PESSOAL_PASSWORD_SERVICE_OPTIONS,
   pessoalPasswordPortalUrl,
 } from "../utils/passwordPortals";
@@ -89,13 +90,6 @@ const secretFields = [
 ] as const satisfies ReadonlyArray<{ name: SecretFieldName; label: string }>;
 
 const PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION = "__custom_service__";
-
-function normalizeSearch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
 
 function buildPasswordFormValues(
   password: PessoalPasswordDetail | PessoalPasswordListItem | null,
@@ -236,14 +230,14 @@ export function PessoalPasswordsSection({
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
   const filteredPasswords = useMemo(() => {
-    const normalizedTerm = normalizeSearch(searchTerm.trim());
+    const normalizedTerm = normalizePessoalText(searchTerm.trim());
 
     if (!normalizedTerm) {
       return passwords;
     }
 
     return passwords.filter((password) => {
-      const searchable = normalizeSearch(
+      const searchable = normalizePessoalText(
         `${password.service_name} ${getResponsibleName(password)}`,
       );
 

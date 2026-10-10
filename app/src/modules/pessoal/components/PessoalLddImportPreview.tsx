@@ -228,6 +228,11 @@ export function PessoalLddImportPreview({
             <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
               Corrija ou remova as linhas com erro para confirmar.
             </p>
+          ) : existingLdd ? (
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              Depois de confirmar, este PDF não poderá ser importado de novo para o cliente. Linhas
+              removidas da prévia terão de ser cadastradas à mão.
+            </p>
           ) : !existingLdd ? (
             <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
               Aguardando a lista de LDD do cliente para mostrar o saldo cadastrado. Use

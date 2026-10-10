@@ -62,7 +62,8 @@ export const previewLddImportBodySchema = z
   })
   .strict();
 
-const isCalendarDate = (value: string) => {
+/** `AAAA-MM-DD` que existe no calendário (31/02 não passa). */
+export const isCalendarDate = (value: string): boolean => {
   const date = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
 };

@@ -6193,15 +6193,28 @@ const handlers = {
 
   async pessoalLddImportConfirm(op) {
     // Hash novo a cada execução: o mesmo arquivo só pode ser importado uma vez por cliente.
-    await httpRequest(op, {
+    // Chave em 2099, que nenhum débito real usa: o LDD é sempre criado aqui e removido em seguida.
+    const response = await httpRequest(op, {
       expectedStatus: [201],
       json: {
         client_id: requireState("primaryClientId"),
         file_name: "ldd.pdf",
         file_hash: crypto.randomBytes(32).toString("hex"),
-        rows: [{ period: "01/2024", due_date: "2024-02-20", balance_amount: 0.01 }],
+        rows: [{ period: "12/2099", due_date: "2099-12-31", balance_amount: 0.01 }],
       },
     });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const importedId = pickFirst(response.body, "data.records.0.id");
+    if (importedId) {
+      await httpRequest(op, {
+        method: "DELETE",
+        path: `/pessoal/ldd/${importedId}`,
+        expectedStatus: [200],
+        label: `${op.id}:cleanup`,
+      });
+    }
   },
 
   async pessoalLddPatch(op) {

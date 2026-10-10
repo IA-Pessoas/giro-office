@@ -5,8 +5,15 @@ import {
 
 import type { PessoalLdd, PessoalLddImportPreview, PessoalLddImportRow } from "../types/tracking";
 
-/** Tipo que o importador grava no servidor (`LDD_IMPORT_TYPE`): só ele compõe o saldo existente. */
-export const LDD_IMPORT_TYPE = "INSS";
+/**
+ * Tipos de LDD previdenciário: `INSS` (cadastro manual e importador de PDF) e `1` (registros
+ * migrados do legado). A importação acresce no saldo deles e a ficha LDD os lista juntos.
+ */
+export const LDD_PREVIDENCIARIO_TYPES = ["INSS", "1"];
+
+export function isPrevidenciarioLdd(ldd: Pick<PessoalLdd, "type">): boolean {
+  return LDD_PREVIDENCIARIO_TYPES.includes(ldd.type.trim().toUpperCase());
+}
 
 /** Mesmo teto do pessoal-service: cabe em base64 no corpo JSON de 1 MB do gateway. */
 export const LDD_PDF_MAX_BYTES = 700 * 1024;
@@ -129,7 +136,7 @@ export function summarizeLddImportByKey(
     const [target] = existingLdd
       .filter(
         (ldd) =>
-          ldd.type === LDD_IMPORT_TYPE &&
+          isPrevidenciarioLdd(ldd) &&
           ldd.period === period &&
           ldd.due_date?.slice(0, 10) === due_date,
       )

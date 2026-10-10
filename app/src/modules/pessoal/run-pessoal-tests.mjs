@@ -1022,6 +1022,8 @@ runTest("LDD import shows existing balance and increase per key and sends only v
   const existing = [
     { id: "b", type: "INSS", period: "01/2024", due_date: "2024-02-20T00:00:00.000Z", balance_amount: 7 },
     { id: "a", type: "INSS", period: "01/2024", due_date: "2024-02-20T00:00:00.000Z", balance_amount: 100.1 },
+    // Débito migrado do legado (tipo 1) também é saldo previdenciário existente.
+    { id: "d", type: "1", period: "02/2024", due_date: "2024-03-20T00:00:00.000Z", balance_amount: 20 },
     { id: "c", type: "FGTS", period: "02/2024", due_date: "2024-03-20T00:00:00.000Z", balance_amount: 50 },
   ];
 
@@ -1032,7 +1034,7 @@ runTest("LDD import shows existing balance and increase per key and sends only v
   ]);
   assert.deepEqual(summarizeLddImportByKey(rows, existing), [
     { period: "01/2024", due_date: "2024-02-20", existing: 100.1, increase: 0.3, total: 100.4 },
-    { period: "02/2024", due_date: "2024-03-20", existing: 0, increase: 5, total: 5 },
+    { period: "02/2024", due_date: "2024-03-20", existing: 20, increase: 5, total: 25 },
   ]);
 });
 

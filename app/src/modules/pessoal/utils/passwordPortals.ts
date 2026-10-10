@@ -32,7 +32,8 @@ export function isPessoalPasswordKnownService(value: string): value is PessoalPa
   return PESSOAL_PASSWORD_SERVICE_OPTIONS.includes(value as PessoalPasswordServiceOption);
 }
 
-const normalize = (value: string) =>
+/** Texto sem acento, caixa ou espaço nas pontas, para comparar nomes de serviço. */
+export const normalizePessoalText = (value: string) =>
   value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -50,7 +51,7 @@ const PORTAL_ALIASES = new Map<string, PessoalPasswordServiceOption>(
       ["Bem+(Mais)", "Bem Mais"],
       ["Benefício Social Familiar", "BSF"],
     ] as const
-  ).map(([alias, service]) => [normalize(alias), service]),
+  ).map(([alias, service]) => [normalizePessoalText(alias), service]),
 );
 
 /**
@@ -58,9 +59,9 @@ const PORTAL_ALIASES = new Map<string, PessoalPasswordServiceOption>(
  * Nome personalizado que não corresponde a um portal conhecido não tem atalho.
  */
 export function pessoalPasswordPortalUrl(serviceName: string): string | null {
-  const wanted = normalize(serviceName);
+  const wanted = normalizePessoalText(serviceName);
   const service =
-    PESSOAL_PASSWORD_SERVICE_OPTIONS.find((option) => normalize(option) === wanted) ??
+    PESSOAL_PASSWORD_SERVICE_OPTIONS.find((option) => normalizePessoalText(option) === wanted) ??
     PORTAL_ALIASES.get(wanted);
   return service ? (PESSOAL_PASSWORD_PORTALS[service] ?? null) : null;
 }
