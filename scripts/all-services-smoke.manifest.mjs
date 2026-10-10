@@ -4560,6 +4560,14 @@ const baseManifest = [
   op({
     service: "contabil-service",
     method: "POST",
+    path: "/contabil/contingency",
+    action: "contabilContingencySimulate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "contabil-service",
+    method: "POST",
     path: "/contabil/controls",
     action: "contabilControlCreateInvalid",
     target: "gateway",
