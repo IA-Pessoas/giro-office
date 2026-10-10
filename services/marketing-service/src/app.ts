@@ -84,7 +84,7 @@ export function createMarketingApp({
   const passwords =
     passwordService ??
     (prisma
-      ? new MarketingPasswordService(prisma, new EncryptionService(env.mtkEncryptionKey))
+      ? new MarketingPasswordService(prisma, new EncryptionService(env.mtkEncryptionKey), audit)
       : null);
   const marketingEvents =
     eventsService ?? (prisma ? new MarketingEventsService(prisma, audit) : null);

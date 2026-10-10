@@ -116,7 +116,7 @@ describe("Marketing password routes", () => {
     expect(service.reveal).toHaveBeenCalledOnce();
     expect(revealed.status).toBe(200);
     expect(revealed.body.data.password).toBe("sensitive-secret");
-    expect(service.reveal).toHaveBeenCalledWith(organizationId, credentialId, true);
+    expect(service.reveal).toHaveBeenCalledWith(organizationId, credentialId, true, userId);
   });
 
   it("rejects tenant overrides and blocks deletion routes", async () => {
@@ -150,7 +150,7 @@ describe("Marketing password routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.password).toBe("sensitive-secret");
-    expect(service.export).toHaveBeenCalledWith(organizationId, credentialId, true);
+    expect(service.export).toHaveBeenCalledWith(organizationId, credentialId, true, userId);
   });
 
   it("scopes imports and quarantine reads to the authenticated organization", async () => {

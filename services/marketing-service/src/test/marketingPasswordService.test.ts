@@ -6,8 +6,10 @@ import { MarketingPasswordService } from "../services/marketingPasswordService.j
 const encryptionKey = Buffer.alloc(32, 7).toString("base64");
 const organizationId = "10000000-0000-4000-8000-000000000001";
 
+const actorUserId = "20000000-0000-4000-8000-000000000009";
+
 function createPrisma() {
-  return {
+  const prisma = {
     passwordMkt: {
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async () => null),
@@ -24,7 +26,9 @@ function createPrisma() {
       createMany: vi.fn(async () => ({ count: 0 })),
       findMany: vi.fn(async () => []),
     },
+    $transaction: vi.fn((run: (tx: unknown) => unknown) => run(prisma)),
   };
+  return prisma;
 }
 
 describe("MarketingPasswordService", () => {
@@ -33,14 +37,19 @@ describe("MarketingPasswordService", () => {
     const service = new MarketingPasswordService(
       prisma as never,
       new EncryptionService(encryptionKey),
+      vi.fn(async () => {}),
     );
 
-    const created = await service.create(organizationId, {
-      local: "Instagram",
-      user: "acme@example.com",
-      password: "sensitive-secret",
-      notes: "Conta oficial",
-    });
+    const created = await service.create(
+      organizationId,
+      {
+        local: "Instagram",
+        user: "acme@example.com",
+        password: "sensitive-secret",
+        notes: "Conta oficial",
+      },
+      actorUserId,
+    );
 
     expect(created).toEqual({
       id: "credential-1",
@@ -71,7 +80,11 @@ describe("MarketingPasswordService", () => {
   it("requires explicit confirmation before revealing a secret", async () => {
     const prisma = createPrisma();
     const encryption = new EncryptionService(encryptionKey);
-    const service = new MarketingPasswordService(prisma as never, encryption);
+    const service = new MarketingPasswordService(
+      prisma as never,
+      encryption,
+      vi.fn(async () => {}),
+    );
     const encrypted = encryption.encrypt("sensitive-secret");
     prisma.passwordMkt.findFirst.mockResolvedValue({
       id: "credential-1",
@@ -79,10 +92,14 @@ describe("MarketingPasswordService", () => {
       password: encrypted,
     } as never);
 
-    await expect(service.reveal(organizationId, "credential-1", false)).rejects.toMatchObject({
+    await expect(
+      service.reveal(organizationId, "credential-1", false, actorUserId),
+    ).rejects.toMatchObject({
       statusCode: 400,
     });
-    await expect(service.reveal(organizationId, "credential-1", true)).resolves.toEqual({
+    await expect(
+      service.reveal(organizationId, "credential-1", true, actorUserId),
+    ).resolves.toEqual({
       password: "sensitive-secret",
     });
   });
@@ -96,14 +113,19 @@ describe("MarketingPasswordService", () => {
     const service = new MarketingPasswordService(
       prisma as never,
       new EncryptionService(encryptionKey),
+      vi.fn(async () => {}),
     );
 
     await expect(
-      service.create(organizationId, {
-        local: "Instagram",
-        user: "acme@example.com",
-        password: "sensitive-secret",
-      }),
+      service.create(
+        organizationId,
+        {
+          local: "Instagram",
+          user: "acme@example.com",
+          password: "sensitive-secret",
+        },
+        actorUserId,
+      ),
     ).rejects.toMatchObject({ statusCode: 409 });
     expect(prisma.passwordMkt.create).not.toHaveBeenCalled();
     expect(prisma.passwordMkt.findFirst).toHaveBeenCalledWith({
@@ -120,15 +142,20 @@ describe("MarketingPasswordService", () => {
     const service = new MarketingPasswordService(
       prisma as never,
       new EncryptionService(encryptionKey),
+      vi.fn(async () => {}),
     );
 
     await expect(
-      service.create(organizationId, {
-        local: "Instagram",
-        user: "acme@example.com",
-        password: "sensitive-secret",
-        notes: "Temporary password: sensitive-secret",
-      }),
+      service.create(
+        organizationId,
+        {
+          local: "Instagram",
+          user: "acme@example.com",
+          password: "sensitive-secret",
+          notes: "Temporary password: sensitive-secret",
+        },
+        actorUserId,
+      ),
     ).rejects.toMatchObject({ statusCode: 400 });
     expect(prisma.passwordMkt.create).not.toHaveBeenCalled();
   });
@@ -145,7 +172,11 @@ describe("MarketingPasswordService", () => {
         password: encryption.encrypt("legacy-secret"),
       },
     ] as never);
-    const service = new MarketingPasswordService(prisma as never, encryption);
+    const service = new MarketingPasswordService(
+      prisma as never,
+      encryption,
+      vi.fn(async () => {}),
+    );
 
     const listed = await service.list(organizationId);
 
@@ -156,7 +187,11 @@ describe("MarketingPasswordService", () => {
   it("imports verifiable Office ciphertext and encrypts all quarantined payloads", async () => {
     const prisma = createPrisma();
     const encryption = new EncryptionService(encryptionKey);
-    const service = new MarketingPasswordService(prisma as never, encryption);
+    const service = new MarketingPasswordService(
+      prisma as never,
+      encryption,
+      vi.fn(async () => {}),
+    );
     const validSecret = "verified-secret";
     const duplicatedSecret = "duplicate-secret";
     const result = await service.importLegacyRecords(organizationId, [
@@ -202,7 +237,11 @@ describe("MarketingPasswordService", () => {
   it("quarantines invalid ciphertext, cross-tenant links, and secrets duplicated in notes", async () => {
     const prisma = createPrisma();
     const encryption = new EncryptionService(encryptionKey);
-    const service = new MarketingPasswordService(prisma as never, encryption);
+    const service = new MarketingPasswordService(
+      prisma as never,
+      encryption,
+      vi.fn(async () => {}),
+    );
     const noteSecret = "note-secret";
     const result = await service.importLegacyRecords(organizationId, [
       {

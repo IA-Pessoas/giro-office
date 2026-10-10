@@ -78,11 +78,12 @@ export function createMarketingPasswordRoutes(
     authenticate,
     editor,
     withLoggedError("Falha ao criar credencial de Marketing.", async (request, response) => {
-      const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+      const { organization_id: organizationId, user_id: userId } =
+        requireAuthenticatedRequestContext(request);
       const body = parseWithZod(createMarketingPasswordBodySchema, request.body);
       response
         .status(201)
-        .json(createSuccessResponse(await passwordService.create(organizationId, body)));
+        .json(createSuccessResponse(await passwordService.create(organizationId, body, userId)));
     }),
   );
 
@@ -91,10 +92,13 @@ export function createMarketingPasswordRoutes(
     authenticate,
     editor,
     withLoggedError("Falha ao atualizar credencial de Marketing.", async (request, response) => {
-      const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+      const { organization_id: organizationId, user_id: userId } =
+        requireAuthenticatedRequestContext(request);
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, request.params);
       const body = parseWithZod(updateMarketingPasswordBodySchema, request.body);
-      response.json(createSuccessResponse(await passwordService.update(organizationId, id, body)));
+      response.json(
+        createSuccessResponse(await passwordService.update(organizationId, id, body, userId)),
+      );
     }),
   );
 
@@ -103,11 +107,14 @@ export function createMarketingPasswordRoutes(
     authenticate,
     editor,
     withLoggedError("Falha ao revelar credencial de Marketing.", async (request, response) => {
-      const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+      const { organization_id: organizationId, user_id: userId } =
+        requireAuthenticatedRequestContext(request);
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, request.params);
       const body = parseWithZod(marketingPasswordConfirmationSchema, request.body);
       response.json(
-        createSuccessResponse(await passwordService.reveal(organizationId, id, body.confirmed)),
+        createSuccessResponse(
+          await passwordService.reveal(organizationId, id, body.confirmed, userId),
+        ),
       );
     }),
   );
@@ -117,11 +124,14 @@ export function createMarketingPasswordRoutes(
     authenticate,
     editor,
     withLoggedError("Falha ao exportar credencial de Marketing.", async (request, response) => {
-      const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+      const { organization_id: organizationId, user_id: userId } =
+        requireAuthenticatedRequestContext(request);
       const { id } = parseWithZod(marketingPasswordIdParamsSchema, request.params);
       const body = parseWithZod(marketingPasswordConfirmationSchema, request.body);
       response.json(
-        createSuccessResponse(await passwordService.export(organizationId, id, body.confirmed)),
+        createSuccessResponse(
+          await passwordService.export(organizationId, id, body.confirmed, userId),
+        ),
       );
     }),
   );
