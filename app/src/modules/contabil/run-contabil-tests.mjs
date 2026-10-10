@@ -284,6 +284,28 @@ await (async () => {
     assert.match(panel, /updateMonthly/);
   });
 
+  await runTest("triagem fiscal configura os documentos especiais do shared (#1693)", () => {
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+    const shared = readFileSync(
+      new URL("../../../../shared/src/triagem/triageDocuments.ts", import.meta.url),
+      "utf8",
+    );
+    const sharedList = shared.slice(
+      shared.indexOf("TRIAGE_FISCAL_SPECIAL_FIELDS = ["),
+      shared.indexOf("] as const satisfies readonly TriageFiscalChecklistField[]"),
+    );
+    const appList = labels.slice(
+      labels.indexOf("FISCAL_SPECIAL_DOCUMENTS"),
+      labels.indexOf("export const STATUSES"),
+    );
+    const fields = (text) => [...text.matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]);
+    assert.deepEqual(fields(appList), fields(sharedList));
+    assert.equal(fields(sharedList).length, 7);
+    const section = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    assert.match(section, /<FiscalSpecialDocumentsPanel/);
+    assert.equal(CONTABIL_ENDPOINTS.triageConfig, "/triagem/config");
+  });
+
   await runTest("triagem fiscal apresenta os 14 campos e controla revisão e entrega", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
     const pageSource = readWorkspaceSource("../../pages/triagem.tsx");

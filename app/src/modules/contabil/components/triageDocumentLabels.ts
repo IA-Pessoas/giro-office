@@ -29,6 +29,21 @@ export const FISCAL_DOCUMENTS = [
   ["cte_as_issuer", "CTe como emitente"],
   ["services_provided_as_mei", "Serviços prestados como MEI"],
 ] as const;
+/**
+ * Documentos fiscais especiais configuráveis por cliente; espelha
+ * TRIAGE_FISCAL_SPECIAL_FIELDS do shared (o app não importa o índice do shared).
+ */
+export const FISCAL_SPECIAL_DOCUMENTS = FISCAL_DOCUMENTS.filter(([field]) =>
+  [
+    "nfce_documents",
+    "sped_fiscal",
+    "sped_contributions",
+    "nfse_received",
+    "model_21_invoice",
+    "cte_as_issuer",
+    "services_provided_as_mei",
+  ].includes(field),
+);
 export const STATUSES: Array<[TriageDocumentStatus, string]> = [
   ["PENDING", "Pendente"],
   ["COMPLETED", "Concluído"],
