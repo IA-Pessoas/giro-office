@@ -1633,7 +1633,8 @@ export class ClientService implements ClientWorkerService {
     await this.ensureClient(clientId, organizationId);
     const rows = await this.db.clientLicitacaoHistory.findMany({
       where: { organization_id: organizationId, client_id: clientId },
-      orderBy: { created_at: "desc" },
+      // Desempate estável para trocas no mesmo milissegundo.
+      orderBy: [{ created_at: "desc" }, { id: "desc" }],
       select: {
         id: true,
         previous_value: true,
