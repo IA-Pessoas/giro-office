@@ -8,6 +8,8 @@ import { extractTriageReportingPage } from "../services/triageReportingService.j
 const ORG = "00000000-0000-4000-8000-000000000001";
 const CLIENT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CLIENT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const USER_ANA = "11111111-1111-4111-8111-111111111111";
+const USER_BRUNO = "22222222-2222-4222-8222-222222222222";
 
 const clientRows = [
   {
@@ -44,6 +46,14 @@ function delegates(monthly: readonly Record<string, unknown>[] = []) {
     monthly: { findMany: vi.fn().mockResolvedValue(monthly) },
     responsibles: {
       findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT_A, customer_with_movement: true }]),
+    },
+    assignments: { findMany: vi.fn().mockResolvedValue([]) },
+    competences: { findMany: vi.fn().mockResolvedValue([]) },
+    users: {
+      findMany: vi.fn().mockResolvedValue([
+        { id: USER_ANA, name: "Ana Souza" },
+        { id: USER_BRUNO, name: "Bruno Lima" },
+      ]),
     },
   };
 }
@@ -153,6 +163,103 @@ describe("extractTriageReportingPage", () => {
   });
 });
 
+describe("extractTriageReportingPage: responsáveis", () => {
+  it("lista as atribuições atuais com serviço, responsável e cliente da organização", async () => {
+    const prisma = delegates();
+    prisma.assignments.findMany.mockResolvedValue([
+      { id: "1", client_id: CLIENT_A, type: "CONTABIL", user_id: USER_ANA },
+      { id: "2", client_id: CLIENT_A, type: "FISCAL", user_id: USER_BRUNO },
+      { id: "3", client_id: CLIENT_B, type: "FISCAL", user_id: "usuario-de-outra-organizacao" },
+    ]);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.triage_responsibles",
+        organizationId: ORG,
+        fields: ["type", "responsible_name", "company_name"],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        { type: "Contábil", responsible_name: "Ana Souza", company_name: "Alfa Comércio Ltda" },
+        { type: "Fiscal", responsible_name: "Bruno Lima", company_name: "Alfa Comércio Ltda" },
+        { type: "Fiscal", responsible_name: null, company_name: null },
+      ],
+      reachedLimit: false,
+    });
+    expect(prisma.assignments.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG },
+        select: { id: true, client_id: true, type: true, user_id: true },
+      }),
+    );
+    expect(prisma.users.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: ORG,
+          id: { in: [USER_ANA, USER_BRUNO, "usuario-de-outra-organizacao"] },
+        },
+      }),
+    );
+    expect(prisma.competences.findMany).not.toHaveBeenCalled();
+  });
+
+  it("por competência usa o responsável da rotina e, sem ele, o congelado na abertura", async () => {
+    const prisma = delegates([
+      {
+        id: "1",
+        client_id: CLIENT_A,
+        competence: "2026-09",
+        type: "CONTABIL",
+        responsible_id: USER_ANA,
+      },
+      { id: "2", client_id: CLIENT_A, competence: "2026-09", type: "FISCAL", responsible_id: null },
+      { id: "3", client_id: CLIENT_B, competence: "2026-09", type: "FISCAL", responsible_id: null },
+    ]);
+    prisma.competences.findMany.mockResolvedValue([
+      {
+        client_id: CLIENT_A,
+        competence: "2026-09",
+        responsible_snapshot: {
+          responsibles: [
+            { type: "CONTABIL", user_id: USER_BRUNO },
+            { type: "FISCAL", user_id: USER_BRUNO },
+          ],
+        },
+      },
+    ]);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.triage_competence_responsibles",
+        organizationId: ORG,
+        fields: ["competence", "type", "responsible_name"],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        { competence: "2026-09", type: "Contábil", responsible_name: "Ana Souza" },
+        { competence: "2026-09", type: "Fiscal", responsible_name: "Bruno Lima" },
+        { competence: "2026-09", type: "Fiscal", responsible_name: null },
+      ],
+      reachedLimit: false,
+    });
+    expect(prisma.monthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, archived_at: null } }),
+    );
+    expect(prisma.competences.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: ORG,
+          client_id: { in: [CLIENT_A, CLIENT_B] },
+          archived_at: null,
+          competence: { in: ["2026-09"] },
+        },
+      }),
+    );
+  });
+});
+
 describe("InternalReportingService com as áreas da Triagem", () => {
   function database() {
     const prisma = {
@@ -171,6 +278,24 @@ describe("InternalReportingService com as áreas da Triagem", () => {
           ),
       },
       clientClouds: { findMany: vi.fn().mockResolvedValue([]) },
+      triageResponsible: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            [
+              { id: "1", client_id: CLIENT_A, type: "CONTABIL", user_id: USER_ANA },
+              { id: "2", client_id: CLIENT_B, type: "FISCAL", user_id: USER_ANA },
+              { id: "3", client_id: CLIENT_B, type: "CONTABIL", user_id: USER_BRUNO },
+            ].slice(skip, skip + take),
+          ),
+      },
+      triageCompetence: { findMany: vi.fn().mockResolvedValue([]) },
+      user: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: USER_ANA, name: "Ana Souza" },
+          { id: USER_BRUNO, name: "Bruno Lima" },
+        ]),
+      },
       triageMonthly: {
         findMany: vi
           .fn()
@@ -217,6 +342,23 @@ describe("InternalReportingService com as áreas da Triagem", () => {
       query: {
         filters: [
           { field: "customer_with_movement", operator: "eq", parameter: "movimento", value: false },
+        ],
+      },
+    });
+
+    expect(result.rows).toEqual([{ name: "Beta" }]);
+  });
+
+  it("lista os clientes atribuídos a um usuário em um serviço, como o relatório legado", async () => {
+    const result = await new InternalReportingService(database() as never).extract({
+      organizationId: ORG,
+      source: "contabil.triage_responsibles",
+      fields: ["name"],
+      limit: 50,
+      query: {
+        filters: [
+          { field: "responsible_name", operator: "eq", parameter: "usuario", value: "Ana Souza" },
+          { field: "type", operator: "eq", parameter: "servico", value: "Fiscal" },
         ],
       },
     });

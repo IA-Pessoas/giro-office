@@ -21,13 +21,14 @@ function field(
   };
 }
 
-// Mesmos campos de cliente, serviço contratado e movimento nas duas áreas: o filtro vale
-// igual em ambas.
+// Mesmos campos de cliente, serviço contratado e movimento em todas as áreas: o filtro vale
+// igual em cada uma.
 const clientFields = [
   field("name", "Nome", "string", stringOperators),
   field("company_name", "Razão social", "string", stringOperators),
   field("cpf_cnpj", "CPF/CNPJ", "string", stringOperators),
   field("status", "Status do cliente", "string", stringOperators),
+  field("regime", "Regime", "string", stringOperators),
   field("competence_entry", "Data de entrada", "date", dateOperators),
   field("contabil", "Serviço Contábil", "boolean", booleanOperators),
   field("fiscal", "Serviço Fiscal", "boolean", booleanOperators),
@@ -37,6 +38,8 @@ const clientFields = [
 export const CONTABIL_TRIAGE_REPORTING_SOURCES = [
   "contabil.triage_clouds",
   "contabil.triage_movement",
+  "contabil.triage_responsibles",
+  "contabil.triage_competence_responsibles",
 ] as const;
 export type ContabilTriageReportingSource = (typeof CONTABIL_TRIAGE_REPORTING_SOURCES)[number];
 
@@ -63,6 +66,31 @@ export const contabilTriageReportingCatalog = {
       fields: [
         field("competence", "Competência", "string", stringOperators),
         field("sends_movement", "Movimento enviado", "boolean", booleanOperators),
+        ...clientFields,
+      ],
+    },
+    {
+      key: "contabil.triage_responsibles",
+      label: "Responsáveis da Triagem",
+      module: "triagem",
+      minimum_permission: 1,
+      keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
+      fields: [
+        field("type", "Serviço da Triagem", "string", stringOperators),
+        field("responsible_name", "Responsável", "string", stringOperators),
+        ...clientFields,
+      ],
+    },
+    {
+      key: "contabil.triage_competence_responsibles",
+      label: "Responsáveis da Triagem por competência",
+      module: "triagem",
+      minimum_permission: 1,
+      keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
+      fields: [
+        field("competence", "Competência", "string", stringOperators),
+        field("type", "Serviço da Triagem", "string", stringOperators),
+        field("responsible_name", "Responsável", "string", stringOperators),
         ...clientFields,
       ],
     },
