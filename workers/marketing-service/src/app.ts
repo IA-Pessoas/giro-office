@@ -51,7 +51,7 @@ export function createMarketingServices(prisma: unknown, env: MarketingWorkerEnv
   const audit = createMarketingWorkerAudit(env);
   return {
     dashboard: new MarketingDashboardService(db),
-    controls: new MarketingAiUsageControlService(db),
+    controls: new MarketingAiUsageControlService(db, audit),
     events: new MarketingEventsService(db, audit),
     editions: new MarketingEventEditionsService(db, audit),
     passwords: () => {
@@ -146,7 +146,11 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/ai-usage-controls",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(createMarketingAiUsageControlBodySchema, await readJson(c));
-      return ok(c, await s.controls.createForUser(org, body.userId, body.competence), 201);
+      return ok(
+        c,
+        await s.controls.createForUser(org, body.userId, body.competence, c.get("auth").userId),
+        201,
+      );
     }),
   );
   app.get(
@@ -179,7 +183,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingAiUsageControlIdParamsSchema, c.req.param());
       const body = parseWithZod(updateMarketingAiUsageControlBodySchema, await readJson(c));
-      return ok(c, await s.controls.updateAnswers(org, id, body));
+      return ok(c, await s.controls.updateAnswers(org, id, body, c.get("auth").userId));
     }),
   );
 
