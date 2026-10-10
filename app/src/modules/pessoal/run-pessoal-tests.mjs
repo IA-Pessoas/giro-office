@@ -1242,7 +1242,7 @@ runTest("agenda do Pessoal é o recorte da agenda compartilhada, com geral e min
   const section = read("../contabil/components/DepartmentAgendaSection.tsx");
   assert.match(section, /agendaService\.list\(module, month, mine\)/);
   assert.match(section, /departmentAgendaQueryKey\(module, month, mine\)/);
-  assert.match(section, /Agenda geral/);
+  assert.match(section, /aria-pressed=\{mine\}/);
   assert.match(section, /Minha agenda/);
   assert.match(section, /event\.client\?\.name/);
   assert.match(section, /event\.participant\?\.name \?\? "Sem responsável"/);

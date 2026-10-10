@@ -39,7 +39,7 @@ const AGENDA_SELECT = {
   participant: { select: { id: true, name: true } },
 } as const;
 
-interface AgendaEventPerson {
+interface AgendaEventRef {
   id: string;
   name: string;
 }
@@ -52,8 +52,8 @@ export interface AgendaEventRow {
   obs: string | null;
   location: string | null;
   department_control_id: string;
-  client: AgendaEventPerson | null;
-  participant: AgendaEventPerson | null;
+  client: AgendaEventRef | null;
+  participant: AgendaEventRef | null;
 }
 
 /** Níveis do módulo (0 a 3) exigidos pela agenda; o owner entra com o maior. */

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Pencil, Plus, Trash2, UserCheck } from "lucide-react";
 
 import { ConfirmationDialog } from "@shared/components";
 import { useFetch } from "@shared/hooks";
@@ -108,22 +108,27 @@ export function DepartmentAgendaSection({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Agenda</h2>
           <p className="text-sm text-gray-600 dark:text-slate-400">
-            Eventos do departamento {departmentLabel} na agenda compartilhada.
+            {mine ? "Seus eventos e os sem responsável do" : "Eventos do"} departamento{" "}
+            {departmentLabel} na agenda compartilhada.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {allowMine &&
-            [false, true].map((option) => (
-              <button
-                key={String(option)}
-                type="button"
-                className={CONTABIL_OUTLINE_ACTION_CLASS}
-                aria-pressed={mine === option}
-                onClick={() => setMine(option)}
-              >
-                {option ? "Minha agenda" : "Agenda geral"}
-              </button>
-            ))}
+          {allowMine && (
+            // Mesmo padrão do "Meus clientes" da carteira: desligado, é a agenda geral.
+            <button
+              type="button"
+              aria-pressed={mine}
+              onClick={() => setMine((current) => !current)}
+              className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                mine
+                  ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              <UserCheck aria-hidden="true" className="h-4 w-4" />
+              Minha agenda
+            </button>
+          )}
           <ContabilCompetenceSelect value={month} onChange={setMonth} label="Mês da agenda" />
           {canEdit && (
             <button
