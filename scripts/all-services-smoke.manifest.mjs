@@ -1837,6 +1837,14 @@ const baseManifest = [
     auth: "bearer",
   }),
   op({
+    service: "regularize-service",
+    method: "GET",
+    path: "/regularize/groups/{id}/map",
+    action: "regularizeGroupMap",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
     service: "client-service",
     method: "POST",
     path: "/client/regimes",

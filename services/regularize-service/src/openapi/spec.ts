@@ -849,6 +849,19 @@ export function buildRegularizeServiceOpenApiSpec(
           responses: { "200": { description: "Vinculo removido", ...successEnvelopeContent() } },
         },
       },
+      "/regularize/groups/{id}/map": {
+        get: {
+          tags: ["Partners"],
+          summary: "Gerar o mapa de um grupo de clientes",
+          description:
+            "Árvore grupo, cidade, sócio e empresas com vínculo societário vigente, com situação, sede e regime de cada empresa. Não traz capital social nem RBT12.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: { "200": { description: "Mapa do grupo", ...successEnvelopeContent() } },
+        },
+      },
       "/regularize/partner": {
         get: {
           tags: ["Partners"],

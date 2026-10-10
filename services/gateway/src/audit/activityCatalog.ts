@@ -1106,6 +1106,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/regularize\/groups\/[^/]+\/map$/,
+    description: { action: "consultou", item: "o mapa de um grupo de clientes" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/regularize\/guidance\/detail$/,
     description: { action: "consultou", item: "os detalhes de uma orientação de regularização" },
   },

@@ -4,6 +4,7 @@ import {
   createRegularizeWorkerApp,
   type RegularizeClientPfService,
   type RegularizeDashboardService,
+  type RegularizeGroupMapService,
   type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
   type RegularizeLicenseReportingService,
@@ -535,6 +536,34 @@ describe("regularize Worker", () => {
       organizationId: ORGANIZATION_ID,
       userId: USER_ID,
       id: LICENSE_ID,
+    });
+  });
+
+  it("generates the group map scoped to the caller organization", async () => {
+    const groupMap: RegularizeGroupMapService = {
+      generate: vi.fn(async () => ({ group: { id: LICENSE_ID, name: "Grupo" }, cities: [] })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      groupMapService: groupMap,
+    });
+
+    const ok = await app.request(`https://regularize.test/regularize/groups/${LICENSE_ID}/map`, {
+      headers: headers(),
+    });
+    const invalid = await app.request("https://regularize.test/regularize/groups/abc/map", {
+      headers: headers(),
+    });
+    const anonymous = await app.request(
+      `https://regularize.test/regularize/groups/${LICENSE_ID}/map`,
+    );
+
+    expect([ok.status, invalid.status, anonymous.status]).toEqual([200, 400, 401]);
+    expect(groupMap.generate).toHaveBeenCalledTimes(1);
+    expect(groupMap.generate).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      groupId: LICENSE_ID,
     });
   });
 

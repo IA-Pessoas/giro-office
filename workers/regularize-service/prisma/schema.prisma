@@ -64,6 +64,11 @@ model Client {
   cpf_cnpj        String?
   status          String
   city            String?
+  address         String?
+  number          String?
+  neighborhood    String?
+  regime          String?
+  groups          ClientsGroup[]
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   processes       Process[] @relation("processClientPJ")
@@ -74,6 +79,28 @@ model Client {
   licenses        License[]
 
   @@map("clients")
+}
+
+// Recorte dos grupos de clientes (dono: client-service), só leitura para o mapa de grupo (#1748).
+model Group {
+  id              String @id @default(uuid())
+  name            String
+  status          Boolean @default(true)
+  organization_id String
+  clients         ClientsGroup[]
+
+  @@map("clients.group")
+}
+
+model ClientsGroup {
+  id              String @id @default(uuid())
+  group_id        String
+  client_id       String
+  organization_id String
+  client          Client @relation(fields: [client_id], references: [id])
+  group           Group @relation(fields: [group_id], references: [id])
+
+  @@map("clients.clientsGroup")
 }
 
 model ClientPF {
