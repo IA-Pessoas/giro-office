@@ -908,6 +908,20 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           responses: readResponses,
         },
       },
+      "/pessoal/obrigations/{id}/history": {
+        get: {
+          tags: ["Pessoal Obligations"],
+          security: bearerSecurity,
+          summary: "Historico de alteracoes por item da obrigacao",
+          operationId: "getPessoalObligationHistory",
+          parameters: [
+            idParam("id"),
+            queryParam("page", undefined, false),
+            queryParam("pageSize", undefined, false),
+          ],
+          responses: readResponses,
+        },
+      },
       "/pessoal/obrigations/{id}": {
         patch: {
           tags: ["Pessoal Obligations"],

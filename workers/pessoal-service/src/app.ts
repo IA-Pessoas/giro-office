@@ -24,6 +24,8 @@ import {
   generateObligationsParamsSchema,
   type ListObligationPortfolioQuery,
   listObligationPortfolioQuerySchema,
+  type ObligationHistoryQuery,
+  obligationHistoryQuerySchema,
   obligationIdParamsSchema,
   updateObligationFieldBodySchema,
 } from "@workspace/pessoal-service/src/schemas/obligation.schemas.js";
@@ -50,6 +52,13 @@ import {
   unionIdParamsSchema,
   updateUnionBodySchema,
 } from "@workspace/pessoal-service/src/schemas/union.schemas.js";
+import {
+  listObligationHistory,
+  OBLIGATION_AUDIT_REFERRING,
+  OBLIGATION_UPDATE_ACTION,
+  type ObligationHistoryPrisma,
+  obligationFieldChange,
+} from "@workspace/pessoal-service/src/services/obligationHistoryService.js";
 import { listObligationPortfolio } from "@workspace/pessoal-service/src/services/obligationPortfolioService.js";
 import {
   NO_OBLIGATIONS_GROUP_POLICY,
@@ -167,6 +176,11 @@ export type PessoalObligationService = {
   listPortfolio(
     context: { organizationId: string },
     query: ListObligationPortfolioQuery,
+  ): Promise<unknown>;
+  history(
+    context: { organizationId: string },
+    id: string,
+    query: ObligationHistoryQuery,
   ): Promise<unknown>;
   create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
   updateField(
@@ -1287,6 +1301,14 @@ function localObligationService(
     async listPortfolio(context, query) {
       return listObligationPortfolio(prisma, context.organizationId, query);
     },
+    async history(context, id, query) {
+      return listObligationHistory(
+        prisma as unknown as ObligationHistoryPrisma,
+        context.organizationId,
+        id,
+        query,
+      );
+    },
     async create(context, body) {
       const organizationId = String(context.organizationId);
       await ensureClient(organizationId, body.client_id);
@@ -1358,9 +1380,10 @@ function localObligationService(
         statusCode: 200,
         outcome: "success",
         serviceSource: "pessoal-service",
-        action: "Atualizacao",
-        referring: "pessoal.obligations",
+        action: OBLIGATION_UPDATE_ACTION,
+        referring: OBLIGATION_AUDIT_REFERRING,
         referringId: id,
+        changes: obligationFieldChange(existing, body),
         department: "pessoal",
       });
       return updated;
@@ -1939,6 +1962,18 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       return c.json(
         createSuccessResponse(
           await service.detail({ organizationId: c.get("auth").organizationId }, query),
+        ),
+      );
+    }),
+  );
+  app.get("/pessoal/obrigations/:id/history", (c) =>
+    withObligationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const { id } = parseWithZod(obligationIdParamsSchema, { id: c.req.param("id") });
+      const query = parseWithZod(obligationHistoryQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.history({ organizationId: c.get("auth").organizationId }, id, query),
         ),
       );
     }),

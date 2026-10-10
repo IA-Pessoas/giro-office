@@ -305,6 +305,30 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     ).data;
     expect(pendingVa.items.map((row: { id: string }) => row.id)).not.toContain(id);
 
+    // A auditoria é gravada pelo audit-service (binding ausente no smoke): simula a linha.
+    await smokeInsert("audit_requests", {
+      request_id: randomUUID(),
+      user_id: state.userId,
+      method: "ENTITY_CHANGE",
+      path: `/pessoal/obrigations/${id}`,
+      outcome: "success",
+      service_source: "pessoal-service",
+      action: "Atualizacao",
+      referring: "pessoal.obrigations",
+      referring_id: id,
+      changes_json: { va: { from: false, to: true } },
+    });
+    const history = expectOk(
+      await call("GET", `/pessoal/obrigations/${id}/history`),
+      "GET histórico",
+    ).data;
+    expect(history).toMatchObject({ obligation_id: id, competence, total: 1 });
+    expect(history.items[0]).toMatchObject({
+      actor: { id: state.userId },
+      changes: [{ field: "va", from: false, to: true }],
+    });
+    expect((await call("GET", `/pessoal/obrigations/${randomUUID()}/history`)).status).toBe(404);
+
     const next = "2026-10";
     const generated = expectOk(
       await call("POST", `/pessoal/obrigations/competences/${next}/generate`),

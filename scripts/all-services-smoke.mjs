@@ -6261,6 +6261,13 @@ const handlers = {
     });
   },
 
+  async pessoalObligationHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/obrigations/${requireState("pessoalObligationId")}/history`,
+    });
+  },
+
   async pessoalObligationGenerate(op) {
     await httpRequest(op, {
       expectedStatus: [200],

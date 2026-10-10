@@ -5,8 +5,16 @@ import type {
   CreateObligationBody,
   DetailObligationQuery,
   ListObligationPortfolioQuery,
+  ObligationHistoryQuery,
   UpdateObligationFieldBody,
 } from "../schemas/obligation.schemas.js";
+import {
+  listObligationHistory,
+  OBLIGATION_AUDIT_REFERRING,
+  OBLIGATION_UPDATE_ACTION,
+  type ObligationHistoryPrisma,
+  obligationFieldChange,
+} from "./obligationHistoryService.js";
 import {
   listObligationPortfolio,
   type ObligationPortfolioPrisma,
@@ -255,6 +263,19 @@ export class ObligationService {
     );
   }
 
+  async history(
+    context: Pick<PessoalAuthContext, "organizationId">,
+    id: string,
+    query: ObligationHistoryQuery,
+  ) {
+    return listObligationHistory(
+      this.prisma as unknown as ObligationHistoryPrisma,
+      context.organizationId,
+      id,
+      query,
+    );
+  }
+
   async updateField(
     context: PessoalAuthContext,
     id: string,
@@ -288,10 +309,10 @@ export class ObligationService {
         organizationId: context.organizationId,
         userId,
         permission: context.permission,
-        action: "Atualizacao",
-        referring: "pessoal.obrigations",
+        action: OBLIGATION_UPDATE_ACTION,
+        referring: OBLIGATION_AUDIT_REFERRING,
         referringId: id,
-        changes: body,
+        changes: obligationFieldChange(existing, body),
         path: `/pessoal/obrigations/${id}`,
       });
 

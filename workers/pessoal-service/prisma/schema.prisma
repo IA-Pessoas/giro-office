@@ -8,6 +8,19 @@ datasource db {
   provider = "postgresql"
 }
 
+model AuditRequest {
+  id              String   @id @default(uuid())
+  organization_id String?
+  user_id         String?
+  created_at      DateTime @default(now())
+  action          String?
+  referring       String?
+  referring_id    String?
+  changes_json    Json?
+
+  @@map("audit_requests")
+}
+
 model PessoalGroup {
   id              String   @id @default(uuid())
   name            String
