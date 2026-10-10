@@ -19,7 +19,11 @@ import {
   usePessoalObligation,
   useUpdatePessoalObligationMutation,
 } from "../hooks/usePessoalObligations";
-import type { PessoalObligationUpdatePayload } from "../types/obligations";
+import {
+  PESSOAL_OBLIGATION_ITEMS,
+  type PessoalObligationItem,
+  type PessoalObligationUpdatePayload,
+} from "../types/obligations";
 import { formatPessoalObligationGenerationSummary } from "../utils/obligationGenerationSummary";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
@@ -38,26 +42,17 @@ interface PessoalObligationsSectionProps {
   canEdit: boolean;
 }
 
-const booleanFields = [
-  { name: "advance", label: "Adiantamento" },
-  { name: "payroll", label: "Folha" },
-  { name: "charges", label: "Encargos" },
-  {
-    name: "assistance_fee",
-    label: "Contribuição assistencial",
-    help: "Indica se há cobrança de contribuição assistencial para a obrigação.",
-  },
-  { name: "bem_mais", label: "Bem Mais" },
-  {
-    name: "bsf",
-    label: "BSF",
-    help: "Indica se a rotina BSF deve ser considerada nesta obrigação.",
-  },
-  { name: "va", label: "Vale-alimentação" },
-  { name: "vt", label: "Vale-transporte" },
-] as const;
+const booleanFieldHelp: Partial<Record<PessoalObligationItem, string>> = {
+  assistance_fee: "Indica se há cobrança de contribuição assistencial para a obrigação.",
+  bsf: "Indica se a rotina BSF deve ser considerada nesta obrigação.",
+};
 
-type BooleanFieldName = (typeof booleanFields)[number]["name"];
+const booleanFields = PESSOAL_OBLIGATION_ITEMS.map((item) => ({
+  ...item,
+  help: booleanFieldHelp[item.name],
+}));
+
+type BooleanFieldName = PessoalObligationItem;
 
 function currentCompetence() {
   const now = new Date();
@@ -75,11 +70,7 @@ export function PessoalObligationsSection({
   const createMutation = useCreatePessoalObligationMutation();
   const generateMutation = useGeneratePessoalObligationsMutation(competence);
   const obligation = obligationQuery.data ?? null;
-  const updateMutation = useUpdatePessoalObligationMutation(
-    obligation?.id ?? "",
-    selectedClientId,
-    competence,
-  );
+  const updateMutation = useUpdatePessoalObligationMutation(obligation?.id ?? "");
   const responsibleUsersQuery = useAssignableUsers({
     enabled: canEdit && Boolean(obligation),
     module: "pessoal",
@@ -315,7 +306,7 @@ export function PessoalObligationsSection({
           <>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {booleanFields.map((field) => {
-                const helpText = "help" in field ? field.help : undefined;
+                const helpText = field.help;
 
                 return (
                   <label key={field.name} className={pessoalCheckboxCardClassName}>
