@@ -27,6 +27,9 @@ function setup() {
     },
     // Sem regra de recorrência: a geração mensal tem testes próprios (agendaRecurrence).
     recurringAgenda: { findMany: vi.fn().mockResolvedValue([]) },
+    // Cliente e responsável da própria organização, salvo quando o teste diz o contrário.
+    client: { count: vi.fn().mockResolvedValue(1) },
+    user: { count: vi.fn().mockResolvedValue(1) },
   };
   const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
   return { prisma, audit, service: new AgendaService(prisma as never, audit as never) };
@@ -192,6 +195,84 @@ describe("AgendaService", () => {
       await expect(service.list({ ...pessoal, level: 0 }, "2026-12", true)).rejects.toMatchObject({
         statusCode: 403,
       });
+    });
+  });
+
+  // Administração no Pessoal: o evento ganha cliente e responsável (#1774).
+  describe("cliente e responsável", () => {
+    const pessoal = { ...editor, module: "pessoal" } as const;
+    const assigned = { ...event, client_id: "cli-1", participant_id: "user-2" };
+
+    function setupPessoal() {
+      const context = setup();
+      context.prisma.department.findMany.mockResolvedValue([
+        { id: "dep-pessoal", name: "Departamento Pessoal" },
+      ]);
+      return context;
+    }
+
+    it("grava cliente e responsável conferidos na organização", async () => {
+      const { prisma, service } = setupPessoal();
+
+      await service.create(pessoal, assigned);
+      await service.update(pessoal, EVENT, { participant_id: "user-3" });
+
+      expect(prisma.client.count).toHaveBeenCalledWith({
+        where: { id: "cli-1", organization_id: ORG },
+      });
+      expect(prisma.user.count).toHaveBeenCalledWith({
+        where: { id: "user-2", organization_id: ORG },
+      });
+      expect(prisma.agenda.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ client_id: "cli-1", participant_id: "user-2" }),
+        }),
+      );
+      expect(prisma.agenda.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { participant_id: "user-3" } }),
+      );
+    });
+
+    it("recusa cliente ou responsável de outra organização, sem gravar", async () => {
+      const { prisma, audit, service } = setupPessoal();
+      prisma.client.count.mockResolvedValue(0);
+
+      await expect(service.create(pessoal, assigned)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(service.update(pessoal, EVENT, { client_id: "cli-x" })).rejects.toMatchObject({
+        statusCode: 404,
+      });
+
+      prisma.client.count.mockResolvedValue(1);
+      prisma.user.count.mockResolvedValue(0);
+      await expect(service.create(pessoal, assigned)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(
+        service.update(pessoal, EVENT, { participant_id: "user-x" }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+
+      expect(prisma.agenda.create).not.toHaveBeenCalled();
+      expect(prisma.agenda.updateMany).not.toHaveBeenCalled();
+      expect(audit.createLog).not.toHaveBeenCalled();
+    });
+
+    it("limpa cliente e responsável sem consultar ninguém", async () => {
+      const { prisma, service } = setupPessoal();
+
+      await service.update(pessoal, EVENT, { client_id: null, participant_id: null });
+
+      expect(prisma.client.count).not.toHaveBeenCalled();
+      expect(prisma.user.count).not.toHaveBeenCalled();
+      expect(prisma.agenda.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { client_id: null, participant_id: null } }),
+      );
+    });
+
+    it("quem só visualiza não atribui", async () => {
+      const { prisma, service } = setupPessoal();
+
+      await expect(
+        service.update({ ...pessoal, level: 1 }, EVENT, { participant_id: "user-2" }),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      expect(prisma.user.count).not.toHaveBeenCalled();
     });
   });
 

@@ -53,6 +53,8 @@ function setup() {
 
   const prisma = {
     department: { findMany: vi.fn().mockResolvedValue([{ id: TRIAGEM, name: "Triagem" }]) },
+    client: { count: vi.fn().mockResolvedValue(1) },
+    user: { count: vi.fn().mockResolvedValue(1) },
     agenda: {
       ...table(events),
       create: vi.fn(async ({ data }: { data: Where }) => {
@@ -300,6 +302,51 @@ describe("recorrência mensal da agenda (#1700)", () => {
 
     expect(rules).toHaveLength(1);
     expect(await days("2026-12", "2026-12-10T12:00:00.000Z")).toEqual(["2026-12-09 Reunião"]);
+  });
+
+  // #1774: a ocorrência do mês seguinte nasce com o cliente e o responsável da série.
+  it("as próximas ocorrências levam o cliente e o responsável da série", async () => {
+    const { events, service } = setup();
+    const first = await service.create(editor, {
+      ...monthly,
+      client_id: "cli-1",
+      participant_id: "user-2",
+    });
+
+    await service.list(viewer, "2026-12", false, new Date("2026-12-01T12:00:00.000Z"));
+    const december = events.find((row) => row.recurrence_month === "2026-12");
+    expect(december).toMatchObject({ client_id: "cli-1", participant_id: "user-2" });
+    expect(december?.id).not.toBe(first.id);
+
+    // Trocar o responsável na ocorrência mais recente vale para janeiro; limpar o cliente também.
+    await service.update(editor, String(december?.id), {
+      participant_id: "user-3",
+      client_id: null,
+    });
+    await service.list(viewer, "2027-01", false, new Date("2027-01-04T12:00:00.000Z"));
+    expect(events.find((row) => row.recurrence_month === "2027-01")).toMatchObject({
+      client_id: null,
+      participant_id: "user-3",
+    });
+    expect(events.filter((row) => row.recurring_agenda_id)).toHaveLength(3);
+  });
+
+  it("ligar a recorrência em evento com responsável mantém a atribuição na série", async () => {
+    const { events, service } = setup();
+    const single = await service.create(editor, {
+      agenda: "Folha",
+      date: noon("2026-11-16"),
+      client_id: "cli-1",
+      participant_id: "user-2",
+    });
+
+    await service.update(editor, single.id, { recurrent: true });
+    await service.list(viewer, "2026-12", false, new Date("2026-12-01T12:00:00.000Z"));
+
+    expect(events.find((row) => row.recurrence_month === "2026-12")).toMatchObject({
+      client_id: "cli-1",
+      participant_id: "user-2",
+    });
   });
 
   it("não deixa regra sem evento quando a edição perde a corrida ou falha", async () => {

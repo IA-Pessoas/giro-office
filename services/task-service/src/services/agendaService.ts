@@ -7,7 +7,10 @@ import type { TaskAudit } from "../integrations/audit.js";
 import type prismaClient from "../prisma/index.js";
 import type { AGENDA_STATUSES } from "../schemas/agenda.schemas.js";
 
-export type AgendaPrisma = Pick<typeof prismaClient, "agenda" | "department" | "recurringAgenda">;
+export type AgendaPrisma = Pick<
+  typeof prismaClient,
+  "agenda" | "client" | "department" | "recurringAgenda" | "user"
+>;
 
 /** Quem pede e por qual módulo: a agenda é uma só, o departamento é o filtro. */
 export interface AgendaScope {
@@ -24,6 +27,9 @@ export interface AgendaEventInput {
   status?: (typeof AGENDA_STATUSES)[number];
   obs?: string | null;
   location?: string | null;
+  client_id?: string | null;
+  /** Responsável pelo evento; nulo deixa o evento na "minha agenda" de todos. */
+  participant_id?: string | null;
 }
 
 /** `recurrent` repete o evento todo mês; ausente na edição, não mexe na recorrência. */
@@ -118,6 +124,22 @@ export class AgendaService {
     };
   }
 
+  /** Cliente e responsável informados precisam ser da organização; nulo só limpa o campo. */
+  private async assertAssignment(
+    scope: AgendaScope,
+    { client_id, participant_id }: Pick<AgendaEventInput, "client_id" | "participant_id">,
+  ): Promise<void> {
+    const inOrganization = (id: string) => ({
+      where: { id, organization_id: scope.organizationId },
+    });
+    if (client_id && (await this.prisma.client.count(inOrganization(client_id))) === 0) {
+      throw new ServiceError(404, "Cliente não encontrado.");
+    }
+    if (participant_id && (await this.prisma.user.count(inOrganization(participant_id))) === 0) {
+      throw new ServiceError(404, "Responsável não encontrado.");
+    }
+  }
+
   private log(scope: AgendaScope, action: string, id: string, changes: Record<string, unknown>) {
     return this.audit.createLog({
       userId: scope.userId,
@@ -152,6 +174,8 @@ export class AgendaService {
         day: true,
         obs: true,
         location: true,
+        client_id: true,
+        participant_id: true,
         department_control_id: true,
       },
     });
@@ -211,6 +235,7 @@ export class AgendaService {
     if (!departmentId || !departmentIds.includes(departmentId)) {
       throw new ServiceError(404, "Departamento não encontrado para este módulo.");
     }
+    await this.assertAssignment(scope, event);
     const data = {
       ...event,
       status: event.status ?? DEFAULT_STATUS,
@@ -236,6 +261,8 @@ export class AgendaService {
         recurrence: MONTHLY,
         obs: event.obs,
         location: event.location,
+        client_id: event.client_id,
+        participant_id: event.participant_id,
         organization_id: event.organization_id,
         department_control_id: event.department_control_id,
         generated_through: month,
@@ -258,11 +285,13 @@ export class AgendaService {
       date: Date;
       obs: string | null;
       location: string | null;
+      client_id: string | null;
+      participant_id: string | null;
       department_control_id: string;
       recurring_agenda_id: string | null;
       recurrence_month: string | null;
     },
-    { agenda, date, obs, location }: Partial<AgendaEventInput>,
+    { agenda, date, obs, location, client_id, participant_id }: Partial<AgendaEventInput>,
     recurrent: boolean | undefined,
   ) {
     const ruleId = existing.recurring_agenda_id;
@@ -276,7 +305,14 @@ export class AgendaService {
       // Adiar a ocorrência para outro mês não muda o dia da regra: o mês de destino
       // ainda recebe a própria ocorrência, e as duas não podem cair no mesmo dia.
       const sameMonth = date && monthOf(date) === existing.recurrence_month;
-      const data = { agenda, obs, location, day: sameMonth ? date.getUTCDate() : undefined };
+      const data = {
+        agenda,
+        obs,
+        location,
+        client_id,
+        participant_id,
+        day: sameMonth ? date.getUTCDate() : undefined,
+      };
       if (Object.values(data).some((value) => value !== undefined)) {
         await this.prisma.recurringAgenda.updateMany({
           where: { id: ruleId, generated_through: existing.recurrence_month },
@@ -295,6 +331,8 @@ export class AgendaService {
         recurrence: MONTHLY,
         obs: obs === undefined ? existing.obs : obs,
         location: location === undefined ? existing.location : location,
+        client_id: client_id === undefined ? existing.client_id : client_id,
+        participant_id: participant_id === undefined ? existing.participant_id : participant_id,
         organization_id: scope.organizationId,
         department_control_id: existing.department_control_id,
         generated_through: month,
@@ -318,12 +356,15 @@ export class AgendaService {
         date: true,
         obs: true,
         location: true,
+        client_id: true,
+        participant_id: true,
         department_control_id: true,
         recurring_agenda_id: true,
         recurrence_month: true,
       },
     });
     if (!existing) throw new ServiceError(404, NOT_FOUND);
+    await this.assertAssignment(scope, fields);
     const link = await this.syncRecurrence(scope, existing, fields, recurrent);
     const data = { ...fields, ...link };
     // Pedido que não muda nada (recorrência já ligada, por exemplo) não grava.
