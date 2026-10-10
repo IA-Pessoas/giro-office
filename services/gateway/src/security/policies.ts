@@ -147,8 +147,24 @@ const clientListPolicy: AuthPolicy = {
   ],
 };
 
+// Grupos canônicos da Integração também são geridos pelo Regularize (#1742).
+// Mesma regra de requireGroupPermission em workers/client-service/src/clientService.ts.
+const clientGroupsPath = /^\/client\/groups(?:\/[^/]+(?:\/clients)?)?\/?$/;
+const clientGroupsReadPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["integracao", "regularize"],
+    minPermission: moduleAccessPermission,
+  },
+};
+const clientGroupsEditPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["integracao", "regularize"],
+    minPermission: moduleEditPermission,
+  },
+};
+
 const integracaoClientPath =
-  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/groups(?:\/[^/]+(?:\/clients)?)?|\/regimes(?:\/[^/]+)?|\/segments(?:\/[^/]+)?|\/[^/]+)?\/?$/;
+  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/regimes(?:\/[^/]+)?|\/segments(?:\/[^/]+)?|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /dashboard/stats", authenticatedPolicy],
@@ -183,6 +199,8 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  { method: "GET", path: clientGroupsPath, policy: clientGroupsReadPolicy },
+  { method: "ANY", path: clientGroupsPath, policy: clientGroupsEditPolicy },
   { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },
   { method: "ANY", path: integracaoClientPath, policy: integracaoClientEditPolicy },
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },

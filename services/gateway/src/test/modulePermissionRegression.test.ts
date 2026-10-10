@@ -233,15 +233,38 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
-  it("restringe a gestão de grupos de empresas e regimes ao módulo Integração", () => {
+  it("libera os grupos de empresas para Integração e Regularize, e só para eles", () => {
+    const regularizeReader = authContext({ modules: { regularize: 1 } });
+    const regularizeEditor = authContext({ modules: { regularize: 2 } });
+    const integracaoEditor = authContext({ modules: { integracao: 2 } });
+    const otherModule = authContext({ modules: { comercial: 3, contabil: 3 } });
+    const routes = [
+      ["GET", "/client/groups", true],
+      ["POST", "/client/groups", false],
+      ["PATCH", "/client/groups/group-1", false],
+      ["PUT", "/client/groups/group-1/clients", false],
+    ] as const;
+
+    for (const [method, path, readerCanAccess] of routes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(regularizeReader, policy), `Regularize 1: ${method} ${path}`).toBe(
+        readerCanAccess,
+      );
+      expect(canAccessRoute(regularizeEditor, policy), `Regularize 2: ${method} ${path}`).toBe(
+        true,
+      );
+      expect(canAccessRoute(integracaoEditor, policy), `Integração 2: ${method} ${path}`).toBe(
+        true,
+      );
+      expect(canAccessRoute(otherModule, policy), `outro módulo: ${method} ${path}`).toBe(false);
+    }
+  });
+
+  it("restringe a gestão de regimes e segmentos ao módulo Integração", () => {
     const reader = authContext({ modules: { integracao: 1, comercial: 3 } });
     const editor = authContext({ modules: { integracao: 2 } });
     const otherModule = authContext({ modules: { comercial: 3, contabil: 3 } });
     const routes = [
-      ["GET", "/client/groups", true, true],
-      ["POST", "/client/groups", false, true],
-      ["PATCH", "/client/groups/group-1", false, true],
-      ["PUT", "/client/groups/group-1/clients", false, true],
       ["POST", "/client/regimes", false, true],
       ["PATCH", "/client/regimes/regime-1", false, true],
       ["POST", "/client/segments", false, true],

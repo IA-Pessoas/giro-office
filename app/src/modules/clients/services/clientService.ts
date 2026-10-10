@@ -56,9 +56,12 @@ export const clientService = {
     return unwrapClientEnvelope<ClientGroup>(response.data);
   },
 
-  async updateGroup(id: string, name: string): Promise<ClientGroup> {
+  async updateGroup(
+    id: string,
+    input: Partial<Pick<ClientGroup, "name" | "status">>,
+  ): Promise<ClientGroup> {
     const api = setupAPIClient();
-    const response = await api.patch(CLIENT_GROUP_ENDPOINTS.detail(id), { name });
+    const response = await api.patch(CLIENT_GROUP_ENDPOINTS.detail(id), input);
     return unwrapClientEnvelope<ClientGroup>(response.data);
   },
 

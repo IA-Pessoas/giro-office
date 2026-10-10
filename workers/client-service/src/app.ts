@@ -20,6 +20,12 @@ import {
   updateClientBodySchema,
 } from "../../../services/client-service/src/schemas/client.schemas.js";
 import {
+  clientGroupParamsSchema,
+  createClientGroupBodySchema,
+  replaceClientGroupClientsBodySchema,
+  updateClientGroupBodySchema,
+} from "../../../services/client-service/src/schemas/clientGroup.schemas.js";
+import {
   clientRegimeIdParamsSchema,
   createClientRegimeBodySchema,
   updateClientRegimeBodySchema,
@@ -327,6 +333,44 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
       const body = parse(updateClientSegmentBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(await service.updateSegment(id, organizationId(c), body, authz(c))),
+      );
+    }),
+  );
+
+  app.get("/client/groups", async (c) =>
+    withService(c, async (service) =>
+      c.json(createSuccessResponse(await service.listGroups(organizationId(c), authz(c)))),
+    ),
+  );
+
+  app.post("/client/groups", async (c) =>
+    withService(c, async (service) => {
+      const { name } = parse(createClientGroupBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.createGroup(organizationId(c), name, authz(c))),
+        201,
+      );
+    }),
+  );
+
+  app.patch("/client/groups/:id", async (c) =>
+    withService(c, async (service) => {
+      const id = pathParam(c, clientGroupParamsSchema);
+      const body = parse(updateClientGroupBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.updateGroup(id, organizationId(c), body, authz(c))),
+      );
+    }),
+  );
+
+  app.put("/client/groups/:id/clients", async (c) =>
+    withService(c, async (service) => {
+      const id = pathParam(c, clientGroupParamsSchema);
+      const { client_ids } = parse(replaceClientGroupClientsBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(
+          await service.replaceGroupClients(id, organizationId(c), client_ids, authz(c)),
+        ),
       );
     }),
   );

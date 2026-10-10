@@ -182,6 +182,59 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     );
   });
 
+  it("grupos: vínculo único por cliente+grupo, cliente em vários grupos e inativação", async () => {
+    const newClient = async (label: string) =>
+      expectOk(
+        await call("POST", "/client/integration", {
+          organization_id: requireSmokeState().organizationId,
+          type: "PJ",
+          name: `Smoke ${label} ${Date.now()}`,
+          cpf_cnpj: uniqueCnpj(),
+        }),
+        `POST /client/integration (${label})`,
+      ).data as { id: string };
+    const first = await newClient("Grupo A");
+    const second = await newClient("Grupo B");
+    const createGroup = async (name: string) =>
+      expectOk(await call("POST", "/client/groups", { name }), "POST /client/groups").data as {
+        id: string;
+      };
+    const holding = await createGroup(`Smoke Holding ${Date.now()}`);
+    const filiais = await createGroup(`Smoke Filiais ${Date.now()}`);
+
+    for (const ids of [
+      [first.id, second.id],
+      [first.id, second.id, first.id],
+    ]) {
+      expectOk(
+        await call("PUT", `/client/groups/${holding.id}/clients`, { client_ids: ids }),
+        "PUT /client/groups/:id/clients",
+      );
+    }
+    expectOk(
+      await call("PUT", `/client/groups/${filiais.id}/clients`, { client_ids: [first.id] }),
+      "PUT segundo grupo",
+    );
+    expectOk(
+      await call("PATCH", `/client/groups/${filiais.id}`, { status: false }),
+      "PATCH /client/groups/:id status",
+    );
+
+    const groups = expectOk(await call("GET", "/client/groups"), "GET /client/groups").data as {
+      id: string;
+      status: boolean;
+      clients: { id: string }[];
+    }[];
+    const savedHolding = groups.find((group) => group.id === holding.id);
+    expect(savedHolding?.clients.map((client) => client.id).sort()).toEqual(
+      [first.id, second.id].sort(),
+    );
+    expect(groups.find((group) => group.id === filiais.id)).toMatchObject({
+      status: false,
+      clients: [{ id: first.id }],
+    });
+  });
+
   it("integração: cria, lê, lista com filtros, atualiza, inativa e reativa", async () => {
     const cnpj = uniqueCnpj();
     const name = `Smoke Cliente ${Date.now()}`;

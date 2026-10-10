@@ -11,6 +11,7 @@ import {
   Eye,
   FileKey2,
   Landmark,
+  Network,
   Loader2,
   Pencil,
   Plus,
@@ -27,6 +28,7 @@ import {
 import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
+import { ClientGroupsPanel } from "@modules/clients/components/ClientGroupsPanel";
 import {
   ClientPickerModal,
   ClientSelectionField,
@@ -235,6 +237,7 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "passwords", label: "Senhas", icon: FileKey2 },
   { id: "sites", label: "Sites", icon: ShieldCheck },
   { id: "taxes", label: "Tributos", icon: Landmark },
+  { id: "groups", label: "Grupos", icon: Network },
 ];
 
 function normalizeStatus(status: RegularizeStatus | null | undefined): string {
@@ -2907,6 +2910,11 @@ export function RegularizePage() {
             </Dialog>
           </div>
         </section>
+      ) : null}
+
+      {activeTab === "groups" ? (
+        // Mesma origem canônica dos grupos da Integração; edição exige Regularize nível 2 (#1742).
+        <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
       ) : null}
 
       {activeTab === "taxes" ? (

@@ -23,6 +23,8 @@ model Organization {
   tasks             Task[]
   clientRegimes     ClientRegime[]
   clientSegments    ClientSegment[]
+  groups            Group[]
+  groupMembers      ClientsGroup[]
 
   @@map("organizations")
 }
@@ -87,6 +89,7 @@ model Client {
   pa                            PA?
   terminations                  ClientTermination[]
   tasks                         Task[]
+  groups                        ClientsGroup[]
 
   @@map("clients")
 }
@@ -234,4 +237,28 @@ model ClientSegment {
 
   @@unique([organization_id, normalized_name], map: "uq_client_segment_org_normalized_name")
   @@map("clients.segments")
+}
+
+model Group {
+  id              String         @id @default(uuid())
+  name            String
+  status          Boolean        @default(true)
+  organization_id String
+  clients         ClientsGroup[]
+  organization    Organization   @relation(fields: [organization_id], references: [id])
+
+  @@map("clients.group")
+}
+
+model ClientsGroup {
+  id              String       @id @default(uuid())
+  group_id        String
+  client_id       String
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  group           Group        @relation(fields: [group_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([group_id, client_id], map: "uq_clients_group_member")
+  @@map("clients.clientsGroup")
 }
