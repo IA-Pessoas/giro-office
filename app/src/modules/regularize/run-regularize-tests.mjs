@@ -13,6 +13,8 @@ import {
   REGULARIZE_DTE_NO_TIPO_FILTER,
   unwrapRegularizePage,
 } from "./services/regularizeService.contract.ts";
+import { createCsv } from "../marketing/utils/marketingCsv.ts";
+import { veriComparisonColumns, veriComparisonRows } from "./utils/veriComparison.ts";
 import {
   buildRegularizeProcessStatusUpdatePayload,
   groupRegularizeProcessesByStatus,
@@ -1853,4 +1855,37 @@ await runTest("client picker warns when only active clients are listed (#1347)",
 
   assert.match(source, /filters\.status === "Ativo"/);
   assert.match(source, /Só clientes ativos aparecem aqui\./);
+});
+
+await runTest("Veri comparison shows the same rows on screen and in the CSV (#1755)", async () => {
+  const comparison = {
+    rows: [
+      { name: "Alfa Ltda", document: "11222333000181", in_veri: true, in_workspace: true, status: "Ambos" },
+      { name: "Beta", document: "12345678901", in_veri: true, in_workspace: false, status: "Veri" },
+      { name: "=Gama", document: "11444777000161", in_veri: false, in_workspace: true, status: "Workspace" },
+    ],
+    invalid: [],
+    totals: { veri: 2, workspace: 2, both: 1, veri_only: 1, workspace_only: 1, invalid: 0, workspace_without_document: 0 },
+  };
+
+  assert.deepEqual(veriComparisonColumns(comparison.totals), [
+    "Razão social",
+    "CPF/CNPJ",
+    "Veri (2)",
+    "Workspace (2)",
+    "Status",
+  ]);
+  assert.deepEqual(veriComparisonRows(comparison), [
+    ["Alfa Ltda", "11.222.333/0001-81", "Sim", "Sim", "Ambos"],
+    ["Beta", "123.456.789-01", "Sim", "Não", "Veri"],
+    ["=Gama", "11.444.777/0001-61", "Não", "Sim", "Workspace"],
+  ]);
+  // Nome vindo da planilha não pode virar fórmula ao abrir o CSV.
+  const csv = createCsv([veriComparisonColumns(comparison.totals), ...veriComparisonRows(comparison)]);
+  assert.match(csv, /"'=Gama"/);
+
+  const page = await readModuleSource("components/RegularizePage.tsx");
+  assert.match(page, /activeTab === "veri" \? <RegularizeVeriComparison/);
+  const service = await readModuleSource("services/regularizeService.ts");
+  assert.match(service, /REGULARIZE_ENDPOINTS\.veriCompare, file/);
 });

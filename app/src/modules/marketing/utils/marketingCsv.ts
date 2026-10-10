@@ -13,7 +13,7 @@ function csvCell(value: string | number): string {
   return `"${safeText.replaceAll('"', '""')}"`;
 }
 
-function createCsv(rows: readonly (readonly (string | number)[])[]): string {
+export function createCsv(rows: readonly (readonly (string | number)[])[]): string {
   return rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
 }
 
