@@ -130,6 +130,7 @@ function services() {
       getFiscalSettings: vi.fn(async () => ({ priority: false, delivery_method: null })),
       saveFiscalSettings: vi.fn(async () => ({ priority: true, delivery_method: null })),
       listStatements: vi.fn(async () => []),
+      listStatementHistory: vi.fn(async () => ({ client_id: CLIENT, competences: [] })),
       upsertStatement: vi.fn(async () => ({ id: ID })),
       archiveStatement: vi.fn(async () => ({ id: ID })),
     },
@@ -423,6 +424,25 @@ describe("contabil Worker remainder routes", () => {
     );
     expect(deps.triageDocumentsService.getFiscalSettings).toHaveBeenCalledExactlyOnceWith(
       { client_id: CLIENT },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("histórico bancário exige sessão e consulta a organização do token (#1694)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const url = `https://contabil.test/triagem/statements/history?client_id=${CLIENT}&from=2026-01&to=2026-09&pending=true`;
+
+    const anonymous = await app.request(url);
+    const ok = await app.request(url, { headers: headers("2") });
+    const inverted = await app.request(
+      `https://contabil.test/triagem/statements/history?client_id=${CLIENT}&from=2026-09&to=2026-01`,
+      { headers: headers("2") },
+    );
+
+    expect([anonymous.status, ok.status, inverted.status]).toEqual([401, 200, 400]);
+    expect(deps.triageDocumentsService.listStatementHistory).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, from: "2026-01", to: "2026-09", pending: true },
       expect.objectContaining({ organizationId: ORG }),
     );
   });

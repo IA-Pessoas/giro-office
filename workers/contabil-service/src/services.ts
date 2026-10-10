@@ -5,6 +5,7 @@ import {
   type ReportingQuery,
   ServiceError,
   TRIAGE_FISCAL_CONFIGURABLE_FIELDS,
+  TRIAGE_PENDING_DOCUMENT_STATUSES,
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
@@ -123,6 +124,7 @@ export type DocumentsService = {
   getFiscalSettings(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   saveFiscalSettings(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   listStatements(input: JsonRecord, organizationId: string): Promise<unknown[]>;
+  listStatementHistory(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   upsertStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   archiveStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
 };
@@ -1756,6 +1758,47 @@ export function createDocumentsService(
         },
         orderBy: { bank_id: "asc" },
       });
+    },
+    async listStatementHistory(input, auth) {
+      const clientId = String(input.client_id);
+      await assertClientInOrganization(prisma, clientId, auth.organizationId);
+      const competence = {
+        ...(typeof input.from === "string" ? { gte: input.from } : {}),
+        ...(typeof input.to === "string" ? { lte: input.to } : {}),
+      };
+      // ponytail: até 500 marcadores (anos de bancos de um cliente); paginar se passar disso.
+      const rows = await prisma.triageBankStatement.findMany({
+        where: {
+          organization_id: auth.organizationId,
+          client_id: clientId,
+          archived_at: null,
+          ...(Object.keys(competence).length ? { competence } : {}),
+          ...(input.pending === true
+            ? { status: { in: [...TRIAGE_PENDING_DOCUMENT_STATUSES] } }
+            : {}),
+        },
+        select: { competence: true, bank_id: true, status: true, updated_at: true },
+        orderBy: [{ competence: "desc" }, { bank_id: "asc" }],
+        take: 500,
+      });
+      // Agrupado por competência: cada banco aparece no período a que pertence.
+      const pending = new Set<string>(TRIAGE_PENDING_DOCUMENT_STATUSES);
+      const groups = new Map<string, JsonRecord[]>();
+      for (const row of rows) {
+        const key = String(row.competence);
+        groups.set(key, [
+          ...(groups.get(key) ?? []),
+          { bank_id: row.bank_id, status: row.status, updated_at: row.updated_at },
+        ]);
+      }
+      return {
+        client_id: clientId,
+        competences: [...groups].map(([competenceKey, statements]) => ({
+          competence: competenceKey,
+          pending: statements.filter((item) => pending.has(String(item.status))).length,
+          statements,
+        })),
+      };
     },
     async upsertStatement(input, auth) {
       if (!validStatus(input.status))
