@@ -68,6 +68,12 @@ import {
   shouldShowContabilNav,
 } from "./hooks/contabilAccessUi.ts";
 
+import {
+  agendaDateToIso,
+  agendaDay,
+  AGENDA_ENDPOINT,
+} from "../../shared/services/agendaService.contract.ts";
+
 async function runTest(name, fn) {
   try {
     await fn();
@@ -204,6 +210,16 @@ await (async () => {
     assert.match(pageSource, /canEdit=\{editability\.data\?\.can_edit === true\}/);
     assert.match(pageSource, /canEditClosing=\{contabilAccess\.canEdit\}/);
     assert.doesNotMatch(pageSource, /canEdit\s*\/>/);
+  });
+
+  await runTest("ficha Contábil mostra a mesma nuvem do cliente que a Triagem (#1728)", () => {
+    const relationship = readWorkspaceSource("./components/ContabilRelationshipSection.tsx");
+    const triage = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+    const usage = /<TriageClientCloudsSection clientId=\{clientId\} canEdit=\{canEdit\} \/>/;
+
+    assert.match(relationship, /from "@modules\/triagem\/components\/TriageClientCloudsSection"/);
+    assert.match(relationship, usage);
+    assert.match(triage, usage);
   });
 
   await runTest("triagem apresenta competências com criação, listagem e arquivamento", () => {
@@ -1046,6 +1062,23 @@ await (async () => {
       buildTriageItemPayload("billing_amount", undefined, undefined, "FISCAL", "10,00"),
       { field: "billing_amount", type: "FISCAL", value: "10,00" },
     );
+  });
+
+  await runTest("agenda compartilhada: a data não muda de dia com o fuso (#1727)", () => {
+    assert.equal(AGENDA_ENDPOINT, "/task/agenda");
+    // Meio-dia UTC: o dia escolhido é o mesmo em qualquer fuso do Brasil.
+    assert.equal(agendaDateToIso("2026-12-31"), "2026-12-31T12:00:00.000Z");
+    assert.equal(agendaDay("2026-12-31T12:00:00.000Z"), "2026-12-31");
+  });
+
+  await runTest("agenda compartilhada: a aba do Contábil usa a agenda canônica (#1727)", () => {
+    const shell = readFileSync(new URL("./components/ContabilShell.tsx", import.meta.url), "utf8");
+    assert.match(shell, /<ContabilAgendaSection canEdit=\{canEdit\} \/>/);
+    const section = readFileSync(
+      new URL("./components/ContabilAgendaSection.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(section, /agendaService\.list\("contabil", month\)/);
   });
 })();
 

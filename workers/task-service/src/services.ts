@@ -4,6 +4,7 @@ import {
   type AiTaskExtractionMode,
   createAiTaskExtractionProvider,
 } from "@workspace/task-service/src/integrations/aiTaskExtraction.js";
+import { AgendaService } from "@workspace/task-service/src/services/agendaService.js";
 import { CommercialProspectingCloseService } from "@workspace/task-service/src/services/commercialProspectingCloseService.js";
 import { CommercialTaskBillingProjectionService } from "@workspace/task-service/src/services/commercialTaskBillingProjectionService.js";
 import { DepsTasksService } from "@workspace/task-service/src/services/depsTasksService.js";
@@ -88,6 +89,7 @@ export function createTaskServices(prisma: unknown, env: TaskWorkerEnv) {
     wizard: () => new ProjectWizardService({ db, audit, taskService: crud() }),
     extraction: () => new ProjectWizardExtractionService(extractionProvider(env), db),
     deps: () => new DepsTasksService(db),
+    agenda: () => new AgendaService(db, audit),
     reporting: () => new TaskReportingService(db),
     commercialTaskBilling: () => new CommercialTaskBillingProjectionService(db),
     commercialProspectingClose: () => new CommercialProspectingCloseService(db),
