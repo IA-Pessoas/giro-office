@@ -11,6 +11,7 @@ import {
 
 import { useContabilControlPortfolio } from "../hooks";
 import { ContabilControlSection } from "./ContabilControlSection";
+import { ContabilContingencySection } from "./ContabilContingencySection";
 import { CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilPortfolioSection } from "./ContabilPortfolioSection";
@@ -21,7 +22,7 @@ import { ContabilStateBox } from "./ContabilStateBox";
 import { TriageDocumentsSection } from "./TriageDocumentsSection";
 import { ContabilNoahSection } from "./ContabilNoahSection";
 
-type ContabilTabId = "control" | "responsible" | "relationship" | "documents" | "noah";
+type ContabilTabId = "control" | "responsible" | "relationship" | "documents" | "noah" | "contingency";
 
 interface ContabilShellProps {
   clientId?: string;
@@ -64,6 +65,7 @@ export function ContabilShell({
     },
     { id: "documents", label: "Documentos", icon: FileText },
     { id: "noah", label: "Noah", icon: FileText },
+    { id: "contingency", label: "Contingência", icon: Calculator },
   ];
 
   return (
@@ -224,7 +226,9 @@ function ContabilActiveTabPanel({
         <div className="space-y-4">
           <ContabilClientSelect value={pickedClientId} onChange={onPickClient} />
           {pickedClientId ? (
-            activeTab === "documents" ? (
+            activeTab === "contingency" ? (
+              <ContabilContingencySection clientId={pickedClientId} canEdit={canEdit} />
+            ) : activeTab === "documents" ? (
               <TriageDocumentsSection
                 clientId={pickedClientId}
                 canEdit={canEdit}
@@ -235,8 +239,13 @@ function ContabilActiveTabPanel({
             )
           ) : (
             <ContabilStateBox icon={Calculator} title="Selecione uma empresa para começar">
-              Escolha a empresa acima para abrir o{" "}
-              {activeTab === "documents" ? "controle de documentos" : "relacionamento contábil"}.
+              Escolha a empresa acima para abrir{" "}
+              {activeTab === "contingency"
+                ? "a simulação de Contingência"
+                : activeTab === "documents"
+                  ? "o controle de documentos"
+                  : "o relacionamento contábil"}
+              .
             </ContabilStateBox>
           )}
         </div>
@@ -268,6 +277,18 @@ function ContabilActiveTabPanel({
     return (
       <div role="tabpanel" id="contabil-panel-documents" aria-labelledby="contabil-tab-documents">
         <TriageDocumentsSection clientId={clientId} canEdit={canEdit} canEditClosing={canEdit} />
+      </div>
+    );
+  }
+
+  if (activeTab === "contingency") {
+    return (
+      <div
+        role="tabpanel"
+        id="contabil-panel-contingency"
+        aria-labelledby="contabil-tab-contingency"
+      >
+        <ContabilContingencySection clientId={clientId} canEdit={canEdit} />
       </div>
     );
   }

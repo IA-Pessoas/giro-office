@@ -4248,7 +4248,7 @@ const handlers = {
         name: uniqueText("Smoke Client"),
         organization_id: requireState("session").organization_id,
         status: "Ativo",
-        cpf_cnpj: uniqueDigits(14),
+        cpf_cnpj: uniqueCnpj("primary-client"),
         prospecting_status: "Lead",
         type: "PJ",
         type_registration: "Novo",
@@ -5439,6 +5439,38 @@ const handlers = {
     ) {
       throw new Error("CSV Noah diverge do comprovante sintético.");
     }
+  },
+
+  async contabilContingencySimulate(op) {
+    let company = { name: "Smoke Client", cpf_cnpj: uniqueCnpj("primary-client") };
+    if (!isBadExpectation(op)) {
+      const response = await httpRequest(op, {
+        method: "GET",
+        path: `/client/${requireState("primaryClientId")}`,
+        expectedStatus: [200],
+      });
+      company = response.body.data;
+    }
+    const response = await httpRequest(op, {
+      query: {
+        client_id: requireState("primaryClientId"),
+        company_name: company.company_name?.trim() || company.name,
+        cnpj: company.cpf_cnpj,
+        period_start: "2026-01",
+        period_end: "2026-06",
+        regime: "Simples Nacional",
+        annex: "III",
+        filename: "synthetic.xls",
+      },
+      headers: { "content-type": "application/vnd.ms-excel" },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/contingency/synthetic.xls")),
+    });
+    if (
+      !isBadExpectation(op) &&
+      (response.body?.data?.minimum?.totalCents !== 398200 ||
+        response.body?.data?.maximum?.totalCents !== 955680)
+    )
+      throw new Error("Simulação de Contingência diverge do XLS sintético.");
   },
 
   async contabilControlCreate(op) {

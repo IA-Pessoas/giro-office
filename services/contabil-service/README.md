@@ -93,3 +93,36 @@ Gerar cliente Prisma: `pnpm --filter @workspace/contabil-service prisma:generate
 ## Critérios de relatórios
 
 `POST /internal/reporting/extract` aceita `query` opcional com filtros tipados, grupos AND/OR, ordenação, agrupamento e agregações. O corpo completo e todos os campos utilizados pertencem ao grant assinado. A origem aplica o escopo organizacional e processa o conjunto completo em snapshot consistente antes do limite de saída; excesso de 50.000 registros/20 MiB retorna 422, sem resultado parcial. Payloads sem `query` preservam o contrato legado. Consulte a [matriz e semântica dos critérios](../reports-service/docs/criteria-origins.md) e o OpenAPI do serviço.
+
+## Simulação de Contingência
+
+`POST /contabil/contingency` recebe XLS binário em `application/vnd.ms-excel` e os
+parâmetros de query `client_id`, `company_name`, `cnpj`, `period_start`, `period_end`
+(AAAA-MM), `regime`, `annex`, `rate` (padrão 11) e `filename`. Exige edição no
+Contábil. Cliente é consultado com a organização autenticada; empresa/CNPJ devem
+coincidir com o cadastro. CNPJ identificado na planilha também deve coincidir;
+quando não existe identificação, o resultado informa `identity: not_found`.
+
+O XLS é processado em memória e não é armazenado. Aceita BIFF8/Excel 97–2003, até
+5 MiB, 10.000 linhas e 256 colunas na primeira planilha. Rótulos ausentes, células
+inválidas e fórmulas nos valores extraídos geram erro explícito. Valores monetários
+aceitam números e formatos decimal/BR com até duas casas e magnitude de até R$ 1
+trilhão, incluindo negativos entre parênteses. HTML não é interpretado.
+
+A extração segue `gerar_relatorio.php`: rótulos nas colunas I/J/K, valores em U
+(exceto bancos em S), mantendo a primeira ocorrência não zero. A resposta privada
+(`Cache-Control: no-store`) inclui valores em centavos, valor original e células de
+origem; diferença, transferências internas, cenários mínimo/máximo e parâmetros.
+Tributo usa a alíquota informada; multa 75%, juros 6%. Arredondamento de cada saída
+ocorre depois do cálculo, como no PHP. As classificações são hipóteses do modelo
+legado e não comprovam irregularidade. Não cria lançamentos nem altera Controle.
+Revisão e exportação fazem parte da #1726.
+
+A fixture e os valores esperados ficam em `scripts/fixtures/contingency/README.md`.
+Amostras reais anonimizadas não estão disponíveis (#1716); compatibilidade real
+permanece não validada. O parser é `@e965/xlsx@0.20.3`, espelho npm fixado do SheetJS,
+pois a política do workspace recusa dependências por URL. Todos os arquivos do
+pacote foram comparados com o tarball oficial 0.20.3: só README e package.json
+mudam; `xlsx.mjs` tem SHA256
+`1a0fb062ee9781b13f6687371b202aaefc53b6ce55b530c027e01f9c087b77db`.
+Fonte oficial: https://docs.sheetjs.com/docs/getting-started/installation/nodejs/.
