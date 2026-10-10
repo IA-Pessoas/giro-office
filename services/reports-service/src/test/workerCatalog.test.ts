@@ -46,6 +46,7 @@ describe("createWorkerSourceCatalog", () => {
     ["contabil.triage_accounting_metric", "completion_percent"],
     ["contabil.triage_sgq", "not_sent"],
     ["contabil.triage_fiscal_special_documents", "sped_fiscal"],
+    ["contabil.triage_accounting_documents", "bank_reconciliation"],
   ])("registra %s só para quem acessa a Triagem", (source, field) => {
     const catalog = createWorkerSourceCatalog(
       parseReportsServiceEnv({

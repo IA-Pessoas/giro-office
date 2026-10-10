@@ -26,58 +26,27 @@ import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { FISCAL_DOCUMENTS, STATUSES } from "./TriageDocumentsSection";
-import { STATUS_LABELS } from "./triageDocumentLabels";
+import {
+  fiscalTriagePortfolioCsv,
+  fiscalTriagePortfolioExportTable,
+  fiscalTriageStatusLabel,
+} from "./fiscalTriagePortfolioExport";
 import { CONTABIL_OUTLINE_ACTION_CLASS, CONTABIL_TABLE_FILTER_CLASS } from "./contabilUiClasses";
 
 const PAGE_SIZE = 50;
 
 
-function statusLabel(status: string) {
-  return status === "NOT_STARTED"
-    ? "A configurar"
-    : (STATUS_LABELS[status as TriageDocumentStatus] ?? status);
-}
-
-function csvCell(value: string) {
-  const safe = /^\s*[=+\-@]/.test(value) ? `'${value}` : value;
-  return `"${safe.replaceAll('"', '""')}"`;
-}
-
 type DeliveryLabel = (code: string | null) => string;
-
-function exportTable(rows: FiscalTriagePortfolioItem[], deliveryLabel: DeliveryLabel) {
-  return [
-    [
-      "Empresa",
-      "CNPJ",
-      "Regime",
-      "Responsável",
-      "Prioridade",
-      "Meio de envio",
-      ...FISCAL_DOCUMENTS.map(([, label]) => label),
-    ],
-    ...rows.map((row) => [
-      row.legal_name,
-      row.cpf_cnpj,
-      row.regime ?? "",
-      row.responsible_name ?? "",
-      row.priority ? "Sim" : "Não",
-      deliveryLabel(row.delivery_method),
-      ...FISCAL_DOCUMENTS.map(([field]) => statusLabel(fiscalTriagePortfolioItemStatus(row, field))),
-    ]),
-  ];
-}
 
 function exportCsv(
   competence: string,
   rows: FiscalTriagePortfolioItem[],
   deliveryLabel: DeliveryLabel,
 ) {
-  const content = exportTable(rows, deliveryLabel)
-    .map((line) => line.map(csvCell).join(","))
-    .join("\r\n");
   const url = URL.createObjectURL(
-    new Blob(["\uFEFF", content], { type: "text/csv;charset=utf-8" }),
+    new Blob(["\uFEFF", fiscalTriagePortfolioCsv(rows, deliveryLabel)], {
+      type: "text/csv;charset=utf-8",
+    }),
   );
   const link = document.createElement("a");
   link.href = url;
@@ -102,8 +71,11 @@ function printPortfolio(
   const title = printWindow.document.createElement("h1");
   title.textContent = `Triagem Fiscal · ${competence}`;
   printWindow.document.body.append(title);
+  const { columns, body: bodyRows, total } = fiscalTriagePortfolioExportTable(rows, deliveryLabel);
+  const summary = printWindow.document.createElement("p");
+  summary.textContent = `Total: ${total}`;
+  printWindow.document.body.append(summary);
   const table = printWindow.document.createElement("table");
-  const [columns, ...bodyRows] = exportTable(rows, deliveryLabel);
   const head = printWindow.document.createElement("tr");
   for (const column of columns) {
     const cell = printWindow.document.createElement("th");
@@ -532,7 +504,7 @@ export function FiscalTriagePortfolioSection({
                               ))}
                             </select>
                           ) : (
-                            <span className="text-xs">{statusLabel(fiscalTriagePortfolioItemStatus(row, field))}</span>
+                            <span className="text-xs">{fiscalTriageStatusLabel(fiscalTriagePortfolioItemStatus(row, field))}</span>
                           )}
                         </td>
                       ))}

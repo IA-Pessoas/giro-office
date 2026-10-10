@@ -18,6 +18,10 @@ import {
   CONTABIL_QUERY_KEY,
 } from "./hooks/queryKeys.ts";
 import { getContabilErrorMessage } from "./services/contabilError.ts";
+import {
+  fiscalTriagePortfolioCsv,
+  fiscalTriagePortfolioExportTable,
+} from "./components/fiscalTriagePortfolioExport.ts";
 import { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess.ts";
 import {
   resolveDepartmentModuleKey,
@@ -1062,6 +1066,68 @@ await (async () => {
       buildTriageItemPayload("billing_amount", undefined, undefined, "FISCAL", "10,00"),
       { field: "billing_amount", type: "FISCAL", value: "10,00" },
     );
+  });
+
+  await runTest("carteira fiscal: CSV e impressão levam as linhas filtradas e o total delas (#1705)", () => {
+    const row = (overrides) => ({
+      client_id: "c1",
+      legal_name: "Alfa Ltda",
+      cpf_cnpj: "11222333000181",
+      regime: "Simples Nacional",
+      responsible_id: "u1",
+      responsible_name: "Ana Souza",
+      priority: true,
+      delivery_method: "EMAIL",
+      can_edit: true,
+      has_competence: true,
+      planned_checklist: null,
+      monthly: {
+        id: "m1",
+        checklist: { inbound_report: "COMPLETED", sped_fiscal: "NOT_PRESENT" },
+        item_notes: {},
+      },
+      ...overrides,
+    });
+    const deliveryLabel = (code) => (code === "EMAIL" ? "E-mail" : "Não informado");
+    const rows = [
+      row({}),
+      row({ client_id: "c2", legal_name: '=Beta "SA"', priority: false, delivery_method: null }),
+    ];
+
+    const table = fiscalTriagePortfolioExportTable(rows, deliveryLabel);
+    assert.deepEqual(table.columns.slice(0, 7), [
+      "Empresa",
+      "CNPJ",
+      "Regime",
+      "Responsável",
+      "Prioridade",
+      "Meio de envio",
+      "Relatório de entradas",
+    ]);
+    assert.equal(table.columns.length, 6 + 13);
+    assert.deepEqual(table.body[0].slice(0, 7), [
+      "Alfa Ltda",
+      "11222333000181",
+      "Simples Nacional",
+      "Ana Souza",
+      "Sim",
+      "E-mail",
+      "Concluído",
+    ]);
+    assert.equal(table.body[0][table.columns.indexOf("SPED Fiscal")], "Não possui");
+    assert.equal(table.total, "2 empresas");
+
+    const lines = fiscalTriagePortfolioCsv(rows, deliveryLabel).split("\r\n");
+    assert.equal(lines.length, 4);
+    // Fórmula neutralizada e aspas escapadas.
+    assert.ok(lines[2].startsWith(`"'=Beta ""SA"""`));
+    assert.equal(lines[3], '"Total","2 empresas"');
+    // Seleção vazia segue com cabeçalho e total zerado.
+    assert.equal(
+      fiscalTriagePortfolioCsv([], deliveryLabel).split("\r\n").at(-1),
+      '"Total","0 empresas"',
+    );
+    assert.equal(fiscalTriagePortfolioExportTable([rows[0]], deliveryLabel).total, "1 empresa");
   });
 
   await runTest("agenda compartilhada: a data não muda de dia com o fuso (#1727)", () => {
