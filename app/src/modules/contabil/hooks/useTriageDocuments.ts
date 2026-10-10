@@ -12,17 +12,30 @@ import type {
   TriageClosingStatus,
   TriageDocumentItemNotes,
   TriageDocumentField,
+  TriageDocumentHistoryPage,
   TriageDocumentsMonthly,
   TriageFiscalField,
   TriageRoutineType,
 } from "../types";
 import {
   triageClosingQueryKey,
+  triageDocumentHistoryQueryKey,
   triageFiscalPortfolioQueryKey,
   triageMonthlyQueryKey,
   triageStatementHistoryQueryKey,
   triageStatementsQueryKey,
 } from "./queryKeys";
+
+export function useTriageDocumentHistory(filters: {
+  clientId?: string;
+  competence?: ContabilCompetence;
+  page: number;
+  pageSize: number;
+}): UseQueryResult<TriageDocumentHistoryPage, Error> {
+  return useFetch(triageDocumentHistoryQueryKey(filters), () =>
+    triageDocumentsService.getDocumentHistory(filters),
+  );
+}
 
 export function useTriageClosing(
   clientId: string,

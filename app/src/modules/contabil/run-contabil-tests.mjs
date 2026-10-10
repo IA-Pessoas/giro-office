@@ -19,6 +19,11 @@ import {
 } from "./hooks/queryKeys.ts";
 import { getContabilErrorMessage } from "./services/contabilError.ts";
 import {
+  describeTriageHistoryEntry,
+  formatTriageHistoryField,
+  formatTriageHistoryValue,
+} from "./components/triageDocumentHistory.helpers.ts";
+import {
   fiscalTriagePortfolioCsv,
   fiscalTriagePortfolioExportTable,
 } from "./components/fiscalTriagePortfolioExport.ts";
@@ -1149,6 +1154,78 @@ await (async () => {
       '"Total","0 empresas"',
     );
     assert.equal(fiscalTriagePortfolioExportTable([rows[0]], deliveryLabel).total, "1 empresa");
+  });
+
+  await runTest("histórico documental: campo, valor e objeto legíveis (#1706)", () => {
+    assert.equal(formatTriageHistoryField("checklist.sped_fiscal"), "SPED Fiscal");
+    assert.equal(
+      formatTriageHistoryField("item_notes.bank_reconciliation.justification"),
+      "Conciliação bancária · justificativa",
+    );
+    assert.equal(formatTriageHistoryField("triad_moviment"), "Movimento enviado");
+    assert.equal(formatTriageHistoryField("campo_novo"), "campo_novo");
+
+    assert.equal(formatTriageHistoryValue("checklist.sped_fiscal", "NOT_PRESENT"), "Não possui");
+    assert.equal(formatTriageHistoryValue("status", "COMPLETED"), "Concluído");
+    assert.equal(formatTriageHistoryValue("triad_moviment", true), "Sim");
+    assert.equal(formatTriageHistoryValue("notes", null), "(vazio)");
+    assert.equal(formatTriageHistoryValue("link", "https://drive.test/a"), "https://drive.test/a");
+
+    const entry = (object, action = "Atualizar pendência documental") => ({
+      id: "e1",
+      at: "2026-09-11T10:00:00.000Z",
+      actor: null,
+      action,
+      changes: [],
+      object: { client_id: "c1", client_name: "Alfa Ltda", ...object },
+    });
+    assert.equal(
+      describeTriageHistoryEntry(
+        entry({ kind: "triagem.monthly", competence: "2026-09", routine_type: "FISCAL" }),
+      ),
+      "Alfa Ltda · 2026-09 · Rotina Fiscal · Atualizar pendência documental",
+    );
+    assert.equal(
+      describeTriageHistoryEntry(
+        entry(
+          { kind: "clientes.clouds", competence: null, routine_type: null },
+          "Cadastrar nuvem do cliente",
+        ),
+      ),
+      "Alfa Ltda · Cloud do cliente · Cadastrar nuvem do cliente",
+    );
+    assert.equal(
+      describeTriageHistoryEntry(
+        entry(
+          { kind: "triagem.bank_statements", competence: "2026-09", routine_type: null },
+          "Arquivar marcador de extrato bancário",
+        ),
+      ),
+      "Alfa Ltda · 2026-09 · Extrato bancário · Arquivar marcador de extrato bancário",
+    );
+  });
+
+  await runTest("histórico documental e da competência alcançam todas as páginas (#1706)", () => {
+    const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+    const section = read("./components/TriageDocumentHistorySection.tsx");
+    assert.match(section, /useTriageDocumentHistory\(\{/);
+    assert.match(section, /onPageChange=\{setPage\}/);
+    const page = read("../../pages/triagem.tsx");
+    // Com cliente, qualquer leitor da Triagem vê; sem cliente, só administrador.
+    assert.match(page, /<TriageDocumentHistorySection\s+key=\{client\.id\}/);
+    assert.match(
+      page,
+      /access\.isAdmin \|\| contabilAccess\.isAdmin \? <TriageDocumentHistorySection \/> : null/,
+    );
+    const timeline = read("../triagem/components/TriageAuditTimeline.tsx");
+    assert.match(timeline, /useTriageAudit\(competenceId, open, page\)/);
+    assert.match(timeline, /aria-label="Paginação do histórico da competência"/);
+    assert.match(read("../triagem/hooks/useTriageAudit.ts"), /listTimeline\(competenceId, page\)/);
+    // Resposta sem `items` não derruba a tela que hospeda o painel.
+    assert.match(
+      read("./components/ContabilHistoryPanel.tsx"),
+      /Array\.isArray\(query\.data\?\.items\) \? query\.data : undefined/,
+    );
   });
 
   await runTest("agenda compartilhada: a data não muda de dia com o fuso (#1727)", () => {

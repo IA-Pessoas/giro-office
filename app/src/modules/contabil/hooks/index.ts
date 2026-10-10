@@ -48,6 +48,7 @@ export {
   useTriageEditability,
   useTriageMonthly,
   useTriageMutations,
+  useTriageDocumentHistory,
   useTriageStatements,
 } from "./useTriageDocuments";
 export {

@@ -195,6 +195,15 @@ export const statementSchema = z
     status: z.enum(triageDocumentStatuses),
   })
   .strict();
+export const triageDocumentHistorySchema = z
+  .object({
+    client_id: uuid("client_id").optional(),
+    competence: competence.optional(),
+    page: z.coerce.number().int().min(1).max(10_000).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+
 export const statementHistorySchema = z
   .object({
     client_id: uuid("client_id"),

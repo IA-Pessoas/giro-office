@@ -71,6 +71,21 @@ export function triageStatementHistoryQueryKey(clientId: string, pendingOnly?: b
   return pendingOnly === undefined ? base : ([...base, pendingOnly] as const);
 }
 
+export function triageDocumentHistoryQueryKey(filters: {
+  clientId?: string;
+  competence?: string;
+  page: number;
+}) {
+  return [
+    ...CONTABIL_QUERY_KEY,
+    "triage",
+    "document-history",
+    filters.clientId ?? "all",
+    filters.competence ?? "all",
+    filters.page,
+  ] as const;
+}
+
 export function triageStatementsQueryKey(clientId: string, competence: string) {
   return [...CONTABIL_QUERY_KEY, "triage", "statements", clientId, competence] as const;
 }

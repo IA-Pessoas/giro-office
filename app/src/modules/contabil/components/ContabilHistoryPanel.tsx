@@ -9,21 +9,28 @@ import { getContabilHistoryPageCount } from "./contabilHistory.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 
-interface ContabilHistoryPanelProps<F extends string> {
+interface ContabilHistoryPanelProps<F extends string, E extends ContabilHistoryEntry<F>> {
   titleId: string;
+  title?: string;
   subtitle: string;
   emptyMessage: string;
-  query: UseQueryResult<{ total: number; items: ContabilHistoryEntry<F>[] }, Error>;
+  query: UseQueryResult<{ total: number; items: E[] }, Error>;
   page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
   formatField: (field: F) => string;
   formatValue: (field: F, value: unknown) => string;
+  /** Linha a mais por evento, para históricos que misturam objetos (cliente, rotina, ação). */
+  describeEntry?: (entry: E) => string;
 }
 
 // Linha do tempo paginada lida da auditoria (Controle #1722, Relação #1723).
-export function ContabilHistoryPanel<F extends string>({
+export function ContabilHistoryPanel<
+  F extends string,
+  E extends ContabilHistoryEntry<F> = ContabilHistoryEntry<F>,
+>({
   titleId,
+  title = "Histórico de alterações",
   subtitle,
   emptyMessage,
   query,
@@ -32,8 +39,11 @@ export function ContabilHistoryPanel<F extends string>({
   onPageChange,
   formatField,
   formatValue,
-}: ContabilHistoryPanelProps<F>) {
-  const history = query.data;
+  describeEntry,
+}: ContabilHistoryPanelProps<F, E>) {
+  // Resposta fora do formato (sem `items`) vira histórico vazio: o painel é secundário e não
+  // pode derrubar a tela que o hospeda.
+  const history = Array.isArray(query.data?.items) ? query.data : undefined;
   const pageCount = getContabilHistoryPageCount(history?.total ?? 0, pageSize);
 
   return (
@@ -45,7 +55,7 @@ export function ContabilHistoryPanel<F extends string>({
         <div className="flex items-center gap-2">
           <History className="h-4 w-4 text-blue-600 dark:text-blue-300" />
           <h3 id={titleId} className="text-base font-semibold text-gray-900 dark:text-white">
-            Histórico de alterações
+            {title}
           </h3>
         </div>
         <p className="text-sm text-gray-600 dark:text-slate-400">{subtitle}</p>
@@ -68,7 +78,7 @@ export function ContabilHistoryPanel<F extends string>({
         </ContabilStateBox>
       ) : null}
 
-      {history && history.items.length === 0 ? (
+      {!query.isLoading && !query.error && (!history || history.items.length === 0) ? (
         <p className="text-sm text-gray-600 dark:text-slate-400">{emptyMessage}</p>
       ) : null}
 
@@ -83,6 +93,9 @@ export function ContabilHistoryPanel<F extends string>({
                   <time dateTime={entry.at}>{formatDateTime(entry.at)}</time>
                 </span>
               </p>
+              {describeEntry ? (
+                <p className="text-gray-600 dark:text-slate-400">{describeEntry(entry)}</p>
+              ) : null}
               <ul className="space-y-0.5 text-gray-700 dark:text-slate-300">
                 {entry.changes.map((change) => (
                   <li key={change.field}>
