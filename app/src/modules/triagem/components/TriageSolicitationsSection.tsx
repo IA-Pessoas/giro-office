@@ -10,12 +10,11 @@ import { useTriageCatalogs, useTriageSolicitationMutations, useTriageSolicitatio
 import type { TriageSolicitation, TriageSolicitationStatus } from "../services";
 import { TriageSolicitationDetail } from "./TriageSolicitationDetail";
 
-const FIELD_CLASSNAME =
-  "mt-1 block h-10 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800";
-const BUTTON_CLASSNAME =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800";
-const PRIMARY_BUTTON_CLASSNAME =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60";
+import {
+  TRIAGE_BUTTON_CLASSNAME as BUTTON_CLASSNAME,
+  TRIAGE_FIELD_CLASSNAME as FIELD_CLASSNAME,
+  TRIAGE_PRIMARY_BUTTON_CLASSNAME as PRIMARY_BUTTON_CLASSNAME,
+} from "./triagem.styles";
 
 const TABS: Array<{ value: TriageSolicitationStatus; label: string }> = [
   { value: "OPEN", label: "Em andamento" },

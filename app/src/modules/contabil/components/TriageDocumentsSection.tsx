@@ -72,20 +72,21 @@ export function TriageDocumentsSection({
   canEdit,
   canEditClosing,
   documentType = "CONTABIL",
-  initialCompetence,
+  fixedCompetence,
 }: {
   clientId: string;
   canEdit: boolean;
   canEditClosing: boolean;
   documentType?: TriageRoutineType;
-  initialCompetence?: ContabilCompetence;
+  /** Competência travada (ex.: detalhe da solicitação); sem ela, o seletor fica livre. */
+  fixedCompetence?: ContabilCompetence;
 }) {
   const documents = documentType === "FISCAL" ? FISCAL_DOCUMENTS : CONTABIL_DOCUMENTS;
   const titleId = documentType === "FISCAL"
     ? "triage-fiscal-documents-title"
     : "triage-contabil-documents-title";
   const [competence, setCompetence] = useState<ContabilCompetence>(
-    initialCompetence ?? getCurrentContabilCompetence(),
+    fixedCompetence ?? getCurrentContabilCompetence(),
   );
   const [bankId, setBankId] = useState("");
   // O item fica guardado após fechar para o texto não sumir durante a animação de saída.
@@ -187,11 +188,15 @@ export function TriageDocumentsSection({
         <div className="text-sm font-medium text-gray-700 dark:text-slate-300">
           Competência
           <span className="ml-2">
-            <ContabilCompetenceSelect
-              label={documentType === "FISCAL" ? "Competência fiscal" : "Competência documental"}
-              value={competence}
-              onChange={setCompetence}
-            />
+            {fixedCompetence ? (
+              <span>{fixedCompetence}</span>
+            ) : (
+              <ContabilCompetenceSelect
+                label={documentType === "FISCAL" ? "Competência fiscal" : "Competência documental"}
+                value={competence}
+                onChange={setCompetence}
+              />
+            )}
           </span>
         </div>
       </div>

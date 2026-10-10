@@ -10,6 +10,9 @@ import {
 
 import { useTriageNoteCounts } from "../hooks";
 import type { TriageNoteCountsInput, TriageSolicitation } from "../services";
+import { TRIAGE_FIELD_CLASSNAME, TRIAGE_PRIMARY_BUTTON_CLASSNAME } from "./triagem.styles";
+
+const MAX_NOTE_COUNT = 1_000_000;
 
 const COUNTERS: Array<{ key: keyof TriageNoteCountsInput; label: string }> = [
   { key: "xml_inbound", label: "XML entradas" },
@@ -46,13 +49,11 @@ export function TriageSolicitationDetail({
   const canEditCounts = canEdit && solicitation.status === "OPEN";
 
   useEffect(() => {
-    if (!query.data) return;
-    setDrafts({
-      xml_inbound: String(query.data.xml_inbound),
-      xml_outbound: String(query.data.xml_outbound),
-      nfse_issued: String(query.data.nfse_issued),
-      nfse_received: String(query.data.nfse_received),
-    });
+    const data = query.data;
+    if (!data) return;
+    setDrafts(
+      Object.fromEntries(COUNTERS.map(({ key }) => [key, String(data[key])])) as typeof EMPTY,
+    );
   }, [query.data]);
 
   async function saveCounts(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -60,8 +61,12 @@ export function TriageSolicitationDetail({
     const values = Object.fromEntries(
       COUNTERS.map(({ key }) => [key, Number(drafts[key])]),
     ) as TriageNoteCountsInput;
-    const invalid = COUNTERS.find(({ key }) => !Number.isInteger(values[key]) || values[key] < 0);
-    setFormError(invalid ? `${invalid.label}: informe um número inteiro igual ou maior que zero.` : null);
+    const invalid = COUNTERS.find(
+      ({ key }) => !Number.isInteger(values[key]) || values[key] < 0 || values[key] > MAX_NOTE_COUNT,
+    );
+    setFormError(
+      invalid ? `${invalid.label}: informe um número inteiro entre 0 e 1.000.000.` : null,
+    );
     if (invalid) return;
     try {
       await update.mutateAsync(values);
@@ -92,12 +97,13 @@ export function TriageSolicitationDetail({
                 <input
                   type="number"
                   min={0}
+                  max={MAX_NOTE_COUNT}
                   step={1}
                   inputMode="numeric"
                   value={drafts[key]}
                   disabled={!canEditCounts}
                   onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))}
-                  className="mt-1 block h-10 w-full rounded-lg border border-gray-300 bg-white px-3 disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800"
+                  className={TRIAGE_FIELD_CLASSNAME}
                 />
               </label>
             ))}
@@ -113,7 +119,7 @@ export function TriageSolicitationDetail({
           <button
             type="submit"
             disabled={update.isPending || query.isLoading}
-            className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`${TRIAGE_PRIMARY_BUTTON_CLASSNAME} mt-3`}
           >
             <Save className="h-4 w-4" aria-hidden="true" />
             Salvar contadores
@@ -135,7 +141,7 @@ export function TriageSolicitationDetail({
         <TriageDocumentsSection
           key={`${solicitation.client_id}-${solicitation.competence}`}
           clientId={solicitation.client_id}
-          initialCompetence={solicitation.competence as ContabilCompetence}
+          fixedCompetence={solicitation.competence as ContabilCompetence}
           canEdit={canEditFiscal && fiscalEditability.data?.can_edit === true}
           canEditClosing={false}
           documentType="FISCAL"
