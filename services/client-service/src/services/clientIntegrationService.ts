@@ -1,6 +1,7 @@
 import {
   INTEGRACAO_PERMISSION_LEVEL,
   type IntegracaoServiceAuthorization,
+  normalizeModulePermission,
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
@@ -14,8 +15,12 @@ import {
   isClientDocumentUniqueConstraintError,
 } from "../utils/clientDocuments.js";
 import { cleanDocument } from "../utils/documents.js";
+import { MARKETING_CLIENT_PROFILE_ACCESS } from "../utils/moduleAuthorization.js";
 
-type ClientAuthorization = IntegracaoServiceAuthorization & { userId: string };
+type ClientAuthorization = IntegracaoServiceAuthorization & {
+  marketingLevel?: number;
+  userId: string;
+};
 
 export async function createIntegrationClient(
   prisma: PrismaClient,
@@ -106,6 +111,25 @@ export async function updateIntegrationClient(
     isOwner: false,
   },
 ): Promise<Record<string, unknown>> {
+  const requestedFields = Object.keys(input);
+  const isMarketingInstagramUpdate =
+    requestedFields.length === 1 && requestedFields[0] === "instagram";
+  const hasMarketingInstagramEditAccess =
+    isMarketingInstagramUpdate &&
+    normalizeModulePermission(authorization.marketingLevel) >=
+      MARKETING_CLIENT_PROFILE_ACCESS.EDITOR;
+
+  if (!hasMarketingInstagramEditAccess) {
+    requireIntegracaoRouteAccess("PATCH", "/client/:id/integration", {
+      userId: authorization.userId,
+      level: authorization.level,
+      organizationId,
+      resourceOrganizationId: organizationId,
+      isOwner: authorization.isOwner,
+      requestedFields,
+    });
+  }
+
   const exists = await prisma.client.findFirst({
     where: { id: clientId, organization_id: organizationId },
     select: { id: true, type: true, cpf_cnpj: true },
@@ -113,15 +137,6 @@ export async function updateIntegrationClient(
   if (!exists) {
     throw new ServiceError(404, "Cliente não encontrado.");
   }
-
-  requireIntegracaoRouteAccess("PATCH", "/client/:id/integration", {
-    userId: authorization.userId,
-    level: authorization.level,
-    organizationId,
-    resourceOrganizationId: organizationId,
-    isOwner: authorization.isOwner,
-    requestedFields: Object.keys(input),
-  });
 
   const documentType = input.type ?? exists.type;
   const cleanedCpfCnpj =
@@ -260,12 +275,18 @@ export async function updateIntegrationClient(
     type_registration: true,
     service_unique: true,
   };
+  const marketingProfileSelect = {
+    id: true,
+    name: true,
+    status: true,
+    instagram: true,
+  } as const;
 
   try {
     const updated = await prisma.client.update({
       where: { id: clientId },
       data,
-      select,
+      select: hasMarketingInstagramEditAccess ? marketingProfileSelect : select,
     });
 
     return updated as Record<string, unknown>;

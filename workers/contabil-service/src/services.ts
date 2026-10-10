@@ -6,8 +6,18 @@ import {
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
+import {
+  AUDIT_CREATE_ACTION,
+  AUDIT_UPDATE_ACTION,
+} from "../../../services/contabil-service/src/services/auditActions.js";
 import type { ContingencyPrisma } from "../../../services/contabil-service/src/services/contingencyService.js";
+import {
+  CONTROL_AUDIT_ACTIONS,
+  CONTROL_AUDIT_REFERRING,
+} from "../../../services/contabil-service/src/services/controlHistoryService.js";
 import type { NoahServicePrisma } from "../../../services/contabil-service/src/services/noahService.js";
+import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
+import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
   type TriageDocumentStatus,
@@ -343,7 +353,13 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         const control = await prisma.controlContabil.create({
           data: { ...identity, ...DEFAULT_CONTROL_DATA },
         });
-        await auditCreate(audit, auth, "contabil.control", String(control.id), "Cadastro");
+        await auditCreate(
+          audit,
+          auth,
+          CONTROL_AUDIT_REFERRING,
+          String(control.id),
+          AUDIT_CREATE_ACTION,
+        );
         return { control, created: true };
       } catch (error) {
         if (isUniqueViolation(error))
@@ -431,8 +447,8 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
           userId: auth.userId,
           organizationId: auth.organizationId,
           permission: auth.permission ?? null,
-          action: "Atualização",
-          referring: "contabil.control",
+          action: CONTROL_AUDIT_ACTIONS.updateField,
+          referring: CONTROL_AUDIT_REFERRING,
           referringId: id,
           oldData: current,
           updatedData: updated,
@@ -457,8 +473,8 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Concluir todos os itens do controle contábil",
-        referring: "contabil.control",
+        action: CONTROL_AUDIT_ACTIONS.completeAll,
+        referring: CONTROL_AUDIT_REFERRING,
         referringId: id,
         oldData: current,
         updatedData: updated,
@@ -508,7 +524,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
         action: "Arquivar competência contábil",
-        referring: "contabil.control",
+        referring: CONTROL_AUDIT_REFERRING,
         referringId: String(current.id),
         oldData: current,
         updatedData: { ...counts, archived_at: archivedAt.toISOString() },
@@ -554,7 +570,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
       await auditCreate(
         audit,
         auth,
-        "contabil.control",
+        CONTROL_AUDIT_REFERRING,
         String(input.clientId),
         "Restaurar competência contábil",
       );
@@ -569,10 +585,12 @@ function createSimpleEntityService(
   delegateName: "relationshipContabil" | "responsibleContabil",
   referring: string,
   messages: { foreignKey: string },
+  validate: (input: JsonRecord, current?: JsonRecord) => void = () => {},
 ): RelationshipService {
   const delegate = prisma[delegateName];
   return {
     async create(input, auth) {
+      validate(input);
       const duplicate = await delegate.findFirst({
         where: { client_id: input.client_id, organization_id: auth.organizationId },
       });
@@ -581,7 +599,17 @@ function createSimpleEntityService(
         const row = await delegate.create({
           data: { ...input, organization_id: auth.organizationId },
         });
-        await auditCreate(audit, auth, referring, String(row.id), "Cadastro");
+        // Diff contra objeto vazio: o histórico mostra os valores iniciais como `null → valor`.
+        await audit.logUpdateIfChanged({
+          userId: auth.userId,
+          organizationId: auth.organizationId,
+          permission: auth.permission ?? null,
+          action: AUDIT_CREATE_ACTION,
+          referring,
+          referringId: String(row.id),
+          oldData: {},
+          updatedData: row,
+        });
         return row;
       } catch (error) {
         if (isUniqueViolation(error))
@@ -595,13 +623,14 @@ function createSimpleEntityService(
         where: { id, organization_id: auth.organizationId },
       });
       if (!current) throw new ServiceError(404, "Não está cadastrado.");
+      validate(input, current);
       try {
         const updated = await delegate.update({ where: { id }, data: input });
         await audit.logUpdateIfChanged({
           userId: auth.userId,
           organizationId: auth.organizationId,
           permission: auth.permission ?? null,
-          action: "Atualização",
+          action: AUDIT_UPDATE_ACTION,
           referring,
           referringId: id,
           oldData: current,
@@ -637,9 +666,18 @@ export function createRelationshipService(
   prisma: ContabilPrisma,
   audit: Audit,
 ): RelationshipService {
-  return createSimpleEntityService(prisma, audit, "relationshipContabil", "contabil.relationship", {
-    foreignKey: "Cliente não encontrado.",
-  });
+  return createSimpleEntityService(
+    prisma,
+    audit,
+    "relationshipContabil",
+    RELATIONSHIP_AUDIT_REFERRING,
+    { foreignKey: "Cliente não encontrado." },
+    (input, current) =>
+      assertChartAccountsState(
+        input.chart_accounts as string | null | undefined,
+        current?.chart_accounts as string | null | undefined,
+      ),
+  );
 }
 
 export function createResponsibleService(prisma: ContabilPrisma, audit: Audit): ResponsibleService {

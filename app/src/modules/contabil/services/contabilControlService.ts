@@ -3,6 +3,7 @@ import { setupAPIClient } from "@shared/services/api";
 import type {
   ContabilControl,
   ContabilControlFilters,
+  ContabilControlHistoryPage,
   ContabilCompetence,
   ContabilControlPortfolio,
   ContabilCompetenceOperationPayload,
@@ -44,6 +45,15 @@ export const contabilControlService = {
         params: buildContabilControlParams(filters),
       }),
     );
+  },
+
+  async getHistory(
+    filters: ContabilControlFilters & { page: number; pageSize: number },
+  ): Promise<ContabilControlHistoryPage> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.controlsHistory, {
+      params: { ...buildContabilControlParams(filters), page: filters.page, pageSize: filters.pageSize },
+    });
+    return unwrapContabilEnvelope<ContabilControlHistoryPage>(response.data);
   },
 
   async patchControlField(

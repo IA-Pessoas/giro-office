@@ -69,6 +69,20 @@ model NoahConversion {
   @@map("contabil.noah_conversions")
 }
 
+// Só leitura: históricos do Controle (#1722) e da Relação Contábil (#1723).
+model AuditRequest {
+  id              String   @id @default(uuid())
+  organization_id String?
+  user_id         String?
+  created_at      DateTime @default(now())
+  action          String?
+  referring       String?
+  referring_id    String?
+  changes_json    Json?
+
+  @@map("audit_requests")
+}
+
 model ControlContabil {
   id                               String   @id @default(uuid())
   competence                       String
@@ -117,8 +131,8 @@ model TriageClosing {
 model RelationshipContabil {
   id              String  @id @default(uuid())
   client_id       String
-  bidding         Boolean
-  chart_accounts  String
+  bidding         Boolean?
+  chart_accounts  String?
   tool            String
   system          String
   note            String

@@ -32,7 +32,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
   const createRelationshipExample = {
     client_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     bidding: true,
-    chart_accounts: "Plano referencial",
+    chart_accounts: "Sim — Jonrick",
     tool: "Domínio",
     system: "ERP X",
     note: "Cliente em implantação.",
@@ -674,6 +674,54 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           },
         },
       },
+      "/contabil/controls/history": {
+        get: {
+          tags: ["Controls"],
+          summary: "Histórico de alterações do controle (etapas e observação)",
+          description:
+            "Lido da auditoria, do mais recente para o mais antigo, sem corte por data. Cada item traz ator, instante e os campos alterados com valor anterior e novo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+              example: "2026-01",
+            },
+            {
+              name: "page",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Página do histórico; controle inexistente devolve lista vazia",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "400": { description: "Parâmetros inválidos" },
+            "401": { description: "Não autenticado" },
+          },
+        },
+      },
       "/contabil/controls/year": {
         post: {
           tags: ["Controls"],
@@ -953,8 +1001,17 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    bidding: { type: "boolean" },
-                    chart_accounts: { type: "string" },
+                    bidding: {
+                      type: "boolean",
+                      nullable: true,
+                      description: "null = não selecionado.",
+                    },
+                    chart_accounts: {
+                      type: "string",
+                      nullable: true,
+                      description:
+                        "null = não selecionado. Novos valores: Sim, Não, Sim — Jonrick, Não — Jonrick; texto livre legado só pode ser reenviado sem mudança.",
+                    },
                     tool: { type: "string" },
                     system: { type: "string" },
                     note: { type: "string" },
@@ -998,8 +1055,17 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    bidding: { type: "boolean" },
-                    chart_accounts: { type: "string" },
+                    bidding: {
+                      type: "boolean",
+                      nullable: true,
+                      description: "null = não selecionado.",
+                    },
+                    chart_accounts: {
+                      type: "string",
+                      nullable: true,
+                      description:
+                        "null = não selecionado. Novos valores: Sim, Não, Sim — Jonrick, Não — Jonrick; texto livre legado só pode ser reenviado sem mudança.",
+                    },
                     tool: { type: "string" },
                     system: { type: "string" },
                     note: { type: "string" },
@@ -1066,6 +1132,47 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                 },
               },
             },
+          },
+        },
+      },
+      "/contabil/relationships/client/{clientId}/history": {
+        get: {
+          tags: ["Relationships"],
+          summary: "Histórico de alterações do relacionamento contábil do cliente",
+          description:
+            "Lido da auditoria, do mais recente para o mais antigo. Cada item traz ator, instante e os campos alterados (licitação, plano de contas, ferramenta, sistema, observação) com valor anterior e novo; null = não selecionado.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "clientId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "page",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Página do histórico; sem relacionamento devolve lista vazia",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "400": { description: "Parâmetros inválidos" },
+            "401": { description: "Não autenticado" },
           },
         },
       },
