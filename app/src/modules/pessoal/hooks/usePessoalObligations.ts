@@ -13,6 +13,8 @@ import type {
   PessoalObligationCreatePayload,
   PessoalObligationCreateResult,
   PessoalObligationGenerationResult,
+  PessoalObligationPortfolioFilters,
+  PessoalObligationPortfolioPage,
   PessoalObligationUpdatePayload,
 } from "../types/obligations";
 import { pessoalQueryKey } from "./queryKeys";
@@ -62,7 +64,36 @@ export function useUpdatePessoalObligationMutation(
   return useMutation({
     mutationFn: (payload) => pessoalService.updateObligationField(id, payload),
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: obligationKey(clientId, competence) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: obligationKey(clientId, competence) }),
+        queryClient.invalidateQueries({ queryKey: pessoalQueryKey("obligations", "portfolio") }),
+      ]);
+    },
+  });
+}
+
+export function usePessoalObligationPortfolio(
+  filters: PessoalObligationPortfolioFilters,
+): UseQueryResult<PessoalObligationPortfolioPage, Error> {
+  return useFetch(
+    pessoalQueryKey("obligations", "portfolio", JSON.stringify(filters)),
+    () => pessoalService.listObligationPortfolio(filters),
+    { enabled: filters.competence.length > 0 },
+  );
+}
+
+/** Edição pela carteira: mesmo PATCH da ficha; invalida carteira e ficha individual. */
+export function useUpdatePessoalPortfolioObligationMutation(): UseMutationResult<
+  PessoalObligation,
+  Error,
+  { id: string; payload: PessoalObligationUpdatePayload }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => pessoalService.updateObligationField(id, payload),
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: pessoalQueryKey("obligations") });
     },
   });
 }

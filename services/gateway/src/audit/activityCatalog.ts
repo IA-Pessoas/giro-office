@@ -971,6 +971,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/pessoal\/obrigations\/portfolio$/,
+    description: { action: "consultou", item: "a carteira de obrigações" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/parcelamento\/installments\/[^/]+\/competencies$/,
     description: { action: "consultou", item: "as competências de um parcelamento" },
   },

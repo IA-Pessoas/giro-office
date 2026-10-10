@@ -4,8 +4,13 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreateObligationBody,
   DetailObligationQuery,
+  ListObligationPortfolioQuery,
   UpdateObligationFieldBody,
 } from "../schemas/obligation.schemas.js";
+import {
+  listObligationPortfolio,
+  type ObligationPortfolioPrisma,
+} from "./obligationPortfolioService.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
 import { NO_OBLIGATIONS_GROUP_POLICY, NORMAL_GROUP_POLICY } from "./pessoalGroupPolicy.js";
 import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";
@@ -237,6 +242,17 @@ export class ObligationService {
       },
       select: obligationSelect,
     });
+  }
+
+  async listPortfolio(
+    context: Pick<PessoalAuthContext, "organizationId">,
+    query: ListObligationPortfolioQuery,
+  ) {
+    return listObligationPortfolio(
+      this.prisma as unknown as ObligationPortfolioPrisma,
+      context.organizationId,
+      query,
+    );
   }
 
   async updateField(
