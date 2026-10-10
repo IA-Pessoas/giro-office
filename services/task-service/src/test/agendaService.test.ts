@@ -131,4 +131,77 @@ describe("AgendaService", () => {
     await expect(service.remove(editor, "alheio")).rejects.toMatchObject({ statusCode: 404 });
     expect(audit.createLog).not.toHaveBeenCalled();
   });
+
+  // A Triagem divide a agenda com o Regularize: mesma tabela, departamentos diferentes (#1699).
+  describe("Triagem", () => {
+    const TRIAGEM = "dep-triagem";
+    const REGULARIZE = "dep-regularize";
+    const triagem = { ...editor, module: "triagem" } as const;
+    const viewerTriagem = { ...triagem, level: 1 } as const;
+
+    function setupTriagem() {
+      const context = setup();
+      context.prisma.department.findMany.mockResolvedValue([
+        { id: REGULARIZE, name: "Regularize" },
+        { id: TRIAGEM, name: "Triagem" },
+      ]);
+      return context;
+    }
+
+    it("lista só o departamento da Triagem, sem eventos do Regularize nem de outra organização", async () => {
+      const { prisma, service } = setupTriagem();
+
+      await service.list(viewerTriagem, "2026-12");
+
+      expect(prisma.department.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organization_id: ORG } }),
+      );
+      expect(prisma.agenda.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organization_id: ORG,
+            department_control_id: { in: [TRIAGEM] },
+          }),
+        }),
+      );
+    });
+
+    it("cria no departamento resolvido pelo nome e recusa o do Regularize", async () => {
+      const { prisma, service } = setupTriagem();
+
+      await service.create(triagem, event);
+      expect(prisma.agenda.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            organization_id: ORG,
+            department_control_id: TRIAGEM,
+          }),
+        }),
+      );
+      await expect(
+        service.create(triagem, { ...event, department_id: REGULARIZE }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it("visualizador lê, mas não cria, edita nem remove", async () => {
+      const { prisma, service } = setupTriagem();
+
+      await expect(service.list(viewerTriagem, "2026-12")).resolves.toEqual([]);
+      await expect(service.create(viewerTriagem, event)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(service.update(viewerTriagem, EVENT, event)).rejects.toMatchObject({
+        statusCode: 403,
+      });
+      await expect(service.remove(viewerTriagem, EVENT)).rejects.toMatchObject({ statusCode: 403 });
+      expect(prisma.agenda.create).not.toHaveBeenCalled();
+      expect(prisma.agenda.updateMany).not.toHaveBeenCalled();
+      expect(prisma.agenda.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("sem departamento Triagem na organização, não cria em outro", async () => {
+      const { prisma, service } = setup();
+
+      await expect(service.create(triagem, event)).rejects.toMatchObject({ statusCode: 404 });
+      expect(prisma.agenda.create).not.toHaveBeenCalled();
+    });
+  });
 });

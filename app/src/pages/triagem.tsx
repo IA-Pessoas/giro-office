@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
-import { ListChecks, Settings } from "lucide-react";
+import { CalendarDays, ListChecks, Settings } from "lucide-react";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
@@ -49,6 +49,13 @@ export default function TriagemPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/triagem/agenda"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                Agenda
+              </Link>
               <Link
                 href="/triagem/catalogos"
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
