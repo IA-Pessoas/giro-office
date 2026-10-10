@@ -446,6 +446,39 @@ describe("regularize Worker", () => {
     });
   });
 
+  it("compares a Veri XLSX within the authenticated organization and limits the upload", async () => {
+    const veri = { compare: vi.fn(async () => ({ rows: [], invalid: [], totals: {} })) };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      veriComparisonService: veri as never,
+    });
+    const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const writer = { ...headers(), "x-auth-permission": "2" };
+    const post = (body: BodyInit, contentType: string, extra: HeadersInit = writer) =>
+      app.request("https://regularize.test/regularize/veri/compare", {
+        method: "POST",
+        headers: { ...extra, "content-type": contentType },
+        body,
+      });
+
+    const compared = await post(new Uint8Array([1, 2, 3]), xlsx);
+    expect(compared.status).toBe(200);
+    expect(compared.headers.get("cache-control")).toBe("no-store");
+    expect(veri.compare).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      file: Buffer.from([1, 2, 3]),
+    });
+
+    expect((await post("{}", "application/json")).status).toBe(415);
+    expect((await post(new Uint8Array(2 * 1024 * 1024 + 1), xlsx)).status).toBe(413);
+    expect((await post(new Uint8Array([1]), xlsx, {})).status).toBe(401);
+    expect(
+      (await post(new Uint8Array([1]), xlsx, { ...headers(), "x-auth-permission": "1" })).status,
+    ).toBe(403);
+    expect(veri.compare).toHaveBeenCalledOnce();
+  });
+
   it("routes DTE import with write permission and lists imports by organization", async () => {
     const dte: RegularizeDteImportService = {
       importNotices: vi.fn(async () => ({ id: "import-1", created_count: 1 })),

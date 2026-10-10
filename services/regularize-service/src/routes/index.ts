@@ -11,6 +11,7 @@ import { createPartnersRoutes } from "./partners.routes.js";
 import { createPasswordRoutes } from "./password.routes.js";
 import { createProcessRoutes } from "./process.routes.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
+import { createVeriRoutes } from "./veri.routes.js";
 
 export function createRegularizeRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();
@@ -26,6 +27,7 @@ export function createRegularizeRoutes(deps: RegularizeRouteDeps): Router {
   router.use(createGuidanceRoutes(deps));
   router.use(createLicenseRoutes(deps));
   router.use(createDteRoutes(deps));
+  router.use(createVeriRoutes(deps));
 
   return router;
 }
