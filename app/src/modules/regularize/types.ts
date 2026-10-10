@@ -714,6 +714,8 @@ export type RegularizeDteNotice = {
   assunto: string;
   data_leitura: string | null;
   data_ciencia: string | null;
+  // Data da consulta na SEFAZ, quando a colagem trouxe.
+  registro: string | null;
   pending_reading: boolean;
   created_at: string;
 };

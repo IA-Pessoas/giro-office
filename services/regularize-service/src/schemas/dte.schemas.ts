@@ -15,10 +15,19 @@ export const importDteBodySchema = z
   })
   .strict();
 
+// Dia civil (aaaa-mm-dd) sempre enviado por quem consulta: o servidor não conhece o fuso.
+function dteDaySchema(field: string) {
+  return z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, `${field} deve estar no formato aaaa-mm-dd.`)
+    .refine(isCalendarDay, `${field} não existe no calendário.`)
+    .transform((value) => new Date(`${value}T00:00:00.000Z`));
+}
+
 export const listDteNoticesQuerySchema = z
   .object({
-    from: z.coerce.date().optional(),
-    to: z.coerce.date().optional(),
+    from: dteDaySchema("from").optional(),
+    to: dteDaySchema("to").optional(),
     tipo: z.string().max(100).optional(),
     search: z.string().trim().max(200).default(""),
     reading: z.enum(DTE_NOTICE_READING_FILTERS).default("Todos"),
@@ -34,12 +43,7 @@ export const updateDteNoticeReadingBodySchema = z
   })
   .strict();
 
-// Dia civil (aaaa-mm-dd) sempre enviado por quem consulta: o servidor não conhece o fuso.
-const dteQueryDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "date deve estar no formato aaaa-mm-dd.")
-  .refine(isCalendarDay, "date não existe no calendário.")
-  .transform((value) => new Date(`${value}T00:00:00.000Z`));
+const dteQueryDateSchema = dteDaySchema("date");
 
 const dteQueryListSchema = z
   .string()

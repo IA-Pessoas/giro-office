@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { DTE_IMPORT_LIMITS, dteDedupeKey, parseDteImport } from "../services/dteImportParser.js";
+import {
+  DTE_IMPORT_LIMITS,
+  dteDedupeKey,
+  parseDteDateTime,
+  parseDteImport,
+} from "../services/dteImportParser.js";
+
+describe("parseDteDateTime", () => {
+  it("lê dd/mm/aaaa com ou sem hora, como o legado", () => {
+    expect(parseDteDateTime("05/03/2024 10:22")).toEqual(new Date("2024-03-05T10:22:00.000Z"));
+    expect(parseDteDateTime("05/03/2024")).toEqual(new Date("2024-03-05T00:00:00.000Z"));
+  });
+
+  it("devolve null para texto fora do formato ou data que não existe", () => {
+    expect(parseDteDateTime(null)).toBeNull();
+    expect(parseDteDateTime("2024-03-05")).toBeNull();
+    expect(parseDteDateTime("31/02/2024 10:00")).toBeNull();
+    expect(parseDteDateTime("05/03/2024 25:00")).toBeNull();
+  });
+});
 
 // Tabela sintética no formato que o regularize/pages/dte/upload.php lia: aviso na célula 3
 // (com o span cuja classe vira o tipo), CNPJ na 4 e datas nas 7, 9 e 10.

@@ -291,6 +291,21 @@ export function parseDteImport(format: DteImportFormat, content: string): DtePar
   return { totalRows: items.length, notices, rejections };
 }
 
+const DTE_DATE_TIME = /^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?$/;
+
+// Data do portal no formato que o dte/home.php lia (STR_TO_DATE '%d/%m/%Y %H:%i'). O horário
+// é o do portal, guardado sem fuso: o filtro da caixa compara só o dia.
+export function parseDteDateTime(text: string | null): Date | null {
+  const match = DTE_DATE_TIME.exec(text ?? "");
+  if (!match) return null;
+  const [, day, month, year, hour = "00", minute = "00"] = match;
+  const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:00.000Z`);
+  // "31/02/2024" não vira data: o Date rolaria para março.
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(`${year}-${month}-${day}`)
+    ? date
+    : null;
+}
+
 // Chave de nove campos do SELECT de Fiscal::cadastrarDTE; o hash cabe num índice único.
 export async function dteDedupeKey(fields: DteNoticeFields): Promise<string> {
   const key = JSON.stringify([
