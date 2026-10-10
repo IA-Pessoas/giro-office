@@ -5189,6 +5189,14 @@ const baseManifest = [
   }),
   op({
     service: "pessoal-service",
+    method: "GET",
+    path: "/pessoal/obrigations/portfolio",
+    action: "pessoalObligationPortfolio",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
     method: "PATCH",
     path: "/pessoal/obrigations/{id}",
     action: "pessoalObligationPatch",
