@@ -2,12 +2,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MarketingAiUsageControlService } from "../services/marketingAiUsageControlService.js";
 
+const actorUserId = "00000000-0000-4000-8000-000000000009";
+const blankAnswers = {
+  knowledge: null,
+  integration: null,
+  frequency: null,
+  purpose: null,
+  perceived_gain: null,
+};
+
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "20000000-0000-4000-8000-000000000001";
 const competence = "2026-04";
 
 function createPrisma() {
-  return {
+  const prisma = {
     user: {
       findFirst: vi.fn().mockResolvedValue({ id: userId }),
       findMany: vi.fn().mockResolvedValue([{ id: userId }, { id: "user-2" }]),
@@ -16,6 +25,7 @@ function createPrisma() {
       create: vi.fn().mockResolvedValue({ id: "control-1" }),
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findFirst: vi.fn().mockResolvedValue({ id: "control-1", ...blankAnswers }),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(3),
     },
@@ -23,20 +33,24 @@ function createPrisma() {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    $transaction: vi.fn((run: (tx: unknown) => unknown) => run(prisma)),
   };
+  return prisma;
 }
 
 describe("MarketingAiUsageControlService", () => {
   let prisma: ReturnType<typeof createPrisma>;
   let service: MarketingAiUsageControlService;
+  let audit: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     prisma = createPrisma();
-    service = new MarketingAiUsageControlService(prisma as never);
+    audit = vi.fn(async () => {});
+    service = new MarketingAiUsageControlService(prisma as never, audit);
   });
 
   it("cria controle mensal somente para usuário ativo da organização", async () => {
-    await service.createForUser(organizationId, userId, competence);
+    await service.createForUser(organizationId, userId, competence, actorUserId);
 
     expect(prisma.user.findFirst).toHaveBeenCalledWith({
       where: {
@@ -62,7 +76,9 @@ describe("MarketingAiUsageControlService", () => {
   it("converte duplicidade unitária em conflito de domínio", async () => {
     prisma.marketingAiUsageControl.create.mockRejectedValue({ code: "P2002" });
 
-    await expect(service.createForUser(organizationId, userId, competence)).rejects.toMatchObject({
+    await expect(
+      service.createForUser(organizationId, userId, competence, actorUserId),
+    ).rejects.toMatchObject({
       statusCode: 409,
     });
   });
@@ -219,11 +235,13 @@ describe("MarketingAiUsageControlService", () => {
   });
 
   it("atualiza respostas dentro da organização autenticada", async () => {
-    const control = { id: "control-1", frequency: 10 };
-    prisma.marketingAiUsageControl.findFirst = vi.fn().mockResolvedValue(control);
+    const control = { id: "control-1", ...blankAnswers, frequency: 10 };
+    prisma.marketingAiUsageControl.findFirst
+      .mockResolvedValueOnce({ id: "control-1", ...blankAnswers })
+      .mockResolvedValueOnce(control);
 
     await expect(
-      service.updateAnswers(organizationId, "control-1", { frequency: 10 }),
+      service.updateAnswers(organizationId, "control-1", { frequency: 10 }, actorUserId),
     ).resolves.toEqual(control);
 
     expect(prisma.marketingAiUsageControl.updateMany).toHaveBeenCalledWith({
@@ -236,21 +254,67 @@ describe("MarketingAiUsageControlService", () => {
     });
   });
 
-  it("não atualiza controle pertencente a outra organização", async () => {
-    prisma.marketingAiUsageControl.updateMany.mockResolvedValue({ count: 0 });
+  it("não atualiza nem audita controle pertencente a outra organização", async () => {
+    prisma.marketingAiUsageControl.findFirst.mockResolvedValueOnce(null);
 
     await expect(
-      service.updateAnswers(organizationId, "control-elsewhere", { knowledge: false }),
+      service.updateAnswers(organizationId, "control-elsewhere", { knowledge: false }, actorUserId),
     ).rejects.toMatchObject({ statusCode: 404 });
-    expect(prisma.marketingAiUsageControl.updateMany).toHaveBeenCalledWith({
+    expect(prisma.marketingAiUsageControl.findFirst).toHaveBeenCalledWith({
       where: { id: "control-elsewhere", organization_id: organizationId },
-      data: { knowledge: false },
     });
+    expect(prisma.marketingAiUsageControl.updateMany).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("registra ator, organização, controle e resposta anterior/nova após a edição", async () => {
+    prisma.marketingAiUsageControl.findFirst
+      .mockResolvedValueOnce({ id: "control-1", ...blankAnswers, integration: true })
+      .mockResolvedValueOnce({ id: "control-1", ...blankAnswers, integration: false });
+
+    await service.updateAnswers(organizationId, "control-1", { integration: false }, actorUserId);
+
+    expect(audit).toHaveBeenCalledWith({
+      organizationId,
+      userId: actorUserId,
+      action: "Edição",
+      referring: "marketing.aiUsageControls",
+      referringId: "control-1",
+      changes: { integration: { from: true, to: false } },
+    });
+  });
+
+  it("registra quem criou o controle mensal e para qual usuário e competência", async () => {
+    await service.createForUser(organizationId, userId, competence, actorUserId);
+
+    expect(audit).toHaveBeenCalledWith({
+      organizationId,
+      userId: actorUserId,
+      action: "Cadastro",
+      referring: "marketing.aiUsageControls",
+      referringId: "control-1",
+      changes: {
+        userId: { from: null, to: userId },
+        competence: { from: null, to: competence },
+      },
+    });
+  });
+
+  it("falha a edição quando a trilha exigida não é gravada", async () => {
+    audit.mockRejectedValueOnce(Object.assign(new Error("audit down"), { statusCode: 503 }));
+    prisma.marketingAiUsageControl.findFirst
+      .mockResolvedValueOnce({ id: "control-1", ...blankAnswers })
+      .mockResolvedValueOnce({ id: "control-1", ...blankAnswers, knowledge: true });
+
+    await expect(
+      service.updateAnswers(organizationId, "control-1", { knowledge: true }, actorUserId),
+    ).rejects.toMatchObject({ statusCode: 503 });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it("rejeita frequência fora da faixa sem gravar", async () => {
     await expect(
-      service.updateAnswers(organizationId, "control-1", { frequency: 11 }),
+      service.updateAnswers(organizationId, "control-1", { frequency: 11 }, actorUserId),
     ).rejects.toMatchObject({ statusCode: 400 });
     expect(prisma.marketingAiUsageControl.updateMany).not.toHaveBeenCalled();
   });

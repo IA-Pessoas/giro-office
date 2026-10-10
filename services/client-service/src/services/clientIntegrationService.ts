@@ -6,6 +6,11 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import {
+  AUDITED_TRANSACTION,
+  auditUnavailable,
+  type ClientEntityAudit,
+} from "../integrations/audit.js";
 import type {
   CreateIntegrationBody,
   UpdateIntegrationBody,
@@ -110,6 +115,7 @@ export async function updateIntegrationClient(
     level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
     isOwner: false,
   },
+  audit?: ClientEntityAudit,
 ): Promise<Record<string, unknown>> {
   const requestedFields = Object.keys(input);
   const isMarketingInstagramUpdate =
@@ -132,7 +138,7 @@ export async function updateIntegrationClient(
 
   const exists = await prisma.client.findFirst({
     where: { id: clientId, organization_id: organizationId },
-    select: { id: true, type: true, cpf_cnpj: true },
+    select: { id: true, type: true, cpf_cnpj: true, instagram: true },
   });
   if (!exists) {
     throw new ServiceError(404, "Cliente não encontrado.");
@@ -282,12 +288,30 @@ export async function updateIntegrationClient(
     instagram: true,
   } as const;
 
+  // O perfil Instagram (editável pelo Marketing) tem trilha exigida: sem ela, nada é salvo.
+  const instagramChanged =
+    data.instagram !== undefined && (exists.instagram ?? null) !== (data.instagram ?? null);
+  if (instagramChanged && !audit) throw auditUnavailable();
+
   try {
-    const updated = await prisma.client.update({
-      where: { id: clientId },
-      data,
-      select: hasMarketingInstagramEditAccess ? marketingProfileSelect : select,
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.client.update({
+        where: { id: clientId },
+        data,
+        select: hasMarketingInstagramEditAccess ? marketingProfileSelect : select,
+      });
+      if (instagramChanged && audit) {
+        await audit({
+          organizationId,
+          userId: authorization.userId,
+          action: "update",
+          referring: "clients",
+          referringId: clientId,
+          changes: { instagram: { from: exists.instagram ?? null, to: data.instagram ?? null } },
+        });
+      }
+      return row;
+    }, AUDITED_TRANSACTION);
 
     return updated as Record<string, unknown>;
   } catch (error) {

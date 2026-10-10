@@ -124,6 +124,21 @@ describe("marketing Worker", () => {
     expect(response.status).toBe(404);
   });
 
+  it("atribui a alteração ao usuário autenticado", async () => {
+    const { app, s } = setup();
+    await app.request(`/marketing/events/${EVENT_ID}`, {
+      method: "PUT",
+      headers: gateway({ marketing: 2 }),
+      body: JSON.stringify({ name: "Feira" }),
+    });
+    expect(s.events.updateEvent).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      EVENT_ID,
+      { name: "Feira" },
+      "user-1",
+    );
+  });
+
   it("recusa requisição sem autenticação", async () => {
     const { app } = setup();
     expect((await app.request("/marketing/dashboard")).status).toBe(401);

@@ -260,7 +260,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         get: protectedOperation("Listar usuários ativos da organização elegíveis para pesquisa."),
       },
       "/marketing/ai-usage-controls": {
-        post: protectedOperation("Criar pesquisa mensal para um usuário ativo."),
+        post: auditedOperation("Criar pesquisa mensal para um usuário ativo."),
       },
       "/marketing/ai-usage-controls/batch": {
         post: protectedOperation("Criar pesquisas mensais para todos os usuários ativos."),
@@ -274,7 +274,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         ),
       },
       "/marketing/ai-usage-controls/{id}": {
-        patch: protectedOperation("Salvar respostas da pesquisa mensal."),
+        patch: auditedOperation("Salvar respostas da pesquisa mensal."),
       },
       "/marketing/ai-usage-controls/import": {
         post: protectedOperation("Importar registros legados seguros e enfileirar casos ambíguos."),
@@ -286,20 +286,20 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         get: protectedOperation("Listar metadados de credenciais sem revelar os segredos."),
       },
       "/marketing/passwords": {
-        post: protectedOperation("Criar credencial criptografada para a organização autenticada."),
+        post: auditedOperation("Criar credencial criptografada para a organização autenticada."),
       },
       "/marketing/passwords/{id}": {
         get: protectedOperation("Consultar metadados de uma credencial."),
-        patch: protectedOperation("Editar metadados e, opcionalmente, substituir o segredo."),
+        patch: auditedOperation("Editar metadados e, opcionalmente, substituir o segredo."),
       },
       "/marketing/passwords/{id}/reveal": {
-        post: protectedOperation("Revelar uma credencial após confirmação explícita."),
+        post: auditedOperation("Revelar uma credencial após confirmação explícita."),
       },
       "/marketing/passwords/{id}/export": {
-        post: protectedOperation("Exportar uma credencial após confirmação explícita."),
+        post: auditedOperation("Exportar uma credencial após confirmação explícita."),
       },
       "/marketing/passwords/import": {
-        post: protectedOperation(
+        post: auditedOperation(
           "Importar segredos legados verificáveis e colocar casos inseguros em quarentena.",
         ),
       },
@@ -355,6 +355,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
             "401": { description: "Autenticação obrigatória." },
             "403": { description: "Permissão de edição do Marketing necessária." },
             "409": { description: "Já existe um evento com esse nome na organização." },
+            "503": { description: "Auditoria indisponível; a alteração não foi salva." },
           },
         },
       },
@@ -381,6 +382,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
             "403": { description: "Permissão de edição do Marketing necessária." },
             "404": { description: "Evento não encontrado na organização." },
             "409": { description: "Já existe um evento com esse nome na organização." },
+            "503": { description: "Auditoria indisponível; a alteração não foi salva." },
           },
         },
       },
@@ -447,6 +449,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
             "401": { description: "Autenticação obrigatória." },
             "403": { description: "Permissão de edição do Marketing necessária." },
             "404": { description: "Evento não encontrado na organização." },
+            "503": { description: "Auditoria indisponível; a alteração não foi salva." },
           },
         },
       },
@@ -485,6 +488,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
             "401": { description: "Autenticação obrigatória." },
             "403": { description: "Permissão de edição do Marketing necessária." },
             "404": { description: "Edição não encontrada na organização." },
+            "503": { description: "Auditoria indisponível; a alteração não foi salva." },
           },
         },
       },
@@ -524,6 +528,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
             "403": { description: "Permissão de edição do Marketing necessária." },
             "404": { description: "Edição não encontrada na organização." },
             "409": { description: "Esta edição já possui uma avaliação." },
+            "503": { description: "Auditoria indisponível; a alteração não foi salva." },
           },
         },
       },
@@ -595,6 +600,18 @@ function protectedOperation(summary: string) {
       "400": { description: "Dados inválidos." },
       "401": { description: "Autenticação obrigatória." },
       "403": { description: "Permissão Marketing insuficiente." },
+    },
+  };
+}
+
+/** Alteração com trilha exigida: sem auditoria, não é salva. */
+function auditedOperation(summary: string) {
+  const operation = protectedOperation(summary);
+  return {
+    ...operation,
+    responses: {
+      ...operation.responses,
+      "503": { description: "Auditoria indisponível; a alteração não foi salva." },
     },
   };
 }

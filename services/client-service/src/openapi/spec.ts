@@ -844,6 +844,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
               description: "Cliente de integracao atualizado",
               ...successEnvelopeContent(),
             },
+            "503": { description: "Auditoria indisponível; a alteração não foi salva." },
           },
         },
       },
