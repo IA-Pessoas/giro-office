@@ -53,6 +53,7 @@ function delegates(monthly: readonly Record<string, unknown>[] = []) {
     },
     assignments: { findMany: vi.fn().mockResolvedValue([]) },
     configs: { findMany: vi.fn().mockResolvedValue([]) },
+    catalogItems: { findMany: vi.fn().mockResolvedValue([]) },
     competences: { findMany: vi.fn().mockResolvedValue([]) },
     users: {
       findMany: vi.fn().mockResolvedValue([
@@ -636,7 +637,8 @@ describe("extractTriageReportingPage: documentos fiscais especiais", () => {
         },
       },
     ]);
-    prisma.configs.findMany.mockResolvedValue([{ client_id: CLIENT_A, delivery_method: "E-mail" }]);
+    prisma.configs.findMany.mockResolvedValue([{ client_id: CLIENT_A, delivery_method: "EMAIL" }]);
+    prisma.catalogItems.findMany.mockResolvedValue([{ code: "EMAIL", label: "E-mail" }]);
 
     await expect(
       extractTriageReportingPage(prisma, {
@@ -652,6 +654,7 @@ describe("extractTriageReportingPage: documentos fiscais especiais", () => {
           "model_21_invoice",
           "cte_as_issuer",
           "services_provided_as_mei",
+          "billing_status",
           "billing_amount",
           "delivery_method",
         ],
@@ -669,6 +672,7 @@ describe("extractTriageReportingPage: documentos fiscais especiais", () => {
           model_21_invoice: "Não aplicável",
           cte_as_issuer: "Em revisão",
           services_provided_as_mei: "Não aplicável",
+          billing_status: "Informado",
           billing_amount: "15000.00",
           delivery_method: "E-mail",
         },
@@ -684,6 +688,7 @@ describe("extractTriageReportingPage: documentos fiscais especiais", () => {
           competence: true,
           billing_amount: true,
           checklist: true,
+          item_notes: true,
         },
       }),
     );
@@ -692,9 +697,43 @@ describe("extractTriageReportingPage: documentos fiscais especiais", () => {
         where: { organization_id: ORG, client_id: { in: [CLIENT_A] }, type: "FISCAL" },
       }),
     );
+    expect(prisma.catalogItems.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, kind: "DELIVERY_METHOD", code: { in: ["EMAIL"] } },
+      }),
+    );
     expect(prisma.clients.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { organization_id: ORG, id: { in: [CLIENT_A] } } }),
     );
+  });
+
+  it("separa faturamento desligado de faturamento ainda não informado", async () => {
+    const prisma = delegates([
+      { id: "1", client_id: CLIENT_A, billing_amount: null, item_notes: {} },
+      {
+        id: "2",
+        client_id: CLIENT_B,
+        billing_amount: null,
+        item_notes: { billing_amount: { required: false } },
+      },
+    ]);
+    // Código sem item no catálogo sai como está, em vez de sumir.
+    prisma.configs.findMany.mockResolvedValue([{ client_id: CLIENT_B, delivery_method: "MALOTE" }]);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.triage_fiscal_special_documents",
+        organizationId: ORG,
+        fields: ["billing_status", "delivery_method"],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        { billing_status: "Pendente", delivery_method: null },
+        { billing_status: "Não aplicável", delivery_method: "MALOTE" },
+      ],
+      reachedLimit: false,
+    });
   });
 
   it("seleciona por documento, cliente e competência como o relatório de envio legado", async () => {

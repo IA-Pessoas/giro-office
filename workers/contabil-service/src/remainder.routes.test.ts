@@ -981,7 +981,10 @@ describe("contabil Worker remainder routes", () => {
         ]),
       },
       triageConfig: {
-        findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT, delivery_method: "Portal" }]),
+        findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT, delivery_method: "PORTAL" }]),
+      },
+      triageCatalogItem: {
+        findMany: vi.fn().mockResolvedValue([{ code: "PORTAL", label: "Portal" }]),
       },
       $transaction: vi.fn(),
     };

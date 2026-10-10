@@ -146,6 +146,7 @@ export const contabilTriageReportingCatalog = {
         field("model_21_invoice", "Nota fiscal modelo 21", "string", stringOperators),
         field("cte_as_issuer", "CTe como emitente", "string", stringOperators),
         field("services_provided_as_mei", "Serviços prestados como MEI", "string", stringOperators),
+        field("billing_status", "Situação do faturamento", "string", stringOperators),
         field("billing_amount", "Faturamento", "string", stringOperators),
         field("delivery_method", "Meio de envio", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
