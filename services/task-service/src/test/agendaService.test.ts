@@ -137,6 +137,7 @@ describe("AgendaService", () => {
     const TRIAGEM = "dep-triagem";
     const REGULARIZE = "dep-regularize";
     const triagem = { ...editor, module: "triagem" } as const;
+    const viewerTriagem = { ...triagem, level: 1 } as const;
 
     function setupTriagem() {
       const context = setup();
@@ -150,7 +151,7 @@ describe("AgendaService", () => {
     it("lista só o departamento da Triagem, sem eventos do Regularize nem de outra organização", async () => {
       const { prisma, service } = setupTriagem();
 
-      await service.list({ ...triagem, level: 1 }, "2026-12");
+      await service.list(viewerTriagem, "2026-12");
 
       expect(prisma.department.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { organization_id: ORG } }),
@@ -184,7 +185,6 @@ describe("AgendaService", () => {
 
     it("visualizador lê, mas não cria, edita nem remove", async () => {
       const { prisma, service } = setupTriagem();
-      const viewerTriagem = { ...triagem, level: 1 } as const;
 
       await expect(service.list(viewerTriagem, "2026-12")).resolves.toEqual([]);
       await expect(service.create(viewerTriagem, event)).rejects.toMatchObject({ statusCode: 403 });

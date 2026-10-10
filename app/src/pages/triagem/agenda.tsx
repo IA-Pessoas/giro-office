@@ -35,7 +35,7 @@ export default function TriagemAgendaPage() {
               Agenda da Triagem
             </h1>
           </header>
-          <DepartmentAgendaSection module="triagem" departmentLabel="Triagem" canEdit={access.canEdit} />
+          <DepartmentAgendaSection module="triagem" canEdit={access.canEdit} />
         </div>
       )}
     </>

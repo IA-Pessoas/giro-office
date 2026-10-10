@@ -1,3 +1,5 @@
+import type { AgendaModule } from "@shared/services/agendaService.contract";
+
 export const CONTABIL_QUERY_KEY = ["contabil"] as const;
 
 export function contabilControlQueryKey(clientId: string, competence: string) {
@@ -27,7 +29,7 @@ export function contabilRelationshipHistoryQueryKey(clientId: string, page?: num
 }
 
 /** Sem `month`, é o prefixo de todos os meses (invalidação após escrita). */
-export function departmentAgendaQueryKey(module: string, month?: string) {
+export function departmentAgendaQueryKey(module: AgendaModule, month?: string) {
   const key = [...CONTABIL_QUERY_KEY, "agenda", module] as const;
   return month === undefined ? key : ([...key, month] as const);
 }

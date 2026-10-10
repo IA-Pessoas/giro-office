@@ -213,7 +213,7 @@ function ContabilActiveTabPanel({
   if (activeTab === "agenda") {
     return (
       <div role="tabpanel" id="contabil-panel-agenda" aria-labelledby="contabil-tab-agenda">
-        <DepartmentAgendaSection module="contabil" departmentLabel="Contábil" canEdit={canEdit} />
+        <DepartmentAgendaSection module="contabil" canEdit={canEdit} />
       </div>
     );
   }

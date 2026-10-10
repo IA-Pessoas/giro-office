@@ -85,10 +85,7 @@ runTest("detalhe usa checklist Fiscal da competência e contadores do cliente (#
 runTest("agenda da Triagem usa a agenda compartilhada, com escrita só para quem edita (#1699)", () => {
   const page = readSource("../../pages/triagem/agenda.tsx");
   assert.match(page, /useModuleAccess\("triagem"\)/);
-  assert.match(
-    page,
-    /<DepartmentAgendaSection module="triagem" departmentLabel="Triagem" canEdit=\{access\.canEdit\} \/>/,
-  );
+  assert.match(page, /<DepartmentAgendaSection module="triagem" canEdit=\{access\.canEdit\} \/>/);
   assert.match(readSource("../../pages/triagem.tsx"), /href="\/triagem\/agenda"/);
 
   const section = readSource("../contabil/components/DepartmentAgendaSection.tsx");

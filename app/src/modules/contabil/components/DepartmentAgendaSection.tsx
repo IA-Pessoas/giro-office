@@ -25,19 +25,20 @@ import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 
+/** Nome do departamento nos textos da tela. */
+const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
+  contabil: "Contábil",
+  triagem: "Triagem",
+};
+
 interface DepartmentAgendaSectionProps {
   module: AgendaModule;
-  /** Nome do departamento nos textos da tela. */
-  departmentLabel: string;
   canEdit: boolean;
 }
 
 /** Visão de um departamento na agenda compartilhada: o serviço filtra pelo módulo pedido. */
-export function DepartmentAgendaSection({
-  module,
-  departmentLabel,
-  canEdit,
-}: DepartmentAgendaSectionProps) {
+export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSectionProps) {
+  const departmentLabel = DEPARTMENT_LABEL[module];
   const [month, setMonth] = useState<ContabilCompetence>(getCurrentContabilCompetence);
   const [editing, setEditing] = useState<AgendaEvent | "new" | null>(null);
   const [removing, setRemoving] = useState<AgendaEvent | null>(null);
