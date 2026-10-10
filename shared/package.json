@@ -90,6 +90,11 @@
       "import": "./dist/triagem/index.js",
       "default": "./dist/triagem/index.js"
     },
+    "./triagem/documents": {
+      "types": "./dist/triagem/triageDocuments.d.ts",
+      "import": "./dist/triagem/triageDocuments.js",
+      "default": "./dist/triagem/triageDocuments.js"
+    },
     "./triagem/portfolioFilters": {
       "types": "./dist/triagem/triagePortfolioFilters.d.ts",
       "import": "./dist/triagem/triagePortfolioFilters.js",

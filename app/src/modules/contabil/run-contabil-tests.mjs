@@ -284,25 +284,13 @@ await (async () => {
     assert.match(panel, /updateMonthly/);
   });
 
-  await runTest("triagem fiscal configura os documentos especiais do shared (#1693)", () => {
+  await runTest("triagem fiscal configura documentos especiais e faturamento do shared (#1693)", () => {
     const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
-    const shared = readFileSync(
-      new URL("../../../../shared/src/triagem/triageDocuments.ts", import.meta.url),
-      "utf8",
-    );
-    const sharedList = shared.slice(
-      shared.indexOf("TRIAGE_FISCAL_SPECIAL_FIELDS = ["),
-      shared.indexOf("] as const satisfies readonly TriageFiscalChecklistField[]"),
-    );
-    const appList = labels.slice(
-      labels.indexOf("FISCAL_SPECIAL_DOCUMENTS"),
-      labels.indexOf("export const STATUSES"),
-    );
-    const fields = (text) => [...text.matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]);
-    assert.deepEqual(fields(appList), fields(sharedList));
-    assert.equal(fields(sharedList).length, 7);
     const section = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    assert.match(labels, /from "@workspace\/shared\/triagem\/documents"/);
+    assert.match(labels, /TRIAGE_FISCAL_CONFIGURABLE_FIELDS\.map/);
     assert.match(section, /<FiscalSpecialDocumentsPanel/);
+    assert.match(section, /Faturamento não se aplica a este cliente/);
     assert.equal(CONTABIL_ENDPOINTS.triageConfig, "/triagem/config");
   });
 

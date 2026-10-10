@@ -4,7 +4,7 @@ import {
   normalizeTriageDocumentStatus,
   type ReportingQuery,
   ServiceError,
-  TRIAGE_FISCAL_SPECIAL_FIELDS,
+  TRIAGE_FISCAL_CONFIGURABLE_FIELDS,
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
@@ -819,7 +819,7 @@ function activeFields(value: unknown, fields: readonly string[]): string[] {
 
 /** Configuráveis por rotina: Contábil escolhe todos os itens; Fiscal, só os especiais. */
 function configurableFields(type: "CONTABIL" | "FISCAL"): readonly string[] {
-  return type === "FISCAL" ? TRIAGE_FISCAL_SPECIAL_FIELDS : triageDocumentFields;
+  return type === "FISCAL" ? TRIAGE_FISCAL_CONFIGURABLE_FIELDS : triageDocumentFields;
 }
 
 /**
@@ -829,11 +829,20 @@ function configurableFields(type: "CONTABIL" | "FISCAL"): readonly string[] {
 function nextActiveItems(current: unknown, selected: string[], type: "CONTABIL" | "FISCAL") {
   if (type === "CONTABIL") return selected;
   const configurable = new Set<string>(configurableFields(type));
-  const kept = (Array.isArray(current) ? current : []).filter((item) => {
-    const field = typeof item === "string" ? item : jsonObject(item).field;
+  const entries = Array.isArray(current) ? current : [];
+  const fieldOf = (item: unknown) => (typeof item === "string" ? item : jsonObject(item).field);
+  const kept = entries.filter((item) => {
+    const field = fieldOf(item);
     return typeof field !== "string" || !configurable.has(field);
   });
-  return [...kept, ...selected];
+  // Documento que segue selecionado mantém prioridade e meio de envio do objeto existente.
+  const chosen = selected.map((field) => {
+    const existing = entries.find((item) => fieldOf(item) === field);
+    return existing && typeof existing === "object"
+      ? { ...jsonObject(existing), required: true }
+      : field;
+  });
+  return [...kept, ...chosen];
 }
 
 function dateOnly(value: unknown): Date | null | undefined {
@@ -1322,17 +1331,19 @@ export function createDocumentsService(
                 : undefined);
             const configured = initialItems(config?.active_items);
             // Sem movimento padrão nenhum item é desativado: a rotina segue editável como antes.
-            const unconfigured =
-              type === "CONTABIL" && config
-                ? { note: null, justification: null, required: false }
-                : { note: null, justification: null };
+            // Na Fiscal, `required: false` marca o item fora da configuração (opcional) e esconde o
+            // faturamento de quem não o tem; na Contábil, desativa o item.
+            const unconfigured = config
+              ? { note: null, justification: null, required: false }
+              : { note: null, justification: null };
             const fields = type === "FISCAL" ? triageFiscalFields : triageDocumentFields;
             const checklistValue = Object.fromEntries(
               fields.map((field) => {
                 const value = configured[field];
+                // Mesmo critério de `fiscalRequiredItems` e do Fiscal: só `required: false` desliga.
                 const required =
                   value && typeof value === "object" && !Array.isArray(value)
-                    ? (value as JsonRecord).required === true
+                    ? (value as JsonRecord).required !== false
                     : false;
                 return [field, required ? "PENDING" : "NOT_APPLICABLE"];
               }),

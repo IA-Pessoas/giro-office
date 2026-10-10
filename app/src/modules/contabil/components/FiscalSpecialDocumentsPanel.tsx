@@ -4,9 +4,9 @@ import { useFetch } from "@shared/hooks";
 
 import { triageFiscalSpecialConfigQueryKey } from "../hooks/queryKeys";
 import { getContabilErrorMessage, triageDocumentsService } from "../services";
-import type { TriageFiscalChecklistField } from "../types";
+import type { TriageFiscalSpecialConfig } from "../types";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
-import { FISCAL_SPECIAL_DOCUMENTS } from "./triageDocumentLabels";
+import { FISCAL_CONFIGURABLE_DOCUMENTS } from "./triageDocumentLabels";
 
 /**
  * Documentos fiscais especiais aplicáveis ao cliente. Os marcados entram pendentes nas
@@ -22,7 +22,7 @@ export function FiscalSpecialDocumentsPanel({
   const config = useFetch(triageFiscalSpecialConfigQueryKey(clientId), () =>
     triageDocumentsService.getFiscalSpecialConfig(clientId),
   );
-  const [activeItems, setActiveItems] = useState<TriageFiscalChecklistField[]>([]);
+  const [activeItems, setActiveItems] = useState<TriageFiscalSpecialConfig["active_items"]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
 
@@ -56,10 +56,11 @@ export function FiscalSpecialDocumentsPanel({
         Documentos especiais aplicáveis
       </legend>
       <p className="text-sm text-gray-600 dark:text-slate-400">
-        Marcados entram pendentes em cada nova competência; os demais ficam não aplicáveis.
+        Marcados entram em cada nova competência (documentos pendentes, faturamento a
+        informar); os demais ficam não aplicáveis.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {FISCAL_SPECIAL_DOCUMENTS.map(([field, label]) => (
+        {FISCAL_CONFIGURABLE_DOCUMENTS.map(([field, label]) => (
           <label
             key={field}
             className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300"

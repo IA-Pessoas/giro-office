@@ -68,6 +68,41 @@ describe("documentos fiscais especiais (#1693)", () => {
     );
   });
 
+  it("mantém prioridade e meio de envio do documento que segue selecionado", async () => {
+    const database = prisma();
+    database.triageConfig.findFirst.mockResolvedValue({
+      active_items: [{ field: "sped_fiscal", required: false, priority: "HIGH" }],
+    });
+
+    await createDocumentsService(database as never, audit()).saveConfig(
+      { client_id: CLIENT, type: "FISCAL", active_items: ["sped_fiscal", "billing_amount"] },
+      auth,
+    );
+
+    expect(database.triageConfig.upsert.mock.calls[0][0].update.active_items).toEqual([
+      { field: "sped_fiscal", required: true, priority: "HIGH" },
+      "billing_amount",
+    ]);
+  });
+
+  it("faturamento fora da configuração fica não aplicável na competência", async () => {
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue(null);
+    database.triageCompetence.findFirst.mockResolvedValue({
+      configuration_snapshot: { configs: [{ type: "FISCAL", active_items: ["sped_fiscal"] }] },
+    });
+
+    const result = await createDocumentsService(database as never, audit()).getOrCreateMonthly(
+      { client_id: CLIENT, competence: "2026-09", type: "FISCAL" },
+      auth,
+    );
+
+    expect(result.item_notes).toMatchObject({
+      billing_amount: { required: false },
+      sped_fiscal: { required: true },
+    });
+  });
+
   it("lê os especiais da organização e exige acesso ao Fiscal", async () => {
     const database = prisma();
     database.triageConfig.findFirst.mockResolvedValue({
@@ -104,6 +139,9 @@ describe("documentos fiscais especiais (#1693)", () => {
     const fiscal = { client_id: CLIENT, type: "FISCAL" };
     expect(
       triageConfigBodySchema.safeParse({ ...fiscal, active_items: ["sped_contributions"] }).success,
+    ).toBe(true);
+    expect(
+      triageConfigBodySchema.safeParse({ ...fiscal, active_items: ["billing_amount"] }).success,
     ).toBe(true);
     expect(
       triageConfigBodySchema.safeParse({ ...fiscal, active_items: ["inbound_report"] }).success,

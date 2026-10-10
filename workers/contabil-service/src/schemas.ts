@@ -1,6 +1,6 @@
 import {
   TRIAGE_FISCAL_CHECKLIST_FIELDS,
-  TRIAGE_FISCAL_SPECIAL_FIELDS,
+  TRIAGE_FISCAL_CONFIGURABLE_FIELDS,
   TRIAGE_PORTFOLIO_DOCUMENT_STATUSES,
   TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS,
   TRIAGE_PORTFOLIO_PRIORITY_FILTERS,
@@ -144,7 +144,7 @@ export const triageConfigBodySchema = triageConfigQuerySchema
   .superRefine((body, context) => {
     // Fiscal só configura os documentos especiais; os demais itens seguem a rotina.
     const allowed: readonly string[] =
-      body.type === "FISCAL" ? TRIAGE_FISCAL_SPECIAL_FIELDS : documentFields;
+      body.type === "FISCAL" ? TRIAGE_FISCAL_CONFIGURABLE_FIELDS : documentFields;
     for (const item of body.active_items)
       if (!allowed.includes(item))
         context.addIssue({

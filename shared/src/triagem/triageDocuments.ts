@@ -57,6 +57,18 @@ export const TRIAGE_FISCAL_SPECIAL_FIELDS = [
 export type TriageFiscalSpecialField = (typeof TRIAGE_FISCAL_SPECIAL_FIELDS)[number];
 
 /**
+ * Configuráveis por cliente na rotina fiscal: os documentos especiais e o faturamento
+ * (legado `tb_triagem.campos.faturamento`), que é valor e não estado, mas também só se aplica
+ * a quem o tem configurado.
+ */
+export const TRIAGE_FISCAL_CONFIGURABLE_FIELDS = [
+  ...TRIAGE_FISCAL_SPECIAL_FIELDS,
+  "billing_amount",
+] as const;
+
+export type TriageFiscalConfigurableField = (typeof TRIAGE_FISCAL_CONFIGURABLE_FIELDS)[number];
+
+/**
  * Estados gravados pelo legado (`TriageStatus`, igual nas rotinas Contábil e Fiscal):
  * vazio é pendente. Mapeamento explícito para os estados atuais.
  */

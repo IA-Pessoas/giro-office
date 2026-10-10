@@ -121,7 +121,7 @@ export const triageDocumentsService = {
   },
   async saveFiscalSpecialConfig(
     clientId: string,
-    activeItems: TriageFiscalChecklistField[],
+    activeItems: TriageFiscalSpecialConfig["active_items"],
   ): Promise<TriageFiscalSpecialConfig> {
     const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageConfig, {
       client_id: clientId,
