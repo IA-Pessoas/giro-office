@@ -135,6 +135,24 @@ describe("referências de Cloud por cliente (#1695)", () => {
     expect(database.clientCloud.create).toHaveBeenCalledTimes(1);
   });
 
+  it("recusa leitura e escrita de cliente de outra organização (#1728)", async () => {
+    const database = prisma();
+    database.client.findFirst.mockResolvedValue(null);
+    const service = createDocumentsService(database as never, audit());
+
+    await expect(service.listClouds({ client_id: CLIENT }, auth)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(database.clientCloud.findMany).not.toHaveBeenCalled();
+
+    // Nuvem de outra organização não é encontrada no escopo do usuário.
+    database.clientCloud.findFirst.mockResolvedValue(null);
+    await expect(
+      service.updateCloud(CLOUD, { link: "https://x.example" }, auth),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(database.clientCloud.update).not.toHaveBeenCalled();
+  });
+
   it("aceita só link http(s), sem upload", () => {
     const base = { client_id: CLIENT, type: "Drive" };
     expect(cloudCreateSchema.safeParse({ ...base, link: "https://drive.example/a" }).success).toBe(

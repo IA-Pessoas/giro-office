@@ -206,6 +206,16 @@ await (async () => {
     assert.doesNotMatch(pageSource, /canEdit\s*\/>/);
   });
 
+  await runTest("ficha Contábil mostra a mesma nuvem do cliente que a Triagem (#1728)", () => {
+    const relationship = readWorkspaceSource("./components/ContabilRelationshipSection.tsx");
+    const triage = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+    const usage = /<TriageClientCloudsSection clientId=\{clientId\} canEdit=\{canEdit\} \/>/;
+
+    assert.match(relationship, /from "@modules\/triagem\/components\/TriageClientCloudsSection"/);
+    assert.match(relationship, usage);
+    assert.match(triage, usage);
+  });
+
   await runTest("triagem apresenta competências com criação, listagem e arquivamento", () => {
     const pageSource = readFileSync(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
     const source = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");

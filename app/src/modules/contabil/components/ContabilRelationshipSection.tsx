@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { ConfirmationDialog, Dialog } from "@shared/components";
+import { TriageClientCloudsSection } from "@modules/triagem/components/TriageClientCloudsSection";
 
 import {
   useContabilRelationship,
@@ -272,6 +273,9 @@ export function ContabilRelationshipSection({
           </div>
         </div>
       ) : null}
+
+      {/* Mesma referência da Triagem (clientes.clouds), vinculada ao cliente, não ao relacionamento. */}
+      <TriageClientCloudsSection clientId={clientId} canEdit={canEdit} />
 
       {relationship ? (
         <ContabilRelationshipHistory key={clientId} clientId={clientId} clientName={clientName} />
