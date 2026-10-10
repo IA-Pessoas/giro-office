@@ -1002,4 +1002,42 @@ describe("regularize Worker", () => {
       limit: 10,
     });
   });
+
+  it("routes signed portfolio extraction to the portfolio source", async () => {
+    const reporting = reportingService();
+    const portfolio = { extract: vi.fn(async () => ({ rows: [], reachedLimit: false })) };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      reportingService: reporting,
+      portfolioReportingService: portfolio,
+    });
+
+    for (const source of ["regularize.clients", "regularize.client_groups"]) {
+      const body = { source, fields: ["name"], limit: 10 };
+      const response = await app.request("https://regularize.test/internal/reporting/extract", {
+        method: "POST",
+        headers: {
+          ...reportingHeaders({
+            operation: "extract",
+            source,
+            fields: body.fields,
+            body,
+            requestId: `reporting-${source}`,
+          }),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(response.status).toBe(200);
+      expect(portfolio.extract).toHaveBeenLastCalledWith({
+        organizationId: ORGANIZATION_ID,
+        source,
+        fields: ["name"],
+        limit: 10,
+      });
+    }
+    expect(reporting.extract).not.toHaveBeenCalled();
+  });
 });

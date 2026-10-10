@@ -3,8 +3,15 @@ import {
   type RegularizeLicenseReportingService as RegularizeLicenseReportingServiceType,
   RegularizeMunicipalTaxesReportingService as RegularizeMunicipalTaxesReportingServiceImpl,
   type RegularizeMunicipalTaxesReportingService as RegularizeMunicipalTaxesReportingServiceType,
+  RegularizePortfolioReportingService as RegularizePortfolioReportingServiceImpl,
+  type RegularizePortfolioReportingService as RegularizePortfolioReportingServiceType,
 } from "@workspace/regularize-service/src/reporting/internalReportingService.js";
 import { regularizeMunicipalTaxesReportingCatalog } from "@workspace/regularize-service/src/reporting/regularizeMunicipalTaxesReportingCatalog.js";
+import {
+  REGULARIZE_PORTFOLIO_REPORTING_SOURCES,
+  type RegularizePortfolioReportingSource,
+  regularizePortfolioReportingCatalog,
+} from "@workspace/regularize-service/src/reporting/regularizePortfolioReportingCatalog.js";
 import { regularizeReportingCatalog } from "@workspace/regularize-service/src/reporting/regularizeReportingCatalog.js";
 import {
   clientPfDetailQuerySchema,
@@ -198,6 +205,10 @@ export type RegularizeMunicipalTaxesReportingService = Pick<
   RegularizeMunicipalTaxesReportingServiceType,
   "extract"
 >;
+export type RegularizePortfolioReportingService = Pick<
+  RegularizePortfolioReportingServiceType,
+  "extract"
+>;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
@@ -215,6 +226,7 @@ type RegularizeOptions = {
   reconciliationService?: RegularizeReconciliationService;
   reportingService?: RegularizeLicenseReportingService;
   municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService;
+  portfolioReportingService?: RegularizePortfolioReportingService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -251,6 +263,7 @@ const internalReportingCatalog = {
   sources: [
     ...regularizeReportingCatalog.sources,
     ...regularizeMunicipalTaxesReportingCatalog.sources,
+    ...regularizePortfolioReportingCatalog.sources,
   ],
   relations: [],
 } as const;
@@ -581,6 +594,15 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new RegularizeMunicipalTaxesReportingServiceImpl(client as never)),
     );
   };
+  const withPortfolioReportingService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizePortfolioReportingService) => Promise<T>,
+  ) => {
+    if (options.portfolioReportingService) return callback(options.portfolioReportingService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new RegularizePortfolioReportingServiceImpl(client as never)),
+    );
+  };
   const requireWritePermission = (c: RegularizeContext, message: string): void => {
     if (Number(c.get("auth").claims.permission ?? 0) < MIN_REGULARIZE_WRITE_PERMISSION) {
       throw new ServiceError(403, message);
@@ -619,6 +641,21 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
             await service.extract({
               organizationId: grant.organization_id,
               source: REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE,
+              fields: body.fields,
+              limit: body.limit,
+              ...(body.query ? { query: body.query } : {}),
+            }),
+          ),
+        ),
+      );
+    }
+    if ((REGULARIZE_PORTFOLIO_REPORTING_SOURCES as readonly string[]).includes(body.source)) {
+      return withPortfolioReportingService(c, async (service) =>
+        c.json(
+          createSuccessResponse(
+            await service.extract({
+              organizationId: grant.organization_id,
+              source: body.source as RegularizePortfolioReportingSource,
               fields: body.fields,
               limit: body.limit,
               ...(body.query ? { query: body.query } : {}),

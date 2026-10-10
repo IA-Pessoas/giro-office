@@ -16,6 +16,12 @@ import {
   type RegularizeMunicipalTaxesReportingSource,
 } from "./regularizeMunicipalTaxesReportingCatalog.js";
 import {
+  getRegularizePortfolioReportingFields,
+  REGULARIZE_CLIENT_GROUPS_REPORTING_SOURCE,
+  REGULARIZE_PORTFOLIO_LEGACY_STATUS,
+  type RegularizePortfolioReportingSource,
+} from "./regularizePortfolioReportingCatalog.js";
+import {
   getRegularizeProcessReportingFields,
   type RegularizeProcessReportingSource,
 } from "./regularizeProcessReportingCatalog.js";
@@ -176,5 +182,183 @@ export class RegularizeMunicipalTaxesReportingService {
       rows: result.rows.slice(0, input.limit),
       reachedLimit: result.rows.length > input.limit || result.reachedLimit,
     };
+  }
+}
+
+type PortfolioDelegate = {
+  findMany(input: Record<string, unknown>): Promise<readonly Record<string, unknown>[]>;
+};
+
+// Campos calculados na extração; os demais são colunas do cadastro canônico do cliente.
+// Departamento não marcado no cadastro é "não": sem isso o filtro "= não" perderia os nulos.
+// Licitação fica fora: nulo ali é "não informado", distinto de Sim/Não (#1743).
+const PORTFOLIO_DEPARTMENT_FLAGS = new Set([
+  "contabil",
+  "fiscal",
+  "pessoal",
+  "consultoria",
+  "infoproduto",
+  "tecnologia",
+  "castelo_med",
+]);
+
+const PORTFOLIO_DERIVED_FIELDS = new Set([
+  "segment_type",
+  "has_passwords",
+  "group_name",
+  "group_active",
+]);
+
+export class RegularizePortfolioReportingService {
+  constructor(
+    private readonly prisma: {
+      client: PortfolioDelegate;
+      clientsGroup: PortfolioDelegate;
+      clientSegment: PortfolioDelegate;
+      passwordRegularize: PortfolioDelegate;
+    },
+    private readonly inSnapshot = false,
+  ) {}
+
+  async extract(input: {
+    query?: ReportingQuery;
+    organizationId: string;
+    source: RegularizePortfolioReportingSource;
+    fields: readonly string[];
+    limit: number;
+  }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    if ((input.query || input.limit + 1 > REPORTING_DB_PAGE_SIZE) && !this.inSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new RegularizePortfolioReportingService(transaction, true).extract(input),
+      );
+    }
+    const allowedFields = getRegularizePortfolioReportingFields(input.source);
+    if (input.fields.some((field) => !allowedFields.includes(field))) {
+      throw new ServiceError(403, "Campo não publicado para relatórios.");
+    }
+
+    // Catálogo lido uma vez por extração: a instância é compartilhada entre organizações.
+    let segmentTypes: Promise<ReadonlyMap<string, unknown>> | undefined;
+    const loadSegmentTypes = () => {
+      segmentTypes ??= this.loadSegmentTypes(input.organizationId);
+      return segmentTypes;
+    };
+    const loadPage = (fields: readonly string[], limit: number, cursor?: string) =>
+      this.loadPage(input.organizationId, input.source, fields, limit, loadSegmentTypes, cursor);
+    if (input.query) {
+      return executeReportingQuery({ ...input, query: input.query }, { loadPage });
+    }
+
+    const result = await collectReportingRows(
+      (limit, cursor) => loadPage(input.fields, limit, cursor),
+      input.limit + 1,
+    );
+    return {
+      rows: result.rows.slice(0, input.limit),
+      reachedLimit: result.rows.length > input.limit || result.reachedLimit,
+    };
+  }
+
+  private async loadPage(
+    organizationId: string,
+    source: RegularizePortfolioReportingSource,
+    fields: readonly string[],
+    limit: number,
+    loadSegmentTypes: () => Promise<ReadonlyMap<string, unknown>>,
+    cursor?: string,
+  ): Promise<ReportingPage> {
+    const columns = new Set(fields.filter((field) => !PORTFOLIO_DERIVED_FIELDS.has(field)));
+    if (fields.includes("segment_type")) columns.add("segment");
+    const select = Object.fromEntries(["id", ...columns].map((field) => [field, true]));
+    const paging = {
+      ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
+      orderBy: { id: "asc" },
+      take: limit + 1,
+    };
+    const grouped = source === REGULARIZE_CLIENT_GROUPS_REPORTING_SOURCE;
+    const found = grouped
+      ? await this.prisma.clientsGroup.findMany({
+          where: {
+            organization_id: organizationId,
+            group: { is: { organization_id: organizationId } },
+            client: { is: { organization_id: organizationId } },
+          },
+          select: {
+            id: true,
+            group: { select: { name: true, status: true } },
+            client: { select },
+          },
+          ...paging,
+        })
+      : await this.prisma.client.findMany({
+          where: { organization_id: organizationId },
+          select,
+          ...paging,
+        });
+    const page = found.slice(0, limit);
+    const clients = page.map((row) => (grouped ? row.client : row) as Record<string, unknown>);
+
+    const segmentTypes = fields.includes("segment_type") ? await loadSegmentTypes() : undefined;
+    const withPasswords = fields.includes("has_passwords")
+      ? new Set(
+          (
+            await this.prisma.passwordRegularize.findMany({
+              where: {
+                organization_id: organizationId,
+                client_id: { in: clients.map((client) => client.id) },
+              },
+              select: { client_id: true },
+              distinct: ["client_id"],
+            })
+          ).map((password) => password.client_id),
+        )
+      : undefined;
+
+    const rows = page.map((row, index) => {
+      const client = clients[index] ?? {};
+      const group = (row.group ?? {}) as { name?: unknown; status?: unknown };
+      const derived: Record<string, unknown> = {
+        group_name: group.name,
+        group_active: group.status,
+        has_passwords: withPasswords?.has(client.id),
+        segment_type:
+          segmentTypes?.get(String(client.segment ?? "").toLocaleLowerCase("pt-BR")) ?? null,
+        status: Object.keys(REGULARIZE_PORTFOLIO_LEGACY_STATUS).includes(String(client.status))
+          ? REGULARIZE_PORTFOLIO_LEGACY_STATUS[String(client.status)]
+          : client.status,
+      };
+      return Object.fromEntries(
+        fields.map((field) => [
+          field,
+          field in derived
+            ? derived[field]
+            : PORTFOLIO_DEPARTMENT_FLAGS.has(field)
+              ? client[field] === true
+              : client[field],
+        ]),
+      );
+    });
+    const lastId = page[page.length - 1]?.id;
+    const reachedLimit = found.length > limit;
+    return {
+      rows,
+      reachedLimit,
+      ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
+    };
+  }
+
+  // O cliente guarda o nome do segmento; o tipo vem do catálogo, sem diferenciar maiúsculas.
+  private loadSegmentTypes(organizationId: string): Promise<ReadonlyMap<string, unknown>> {
+    return this.prisma.clientSegment
+      .findMany({ where: { organization_id: organizationId }, select: { name: true, type: true } })
+      .then(
+        (segments) =>
+          new Map(
+            segments.map((segment) => [
+              String(segment.name).toLocaleLowerCase("pt-BR"),
+              segment.type,
+            ]),
+          ),
+      );
   }
 }
