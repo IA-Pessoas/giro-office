@@ -3,8 +3,21 @@ import { type ClientAuditEvent, ClientService } from "./clientService.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 
 const ORG = "org-1";
-const editor = { userId: "user-1", level: 2, permission: 2, isOwner: false };
-const viewer = { userId: "user-2", level: 1, permission: 1, isOwner: false };
+const editor = {
+  userId: "user-1",
+  level: 2,
+  permission: 2,
+  modules: { integracao: 2 },
+  isOwner: false,
+};
+const viewer = {
+  userId: "user-2",
+  level: 1,
+  permission: 1,
+  modules: { integracao: 1 },
+  isOwner: false,
+};
+const regularizeEditor = { ...editor, level: 0, modules: { regularize: 2 } };
 
 type CatalogRow = { id: string; name: string; type?: string; organization_id?: string };
 
@@ -197,6 +210,21 @@ describe("client regime selection", () => {
       service.update("client-1", ORG, { regime: "Inventado" }, editor),
     ).rejects.toMatchObject({ statusCode: 400, message: "Regime não cadastrado na organização." });
     expect(prisma.client.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("catalog management by Regularize", () => {
+  it("lets Regularize level 2 create and rename catalog items, but not other modules", async () => {
+    const { service } = setup({ segments: [{ id: "s1", name: "Varejo", type: "comercio" }] });
+    await expect(
+      service.createSegment(ORG, { name: "Agro", type: "industria" }, regularizeEditor),
+    ).resolves.toMatchObject({ name: "Agro" });
+    await expect(service.createRegime(ORG, "Imune", regularizeEditor)).resolves.toMatchObject({
+      name: "Imune",
+    });
+    await expect(
+      service.updateSegment("s1", ORG, { name: "Atacado" }, { ...editor, modules: { fiscal: 3 } }),
+    ).rejects.toMatchObject({ statusCode: 403 });
   });
 });
 

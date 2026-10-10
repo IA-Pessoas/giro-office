@@ -1,6 +1,6 @@
 import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
-import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+import { CLIENT_SEGMENT_TYPES, TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 
 import type { ClientServiceEnv } from "../config/env.js";
 
@@ -347,6 +347,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
         post: {
           tags: ["Clients"],
           summary: "Cadastrar regime",
+          description: "Integração ou Regularize nível 2.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -452,6 +453,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
         post: {
           tags: ["Clients"],
           summary: "Cadastrar segmento com tipo (serviço, comércio ou indústria)",
+          description: "Integração ou Regularize nível 2.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -462,7 +464,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   required: ["name", "type"],
                   properties: {
                     name: { type: "string", minLength: 1, maxLength: 80 },
-                    type: { type: "string", enum: ["servico", "comercio", "industria"] },
+                    type: { type: "string", enum: [...CLIENT_SEGMENT_TYPES] },
                   },
                   additionalProperties: false,
                 },
@@ -496,7 +498,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   type: "object",
                   properties: {
                     name: { type: "string", minLength: 1, maxLength: 80 },
-                    type: { type: "string", enum: ["servico", "comercio", "industria"] },
+                    type: { type: "string", enum: [...CLIENT_SEGMENT_TYPES] },
                   },
                   additionalProperties: false,
                 },

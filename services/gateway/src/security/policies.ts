@@ -147,16 +147,18 @@ const clientListPolicy: AuthPolicy = {
   ],
 };
 
-// Grupos canônicos da Integração também são geridos pelo Regularize (#1742).
-// Mesma regra de requireGroupPermission em workers/client-service/src/clientService.ts.
-const clientGroupsPath = /^\/client\/groups(?:\/[^/]+(?:\/clients)?)?\/?$/;
-const clientGroupsReadPolicy: AuthPolicy = {
+// Catálogos da ficha (regimes, segmentos) e grupos canônicos: Integração ou Regularize
+// (#1740, #1741, #1742). Mesma regra de requireClientCatalogPermission no client-service Worker.
+// GET /client/regimes e /client/segments seguem a política exata de lista de clientes.
+const clientCatalogsPath =
+  /^\/client\/(?:groups(?:\/[^/]+(?:\/clients)?)?|regimes(?:\/[^/]+)?|segments(?:\/[^/]+)?)\/?$/;
+const clientCatalogsReadPolicy: AuthPolicy = {
   anyModulePermission: {
     modules: ["integracao", "regularize"],
     minPermission: moduleAccessPermission,
   },
 };
-const clientGroupsEditPolicy: AuthPolicy = {
+const clientCatalogsEditPolicy: AuthPolicy = {
   anyModulePermission: {
     modules: ["integracao", "regularize"],
     minPermission: moduleEditPermission,
@@ -164,7 +166,7 @@ const clientGroupsEditPolicy: AuthPolicy = {
 };
 
 const integracaoClientPath =
-  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/regimes(?:\/[^/]+)?|\/segments(?:\/[^/]+)?|\/[^/]+)?\/?$/;
+  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /dashboard/stats", authenticatedPolicy],
@@ -202,8 +204,8 @@ const routePolicyMatchers: Array<{
   // Lista de licitantes e histórico de licitação lidos pelo Regularize (#1743).
   { method: "GET", path: /^\/client\/licitacao\/bidders\/?$/, policy: clientListPolicy },
   { method: "GET", path: /^\/client\/[^/]+\/licitacao\/history\/?$/, policy: clientListPolicy },
-  { method: "GET", path: clientGroupsPath, policy: clientGroupsReadPolicy },
-  { method: "ANY", path: clientGroupsPath, policy: clientGroupsEditPolicy },
+  { method: "GET", path: clientCatalogsPath, policy: clientCatalogsReadPolicy },
+  { method: "ANY", path: clientCatalogsPath, policy: clientCatalogsEditPolicy },
   { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },
   { method: "ANY", path: integracaoClientPath, policy: integracaoClientEditPolicy },
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },

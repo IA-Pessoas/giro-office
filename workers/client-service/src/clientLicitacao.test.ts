@@ -14,7 +14,10 @@ const regularize = {
 function setup(licitacao: boolean | null) {
   const history: Array<Record<string, unknown>> = [];
   const tx = {
-    client: { update: vi.fn(async ({ data }) => ({ id: "client-1", ...data })) },
+    client: {
+      findFirst: vi.fn(async () => ({ licitacao })),
+      update: vi.fn(async ({ data }) => ({ id: "client-1", ...data })),
+    },
     clientLicitacaoHistory: {
       create: vi.fn(async ({ data }) => {
         history.push(data);
