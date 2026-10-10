@@ -21,6 +21,17 @@ import type {
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
   RegularizeDashboard,
+  RegularizeDteImport,
+  RegularizeDteImportPayload,
+  RegularizeDteImportsPage,
+  RegularizeDteNotice,
+  RegularizeDteNoticeListFilters,
+  RegularizeDteNoticeReadingPayload,
+  RegularizeDteNoticesPage,
+  RegularizeDteQueryGrid,
+  RegularizeDteQueryListsPayload,
+  RegularizeDteQueryListsResult,
+  RegularizeDteQueryStatusPayload,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
@@ -61,6 +72,7 @@ import {
   buildRegularizeGuidanceListParams,
   buildRegularizeIdParams,
   buildRegularizeLicenseListParams,
+  buildRegularizeDteNoticeListParams,
   buildRegularizeMunicipalTaxesListParams,
   buildRegularizePartnerListParams,
   buildRegularizePasswordListParams,
@@ -293,6 +305,63 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEntity<RegularizeMunicipalTaxesDetail>(response.data);
+  },
+
+  async importDte(payload: RegularizeDteImportPayload): Promise<RegularizeDteImport> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.dteImport, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteImport>(response.data);
+  },
+
+  async listDteImports(): Promise<RegularizeDteImportsPage> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dteImports);
+
+    return unwrapRegularizeEnvelope<RegularizeDteImportsPage>(response.data);
+  },
+
+  async listDteNotices(filters: RegularizeDteNoticeListFilters): Promise<RegularizeDteNoticesPage> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dteNotices, {
+      params: buildRegularizeDteNoticeListParams(filters),
+    });
+
+    return unwrapRegularizeEnvelope<RegularizeDteNoticesPage>(response.data);
+  },
+
+  async setDteNoticeReading(
+    payload: RegularizeDteNoticeReadingPayload,
+  ): Promise<RegularizeDteNotice> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.dteNoticeReading, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteNotice>(response.data);
+  },
+
+  async getDteQueryGrid(date: string): Promise<RegularizeDteQueryGrid> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dteQueries, { params: { date } });
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryGrid>(response.data);
+  },
+
+  async setDteQueryStatus(
+    payload: RegularizeDteQueryStatusPayload,
+  ): Promise<RegularizeDteQueryStatusPayload> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.dteQueryStatus, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryStatusPayload>(response.data);
+  },
+
+  async importDteQueryLists(
+    payload: RegularizeDteQueryListsPayload,
+  ): Promise<RegularizeDteQueryListsResult> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.dteQueryImport, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryListsResult>(response.data);
   },
 
   async createMunicipalTax(

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { idQuerySchema } from "./common.schemas.js";
+import { idQuerySchema, isCalendarDay } from "./common.schemas.js";
 
 const PART_RANGE_MESSAGE = "Participação deve ser maior que 0% e no máximo 100%.";
 
@@ -11,11 +11,7 @@ function partnerDate(label: string) {
   return z
     .string({ required_error: message, invalid_type_error: message })
     .regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/, message)
-    .refine((value) => {
-      const day = value.slice(0, 10);
-      const date = new Date(day);
-      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
-    }, message)
+    .refine((value) => isCalendarDay(value.slice(0, 10)), message)
     .transform((value) => new Date(value));
 }
 

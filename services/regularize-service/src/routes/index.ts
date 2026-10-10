@@ -3,6 +3,7 @@ import { requireRegularizePermission } from "../middlewares/authorizeRegularize.
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { createClientPfRoutes } from "./clientPf.routes.js";
 import { createDashboardRoutes } from "./dashboard.routes.js";
+import { createDteRoutes } from "./dte.routes.js";
 import { createGuidanceRoutes } from "./guidance.routes.js";
 import { createLicenseRoutes } from "./license.routes.js";
 import { createMunicipalTaxesRoutes } from "./municipalTaxes.routes.js";
@@ -24,6 +25,7 @@ export function createRegularizeRoutes(deps: RegularizeRouteDeps): Router {
   router.use(createProcessRoutes(deps));
   router.use(createGuidanceRoutes(deps));
   router.use(createLicenseRoutes(deps));
+  router.use(createDteRoutes(deps));
 
   return router;
 }

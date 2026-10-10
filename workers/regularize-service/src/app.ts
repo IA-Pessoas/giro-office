@@ -14,6 +14,15 @@ import {
 } from "@workspace/regularize-service/src/schemas/clientPf.schemas.js";
 import { regularizeDashboardQuerySchema } from "@workspace/regularize-service/src/schemas/dashboard.schemas.js";
 import {
+  dteQueryGridQuerySchema,
+  importDteBodySchema,
+  importDteQueryListsBodySchema,
+  listDteImportsQuerySchema,
+  listDteNoticesQuerySchema,
+  updateDteNoticeReadingBodySchema,
+  updateDteQueryStatusBodySchema,
+} from "@workspace/regularize-service/src/schemas/dte.schemas.js";
+import {
   addGuidanceActivityBodySchema,
   addGuidancePartnerBodySchema,
   createGuidanceBodySchema,
@@ -67,6 +76,9 @@ import {
 } from "@workspace/regularize-service/src/schemas/process.schemas.js";
 import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/schemas/status.schemas.js";
 import { ClientPfService } from "@workspace/regularize-service/src/services/clientPfService.js";
+import { DteImportService } from "@workspace/regularize-service/src/services/dteImportService.js";
+import { DteNoticeService } from "@workspace/regularize-service/src/services/dteNoticeService.js";
+import { DteQueryService } from "@workspace/regularize-service/src/services/dteQueryService.js";
 import {
   GuidanceService,
   type GuidanceService as GuidanceServiceType,
@@ -142,6 +154,9 @@ export type RegularizeMunicipalTaxesService = Pick<
   MunicipalTaxesService,
   "create" | "update" | "detail" | "list"
 >;
+export type RegularizeDteImportService = Pick<DteImportService, "importNotices" | "listImports">;
+export type RegularizeDteNoticeService = Pick<DteNoticeService, "list" | "setReading">;
+export type RegularizeDteQueryService = Pick<DteQueryService, "grid" | "setStatus" | "importLists">;
 export type RegularizeClientPfService = Pick<
   ClientPfService,
   "create" | "update" | "detail" | "list"
@@ -189,6 +204,9 @@ type RegularizeOptions = {
   licenseService?: RegularizeLicenseService;
   processService?: RegularizeProcessService;
   municipalTaxesService?: RegularizeMunicipalTaxesService;
+  dteImportService?: RegularizeDteImportService;
+  dteNoticeService?: RegularizeDteNoticeService;
+  dteQueryService?: RegularizeDteQueryService;
   clientPfService?: RegularizeClientPfService;
   partnersService?: RegularizePartnersService;
   passwordService?: RegularizePasswordService;
@@ -399,6 +417,8 @@ function localService(
   };
 }
 
+const MIN_REGULARIZE_WRITE_PERMISSION = 2;
+
 export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
   const app = new Hono<RegularizeWorkerContext>();
   app.get("/health", (c) =>
@@ -453,6 +473,33 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
     if (options.municipalTaxesService) return callback(options.municipalTaxesService);
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
       callback(new MunicipalTaxesService(client as never)),
+    );
+  };
+  const withDteQueryService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeDteQueryService) => Promise<T>,
+  ) => {
+    if (options.dteQueryService) return callback(options.dteQueryService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new DteQueryService(client as never)),
+    );
+  };
+  const withDteNoticeService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeDteNoticeService) => Promise<T>,
+  ) => {
+    if (options.dteNoticeService) return callback(options.dteNoticeService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new DteNoticeService(client as never)),
+    );
+  };
+  const withDteImportService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeDteImportService) => Promise<T>,
+  ) => {
+    if (options.dteImportService) return callback(options.dteImportService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new DteImportService(client as never)),
     );
   };
   const withClientPfService = async <T>(
@@ -534,11 +581,13 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new RegularizeMunicipalTaxesReportingServiceImpl(client as never)),
     );
   };
-  const requirePasswordReveal = (c: RegularizeContext): void => {
-    if (Number(c.get("auth").claims.permission ?? 0) < 2) {
-      throw new ServiceError(403, "Permissão insuficiente para revelar credencial.");
+  const requireWritePermission = (c: RegularizeContext, message: string): void => {
+    if (Number(c.get("auth").claims.permission ?? 0) < MIN_REGULARIZE_WRITE_PERMISSION) {
+      throw new ServiceError(403, message);
     }
   };
+  const requirePasswordReveal = (c: RegularizeContext): void =>
+    requireWritePermission(c, "Permissão insuficiente para revelar credencial.");
   const requireInternal = (c: RegularizeContext): void =>
     assertRegularizeInternalToken(c.req.raw, options.env ?? c.env);
   app.get("/internal/reporting/catalog", async (c) => {
@@ -886,6 +935,103 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       return c.json(
         createSuccessResponse(
           await service.list({ organizationId: c.get("auth").organizationId, ...query }),
+        ),
+      );
+    }),
+  );
+  app.post("/regularize/dte/import", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para importar avisos DTE.");
+    return withDteImportService(c, async (service) => {
+      const body = parseWithZod(importDteBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.importNotices({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            ...body,
+          }),
+        ),
+        201,
+      );
+    });
+  });
+  app.get("/regularize/dte/notices", async (c) =>
+    withDteNoticeService(c, async (service) => {
+      const query = parseWithZod(listDteNoticesQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list({ organizationId: c.get("auth").organizationId, ...query }),
+        ),
+      );
+    }),
+  );
+  app.put("/regularize/dte/notices/reading", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para alterar a leitura do aviso DTE.");
+    return withDteNoticeService(c, async (service) => {
+      const body = parseWithZod(updateDteNoticeReadingBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.setReading({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            id: body.id,
+            pendingReading: body.pending_reading,
+          }),
+        ),
+      );
+    });
+  });
+  app.get("/regularize/dte/queries", async (c) =>
+    withDteQueryService(c, async (service) => {
+      const { date } = parseWithZod(dteQueryGridQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.grid({ organizationId: c.get("auth").organizationId, date }),
+        ),
+      );
+    }),
+  );
+  app.put("/regularize/dte/queries/status", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para alterar a consulta DTE.");
+    return withDteQueryService(c, async (service) => {
+      const body = parseWithZod(updateDteQueryStatusBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.setStatus({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            clientId: body.client_id,
+            date: body.date,
+            status: body.status,
+          }),
+        ),
+      );
+    });
+  });
+  app.post("/regularize/dte/queries/import", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para registrar consultas DTE.");
+    return withDteQueryService(c, async (service) => {
+      const body = parseWithZod(importDteQueryListsBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.importLists({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            date: body.date,
+            done: body.done,
+            notDone: body.not_done,
+          }),
+        ),
+        201,
+      );
+    });
+  });
+  app.get("/regularize/dte/imports", async (c) =>
+    withDteImportService(c, async (service) => {
+      const query = parseWithZod(listDteImportsQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.listImports({ organizationId: c.get("auth").organizationId, ...query }),
         ),
       );
     }),

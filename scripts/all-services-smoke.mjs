@@ -6617,6 +6617,66 @@ const handlers = {
       findFirstId(response.body?.data);
   },
 
+  // Conteúdo fixo: a chave de duplicata impede que cada rodada crie um aviso novo.
+  async regularizeDteImport(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        format: "json",
+        content: JSON.stringify([
+          { tipo: "", cell3: "QA_ smoke aviso DTE", cell4: "00000000000191", cell5: "QA_ smoke" },
+        ]),
+      },
+    });
+  },
+
+  async regularizeDteImportsList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  // Período aberto: o aviso de smoke só é criado na primeira rodada e sai da janela de 45 dias.
+  async regularizeDteNoticesList(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      query: { from: "2000-01-01", search: "QA_ smoke aviso DTE" },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.regularizeDteNoticeId = response.body?.data?.data?.[0]?.id;
+  },
+
+  async regularizeDteNoticeReadingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { id: requireState("regularizeDteNoticeId"), pending_reading: false },
+    });
+  },
+
+  // Dia fixo e antigo, sem gravar nada: "sem_registro" em quem não tem registro e uma lista só
+  // com documento desconhecido.
+  async regularizeDteQueriesGrid(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { date: "2000-01-01" } });
+  },
+
+  async regularizeDteQueryStatusUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        date: "2000-01-01",
+        status: "sem_registro",
+      },
+    });
+  },
+
+  async regularizeDteQueryListsImport(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: { date: "2000-01-01", done: "00000000000191", not_done: "" },
+    });
+  },
+
   async taskIntegrationCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],
