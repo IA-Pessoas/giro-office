@@ -2,6 +2,8 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Pencil, Plus, Repeat, Trash2, UserCheck } from "lucide-react";
 
+import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
+import { useAssignableUsers } from "@modules/rh";
 import { ConfirmationDialog } from "@shared/components";
 import { useFetch } from "@shared/hooks";
 import { agendaService } from "@shared/services/agendaService";
@@ -35,21 +37,23 @@ const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
 interface DepartmentAgendaSectionProps {
   module: AgendaModule;
   canEdit: boolean;
-  /** Oferece a alternância entre a agenda geral e a do usuário atual. */
-  allowMine?: boolean;
+  /** Eventos com responsável e cliente: oferece "Minha agenda" e os dois campos no formulário. */
+  assignable?: boolean;
 }
 
 /** Visão de um departamento na agenda compartilhada: o serviço filtra pelo módulo pedido. */
 export function DepartmentAgendaSection({
   module,
   canEdit,
-  allowMine = false,
+  assignable = false,
 }: DepartmentAgendaSectionProps) {
   const departmentLabel = DEPARTMENT_LABEL[module];
   const [month, setMonth] = useState<ContabilCompetence>(getCurrentContabilCompetence);
   const [mine, setMine] = useState(false);
   const [editing, setEditing] = useState<AgendaEvent | "new" | null>(null);
   const [removing, setRemoving] = useState<AgendaEvent | null>(null);
+  const [client, setClient] = useState<ClientPickerOption | null>(null);
+  const users = useAssignableUsers({ module, enabled: assignable && canEdit });
   const queryClient = useQueryClient();
   const events = useFetch(departmentAgendaQueryKey(module, month, mine), () =>
     agendaService.list(module, month, mine),
@@ -58,9 +62,16 @@ export function DepartmentAgendaSection({
 
   const save = useMutation({
     mutationFn: (payload: AgendaEventPayload) => {
-      const { date, status, recurrent, ...rest } = payload;
+      const { date, status, recurrent, client_id, participant_id, ...rest } = payload;
+      const assignment = assignable ? { client_id, participant_id } : {};
       if (!editing || editing === "new") {
-        return agendaService.create(module, { ...rest, date, status, ...(recurrent ? { recurrent } : {}) });
+        return agendaService.create(module, {
+          ...rest,
+          ...assignment,
+          date,
+          status,
+          ...(recurrent ? { recurrent } : {}),
+        });
       }
       // Só o que mudou: evento legado mantém o horário e o estado que já tinha.
       return agendaService.update(module, editing.id, {
@@ -68,6 +79,8 @@ export function DepartmentAgendaSection({
         ...(agendaDay(date) === agendaDay(editing.date) ? {} : { date }),
         ...(status === editing.status ? {} : { status }),
         ...(recurrent === Boolean(editing.recurring_agenda_id) ? {} : { recurrent }),
+        ...(!assignable || client_id === (editing.client?.id ?? null) ? {} : { client_id }),
+        ...(!assignable || participant_id === (editing.participant?.id ?? null) ? {} : { participant_id }),
       });
     },
     onSuccess: async () => {
@@ -85,6 +98,7 @@ export function DepartmentAgendaSection({
 
   const openForm = (target: AgendaEvent | "new" | null) => {
     save.reset();
+    setClient(target && target !== "new" ? target.client : null);
     setEditing(target);
   };
 
@@ -97,6 +111,12 @@ export function DepartmentAgendaSection({
       status: form.get("status") as AgendaStatus,
       obs: String(form.get("obs")).trim() || null,
       recurrent: form.get("recurrent") === "on",
+      ...(assignable
+        ? {
+            client_id: client?.id ?? null,
+            participant_id: String(form.get("participant_id")) || null,
+          }
+        : {}),
     });
   };
 
@@ -117,7 +137,7 @@ export function DepartmentAgendaSection({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {allowMine && (
+          {assignable && (
             // Mesmo padrão do "Meus clientes" da carteira: desligado, é a agenda geral.
             <button
               type="button"
@@ -194,6 +214,55 @@ export function DepartmentAgendaSection({
               ))}
             </select>
           </div>
+          {assignable && (
+            <>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor={`${module}-agenda-participant`}
+                  className="text-sm font-medium text-gray-700 dark:text-slate-300"
+                >
+                  Responsável
+                </label>
+                <select
+                  id={`${module}-agenda-participant`}
+                  name="participant_id"
+                  className={CONTABIL_SELECT_CLASS}
+                  // A lista chega depois do formulário: a chave remonta o select já com o valor.
+                  key={users.data?.length ?? 0}
+                  defaultValue={current?.participant?.id ?? ""}
+                >
+                  <option value="">Sem responsável</option>
+                  {current?.participant &&
+                    !users.data?.some((user) => user.id === current.participant?.id) && (
+                      <option value={current.participant.id}>{current.participant.name}</option>
+                    )}
+                  {users.data?.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {/* O seletor abre uma busca dentro do formulário: Enter nela não salva o evento. */}
+              <div
+                className="flex flex-col gap-1"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Cliente</span>
+                <ClientPickerModal
+                  selectedClient={client}
+                  onSelectClient={setClient}
+                  filters={{ status: "Ativo", legacyIntegrationStatusFilter: false }}
+                  triggerLabel="Sem cliente"
+                  allowClearSelection
+                />
+              </div>
+            </>
+          )}
           <div className="space-y-1 sm:col-span-2">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
               <input
@@ -267,7 +336,7 @@ export function DepartmentAgendaSection({
                     {event.obs}
                   </p>
                 )}
-                {(event.client || event.participant || allowMine) && (
+                {(event.client || event.participant || assignable) && (
                   <p className="break-words text-xs text-gray-500 dark:text-slate-400">
                     {event.client?.name && `Cliente: ${event.client.name} · `}
                     Responsável: {event.participant?.name ?? "Sem responsável"}

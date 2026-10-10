@@ -28,6 +28,9 @@ export interface AgendaEventPayload {
   obs: string | null;
   /** Repete todo mês; desligar encerra a série e mantém os eventos já criados. */
   recurrent?: boolean;
+  /** Nulo limpa o vínculo; ausente não mexe nele. */
+  client_id?: string | null;
+  participant_id?: string | null;
 }
 
 /** Evento de dia inteiro: meio-dia UTC mantém o dia escolhido em qualquer fuso do Brasil. */
