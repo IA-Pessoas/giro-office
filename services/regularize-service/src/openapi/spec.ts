@@ -935,6 +935,48 @@ export function buildRegularizeServiceOpenApiSpec(
           },
         },
       },
+      "/regularize/dte/queries": {
+        get: {
+          tags: ["DTE"],
+          summary: "Grade de consultas diárias ao DTE por cliente",
+          description:
+            "Clientes de comércio ou indústria da BA com inscrição estadual, na carteira da competência do dia, mais os que já têm registro na data.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "date",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "date" },
+            },
+          ],
+          responses: {
+            "200": { description: "Situação por cliente no dia", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/queries/status": {
+        put: {
+          tags: ["DTE"],
+          summary: "Marcar a consulta de um cliente como feita, não feita ou sem registro",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Situação atualizada", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/queries/import": {
+        post: {
+          tags: ["DTE"],
+          summary: "Registrar consultas do dia por listas de CPF/CNPJ",
+          description:
+            "Recebe as listas de feitas e não feitas; documento nas duas listas não é aplicado.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "201": { description: "Resumo do registro", ...successEnvelopeContent() },
+          },
+        },
+      },
       "/regularize/municipal-taxes": {
         get: {
           tags: ["MunicipalTaxes"],

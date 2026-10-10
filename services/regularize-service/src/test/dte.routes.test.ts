@@ -7,10 +7,12 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import { DTE_IMPORT_LIMITS } from "../services/dteImportParser.js";
 import { DteImportService } from "../services/dteImportService.js";
 import { DteNoticeService } from "../services/dteNoticeService.js";
+import { DteQueryService } from "../services/dteQueryService.js";
 import { createTestApp, gatewayHeaders } from "./regularizeTestUtils.js";
 
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
 const NOTICE_ID = "c0000000-0000-4000-8000-000000000001";
+const QUERY_DATE = new Date("2026-10-09T00:00:00.000Z");
 
 describe("dte routes", () => {
   afterEach(() => {
@@ -144,6 +146,84 @@ describe("dte routes", () => {
       userId: "user-1",
       id: NOTICE_ID,
       pendingReading: false,
+    });
+  });
+
+  it("mostra a grade de consultas do dia para quem tem leitura", async () => {
+    const grid = {
+      date: "2026-10-09",
+      rows: [],
+      totals: { feita: 0, nao_feita: 0, sem_registro: 0 },
+    };
+    const gridSpy = vi.spyOn(DteQueryService.prototype, "grid").mockResolvedValue(grid);
+    const app = createTestApp({} as PrismaClient);
+
+    const response = await request(app)
+      .get("/regularize/dte/queries?date=2026-10-09")
+      .set(gatewayHeaders({ permission: 1 }));
+    const invalid = await request(app)
+      .get("/regularize/dte/queries?date=2026-13-40")
+      .set(gatewayHeaders());
+    const missing = await request(app).get("/regularize/dte/queries").set(gatewayHeaders());
+
+    expect([response.status, invalid.status, missing.status]).toEqual([200, 400, 400]);
+    expect(gridSpy).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID, date: QUERY_DATE });
+    expect(response.body).toEqual({ success: true, data: grid });
+  });
+
+  it("altera a situação da consulta só com permissão de escrita", async () => {
+    const setStatus = vi
+      .spyOn(DteQueryService.prototype, "setStatus")
+      .mockResolvedValue({ client_id: NOTICE_ID, date: "2026-10-09", status: "nao_feita" });
+    const app = createTestApp({} as PrismaClient);
+    const body = { client_id: NOTICE_ID, date: "2026-10-09", status: "nao_feita" };
+    const put = (permission: number, payload: Record<string, unknown>) =>
+      request(app)
+        .put("/regularize/dte/queries/status")
+        .set(gatewayHeaders({ permission }))
+        .send(payload);
+
+    const statuses = [
+      (await put(1, body)).status,
+      (await put(2, body)).status,
+      (await put(2, { ...body, status: "talvez" })).status,
+    ];
+
+    expect(statuses).toEqual([403, 200, 400]);
+    expect(setStatus).toHaveBeenCalledTimes(1);
+    expect(setStatus).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: "user-1",
+      clientId: NOTICE_ID,
+      date: QUERY_DATE,
+      status: "nao_feita",
+    });
+  });
+
+  it("registra as listas de consultas só com permissão de escrita", async () => {
+    const importLists = vi.spyOn(DteQueryService.prototype, "importLists").mockResolvedValue({
+      date: "2026-10-09",
+      done: 1,
+      not_done: 0,
+      conflicts: [],
+      unknown: [],
+    });
+    const app = createTestApp({} as PrismaClient);
+    const body = { date: "2026-10-09", done: "11111111000111", not_done: "" };
+    const post = (permission: number) =>
+      request(app)
+        .post("/regularize/dte/queries/import")
+        .set(gatewayHeaders({ permission }))
+        .send(body);
+
+    expect([(await post(1)).status, (await post(2)).status]).toEqual([403, 201]);
+    expect(importLists).toHaveBeenCalledTimes(1);
+    expect(importLists).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: "user-1",
+      date: QUERY_DATE,
+      done: "11111111000111",
+      notDone: "",
     });
   });
 });

@@ -952,6 +952,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "alterou", item: "a leitura de um aviso DTE" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/queries$/,
+    description: { action: "consultou", item: "a grade de consultas diárias ao DTE" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/dte\/queries\/status$/,
+    description: { action: "alterou", item: "a situação de uma consulta diária ao DTE" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/dte\/queries\/import$/,
+    description: { action: "registrou", item: "consultas diárias ao DTE por lista" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/regularize\/process\/send-to-fiscal$/,
     description: { action: "enviou", item: "um processo de regularização ao Fiscal" },

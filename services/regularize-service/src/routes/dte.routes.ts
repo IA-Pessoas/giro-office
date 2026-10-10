@@ -2,19 +2,24 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import {
+  dteQueryGridQuerySchema,
   importDteBodySchema,
+  importDteQueryListsBodySchema,
   listDteImportsQuerySchema,
   listDteNoticesQuerySchema,
   updateDteNoticeReadingBodySchema,
+  updateDteQueryStatusBodySchema,
 } from "../schemas/dte.schemas.js";
 import { DteImportService } from "../services/dteImportService.js";
 import { DteNoticeService } from "../services/dteNoticeService.js";
+import { DteQueryService } from "../services/dteQueryService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
 export function createDteRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();
   const dteImportService = new DteImportService(deps.prisma);
   const dteNoticeService = new DteNoticeService(deps.prisma);
+  const dteQueryService = new DteQueryService(deps.prisma);
 
   router.post("/dte/import", async (request: Request, response: Response, next: NextFunction) => {
     try {
@@ -73,6 +78,60 @@ export function createDteRoutes(deps: RegularizeRouteDeps): Router {
         response.json(createSuccessResponse(updated));
       } catch (err) {
         logError("Erro ao alterar leitura de aviso DTE do regularize", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get("/dte/queries", async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const query = parseWithZod(dteQueryGridQuerySchema, request.query);
+      const grid = await dteQueryService.grid({
+        organizationId: request.organization_id,
+        date: query.date,
+      });
+      response.json(createSuccessResponse(grid));
+    } catch (err) {
+      logError("Erro ao listar consultas DTE do regularize", { err });
+      next(err);
+    }
+  });
+
+  router.put(
+    "/dte/queries/status",
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(updateDteQueryStatusBodySchema, request.body);
+        const updated = await dteQueryService.setStatus({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          clientId: body.client_id,
+          date: body.date,
+          status: body.status,
+        });
+        response.json(createSuccessResponse(updated));
+      } catch (err) {
+        logError("Erro ao alterar consulta DTE do regularize", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/dte/queries/import",
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(importDteQueryListsBodySchema, request.body);
+        const result = await dteQueryService.importLists({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          date: body.date,
+          done: body.done,
+          notDone: body.not_done,
+        });
+        response.status(201).json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao registrar listas de consultas DTE do regularize", { err });
         next(err);
       }
     },
