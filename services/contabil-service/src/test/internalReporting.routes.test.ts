@@ -102,9 +102,24 @@ describe("internal reporting routes", () => {
     );
     expect(relationship.fields.map((field: { key: string }) => field.key)).toEqual([
       "bidding",
+      "bidding_status",
       "chart_accounts",
       "tool",
       "system",
+      "note",
+      "segment",
+      "responsible_name",
+      "posted_by_name",
+      "name",
+      "company_name",
+      "cpf_cnpj",
+      "status",
+      "regime",
+      "competence_entry",
+      "deletion_date",
+      "contabil",
+      "fiscal",
+      "customer_with_movement",
     ]);
     expect(relationship.keys.map((field: { key: string }) => field.key)).toEqual(["client_id"]);
     const responsibles = response.body.data.sources.find(

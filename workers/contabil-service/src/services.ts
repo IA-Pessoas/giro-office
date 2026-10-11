@@ -24,7 +24,7 @@ import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import {
   extractTriageReportingPage,
-  isClientReportingSource,
+  isContabilReportingSource,
 } from "../../../services/contabil-service/src/services/triageReportingService.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
@@ -2064,33 +2064,27 @@ export function createReportingService(
     limit: number;
     offset?: number;
   }) => {
-    const allowed = getContabilReportingFields(input.source as never);
+    if (!isContabilReportingSource(input.source))
+      throw new ServiceError(403, "Área não publicada para relatórios.");
+    const allowed = getContabilReportingFields(input.source);
     if (input.fields.some((field) => !allowed.includes(field)))
       throw new ServiceError(403, "Campo não publicado para relatórios.");
-    if (isClientReportingSource(input.source)) {
-      return extractTriageReportingPage(
-        {
-          clients: input.prisma.client,
-          clouds: input.prisma.clientCloud,
-          control: input.prisma.controlContabil,
-          monthly: input.prisma.triageMonthly,
-          responsibles: input.prisma.responsibleContabil,
-          assignments: input.prisma.triageResponsible,
-          competences: input.prisma.triageCompetence,
-          configs: input.prisma.triageConfig,
-          catalogItems: input.prisma.triageCatalogItem,
-          users: input.prisma.user,
-        },
-        { ...input, source: input.source },
-      );
-    }
-    const rows = await input.prisma.relationshipContabil.findMany({
-      where: { organization_id: input.organizationId },
-      select: Object.fromEntries(input.fields.map((field) => [field, true])),
-      ...(input.offset !== undefined ? { skip: input.offset, orderBy: { id: "asc" } } : {}),
-      take: input.limit + 1,
-    });
-    return { rows: rows.slice(0, input.limit), reachedLimit: rows.length > input.limit };
+    return extractTriageReportingPage(
+      {
+        clients: input.prisma.client,
+        clouds: input.prisma.clientCloud,
+        control: input.prisma.controlContabil,
+        monthly: input.prisma.triageMonthly,
+        relationships: input.prisma.relationshipContabil,
+        responsibles: input.prisma.responsibleContabil,
+        assignments: input.prisma.triageResponsible,
+        competences: input.prisma.triageCompetence,
+        configs: input.prisma.triageConfig,
+        catalogItems: input.prisma.triageCatalogItem,
+        users: input.prisma.user,
+      },
+      { ...input, source: input.source },
+    );
   };
   return {
     async extract(input) {

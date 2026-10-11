@@ -64,11 +64,29 @@ describe("InternalReportingService", () => {
   it("extrai relacionamento contábil com escopo da organização e limite", async () => {
     const relationships = {
       findMany: vi.fn().mockResolvedValue([
-        { bidding: true, chart_accounts: "Plano A", tool: "Ferramenta A", system: "Sistema A" },
-        { bidding: false, chart_accounts: "Plano B", tool: "Ferramenta B", system: "Sistema B" },
+        {
+          id: "1",
+          client_id: "a",
+          bidding: true,
+          chart_accounts: "Plano A",
+          tool: "Ferramenta A",
+          system: "Sistema A",
+        },
+        {
+          id: "2",
+          client_id: "b",
+          bidding: false,
+          chart_accounts: "Plano B",
+          tool: "Ferramenta B",
+          system: "Sistema B",
+        },
       ]),
     };
-    const service = new InternalReportingService({ relationshipContabil: relationships } as never);
+    const client = { findMany: vi.fn() };
+    const service = new InternalReportingService({
+      relationshipContabil: relationships,
+      client,
+    } as never);
 
     await expect(
       service.extract({
@@ -85,9 +103,20 @@ describe("InternalReportingService", () => {
     });
     expect(relationships.findMany).toHaveBeenCalledWith({
       where: { organization_id: ORG_A },
-      select: { bidding: true, chart_accounts: true, tool: true, system: true },
+      select: {
+        id: true,
+        client_id: true,
+        bidding: true,
+        tool: true,
+        system: true,
+        chart_accounts: true,
+      },
+      orderBy: { id: "asc" },
+      skip: 0,
       take: 2,
     });
+    // Sem campo de cliente pedido, a tabela de clientes não é lida.
+    expect(client.findMany).not.toHaveBeenCalled();
   });
 
   it("extrai o indicador de movimento de responsáveis com escopo da organização", async () => {
@@ -129,11 +158,11 @@ describe("InternalReportingService", () => {
     expect(user.findMany).not.toHaveBeenCalled();
   });
 
-  it("não publica ids, organização ou observação do relacionamento", async () => {
+  it("não publica ids nem organização do relacionamento", async () => {
     const relationships = { findMany: vi.fn() };
     const service = new InternalReportingService({ relationshipContabil: relationships } as never);
 
-    for (const field of ["client_id", "id", "organization_id", "note"]) {
+    for (const field of ["client_id", "id", "organization_id"]) {
       await expect(
         service.extract({
           organizationId: ORG_A,

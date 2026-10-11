@@ -52,6 +52,7 @@ function delegates(monthly: readonly Record<string, unknown>[] = []) {
     },
     monthly: { findMany: vi.fn().mockResolvedValue(monthly) },
     control: { findMany: vi.fn().mockResolvedValue([]) },
+    relationships: { findMany: vi.fn().mockResolvedValue([]) },
     responsibles: {
       findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT_A, customer_with_movement: true }]),
     },
@@ -1209,5 +1210,214 @@ describe("extractTriageReportingPage: Controle Contábil", () => {
       },
     });
     expect(totals.rows).toEqual([{ competencias: listed.rows.length }]);
+  });
+});
+
+describe("extractTriageReportingPage: Relação Contábil", () => {
+  const CLIENT_C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const clients = [
+    { ...clientRows[0], regime: "Simples Nacional", segment: "Comércio" },
+    { ...clientRows[1], regime: "Lucro Presumido", segment: null },
+    {
+      ...clientRows[0],
+      id: CLIENT_C,
+      name: "Gama",
+      cpf_cnpj: "33444555000199",
+      segment: "Serviços",
+    },
+  ];
+  // Os estados do legado: licitação sem resposta/Sim/Não; plano de contas sem resposta, as
+  // quatro opções e o texto livre antigo.
+  const relationships = [
+    {
+      id: "1",
+      client_id: CLIENT_A,
+      bidding: true,
+      chart_accounts: "Sim — Jonrick",
+      tool: "Domínio",
+      system: "ERP",
+      note: "Envia por e-mail",
+    },
+    {
+      id: "2",
+      client_id: CLIENT_B,
+      bidding: false,
+      chart_accounts: "Plano próprio",
+      tool: "Planilha",
+      system: "",
+      note: "",
+    },
+    {
+      id: "3",
+      client_id: CLIENT_C,
+      bidding: null,
+      chart_accounts: null,
+      tool: "",
+      system: "",
+      note: "",
+    },
+  ];
+  const responsibles = [
+    {
+      client_id: CLIENT_A,
+      person_responsible_id: USER_ANA,
+      posted_by_id: USER_BRUNO,
+      customer_with_movement: true,
+    },
+    { client_id: CLIENT_B, person_responsible_id: USER_BRUNO, posted_by_id: USER_ANA },
+    { client_id: CLIENT_C, person_responsible_id: USER_BRUNO, posted_by_id: null },
+  ];
+
+  it("lista cada relação com cliente, responsáveis e os estados da ficha", async () => {
+    const prisma = delegates();
+    prisma.relationships.findMany.mockResolvedValue(relationships);
+    prisma.clients.findMany.mockResolvedValue(clients);
+    prisma.responsibles.findMany.mockResolvedValue(responsibles);
+
+    const result = await extractTriageReportingPage(prisma, {
+      source: "contabil.relationship",
+      organizationId: ORG,
+      fields: [
+        "name",
+        "regime",
+        "segment",
+        "responsible_name",
+        "bidding",
+        "bidding_status",
+        "chart_accounts",
+        "customer_with_movement",
+        "tool",
+        "note",
+      ],
+      limit: 10,
+    });
+
+    expect(result).toEqual({
+      rows: [
+        {
+          name: "Alfa",
+          regime: "Simples Nacional",
+          segment: "Comércio",
+          responsible_name: "Ana Souza",
+          bidding: true,
+          bidding_status: "Sim",
+          chart_accounts: "Sim — Jonrick",
+          customer_with_movement: true,
+          tool: "Domínio",
+          note: "Envia por e-mail",
+        },
+        {
+          name: "Beta",
+          regime: "Lucro Presumido",
+          segment: null,
+          responsible_name: "Bruno Lima",
+          bidding: false,
+          bidding_status: "Não",
+          chart_accounts: "Plano próprio",
+          customer_with_movement: false,
+          tool: "Planilha",
+          note: "",
+        },
+        {
+          name: "Gama",
+          regime: null,
+          segment: "Serviços",
+          responsible_name: "Bruno Lima",
+          bidding: null,
+          bidding_status: "Não selecionado",
+          chart_accounts: "Não selecionado",
+          customer_with_movement: false,
+          tool: "",
+          note: "",
+        },
+      ],
+      reachedLimit: false,
+    });
+    for (const delegate of [
+      prisma.relationships,
+      prisma.clients,
+      prisma.responsibles,
+      prisma.users,
+    ]) {
+      expect(delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+      );
+    }
+  });
+
+  it("filtra por responsável em qualquer dos dois papéis e por cliente ativo, com o mesmo total", async () => {
+    const prisma = delegates();
+    prisma.clients.findMany.mockResolvedValue(clients);
+    prisma.responsibles.findMany.mockResolvedValue(responsibles);
+    const database = {
+      $transaction: vi.fn(),
+      // A consulta com critérios pagina com `skip`: devolve a página pedida.
+      relationshipContabil: {
+        findMany: vi.fn(async (query: { skip?: number }) => relationships.slice(query.skip)),
+      },
+      client: prisma.clients,
+      responsibleContabil: prisma.responsibles,
+      user: prisma.users,
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    // O legado lista as empresas em que o usuário é responsável ou responsável pelo lançamento.
+    const criteria = {
+      filters: [
+        { field: "responsible_name", operator: "eq", parameter: "responsavel", value: "Ana Souza" },
+        { field: "posted_by_name", operator: "eq", parameter: "lancamento", value: "Ana Souza" },
+        { field: "status", operator: "eq", parameter: "situacao", value: "Ativo" },
+      ],
+      filter_groups: [{ operator: "or" as const, filters: ["responsavel", "lancamento"] }],
+    };
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.relationship",
+      fields: ["name", "chart_accounts"],
+      limit: 50,
+      query: criteria,
+    });
+    // Beta também é da Ana (lançamento), mas está inativo.
+    expect(listed.rows).toEqual([{ name: "Alfa", chart_accounts: "Sim — Jonrick" }]);
+
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.relationship",
+      fields: ["name"],
+      limit: 50,
+      query: {
+        ...criteria,
+        aggregations: [{ field: "name", function: "count", alias: "empresas" }],
+      },
+    });
+    expect(totals.rows).toEqual([{ empresas: listed.rows.length }]);
+
+    // "Não selecionado" é filtrável nos dois campos de estado.
+    const unanswered = await service.extract({
+      organizationId: ORG,
+      source: "contabil.relationship",
+      fields: ["name"],
+      limit: 50,
+      query: {
+        filters: [
+          {
+            field: "bidding_status",
+            operator: "eq",
+            parameter: "licitacao",
+            value: "Não selecionado",
+          },
+          {
+            field: "chart_accounts",
+            operator: "eq",
+            parameter: "plano",
+            value: "Não selecionado",
+          },
+        ],
+      },
+    });
+    expect(unanswered.rows).toEqual([{ name: "Gama" }]);
   });
 });
