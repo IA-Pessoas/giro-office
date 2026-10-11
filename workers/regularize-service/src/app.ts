@@ -30,6 +30,10 @@ import {
   updateDteQueryStatusBodySchema,
 } from "@workspace/regularize-service/src/schemas/dte.schemas.js";
 import {
+  groupMapParamsSchema,
+  parseSaveGroupMapBody,
+} from "@workspace/regularize-service/src/schemas/groupMap.schemas.js";
+import {
   addGuidanceActivityBodySchema,
   addGuidancePartnerBodySchema,
   createGuidanceBodySchema,
@@ -86,6 +90,7 @@ import { ClientPfService } from "@workspace/regularize-service/src/services/clie
 import { DteImportService } from "@workspace/regularize-service/src/services/dteImportService.js";
 import { DteNoticeService } from "@workspace/regularize-service/src/services/dteNoticeService.js";
 import { DteQueryService } from "@workspace/regularize-service/src/services/dteQueryService.js";
+import { GroupMapService } from "@workspace/regularize-service/src/services/groupMapService.js";
 import {
   GuidanceService,
   type GuidanceService as GuidanceServiceType,
@@ -178,6 +183,7 @@ export type RegularizePartnersService = Pick<
   PartnersService,
   "create" | "update" | "detail" | "list" | "remove"
 >;
+export type RegularizeGroupMapService = Pick<GroupMapService, "generate" | "getSaved" | "save">;
 export type RegularizePasswordService = Pick<
   PasswordService,
   "create" | "update" | "list" | "detail" | "createSite" | "updateSite" | "listSites" | "detailSite"
@@ -228,6 +234,7 @@ type RegularizeOptions = {
   veriComparisonService?: RegularizeVeriComparisonService;
   clientPfService?: RegularizeClientPfService;
   partnersService?: RegularizePartnersService;
+  groupMapService?: RegularizeGroupMapService;
   passwordService?: RegularizePasswordService;
   guidanceService?: RegularizeGuidanceService;
   dashboardService?: RegularizeDashboardService;
@@ -543,6 +550,15 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       const prisma = client as never;
       return callback(new PartnersService(prisma, new RegularizeReconciliationServiceImpl(prisma)));
     });
+  };
+  const withGroupMapService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeGroupMapService) => Promise<T>,
+  ) => {
+    if (options.groupMapService) return callback(options.groupMapService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new GroupMapService(client as never)),
+    );
   };
   const withPasswordService = async <T>(
     c: RegularizeContext,
@@ -1205,6 +1221,46 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       );
     }),
   );
+  app.get("/regularize/groups/:id/map", async (c) =>
+    withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.generate({ organizationId: c.get("auth").organizationId, groupId: id }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/groups/:id/map/saved", async (c) =>
+    withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.getSaved({ organizationId: c.get("auth").organizationId, groupId: id }),
+        ),
+      );
+    }),
+  );
+  app.put("/regularize/groups/:id/map/saved", async (c) => {
+    // Mesmo nível de escrita do Express (authorizeRegularize): salvar o mapa exige nível 2.
+    if (Number(c.get("auth").claims.permission ?? 0) < 2) {
+      throw new ServiceError(403, "Permissão insuficiente para salvar o mapa do grupo.");
+    }
+    return withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      const { tree } = parseSaveGroupMapBody(await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.save({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            groupId: id,
+            tree,
+          }),
+        ),
+      );
+    });
+  });
   app.delete("/regularize/partners/:id", async (c) =>
     withPartnersService(c, async (service) => {
       const { id } = parseWithZod(partnerIdParamsSchema, { id: c.req.param("id") });

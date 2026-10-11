@@ -29,6 +29,7 @@ import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
   contabil: "Contábil",
   triagem: "Triagem",
+  regularize: "Regularize",
 };
 
 interface DepartmentAgendaSectionProps {

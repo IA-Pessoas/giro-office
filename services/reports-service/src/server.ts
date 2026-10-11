@@ -10,6 +10,7 @@ import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapte
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
 import { ContabilRelationshipAdapter } from "./integrations/contabilRelationshipAdapter.js";
 import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsiblesAdapter.js";
+import { ContabilTriageAdapter } from "./integrations/contabilTriageAdapter.js";
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
 import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
@@ -55,6 +56,7 @@ const app = createReportsApp({
       new ContabilControlAdapter(env),
       new ContabilRelationshipAdapter(env),
       new ContabilResponsiblesAdapter(env),
+      new ContabilTriageAdapter(env),
       new TaskAdapter(env),
       new ProjectAdapter(env),
       new CertificatePfAdapter(env),
