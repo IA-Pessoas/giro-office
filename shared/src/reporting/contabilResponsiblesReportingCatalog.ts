@@ -1,22 +1,18 @@
+import { contabilClientReportingFields } from "./contabilTriageReportingCatalog.js";
 import { reportingAggregations } from "./reportingCapabilities.js";
 
-const booleanOperators = ["eq", "neq"] as const;
+const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const keyOperators = ["eq", "in"] as const;
 
-function field(
-  key: string,
-  label: string,
-  value_type: "string" | "boolean",
-  filter_operators: readonly string[],
-) {
+function field(key: string, label: string, filter_operators: readonly string[]) {
   return {
     groupable: true,
     sortable: true,
     key,
     label,
-    value_type,
+    value_type: "string" as const,
     filter_operators,
-    aggregations: reportingAggregations(value_type),
+    aggregations: reportingAggregations("string"),
   };
 }
 
@@ -32,12 +28,16 @@ export const contabilResponsiblesReportingCatalog = {
       module: "contabil",
       minimum_permission: 1,
       keys: [
-        field("client_id", "Cliente", "string", keyOperators),
-        field("person_responsible_id", "Responsável", "string", keyOperators),
-        field("posted_by_id", "Publicador", "string", keyOperators),
+        field("client_id", "Cliente", keyOperators),
+        field("person_responsible_id", "Responsável", keyOperators),
+        field("posted_by_id", "Responsável pelo lançamento", keyOperators),
       ],
+      // Uma linha por cliente do Contábil; sem responsável cadastrado, os nomes saem em
+      // branco. "Cliente com movimento" vem do mesmo cadastro que as áreas da Triagem leem.
       fields: [
-        field("customer_with_movement", "Cliente com movimento", "boolean", booleanOperators),
+        field("responsible_name", "Responsável", stringOperators),
+        field("posted_by_name", "Responsável pelo lançamento", stringOperators),
+        ...contabilClientReportingFields,
       ],
     },
   ],

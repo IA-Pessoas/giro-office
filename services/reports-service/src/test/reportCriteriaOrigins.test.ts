@@ -84,6 +84,11 @@ for (const source of reportingSources.filter(
   describe(source.key, () => {
     it("orders the entire authorized set before the output cap", async () => {
       const field =
+        // Nos responsáveis do Contábil a linha é o cliente; os nomes dos responsáveis vêm de
+        // outra tabela e são cobertos em contabil-service/triageReportingService.test.ts.
+        (source.key === "contabil.responsibles"
+          ? source.fields.find((field) => field.key === "name")
+          : undefined) ??
         source.fields.find(
           (field) => field.value_type === "string" && !pessoalDerivedFields.has(field.key),
         ) ??

@@ -993,6 +993,70 @@ describe("contabil Worker remainder routes", () => {
     }
   });
 
+  it("extrai as empresas de um responsável do Contábil na organização do grant", async () => {
+    const clients = [
+      { id: CLIENT, company_name: "Alfa Ltda" },
+      { id: "client-without-responsible", company_name: "Beta Ltda" },
+    ];
+    const prisma = {
+      client: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            clients.slice(skip, skip + take),
+          ),
+      },
+      responsibleContabil: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { client_id: CLIENT, person_responsible_id: USER, posted_by_id: "other-user" },
+          ]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: USER, name: "Ana Souza" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.responsibles",
+      fields: ["company_name", "posted_by_name"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "responsible_name", operator: "eq", parameter: "usuario", value: "Ana Souza" },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: ["company_name", "posted_by_name", "responsible_name"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    // O responsável pelo lançamento é de outra organização: o nome não sai.
+    await expect(response.json()).resolves.toMatchObject({
+      data: { rows: [{ company_name: "Alfa Ltda", posted_by_name: null }], reachedLimit: false },
+    });
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, contabil: true } }),
+    );
+    for (const delegate of [prisma.responsibleContabil, prisma.user]) {
+      expect(delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+      );
+    }
+  });
+
   it("extrai SGQ e métrica Contábil da Triagem na organização do grant", async () => {
     // O SGQ vai até o mês corrente: fixa a data para o intervalo ser o das rotinas.
     vi.useFakeTimers({ now: new Date("2026-01-20T12:00:00.000Z"), toFake: ["Date"] });
