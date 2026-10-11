@@ -73,6 +73,7 @@ export type ListInstagramProfilesFilters = {
   pageSize: number;
   profile: "all" | "with" | "without";
   search?: string;
+  status?: string;
 };
 
 type ClientAuthorization = IntegracaoServiceAuthorization & {
@@ -418,7 +419,10 @@ export class ClientService implements IClientService {
           OR c.fantasy_name ILIKE ${`%${search}%`}
         )`
       : Prisma.empty;
-    const where = Prisma.sql`WHERE c.organization_id = ${organizationId} ${profileCondition} ${searchCondition}`;
+    const statusCondition = filters.status
+      ? Prisma.sql`AND c.status = ${filters.status}`
+      : Prisma.empty;
+    const where = Prisma.sql`WHERE c.organization_id = ${organizationId} ${profileCondition} ${statusCondition} ${searchCondition}`;
     const skip = (filters.page - 1) * filters.pageSize;
     const [rows, totals] = await Promise.all([
       this.prisma.$queryRaw<ClientInstagramProfile[]>(Prisma.sql`
