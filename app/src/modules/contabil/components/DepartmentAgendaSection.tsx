@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 
 import { ConfirmationDialog } from "@shared/components";
 import { useFetch } from "@shared/hooks";
@@ -11,12 +11,13 @@ import {
   agendaDay,
   type AgendaEvent,
   type AgendaEventPayload,
+  type AgendaModule,
   type AgendaStatus,
 } from "@shared/services/agendaService.contract";
 import { Input } from "@shared/ui/newLayout/input";
 import { formatCivilDate } from "@shared/utils/dateFormat";
 
-import { contabilAgendaQueryKey } from "../hooks/queryKeys";
+import { departmentAgendaQueryKey } from "../hooks/queryKeys";
 import { getContabilErrorMessage } from "../services/contabilError";
 import type { ContabilCompetence } from "../types";
 import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
@@ -24,24 +25,41 @@ import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 
-/** Visão Contábil da agenda compartilhada: o serviço filtra pelo departamento do módulo. */
-export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
+/** Nome do departamento nos textos da tela. */
+const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
+  contabil: "Contábil",
+  triagem: "Triagem",
+};
+
+interface DepartmentAgendaSectionProps {
+  module: AgendaModule;
+  canEdit: boolean;
+}
+
+/** Visão de um departamento na agenda compartilhada: o serviço filtra pelo módulo pedido. */
+export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSectionProps) {
+  const departmentLabel = DEPARTMENT_LABEL[module];
   const [month, setMonth] = useState<ContabilCompetence>(getCurrentContabilCompetence);
   const [editing, setEditing] = useState<AgendaEvent | "new" | null>(null);
   const [removing, setRemoving] = useState<AgendaEvent | null>(null);
   const queryClient = useQueryClient();
-  const events = useFetch(contabilAgendaQueryKey(month), () => agendaService.list("contabil", month));
-  const refresh = () => queryClient.invalidateQueries({ queryKey: contabilAgendaQueryKey() });
+  const events = useFetch(departmentAgendaQueryKey(module, month), () =>
+    agendaService.list(module, month),
+  );
+  const refresh = () => queryClient.invalidateQueries({ queryKey: departmentAgendaQueryKey(module) });
 
   const save = useMutation({
     mutationFn: (payload: AgendaEventPayload) => {
-      if (!editing || editing === "new") return agendaService.create("contabil", payload);
+      const { date, status, recurrent, ...rest } = payload;
+      if (!editing || editing === "new") {
+        return agendaService.create(module, { ...rest, date, status, ...(recurrent ? { recurrent } : {}) });
+      }
       // Só o que mudou: evento legado mantém o horário e o estado que já tinha.
-      const { date, status, ...rest } = payload;
-      return agendaService.update("contabil", editing.id, {
+      return agendaService.update(module, editing.id, {
         ...rest,
         ...(agendaDay(date) === agendaDay(editing.date) ? {} : { date }),
         ...(status === editing.status ? {} : { status }),
+        ...(recurrent === Boolean(editing.recurring_agenda_id) ? {} : { recurrent }),
       });
     },
     onSuccess: async () => {
@@ -50,7 +68,7 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
     },
   });
   const remove = useMutation({
-    mutationFn: (event: AgendaEvent) => agendaService.remove("contabil", event.id),
+    mutationFn: (event: AgendaEvent) => agendaService.remove(module, event.id),
     onSuccess: async () => {
       setRemoving(null);
       await refresh();
@@ -70,18 +88,23 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
       date: agendaDateToIso(String(form.get("date"))),
       status: form.get("status") as AgendaStatus,
       obs: String(form.get("obs")).trim() || null,
+      recurrent: form.get("recurrent") === "on",
     });
   };
 
   const current = editing && editing !== "new" ? editing : null;
 
   return (
-    <section className="space-y-5" aria-label="Agenda do Contábil" aria-busy={events.isLoading}>
+    <section
+      className="space-y-5"
+      aria-label={`Agenda do departamento ${departmentLabel}`}
+      aria-busy={events.isLoading}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Agenda</h2>
           <p className="text-sm text-gray-600 dark:text-slate-400">
-            Eventos do departamento Contábil na agenda compartilhada.
+            Eventos do departamento {departmentLabel} na agenda compartilhada.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -125,13 +148,13 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
           </label>
           <div className="flex flex-col gap-1">
             <label
-              htmlFor="contabil-agenda-status"
+              htmlFor={`${module}-agenda-status`}
               className="text-sm font-medium text-gray-700 dark:text-slate-300"
             >
               Estado
             </label>
             <select
-              id="contabil-agenda-status"
+              id={`${module}-agenda-status`}
               name="status"
               className={CONTABIL_SELECT_CLASS}
               defaultValue={current?.status ?? "Pendente"}
@@ -145,6 +168,24 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                name="recurrent"
+                defaultChecked={Boolean(current?.recurring_agenda_id)}
+                aria-describedby={`${module}-agenda-recurrent-help`}
+              />
+              Repetir todo mês
+            </label>
+            <p
+              id={`${module}-agenda-recurrent-help`}
+              className="text-sm text-gray-600 dark:text-slate-400"
+            >
+              Um novo evento é criado a cada mês, no mesmo dia. Sábado e domingo são
+              antecipados para a sexta. Desmarcar encerra a repetição e mantém os eventos já criados.
+            </p>
           </div>
           {save.error && (
             <p role="alert" className="text-sm text-red-600 dark:text-red-400 sm:col-span-2">
@@ -202,6 +243,12 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
                   </p>
                 )}
               </div>
+              {event.recurring_agenda_id && (
+                <span className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-slate-400">
+                  <Repeat className="h-4 w-4" aria-hidden="true" />
+                  Mensal
+                </span>
+              )}
               <span className="text-sm text-gray-600 dark:text-slate-400">
                 {event.status ?? "Sem estado"}
               </span>
@@ -239,7 +286,11 @@ export function ContabilAgendaSection({ canEdit }: { canEdit: boolean }) {
           if (!open) setRemoving(null);
         }}
         title="Remover evento"
-        description={`Remover "${removing?.agenda ?? ""}" da agenda?`}
+        description={
+          removing?.recurring_agenda_id
+            ? `Remover "${removing.agenda}" da agenda? Só este evento sai: a repetição mensal continua. Para encerrá-la, edite o evento e desmarque Repetir todo mês.`
+            : `Remover "${removing?.agenda ?? ""}" da agenda?`
+        }
         onConfirm={() => {
           if (removing) remove.mutate(removing);
         }}

@@ -4,6 +4,9 @@ import {
   createRegularizeWorkerApp,
   type RegularizeClientPfService,
   type RegularizeDashboardService,
+  type RegularizeDteImportService,
+  type RegularizeDteNoticeService,
+  type RegularizeDteQueryService,
   type RegularizeGroupMapService,
   type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
@@ -441,6 +444,174 @@ describe("regularize Worker", () => {
       type: "TFF",
       page: 1,
       limit: 20,
+    });
+  });
+
+  it("routes DTE import with write permission and lists imports by organization", async () => {
+    const dte: RegularizeDteImportService = {
+      importNotices: vi.fn(async () => ({ id: "import-1", created_count: 1 })),
+      listImports: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dteImportService: dte,
+    });
+    const post = (permission: string) =>
+      app.request("https://regularize.test/regularize/dte/import", {
+        method: "POST",
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ format: "json", content: "[]" }),
+      });
+
+    const denied = await post("1");
+    const created = await post("2");
+    const list = await app.request("https://regularize.test/regularize/dte/imports", {
+      headers: headers(),
+    });
+
+    expect([denied.status, created.status, list.status]).toEqual([403, 201, 200]);
+    expect(dte.importNotices).toHaveBeenCalledTimes(1);
+    expect(dte.importNotices).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      format: "json",
+      content: "[]",
+    });
+    expect(dte.listImports).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it("lists DTE notices by organization and changes reading only with write permission", async () => {
+    const notices: RegularizeDteNoticeService = {
+      list: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+      setReading: vi.fn(async () => ({ id: LICENSE_ID, pending_reading: false })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dteNoticeService: notices,
+    });
+    const put = (permission: string) =>
+      app.request("https://regularize.test/regularize/dte/notices/reading", {
+        method: "PUT",
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: LICENSE_ID, pending_reading: false }),
+      });
+
+    const list = await app.request(
+      "https://regularize.test/regularize/dte/notices?reading=Pendente&tipo=badge%20badge-warning",
+      { headers: headers() },
+    );
+    const denied = await put("1");
+    const updated = await put("2");
+
+    expect([list.status, denied.status, updated.status]).toEqual([200, 403, 200]);
+    expect(notices.list).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      tipo: "badge badge-warning",
+      search: "",
+      reading: "Pendente",
+      page: 1,
+      limit: 20,
+    });
+    expect(notices.setReading).toHaveBeenCalledTimes(1);
+    expect(notices.setReading).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      id: LICENSE_ID,
+      pendingReading: false,
+    });
+  });
+
+  it("shows the DTE query grid and requires write permission to change or import", async () => {
+    const queries: RegularizeDteQueryService = {
+      grid: vi.fn(async () => ({
+        date: "2026-10-09",
+        rows: [],
+        totals: { feita: 0, nao_feita: 0, sem_registro: 0 },
+      })),
+      setStatus: vi.fn(async () => ({
+        client_id: LICENSE_ID,
+        date: "2026-10-09",
+        status: "feita" as const,
+      })),
+      importLists: vi.fn(async () => ({
+        date: "2026-10-09",
+        done_count: 1,
+        not_done_count: 0,
+        conflicts: [],
+        unknown: [],
+      })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dteQueryService: queries,
+    });
+    const send = (method: string, path: string, permission: string, body: unknown) =>
+      app.request(`https://regularize.test/regularize/dte/queries/${path}`, {
+        method,
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    const statusBody = { client_id: LICENSE_ID, date: "2026-10-09", status: "feita" };
+    const importBody = { date: "2026-10-09", done: "11111111000111", not_done: "" };
+
+    const grid = await app.request(
+      "https://regularize.test/regularize/dte/queries?date=2026-10-09",
+      {
+        headers: headers(),
+      },
+    );
+    const badDate = await app.request(
+      "https://regularize.test/regularize/dte/queries?date=09/10/2026",
+      {
+        headers: headers(),
+      },
+    );
+    const statuses = [
+      grid.status,
+      badDate.status,
+      (await send("PUT", "status", "1", statusBody)).status,
+      (await send("PUT", "status", "2", statusBody)).status,
+      (await send("POST", "import", "1", importBody)).status,
+      (await send("POST", "import", "2", importBody)).status,
+    ];
+
+    expect(statuses).toEqual([200, 400, 403, 200, 403, 201]);
+    const date = new Date("2026-10-09T00:00:00.000Z");
+    expect(queries.grid).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID, date });
+    expect(queries.setStatus).toHaveBeenCalledTimes(1);
+    expect(queries.setStatus).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      clientId: LICENSE_ID,
+      date,
+      status: "feita",
+    });
+    expect(queries.importLists).toHaveBeenCalledTimes(1);
+    expect(queries.importLists).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      date,
+      done: "11111111000111",
+      notDone: "",
     });
   });
 

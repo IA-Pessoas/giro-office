@@ -4,6 +4,7 @@ import { ServiceError } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import { createLddRoutes } from "../routes/ldd.routes.js";
+import { LDD_PDF_MAX_BASE64_LENGTH, previewLddImportBodySchema } from "../schemas/ldd.schemas.js";
 import {
   clientId,
   createRouteTestApp,
@@ -106,5 +107,87 @@ describe("LDD routes", () => {
     expect(updateResponse.status).toBe(400);
     expect(service.create).not.toHaveBeenCalled();
     expect(service.update).not.toHaveBeenCalled();
+  });
+  it("devolve a prévia do PDF LDD e valida o corpo antes do service", async () => {
+    const preview = { file_name: "ldd.pdf", rows: [] };
+    const service = { previewImport: vi.fn(async () => preview) };
+    const app = createRouteTestApp("/pessoal/ldd", createLddRoutes(service as never));
+    const body = { client_id: clientId, file_name: "ldd.pdf", content_base64: "JVBERi0=" };
+
+    const response = await request(app)
+      .post("/pessoal/ldd/import/preview")
+      .set(gatewayHeaders())
+      .send(body);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: preview });
+    expect(service.previewImport).toHaveBeenCalledWith(
+      { organizationId, userId, permission: 2, requestId: expect.any(String) },
+      body,
+    );
+
+    for (const invalid of [
+      { ...body, client_id: "invalido" },
+      { ...body, content_base64: "não é base64" },
+      { ...body, file_name: "" },
+      { ...body, extra: true },
+    ]) {
+      const rejected = await request(app)
+        .post("/pessoal/ldd/import/preview")
+        .set(gatewayHeaders())
+        .send(invalid);
+      expect(rejected.status).toBe(400);
+    }
+    expect(service.previewImport).toHaveBeenCalledTimes(1);
+  });
+
+  it("barra no schema o PDF acima de 700 KB", () => {
+    const body = { client_id: clientId, file_name: "ldd.pdf" };
+    const parse = (length: number) =>
+      previewLddImportBodySchema.safeParse({ ...body, content_base64: "A".repeat(length) });
+
+    expect(parse(LDD_PDF_MAX_BASE64_LENGTH).success).toBe(true);
+    expect(parse(LDD_PDF_MAX_BASE64_LENGTH + 4).error?.issues[0]?.message).toBe(
+      "O PDF excede o limite de 700 KB.",
+    );
+  });
+
+  it("confirma a importação com 201 e valida as linhas antes do service", async () => {
+    const result = { import_id: "import-1", rows_count: 1, total_amount: 10, records: [] };
+    const service = { confirmImport: vi.fn(async () => result) };
+    const app = createRouteTestApp("/pessoal/ldd", createLddRoutes(service as never));
+    const row = { period: "13/2023", due_date: "2023-12-20", balance_amount: 10 };
+    const body = {
+      client_id: clientId,
+      file_name: "ldd.pdf",
+      file_hash: "a".repeat(64),
+      rows: [row],
+    };
+    const post = (payload: unknown) =>
+      request(app)
+        .post("/pessoal/ldd/import")
+        .set(gatewayHeaders())
+        .send(payload as object);
+
+    const response = await post(body);
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ success: true, data: result });
+    expect(service.confirmImport).toHaveBeenCalledWith(
+      { organizationId, userId, permission: 2, requestId: expect.any(String) },
+      body,
+    );
+
+    for (const invalid of [
+      { ...body, rows: [] },
+      { ...body, file_hash: "abc" },
+      { ...body, rows: [{ ...row, period: "14/2023" }] },
+      { ...body, rows: [{ ...row, due_date: "2023-02-31" }] },
+      { ...body, rows: [{ ...row, balance_amount: 0 }] },
+      { ...body, rows: [{ ...row, organization_id: organizationId }] },
+    ]) {
+      expect((await post(invalid)).status).toBe(400);
+    }
+    expect(service.confirmImport).toHaveBeenCalledTimes(1);
   });
 });

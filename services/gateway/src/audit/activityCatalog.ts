@@ -253,6 +253,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/pessoal\/ldd\/import$/,
+    description: { action: "importou", item: "débitos de LDD de um PDF" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/ldd\/import\/preview$/,
+    description: { action: "gerou", item: "uma prévia de importação de LDD em PDF" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/pessoal\/group-assignments\/previews$/,
     description: { action: "gerou", item: "uma prévia de atribuição de grupo" },
   },
@@ -930,6 +940,41 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PUT"],
     pattern: /^\/regularize\/guidance\/activity$/,
     description: { action: "atualizou", item: "uma atividade da orientação de regularização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/dte\/import$/,
+    description: { action: "importou", item: "avisos DTE no Regularize" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/imports$/,
+    description: { action: "consultou", item: "a lista de importações de avisos DTE" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/notices$/,
+    description: { action: "consultou", item: "a caixa de avisos DTE" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/dte\/notices\/reading$/,
+    description: { action: "alterou", item: "a leitura de um aviso DTE" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/queries$/,
+    description: { action: "consultou", item: "a grade de consultas diárias ao DTE" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/dte\/queries\/status$/,
+    description: { action: "alterou", item: "a situação de uma consulta diária ao DTE" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/dte\/queries\/import$/,
+    description: { action: "registrou", item: "consultas diárias ao DTE por lista" },
   },
   {
     methods: ["POST"],

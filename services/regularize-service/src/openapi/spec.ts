@@ -603,6 +603,10 @@ export function buildRegularizeServiceOpenApiSpec(
       { name: "PF", description: "Clientes PF do regularize" },
       { name: "Partners", description: "Quadro societario" },
       { name: "MunicipalTaxes", description: "Tributos municipais" },
+      {
+        name: "DTE",
+        description: "Importação manual de avisos, caixa de avisos e consultas diárias ao DTE",
+      },
       { name: "Processes", description: "Processos de regularize" },
       { name: "Guidance", description: "Orientacoes procedurais" },
       { name: "Licenses", description: "Alvaras e licencas" },
@@ -926,6 +930,122 @@ export function buildRegularizeServiceOpenApiSpec(
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
           responses: { "200": { description: "Detalhe do socio", ...successEnvelopeContent() } },
+        },
+      },
+      "/regularize/dte/import": {
+        post: {
+          tags: ["DTE"],
+          summary: "Importar avisos DTE colados em HTML ou JSON",
+          description:
+            "Extrai a primeira tabela conforme o legado e ignora avisos repetidos. Leitor verificado apenas com casos sintéticos.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "201": { description: "Resumo da importação", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/imports": {
+        get: {
+          tags: ["DTE"],
+          summary: "Listar importações de DTE com recusas e duplicatas",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Página de importações", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/notices": {
+        get: {
+          tags: ["DTE"],
+          summary: "Listar avisos DTE importados",
+          description:
+            "Sem `from`, lista os avisos emitidos nos últimos 45 dias. O período usa a data de emissão do aviso; quando ela não pôde ser lida, a data da importação.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "from", in: "query", schema: { type: "string", format: "date" } },
+            { name: "to", in: "query", schema: { type: "string", format: "date" } },
+            {
+              name: "tipo",
+              in: "query",
+              description: "Trecho da classe do selo (ex.: badge-warning); vazio lista os sem cor.",
+              schema: { type: "string" },
+            },
+            { name: "search", in: "query", schema: { type: "string", default: "" } },
+            {
+              name: "reading",
+              in: "query",
+              schema: { type: "string", enum: ["Todos", "Pendente", "Lido"], default: "Todos" },
+            },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Página de avisos DTE", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/notices/reading": {
+        put: {
+          tags: ["DTE"],
+          summary: "Alterar o estado de leitura de um aviso DTE",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Aviso atualizado", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/queries": {
+        get: {
+          tags: ["DTE"],
+          summary: "Grade de consultas diárias ao DTE por cliente",
+          description:
+            "Clientes de comércio ou indústria da BA com inscrição estadual, na carteira da competência do dia, mais os que já têm registro na data.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "date",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "date" },
+            },
+          ],
+          responses: {
+            "200": { description: "Situação por cliente no dia", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/queries/status": {
+        put: {
+          tags: ["DTE"],
+          summary: "Marcar a consulta de um cliente como feita, não feita ou sem registro",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Situação atualizada", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/queries/import": {
+        post: {
+          tags: ["DTE"],
+          summary: "Registrar consultas do dia por listas de CPF/CNPJ",
+          description:
+            "Recebe as listas de feitas e não feitas; documento nas duas listas não é aplicado.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "201": { description: "Resumo do registro", ...successEnvelopeContent() },
+          },
         },
       },
       "/regularize/municipal-taxes": {

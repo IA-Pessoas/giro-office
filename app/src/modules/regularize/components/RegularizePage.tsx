@@ -12,6 +12,7 @@ import {
   FileKey2,
   Gavel,
   Landmark,
+  Mail,
   Network,
   Loader2,
   Pencil,
@@ -54,6 +55,9 @@ import { RegularizeGroupMap } from "./RegularizeGroupMap";
 import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
 import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
 import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
+import { RegularizeDteInbox } from "./RegularizeDteInbox";
+import { RegularizeDtePanel } from "./RegularizeDtePanel";
+import { RegularizeDteQueries } from "./RegularizeDteQueries";
 import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
@@ -242,6 +246,7 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "passwords", label: "Senhas", icon: FileKey2 },
   { id: "sites", label: "Sites", icon: ShieldCheck },
   { id: "taxes", label: "Tributos", icon: Landmark },
+  { id: "dte", label: "DTE", icon: Mail },
   { id: "groups", label: "Grupos", icon: Network },
   { id: "bidders", label: "Licitantes", icon: Gavel },
   { id: "catalogs", label: "Catálogos", icon: Tags },
@@ -2928,6 +2933,16 @@ export function RegularizePage() {
       ) : null}
 
       {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}
+
+      {activeTab === "dte" ? (
+        // Caixa de avisos (#1745), importação (#1744) e consultas diárias (#1746) são fluxos
+        // separados na mesma aba.
+        <div className="space-y-4">
+          <RegularizeDteInbox canEdit={regularizeAccess.canEdit} />
+          <RegularizeDtePanel canEdit={regularizeAccess.canEdit} />
+          <RegularizeDteQueries canEdit={regularizeAccess.canEdit} />
+        </div>
+      ) : null}
 
       {activeTab === "catalogs" ? (
         // Regimes e segmentos que a ficha Regularize usa; editar exige Regularize nível 2 (#1740, #1741).

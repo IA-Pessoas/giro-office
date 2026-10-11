@@ -1,5 +1,6 @@
 import type {
   RegularizeClientPfListFilters,
+  RegularizeDteNoticeListFilters,
   RegularizeGuidanceListFilters,
   RegularizeId,
   RegularizeLicenseListFilters,
@@ -26,6 +27,13 @@ export const REGULARIZE_ENDPOINTS = {
   groupMapSaved: (groupId: RegularizeId) => `/regularize/groups/${groupId}/map/saved`,
   municipalTaxes: "/regularize/municipal-taxes",
   municipalTaxesDetail: "/regularize/municipal-taxes-detail",
+  dteImport: "/regularize/dte/import",
+  dteImports: "/regularize/dte/imports",
+  dteNotices: "/regularize/dte/notices",
+  dteNoticeReading: "/regularize/dte/notices/reading",
+  dteQueries: "/regularize/dte/queries",
+  dteQueryStatus: "/regularize/dte/queries/status",
+  dteQueryImport: "/regularize/dte/queries/import",
   processes: "/regularize/processes",
   process: "/regularize/process",
   sendToFiscal: "/regularize/process/send-to-fiscal",
@@ -102,6 +110,28 @@ export function buildRegularizeMunicipalTaxesListParams(
     ...(filters.type ? { type: filters.type } : {}),
     ...(filters.page !== undefined ? { page: filters.page } : {}),
     ...(filters.limit !== undefined ? { limit: filters.limit } : {}),
+  };
+}
+
+// Opção "Sem cor" do filtro: a API recebe tipo vazio, que no select já significa "todas".
+export const REGULARIZE_DTE_NO_TIPO_FILTER = "sem-cor";
+
+// Sem "Emitido de", a caixa mostra tudo (o ?todos do legado). A API aplica 45 dias quando o
+// from não vem, então o filtro vazio vai como uma data anterior a qualquer aviso.
+export const REGULARIZE_DTE_ALL_PERIOD_FROM = "1900-01-01";
+
+// from e to vão como dia (aaaa-mm-dd): a emissão do aviso é comparada pelo dia, sem fuso.
+export function buildRegularizeDteNoticeListParams(filters: RegularizeDteNoticeListFilters) {
+  return {
+    from: filters.from || REGULARIZE_DTE_ALL_PERIOD_FROM,
+    ...(filters.to ? { to: filters.to } : {}),
+    ...(filters.tipo
+      ? { tipo: filters.tipo === REGULARIZE_DTE_NO_TIPO_FILTER ? "" : filters.tipo }
+      : {}),
+    ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
+    reading: filters.reading,
+    page: filters.page,
+    limit: filters.limit,
   };
 }
 

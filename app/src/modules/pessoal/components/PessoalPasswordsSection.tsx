@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ChevronDown,
   Copy,
+  ExternalLink,
   Eye,
   EyeOff,
   KeyRound,
@@ -35,6 +36,12 @@ import type {
   PessoalPasswordPayload,
   PessoalPasswordUpdatePayload,
 } from "../types/passwords";
+import {
+  isPessoalPasswordKnownService,
+  normalizePessoalText,
+  PESSOAL_PASSWORD_SERVICE_OPTIONS,
+  pessoalPasswordPortalUrl,
+} from "../utils/passwordPortals";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
   pessoalPrimaryButtonClassName,
@@ -83,30 +90,6 @@ const secretFields = [
 ] as const satisfies ReadonlyArray<{ name: SecretFieldName; label: string }>;
 
 const PESSOAL_PASSWORD_CUSTOM_SERVICE_OPTION = "__custom_service__";
-
-const pessoalPasswordServiceOptions = [
-  "Portal eSocial",
-  "Gov.br",
-  "Cefaz",
-  "Feira Legal",
-  "Prefeitura",
-  "Bem Mais",
-  "BSF",
-  "Onvio",
-] as const;
-
-function normalizeSearch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-function isPessoalPasswordKnownService(value: string): boolean {
-  return pessoalPasswordServiceOptions.includes(
-    value as (typeof pessoalPasswordServiceOptions)[number],
-  );
-}
 
 function buildPasswordFormValues(
   password: PessoalPasswordDetail | PessoalPasswordListItem | null,
@@ -247,14 +230,14 @@ export function PessoalPasswordsSection({
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
   const filteredPasswords = useMemo(() => {
-    const normalizedTerm = normalizeSearch(searchTerm.trim());
+    const normalizedTerm = normalizePessoalText(searchTerm.trim());
 
     if (!normalizedTerm) {
       return passwords;
     }
 
     return passwords.filter((password) => {
-      const searchable = normalizeSearch(
+      const searchable = normalizePessoalText(
         `${password.service_name} ${getResponsibleName(password)}`,
       );
 
@@ -584,26 +567,39 @@ export function PessoalPasswordsSection({
 
             {filteredPasswords.map((password) => {
               const isSelected = password.id === selectedPasswordId;
+              const portalUrl = pessoalPasswordPortalUrl(password.service_name);
 
               return (
-                <button
-                  key={password.id}
-                  type="button"
-                  onClick={() => setSelectedPasswordId(password.id)}
-                  className={cn(
-                    "w-full rounded-xl border p-4 text-left transition-colors",
-                    isSelected
-                      ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30"
-                      : "border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900/30 dark:hover:border-blue-800",
-                  )}
-                >
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {password.service_name}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Responsável: {getResponsibleName(password)}
-                  </p>
-                </button>
+                <div key={password.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPasswordId(password.id)}
+                    className={cn(
+                      "w-full rounded-xl border p-4 text-left transition-colors",
+                      isSelected
+                        ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30"
+                        : "border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900/30 dark:hover:border-blue-800",
+                    )}
+                  >
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {password.service_name}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      Responsável: {getResponsibleName(password)}
+                    </p>
+                  </button>
+                  {portalUrl ? (
+                    <a
+                      href={portalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-1 text-sm font-medium text-blue-700 underline underline-offset-2 dark:text-blue-300"
+                    >
+                      <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      Abrir portal {password.service_name} (nova aba)
+                    </a>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -819,7 +815,7 @@ export function PessoalPasswordsSection({
                       className={`${pessoalTextFieldClassName} appearance-none pr-12`}
                     >
                       <option value="">Selecione</option>
-                      {pessoalPasswordServiceOptions.map((serviceName) => (
+                      {PESSOAL_PASSWORD_SERVICE_OPTIONS.map((serviceName) => (
                         <option key={serviceName} value={serviceName}>
                           {serviceName}
                         </option>

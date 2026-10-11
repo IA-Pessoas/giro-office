@@ -164,7 +164,7 @@ assert.match(birthdayReport, /id="marketing-birthday-report"/);
 assert.match(birthdayReport, /printMarketingReport\("marketing-birthday-report"\)/);
 assert.match(birthdayReport, /employeeBirthdayRows\(report\.employees\.items\)/);
 assert.match(
-  await readFile(new URL("./utils/printMarketingReport.ts", import.meta.url), "utf8"),
+  await readFile(new URL("../../shared/utils/printReport.ts", import.meta.url), "utf8"),
   /window\.print\(\)/,
 );
 assert.match(styles, /\.marketing-print-report \*/);

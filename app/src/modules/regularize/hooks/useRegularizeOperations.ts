@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useMutation,
   useQueryClient,
   type UseMutationResult,
@@ -18,6 +19,17 @@ import type {
   CreateRegularizeProcessPayload,
   RemoveRegularizeGuidanceActivityPayload,
   RemoveRegularizeGuidancePartnerPayload,
+  RegularizeDteImport,
+  RegularizeDteImportPayload,
+  RegularizeDteImportsPage,
+  RegularizeDteNotice,
+  RegularizeDteNoticeListFilters,
+  RegularizeDteNoticeReadingPayload,
+  RegularizeDteNoticesPage,
+  RegularizeDteQueryGrid,
+  RegularizeDteQueryListsPayload,
+  RegularizeDteQueryListsResult,
+  RegularizeDteQueryStatusPayload,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
@@ -91,6 +103,90 @@ export function useRegularizeMunicipalTaxes(
       enabled: Boolean(filters.year) && (options?.enabled ?? true),
     },
   );
+}
+
+export function useRegularizeDteImports(): UseQueryResult<RegularizeDteImportsPage, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(regularizeQueryKeys.dteImports(scope), () => regularizeService.listDteImports());
+}
+
+export function useRegularizeDteNotices(
+  filters: RegularizeDteNoticeListFilters,
+): UseQueryResult<RegularizeDteNoticesPage, Error> {
+  const scope = useRegularizeQueryScope();
+
+  // Mantém a página anterior na tela enquanto a próxima carrega.
+  return useFetch(
+    regularizeQueryKeys.dteNotices(filters, scope),
+    () => regularizeService.listDteNotices(filters),
+    { placeholderData: keepPreviousData },
+  );
+}
+
+export function useSetRegularizeDteNoticeReadingMutation(): UseMutationResult<
+  RegularizeDteNotice,
+  Error,
+  RegularizeDteNoticeReadingPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.setDteNoticeReading(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useRegularizeDteQueryGrid(
+  date: string,
+): UseQueryResult<RegularizeDteQueryGrid, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(
+    regularizeQueryKeys.dteQueryGrid(date, scope),
+    () => regularizeService.getDteQueryGrid(date),
+    // Sem manter a grade anterior: os campos de situação gravam no dia escolhido.
+    { enabled: Boolean(date) },
+  );
+}
+
+export function useSetRegularizeDteQueryStatusMutation(): UseMutationResult<
+  RegularizeDteQueryStatusPayload,
+  Error,
+  RegularizeDteQueryStatusPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.setDteQueryStatus(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useImportRegularizeDteQueryListsMutation(): UseMutationResult<
+  RegularizeDteQueryListsResult,
+  Error,
+  RegularizeDteQueryListsPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.importDteQueryLists(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useImportRegularizeDteMutation(): UseMutationResult<
+  RegularizeDteImport,
+  Error,
+  RegularizeDteImportPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.importDte(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
 }
 
 export function useRegularizeMunicipalTaxDetail(

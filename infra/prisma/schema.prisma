@@ -213,6 +213,7 @@ model Organization {
   permissionsProjects           PermissionProject[]
   permissionsSpecifics          PermissionSpecific[]
   lddPessoal                    LddPessoal[]
+  lddImportPessoal              LddImportPessoal[]
   obrigationsPessoal            ObrigationsPessoal[]
   passwordsPessoal              PasswordPessoal[]
   pessoalGroups                 PessoalGroup[]
@@ -233,6 +234,9 @@ model Organization {
   sitePasswordsRegularize       SitePasswordsRegularize[]
   passwordsRegularize           PasswordRegularize[]
   proceduralGuidances           ProceduralGuidance[]
+  dteImports                    RegularizeDteImport[]
+  dteNotices                    RegularizeDteNotice[]
+  dteQueries                    RegularizeDteQuery[]
   processes                     Process[]
   holidays                      Holidays[]
   pointsConfig                  PointsConfig[]
@@ -811,10 +815,12 @@ model Client {
   installments                  Installment[]
   panoramasParcelameto          PanoramaParcelameto[]
   lddPessoal                    LddPessoal[]
+  lddImportPessoal              LddImportPessoal[]
   obrigationsPessoal            ObrigationsPessoal[]
   passPessoal                   PasswordPessoal[]
   situationsPessoal             SituationsPessoal[]
   licenses                      License[]
+  dteQueries                    RegularizeDteQuery[]
   municipalTaxes                MunicipalTaxes[]
   partners                      Partners[]
   passRegularize                PasswordRegularize[]
@@ -1456,14 +1462,19 @@ model Agenda {
   obs                   String?
   department_control_id String
   organization_id       String
+  // Ocorrência de uma recorrência mensal: uma por regra e competência (AAAA-MM).
+  recurring_agenda_id   String?
+  recurrence_month      String?
   client                Client?      @relation(fields: [client_id], references: [id])
   department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
   organization          Organization @relation(fields: [organization_id], references: [id])
   participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
   participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])
   participant           User?        @relation("participant", fields: [participant_id], references: [id])
+  recurring_agenda      RecurringAgenda? @relation(fields: [recurring_agenda_id], references: [id], onDelete: SetNull)
   task                  Task?        @relation(fields: [task_id], references: [id])
 
+  @@unique([recurring_agenda_id, recurrence_month], map: "uq_agenda_recurrence_occurrence")
   @@map("agenda")
 }
 
@@ -1480,8 +1491,11 @@ model RecurringAgenda {
   obs                   String?
   department_control_id String
   organization_id       String
+  // Última competência (AAAA-MM) já gerada; nulo = regra legada, fora do gerador.
+  generated_through     String?
   client                Client?      @relation(fields: [client_id], references: [id])
   department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
+  occurrences           Agenda[]
   organization          Organization @relation(fields: [organization_id], references: [id])
   participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
   participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])
@@ -2360,6 +2374,24 @@ model LddPessoal {
   @@map("pessoal.ldd")
 }
 
+/// Arquivos LDD/INSS já importados: o hash impede somar o mesmo PDF duas vezes (#1769).
+model LddImportPessoal {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  file_hash       String
+  file_name       String
+  rows_count      Int
+  total_amount    Float
+  imported_by_id  String
+  created_at      DateTime     @default(now())
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id, file_hash], map: "uq_pessoal_ldd_imports_file")
+  @@map("pessoal.ldd_imports")
+}
+
 model PasswordPessoal {
   id              String       @id @default(uuid())
   client_id       String
@@ -2768,6 +2800,78 @@ model MunicipalTaxes {
   organization         Organization @relation(fields: [organization_id], references: [id])
 
   @@map("regularize.municipalTaxes")
+}
+
+// Importação manual de avisos DTE (#1744). Guarda o resumo e o que foi recusado ou
+// repetido, para conferência; o conteúdo colado não é armazenado.
+model RegularizeDteImport {
+  id              String                @id @default(uuid())
+  organization_id String
+  user_id         String
+  format          String
+  total_rows      Int
+  created_count   Int
+  duplicate_count Int
+  rejected_count  Int
+  duplicates      Json
+  rejections      Json
+  created_at      DateTime              @default(now())
+  organization    Organization          @relation(fields: [organization_id], references: [id])
+  notices         RegularizeDteNotice[]
+
+  @@index([organization_id, created_at], map: "idx_regularize_dte_import_org_created")
+  @@map("regularize.dte_imports")
+}
+
+// Aviso DTE (tb_regularize.dte do legado). Datas ficam como o texto da origem; a de emissão
+// também é lida como dd/mm/aaaa hh:mm em data_emissao_at, que a caixa de avisos usa no período
+// (dte/home.php). dedupe_key = SHA-256 dos nove campos de Fiscal::cadastrarDTE;
+// pending_reading = coluna `lido` do legado.
+model RegularizeDteNotice {
+  id              String              @id @default(uuid())
+  organization_id String
+  import_id       String
+  dedupe_key      String
+  tipo            String
+  aviso           String
+  cnpj_cpf        String
+  destinatario    String
+  remetente       String
+  data_emissao    String?
+  data_emissao_at DateTime?
+  assunto         String
+  data_leitura    String?
+  data_ciencia    String?
+  registro        String?
+  pending_reading Boolean
+  created_at      DateTime            @default(now())
+  organization    Organization        @relation(fields: [organization_id], references: [id])
+  import          RegularizeDteImport @relation(fields: [import_id], references: [id])
+
+  @@unique([organization_id, dedupe_key], map: "uq_regularize_dte_notice_dedupe")
+  @@index([organization_id, created_at], map: "idx_regularize_dte_notice_org_created")
+  @@index([organization_id, data_emissao_at], map: "idx_regularize_dte_notice_org_emissao")
+  @@map("regularize.dte_notices")
+}
+
+// Consulta diária ao DTE por cliente (#1746). O legado (tb_regularize.dte_status) guardava
+// duas listas de CPF/CNPJ por dia; aqui é uma linha por cliente e dia, então o cliente não
+// tem como estar em "feitas" e "não feitas" ao mesmo tempo. Sem linha = sem registro.
+model RegularizeDteQuery {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  client_id          String
+  date               DateTime     @db.Date
+  done               Boolean
+  updated_by_user_id String
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+  organization       Organization @relation(fields: [organization_id], references: [id])
+  client             Client       @relation(fields: [client_id], references: [id])
+
+  @@unique([organization_id, client_id, date], map: "uq_regularize_dte_query_client_date")
+  @@index([organization_id, date], map: "idx_regularize_dte_query_org_date")
+  @@map("regularize.dte_queries")
 }
 
 model TasksIntegrationRegularize {

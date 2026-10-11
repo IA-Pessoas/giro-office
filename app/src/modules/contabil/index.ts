@@ -8,6 +8,7 @@ export {
   ContabilResponsibleSection,
   ContabilShell,
   ContabilStateBox,
+  DepartmentAgendaSection,
   TriageDocumentsSection,
   FiscalTriagePortfolioSection,
 } from "./components";
