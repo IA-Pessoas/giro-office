@@ -4,6 +4,7 @@ import { clientIntegrationReportingCatalog } from "./clientIntegrationReportingC
 import { contabilControlReportingCatalog } from "./contabilControlReportingCatalog.js";
 import { contabilRelationshipReportingCatalog } from "./contabilRelationshipReportingCatalog.js";
 import { contabilResponsiblesReportingCatalog } from "./contabilResponsiblesReportingCatalog.js";
+import { contabilTriageReportingCatalog } from "./contabilTriageReportingCatalog.js";
 import { fiscalIcmsReportingCatalog } from "./fiscalIcmsReportingCatalog.js";
 import { fiscalIpiReportingCatalog } from "./fiscalIpiReportingCatalog.js";
 import { fiscalNcmReportingCatalog } from "./fiscalNcmReportingCatalog.js";
@@ -35,6 +36,7 @@ export const reportingSources = [
   ...contabilControlReportingCatalog.sources,
   ...contabilRelationshipReportingCatalog.sources,
   ...contabilResponsiblesReportingCatalog.sources,
+  ...contabilTriageReportingCatalog.sources,
   ...fiscalIcmsReportingCatalog.sources,
   ...fiscalIpiReportingCatalog.sources,
   ...fiscalNcmReportingCatalog.sources,

@@ -10,6 +10,7 @@ export type RegularizeTabId =
   | "dte"
   | "veri"
   | "groups"
+  | "agenda"
   | "bidders"
   | "catalogs";
 

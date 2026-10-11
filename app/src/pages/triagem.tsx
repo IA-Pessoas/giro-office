@@ -5,7 +5,13 @@ import { CalendarDays, ListChecks, Settings } from "lucide-react";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
-import { AccessDeniedPanel, FiscalTriagePortfolioSection, TriageDocumentsSection, useTriageEditability } from "@modules/contabil";
+import {
+  AccessDeniedPanel,
+  FiscalTriagePortfolioSection,
+  TriageDocumentHistorySection,
+  TriageDocumentsSection,
+  useTriageEditability,
+} from "@modules/contabil";
 import {
   TriageCompetenceSection,
   TriageOverviewPanel,
@@ -105,11 +111,19 @@ export default function TriagemPage() {
                   />
                 </div>
               ) : null}
+              <TriageDocumentHistorySection
+                key={client.id}
+                clientId={client.id}
+                clientName={client.name}
+              />
             </>
           ) : (
-            <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-              Selecione um cliente para consultar as pendências documentais.
-            </div>
+            <>
+              <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                Selecione um cliente para consultar as pendências documentais.
+              </div>
+              {access.isAdmin || contabilAccess.isAdmin ? <TriageDocumentHistorySection /> : null}
+            </>
           )}
         </div>
       )}

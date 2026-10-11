@@ -1,4 +1,5 @@
 import {
+  CLIENT_INACTIVE_STATUS,
   executeReportingQuery,
   getContabilReportingFields,
   normalizeTriageDocumentStatus,
@@ -21,6 +22,10 @@ import {
 import type { NoahServicePrisma } from "../../../services/contabil-service/src/services/noahService.js";
 import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
+import {
+  extractTriageReportingPage,
+  isTriageReportingSource,
+} from "../../../services/contabil-service/src/services/triageReportingService.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
   type TriageDocumentStatus,
@@ -238,9 +243,6 @@ function competenceInterval(competence: string): { start: Date; end: Date } {
     end: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),
   };
 }
-
-/** Status do cadastro de cliente inativado (client-service, `inactivate`). */
-const CLIENT_INACTIVE_STATUS = "Inativo";
 
 /**
  * Janela de elegibilidade da carteira na competência: entrada até o fim do mês, saída e
@@ -609,13 +611,22 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         statements: result[2].count,
         closings: result[3].count,
       };
-      await auditCreate(
-        audit,
-        auth,
-        CONTROL_AUDIT_REFERRING,
-        String(input.clientId),
-        "Restaurar competência contábil",
-      );
+      // Mesmo objeto do arquivamento (o controle), com as contagens: é o que o histórico
+      // documental da Triagem lê.
+      const restored = await prisma.controlContabil.findFirst({
+        where: identity,
+        select: { id: true },
+      });
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Restaurar competência contábil",
+        referring: CONTROL_AUDIT_REFERRING,
+        referringId: String(restored?.id ?? input.clientId),
+        oldData: null,
+        updatedData: counts,
+      });
       return counts;
     },
   };
@@ -1232,7 +1243,14 @@ export function createDocumentsService(
           regime: true,
           triageMonthlys: {
             where: monthlyScope,
-            select: { id: true, checklist: true, item_notes: true },
+            select: {
+              id: true,
+              checklist: true,
+              item_notes: true,
+              billing_amount: true,
+              justification: true,
+              notes: true,
+            },
             take: 1,
           },
           triageCompetences: {
@@ -1316,6 +1334,9 @@ export function createDocumentsService(
                   id: monthly.id,
                   checklist: checklist(monthly.checklist, fiscalFields),
                   item_notes: itemNotes(monthly.item_notes, fiscalFields),
+                  billing_amount: monthly.billing_amount ?? null,
+                  justification: monthly.justification ?? null,
+                  notes: monthly.notes ?? null,
                 }
               : null,
           };
@@ -2028,6 +2049,14 @@ export function createReportingService(
       controlContabil: ReportingDelegate;
       responsibleContabil: ReportingDelegate;
       relationshipContabil: ReportingDelegate;
+      client: ReportingDelegate;
+      clientCloud: ReportingDelegate;
+      triageMonthly: ReportingDelegate;
+      triageResponsible: ReportingDelegate;
+      triageCompetence: ReportingDelegate;
+      triageConfig: ReportingDelegate;
+      triageCatalogItem: ReportingDelegate;
+      user: ReportingDelegate;
     };
     source: string;
     organizationId: string;
@@ -2038,6 +2067,22 @@ export function createReportingService(
     const allowed = getContabilReportingFields(input.source as never);
     if (input.fields.some((field) => !allowed.includes(field)))
       throw new ServiceError(403, "Campo não publicado para relatórios.");
+    if (isTriageReportingSource(input.source)) {
+      return extractTriageReportingPage(
+        {
+          clients: input.prisma.client,
+          clouds: input.prisma.clientCloud,
+          monthly: input.prisma.triageMonthly,
+          responsibles: input.prisma.responsibleContabil,
+          assignments: input.prisma.triageResponsible,
+          competences: input.prisma.triageCompetence,
+          configs: input.prisma.triageConfig,
+          catalogItems: input.prisma.triageCatalogItem,
+          users: input.prisma.user,
+        },
+        { ...input, source: input.source },
+      );
+    }
     const delegate =
       input.source === "contabil.control"
         ? input.prisma.controlContabil

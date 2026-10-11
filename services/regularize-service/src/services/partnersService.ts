@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { CreatePartnerBody, UpdatePartnerBody } from "../schemas/partners.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 import type { RegularizeReconciliationService } from "./regularizeReconciliationService.js";
@@ -29,6 +29,11 @@ const partnerListSelect = {
 function startOfTodayUtc(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+// Vínculo societário vigente: sem saída, ou com saída de hoje em diante.
+export function currentPartnerBondWhere(): Pick<Prisma.PartnersWhereInput, "OR"> {
+  return { OR: [{ exit: null }, { exit: { gte: startOfTodayUtc() } }] };
 }
 
 export class PartnersService {
@@ -218,7 +223,7 @@ export class PartnersService {
       where: {
         organization_id: organizationId,
         pj_id: pjId,
-        OR: [{ exit: null }, { exit: { gte: startOfTodayUtc() } }],
+        ...currentPartnerBondWhere(),
         ...(ignoreId ? { id: { not: ignoreId } } : {}),
       },
       _sum: { part: true },
