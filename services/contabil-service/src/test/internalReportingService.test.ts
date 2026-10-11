@@ -10,12 +10,13 @@ describe("InternalReportingService", () => {
   it("extrai somente campos publicados na organização do grant e identifica corte", async () => {
     const controls = {
       findMany: vi.fn().mockResolvedValue([
-        { competence: "2026-01", monthly_closing: true },
-        { competence: "2026-02", monthly_closing: false },
-        { competence: "2026-03", monthly_closing: true },
+        { id: "1", client_id: "a", competence: "2026-01", monthly_closing: true },
+        { id: "2", client_id: "a", competence: "2026-02", monthly_closing: false },
+        { id: "3", client_id: "a", competence: "2026-03", monthly_closing: true },
       ]),
     };
-    const service = new InternalReportingService({ controlContabil: controls } as never);
+    const client = { findMany: vi.fn() };
+    const service = new InternalReportingService({ controlContabil: controls, client } as never);
 
     await expect(
       service.extract({
@@ -31,18 +32,23 @@ describe("InternalReportingService", () => {
       ],
       reachedLimit: true,
     });
+    // Só o controle vigente: o arquivado fica no histórico.
     expect(controls.findMany).toHaveBeenCalledWith({
-      where: { organization_id: ORG_A },
-      select: { competence: true, monthly_closing: true },
+      where: { organization_id: ORG_A, archived_at: null },
+      select: { id: true, client_id: true, competence: true, monthly_closing: true },
+      orderBy: { id: "asc" },
+      skip: 0,
       take: 3,
     });
+    // Sem campo de cliente pedido, a tabela de clientes não é lida.
+    expect(client.findMany).not.toHaveBeenCalled();
   });
 
-  it("recusa chaves e texto sensível que não são campos de relatório", async () => {
+  it("recusa chaves e colunas internas que não são campos de relatório", async () => {
     const controls = { findMany: vi.fn() };
     const service = new InternalReportingService({ controlContabil: controls } as never);
 
-    for (const field of ["client_id", "id", "notes"]) {
+    for (const field of ["client_id", "id", "organization_id", "archived_at"]) {
       await expect(
         service.extract({
           organizationId: ORG_A,

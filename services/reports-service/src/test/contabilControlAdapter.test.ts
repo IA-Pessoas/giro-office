@@ -33,12 +33,19 @@ describe("ContabilControlAdapter", () => {
       sourceTimeoutMs: 100,
     });
 
-    expect(adapter.sources[0]?.fields.map((field) => field.key)).toEqual(
-      expect.arrayContaining(["competence", "monthly_closing", "reconcile_bank_statements"]),
+    const fields = adapter.sources[0]?.fields.map((field) => field.key) ?? [];
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        "competence",
+        "completion_percent",
+        "monthly_closing",
+        "reconcile_bank_statements",
+        "notes",
+      ]),
     );
-    expect(adapter.sources[0]?.fields.map((field) => field.key)).not.toEqual(
-      expect.arrayContaining(["client_id", "id", "notes"]),
-    );
+    for (const internal of ["client_id", "id", "organization_id", "archived_at"]) {
+      expect(fields).not.toContain(internal);
+    }
 
     await expect(
       adapter.preview({

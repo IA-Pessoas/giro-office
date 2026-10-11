@@ -64,6 +64,7 @@ export class InternalReportingService {
         {
           clients: this.prisma.client,
           clouds: this.prisma.clientClouds,
+          control: this.prisma.controlContabil,
           monthly: this.prisma.triageMonthly,
           responsibles: this.prisma.responsibleContabil,
           assignments: this.prisma.triageResponsible,
@@ -76,11 +77,7 @@ export class InternalReportingService {
       );
     }
 
-    const delegate =
-      input.source === "contabil.control"
-        ? this.prisma.controlContabil
-        : this.prisma.relationshipContabil;
-    const rows = await delegate.findMany({
+    const rows = await this.prisma.relationshipContabil.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
       ...(input.offset !== undefined

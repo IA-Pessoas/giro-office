@@ -2072,6 +2072,7 @@ export function createReportingService(
         {
           clients: input.prisma.client,
           clouds: input.prisma.clientCloud,
+          control: input.prisma.controlContabil,
           monthly: input.prisma.triageMonthly,
           responsibles: input.prisma.responsibleContabil,
           assignments: input.prisma.triageResponsible,
@@ -2083,11 +2084,7 @@ export function createReportingService(
         { ...input, source: input.source },
       );
     }
-    const delegate =
-      input.source === "contabil.control"
-        ? input.prisma.controlContabil
-        : input.prisma.relationshipContabil;
-    const rows = await delegate.findMany({
+    const rows = await input.prisma.relationshipContabil.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
       ...(input.offset !== undefined ? { skip: input.offset, orderBy: { id: "asc" } } : {}),

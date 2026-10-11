@@ -1,7 +1,10 @@
 import {
   CLIENT_INACTIVE_STATUS,
+  CONTABIL_CONTROL_REPORTING_SOURCES,
+  CONTABIL_CONTROL_STEP_FIELDS,
   CONTABIL_RESPONSIBLES_REPORTING_SOURCES,
   CONTABIL_TRIAGE_REPORTING_SOURCES,
+  type ContabilControlReportingSource,
   type ContabilResponsiblesReportingSource,
   type ContabilTriageReportingSource,
   normalizeTriageDocumentStatus,
@@ -21,6 +24,7 @@ type TriageReportingDelegate = {
 export type TriageReportingPrisma = {
   clients: TriageReportingDelegate;
   clouds: TriageReportingDelegate;
+  control: TriageReportingDelegate;
   monthly: TriageReportingDelegate;
   responsibles: TriageReportingDelegate;
   assignments: TriageReportingDelegate;
@@ -59,10 +63,26 @@ type RowSource = {
 };
 type RowSourceKey =
   | Exclude<ContabilTriageReportingSource, "contabil.triage_sgq">
+  | ContabilControlReportingSource
   | ContabilResponsiblesReportingSource;
 // Nenhuma área esconde cliente inativado (`deletion_date` é a data da inativação): status e
 // data de inativação são campos, e o filtro é de quem monta o relatório.
 const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
+  // Uma linha por cliente e competência: o controle vigente; o arquivado fica no histórico.
+  "contabil.control": {
+    delegate: "control",
+    where: { archived_at: null },
+    columns: {
+      competence: "competence",
+      notes: "notes",
+      ...Object.fromEntries(CONTABIL_CONTROL_STEP_FIELDS.map((step) => [step, step])),
+    },
+    derived: {
+      columns: CONTABIL_CONTROL_STEP_FIELDS,
+      fields: ["completion_percent", "completed_steps"],
+      values: controlProgress,
+    },
+  },
   // Uma linha por cliente do Contábil, como o relatório legado: quem não tem responsável
   // cadastrado sai com os nomes em branco. O cadastro é o mesmo de onde as áreas da Triagem
   // leem "cliente com movimento".
@@ -172,6 +192,16 @@ function accountingMetric(checklist: unknown): Row {
     completed_items: completed,
     applicable_items: applicable,
     completion_percent: applicable ? Math.round((completed / applicable) * 10_000) / 100 : null,
+  };
+}
+
+/** Andamento do Controle Contábil: etapas concluídas sobre as 17 da rotina, como no legado. */
+function controlProgress(row: Row): Row {
+  const completed = CONTABIL_CONTROL_STEP_FIELDS.filter((step) => row[step] === true).length;
+  return {
+    completed_steps: completed,
+    completion_percent:
+      Math.round((completed / CONTABIL_CONTROL_STEP_FIELDS.length) * 10_000) / 100,
   };
 }
 
@@ -300,13 +330,18 @@ async function extractSgqPage(
   };
 }
 
-type ClientReportingSource = ContabilTriageReportingSource | ContabilResponsiblesReportingSource;
+type ClientReportingSource =
+  | ContabilTriageReportingSource
+  | ContabilControlReportingSource
+  | ContabilResponsiblesReportingSource;
 
-/** Áreas que este extrator monta: as da Triagem e os responsáveis do Contábil. */
+/** Áreas que este extrator monta: as da Triagem, o Controle e os responsáveis do Contábil. */
 export function isClientReportingSource(source: string): source is ClientReportingSource {
-  return [...CONTABIL_TRIAGE_REPORTING_SOURCES, ...CONTABIL_RESPONSIBLES_REPORTING_SOURCES].some(
-    (candidate) => candidate === source,
-  );
+  return [
+    ...CONTABIL_TRIAGE_REPORTING_SOURCES,
+    ...CONTABIL_CONTROL_REPORTING_SOURCES,
+    ...CONTABIL_RESPONSIBLES_REPORTING_SOURCES,
+  ].some((candidate) => candidate === source);
 }
 
 function byClient(rows: readonly Row[]): Map<string, Row[]> {
@@ -340,10 +375,10 @@ function inheritedResponsible(
 }
 
 /**
- * Página das áreas da Triagem na Central de Relatórios. A linha é o cliente em
+ * Página das áreas da Triagem e do Contábil na Central de Relatórios. A linha é o cliente em
  * `contabil.triage_clouds` e em `contabil.responsibles` (só os do Contábil), a atribuição
- * atual em `contabil.triage_responsibles`, o mês em `contabil.triage_sgq` e a rotina mensal
- * nas demais. Quem chama já validou os campos contra o catálogo; a organização vem do grant
+ * atual em `contabil.triage_responsibles`, o controle do mês em `contabil.control`, o mês em
+ * `contabil.triage_sgq` e a rotina mensal nas demais. Quem chama já validou os campos contra o catálogo; a organização vem do grant
  * e limita todas as consultas.
  */
 export async function extractTriageReportingPage(

@@ -87,9 +87,15 @@ describe("internal reporting routes", () => {
       .expect(200);
 
     expect(response.body.data.sources[0].key).toBe("contabil.control");
-    expect(
-      response.body.data.sources[0].fields.map((field: { key: string }) => field.key),
-    ).not.toEqual(expect.arrayContaining(["client_id", "id", "notes"]));
+    const controlFields: string[] = response.body.data.sources[0].fields.map(
+      (field: { key: string }) => field.key,
+    );
+    expect(controlFields).toEqual(
+      expect.arrayContaining(["competence", "completion_percent", "monthly_closing", "notes"]),
+    );
+    for (const internal of ["client_id", "id", "organization_id", "archived_at"]) {
+      expect(controlFields).not.toContain(internal);
+    }
 
     const relationship = response.body.data.sources.find(
       (source: { key: string }) => source.key === "contabil.relationship",
