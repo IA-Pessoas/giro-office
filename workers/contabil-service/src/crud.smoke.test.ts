@@ -474,6 +474,35 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     );
   });
 
+  it("histórico documental: lê a auditoria do cliente e devolve todo evento contado", async () => {
+    // A auditoria é de outro serviço (AUDIT_SERVICE é stub): os eventos entram direto no banco.
+    const event = (changes: Record<string, unknown>) =>
+      smokeInsert("audit_requests", {
+        id: randomUUID(),
+        request_id: `smoke-${randomUUID()}`,
+        action: "Configurar prioridade e meio de envio fiscal",
+        referring: "triagem.configs",
+        referring_id: clientId,
+        changes_json: JSON.stringify(changes),
+      });
+    const changed = await event({ priority: { from: false, to: true } });
+    const stampOnly = await event({ updated_at: { from: "a", to: "b" } });
+    await event({});
+
+    const history = expectOk(
+      await call("GET", `/triagem/documents/history?client_id=${clientId}&pageSize=100`),
+      "GET documents/history",
+    ).data;
+    const items = history.items as Array<{ id: string; changes: unknown[] }>;
+    // Evento sem campo exibível conta e aparece, sem alterações; `{}` fica fora dos dois.
+    expect(history.total).toBe(items.length);
+    expect(items.find((item) => item.id === changed.id)?.changes).toEqual([
+      { field: "priority", from: false, to: true },
+    ]);
+    expect(items.find((item) => item.id === stampOnly.id)?.changes).toEqual([]);
+    expect(items.filter((item) => item.changes.length === 0)).toHaveLength(1);
+  });
+
   it("pendências documentais fiscais: cria da competência, faturamento e método de entrega", async () => {
     expectOk(
       await call("GET", `/triagem/editability?client_id=${clientId}&type=FISCAL`),
