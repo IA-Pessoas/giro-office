@@ -340,6 +340,48 @@ describe("listTriageDocumentHistory", () => {
     expect(prisma.auditRequest.findMany).not.toHaveBeenCalled();
   });
 
+  it("devolve todo evento contado: sem campo exibível, o evento sai sem alterações", async () => {
+    const prisma = database();
+    const noDisplayable = [
+      // Só carimbos.
+      { updated_at: { from: "2026-09-01T00:00:00.000Z", to: "2026-09-13T08:00:00.000Z" } },
+      // Regravação sem mudança: o JSON vem inteiro no evento, igual dos dois lados.
+      {
+        checklist: { from: { sped_fiscal: "PENDING" }, to: { sped_fiscal: "PENDING" } },
+        notes: { from: null, to: "" },
+      },
+    ].map((changes_json, index) => ({
+      id: `event-sem-campo-${index}`,
+      user_id: USER,
+      created_at: new Date("2026-09-13T08:00:00.000Z"),
+      action: "Atualizar pendência documental",
+      referring: "triagem.monthly",
+      referring_id: MONTHLY,
+      changes_json,
+    }));
+    const events = [...noDisplayable, ...prisma.events];
+    prisma.auditRequest.findMany.mockResolvedValue(events);
+    prisma.auditRequest.count.mockResolvedValue(events.length);
+
+    const result = await listTriageDocumentHistory(prisma, {
+      organizationId: ORG,
+      clientId: CLIENT,
+      page: 1,
+      pageSize: 20,
+    });
+
+    // A paginação é da consulta: o que conta no total está na página.
+    expect(result.total).toBe(5);
+    expect(result.items.map((item) => item.id)).toEqual(events.map((event) => event.id));
+    expect(result.items[0]).toMatchObject({
+      actor: { id: USER, name: "Ana Souza" },
+      action: "Atualizar pendência documental",
+      object: { kind: "triagem.monthly", client_name: "Alfa Comércio Ltda", competence: "2026-09" },
+      changes: [],
+    });
+    expect(result.items[1].changes).toEqual([]);
+  });
+
   it("mostra configuração (auditada pelo cliente) e arquivamento da competência (auditado no controle)", async () => {
     const prisma = database();
     prisma.auditRequest.findMany.mockResolvedValue([

@@ -314,38 +314,37 @@ export async function listTriageDocumentHistory(
   return {
     ...echo,
     total,
-    // ponytail: evento sem campo exibível (só carimbos) sai da página mas conta no total,
-    // como no histórico do Controle; filtrar no SQL exige filtro por chave JSON.
-    items: events
-      .map((event) => {
-        const object = objects.get(`${event.referring}:${event.referring_id}`);
-        return {
-          id: event.id,
-          at: new Date(event.created_at as string).toISOString(),
-          actor: event.user_id
-            ? { id: event.user_id, name: userNames.get(event.user_id) ?? null }
-            : null,
-          action: event.action ?? null,
-          object: {
-            kind: event.referring,
-            client_id: object?.client_id ?? null,
-            client_name: clientNames.get(object?.client_id) ?? null,
-            competence: object?.competence ?? null,
-            routine_type: object?.type ?? null,
-          },
-          changes: (changesOf.get(event.id) ?? []).map((change) => {
-            const kind = catalogKind(change.field);
-            // Código sem item no catálogo e usuário de fora da organização saem como estão.
-            const display = (value: Scalar) =>
-              (change.field === "responsible_id"
-                ? userNames.get(value)
-                : kind
-                  ? catalogLabels.get(`${kind}:${value}`)
-                  : undefined) ?? value;
-            return { ...change, from: display(change.from), to: display(change.to) };
-          }),
-        };
-      })
-      .filter((item) => item.changes.length > 0),
+    // Evento sem campo exibível (só carimbos, ou regravação sem mudança) sai com `changes`
+    // vazio: tirá-lo daqui desalinha a página do total, e tirá-lo na consulta não dá, porque
+    // "exibível" depende de comparar anterior e novo já normalizados (`triageDocumentChanges`).
+    items: events.map((event) => {
+      const object = objects.get(`${event.referring}:${event.referring_id}`);
+      return {
+        id: event.id,
+        at: new Date(event.created_at as string).toISOString(),
+        actor: event.user_id
+          ? { id: event.user_id, name: userNames.get(event.user_id) ?? null }
+          : null,
+        action: event.action ?? null,
+        object: {
+          kind: event.referring,
+          client_id: object?.client_id ?? null,
+          client_name: clientNames.get(object?.client_id) ?? null,
+          competence: object?.competence ?? null,
+          routine_type: object?.type ?? null,
+        },
+        changes: (changesOf.get(event.id) ?? []).map((change) => {
+          const kind = catalogKind(change.field);
+          // Código sem item no catálogo e usuário de fora da organização saem como estão.
+          const display = (value: Scalar) =>
+            (change.field === "responsible_id"
+              ? userNames.get(value)
+              : kind
+                ? catalogLabels.get(`${kind}:${value}`)
+                : undefined) ?? value;
+          return { ...change, from: display(change.from), to: display(change.to) };
+        }),
+      };
+    }),
   };
 }
