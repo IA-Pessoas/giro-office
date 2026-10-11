@@ -72,7 +72,9 @@ for (const source of reportingSources.filter(
   (source) =>
     source.key !== "rh.attendance" &&
     source.key !== "marketing.budgets" &&
-    source.key !== "integracao.client_groups",
+    source.key !== "integracao.client_groups" &&
+    // Uma linha por mês, calculada: coberta em contabil-service/triageReportingService.test.ts.
+    source.key !== "contabil.triage_sgq",
 )) {
   describe(source.key, () => {
     it("orders the entire authorized set before the output cap", async () => {

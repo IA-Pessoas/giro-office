@@ -32,6 +32,7 @@ const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
   contabil: "Contábil",
   pessoal: "Pessoal",
   triagem: "Triagem",
+  regularize: "Regularize",
 };
 
 interface DepartmentAgendaSectionProps {

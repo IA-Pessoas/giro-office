@@ -199,6 +199,21 @@ describe("matriz de regressão das políticas modulares", () => {
     }
   });
 
+  // #1747: o Regularize entra na agenda compartilhada com os níveis do próprio módulo.
+  it("libera a agenda compartilhada para o Regularize: leitura no nível 1, escrita no 2", () => {
+    const read = requiredRoutePolicy("GET", "/task/agenda");
+
+    expect(canAccessRoute(authContext({ modules: { regularize: 1 } }), read)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { regularize: 0 } }), read)).toBe(false);
+
+    for (const method of ["POST", "PUT", "DELETE"]) {
+      const write = requiredRoutePolicy(method, "/task/agenda");
+
+      expect(canAccessRoute(authContext({ modules: { regularize: 2 } }), write)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { regularize: 1 } }), write)).toBe(false);
+    }
+  });
+
   it("deixa a atribuição de Triagem decidir a escrita no serviço", () => {
     const policy = requiredRoutePolicy("PATCH", "/triagem/monthly/monthly-1/item");
 

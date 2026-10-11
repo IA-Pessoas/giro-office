@@ -356,4 +356,69 @@ describe("AgendaService", () => {
       expect(prisma.agenda.create).not.toHaveBeenCalled();
     });
   });
+
+  // O Regularize usa a mesma agenda, no recorte do seu departamento (#1747).
+  describe("Regularize", () => {
+    const TRIAGEM = "dep-triagem";
+    const REGULARIZE = "dep-regularize";
+    const regularize = { ...editor, module: "regularize" } as const;
+
+    function setupRegularize() {
+      const context = setup();
+      context.prisma.department.findMany.mockResolvedValue([
+        { id: REGULARIZE, name: "Regularize" },
+        { id: TRIAGEM, name: "Triagem" },
+      ]);
+      return context;
+    }
+
+    it("lista e cria só no departamento Regularize da organização", async () => {
+      const { prisma, service } = setupRegularize();
+
+      await service.list({ ...regularize, level: 1 }, "2026-12");
+      await service.create(regularize, event);
+
+      expect(prisma.agenda.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organization_id: ORG,
+            department_control_id: { in: [REGULARIZE] },
+          }),
+        }),
+      );
+      expect(prisma.agenda.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            organization_id: ORG,
+            department_control_id: REGULARIZE,
+          }),
+        }),
+      );
+    });
+
+    it("recusa departamento de outro módulo e evento fora do seu recorte", async () => {
+      const { prisma, service } = setupRegularize();
+      prisma.agenda.findFirst.mockResolvedValue(null);
+      prisma.agenda.updateMany.mockResolvedValue({ count: 0 });
+      prisma.agenda.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.create(regularize, { ...event, department_id: TRIAGEM }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      await expect(service.update(regularize, "alheio", event)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+      await expect(service.remove(regularize, "alheio")).rejects.toMatchObject({ statusCode: 404 });
+      expect(prisma.agenda.create).not.toHaveBeenCalled();
+      // Edição e remoção filtram pela organização e pelo departamento, nunca só pelo ID.
+      for (const mutation of [prisma.agenda.updateMany, prisma.agenda.deleteMany]) {
+        for (const [args] of mutation.mock.calls) {
+          expect(args.where).toMatchObject({
+            organization_id: ORG,
+            department_control_id: { in: [REGULARIZE] },
+          });
+        }
+      }
+    });
+  });
 });

@@ -4,7 +4,7 @@ export const AGENDA_STATUSES = ["Pendente", "Realizado", "Cancelado"] as const;
 export type AgendaStatus = (typeof AGENDA_STATUSES)[number];
 
 /** Módulo cujo departamento filtra a agenda compartilhada. */
-export type AgendaModule = "contabil" | "pessoal" | "triagem";
+export type AgendaModule = "contabil" | "pessoal" | "triagem" | "regularize";
 
 export interface AgendaEvent {
   id: string;

@@ -10,6 +10,16 @@ export const TRIAGE_DOCUMENT_STATUSES = [
 
 export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
 
+/** Rótulo de cada estado fora da tela (relatórios e exportações); o app tem os seus. */
+export const TRIAGE_DOCUMENT_STATUS_LABELS: Readonly<Record<TriageDocumentStatus, string>> = {
+  PENDING: "Pendente",
+  COMPLETED: "Concluído",
+  ATTENTION: "Atenção",
+  UNDER_REVIEW: "Em revisão",
+  NOT_PRESENT: "Não possui",
+  NOT_APPLICABLE: "Não aplicável",
+};
+
 /**
  * Status que ainda pendem: PENDING aguarda o documento; ATTENTION e UNDER_REVIEW aguardam
  * conferência. NOT_PRESENT e NOT_APPLICABLE não pendem.
@@ -19,6 +29,26 @@ export const TRIAGE_PENDING_DOCUMENT_STATUSES = [
   "ATTENTION",
   "UNDER_REVIEW",
 ] as const satisfies readonly TriageDocumentStatus[];
+
+/**
+ * Status do cadastro de cliente inativado (client-service, `inactivate`), que também grava
+ * `deletion_date` com a data da inativação.
+ */
+export const CLIENT_INACTIVE_STATUS = "Inativo";
+
+/** Itens do checklist da rotina contábil da Triagem. */
+export const TRIAGE_ACCOUNTING_CHECKLIST_FIELDS = [
+  "financial_transactions",
+  "triaged_transactions",
+  "inventory_control",
+  "accounts_payable_report",
+  "accounts_receivable_report",
+  "card_statements",
+  "loan_agreements",
+  "bank_reconciliation",
+  "bank_investments",
+  "card_sales_report",
+] as const;
 
 /** Itens do checklist da rotina fiscal da Triagem. */
 export const TRIAGE_FISCAL_CHECKLIST_FIELDS = [
