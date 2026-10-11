@@ -99,6 +99,11 @@ export function ContabilHistoryPanel<
               {describeEntry ? (
                 <p className="text-gray-600 dark:text-slate-400">{describeEntry(entry)}</p>
               ) : null}
+              {entry.changes.length === 0 ? (
+                <p className="text-gray-600 dark:text-slate-400">
+                  Registro salvo sem alteração nos campos exibidos.
+                </p>
+              ) : null}
               <ul className="space-y-0.5 text-gray-700 dark:text-slate-300">
                 {entry.changes.map((change) => (
                   <li key={change.field}>
