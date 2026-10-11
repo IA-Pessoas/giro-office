@@ -1210,6 +1210,75 @@ describe("contabil Worker remainder routes", () => {
     }
   });
 
+  it("extrai os documentos do Contábil de um cliente no período com o estado do checklist", async () => {
+    const routines = [
+      {
+        id: "1",
+        client_id: CLIENT,
+        competence: "2026-08",
+        settlement_date: "2026-09-05T00:00:00.000Z",
+        checklist: { financial_transactions: "COMPLETED" },
+      },
+      { id: "2", client_id: CLIENT, competence: "2026-09", settlement_date: null, checklist: {} },
+      { id: "3", client_id: "other-client", competence: "2026-09", checklist: {} },
+    ];
+    const prisma = {
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            routines.slice(skip, skip + take),
+          ),
+      },
+      client: { findMany: vi.fn().mockResolvedValue([{ id: CLIENT, cpf_cnpj: "11222333000181" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.documents",
+      fields: ["competence", "financial_transactions", "settlement_date"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+          { field: "competence", operator: "gte", parameter: "inicio", value: "2026-09" },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: [...body.fields, "cpf_cnpj"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          { competence: "2026-09", financial_transactions: "Não aplicável", settlement_date: null },
+        ],
+        reachedLimit: false,
+      },
+    });
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
   it("extrai SGQ e métrica Contábil da Triagem na organização do grant", async () => {
     // O SGQ vai até o mês corrente: fixa a data para o intervalo ser o das rotinas.
     vi.useFakeTimers({ now: new Date("2026-01-20T12:00:00.000Z"), toFake: ["Date"] });

@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import type {
+  contabilDocumentsReportingCatalog,
   contabilRelationshipReportingCatalog,
   contabilResponsiblesReportingCatalog,
   contabilTriageReportingCatalog,
@@ -29,6 +30,7 @@ const relations: readonly ReportCatalogRelation[] = [];
 
 export type ContabilReportingCatalog =
   | typeof contabilControlReportingCatalog
+  | typeof contabilDocumentsReportingCatalog
   | typeof contabilRelationshipReportingCatalog
   | typeof contabilResponsiblesReportingCatalog
   | typeof contabilTriageReportingCatalog;

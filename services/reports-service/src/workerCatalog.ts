@@ -5,6 +5,7 @@ import { CertificatePfAdapter } from "./integrations/certificatePfAdapter.js";
 import { CertificatePjAdapter } from "./integrations/certificatePjAdapter.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
+import { ContabilDocumentsAdapter } from "./integrations/contabilDocumentsAdapter.js";
 import { ContabilRelationshipAdapter } from "./integrations/contabilRelationshipAdapter.js";
 import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsiblesAdapter.js";
 import { ContabilTriageAdapter } from "./integrations/contabilTriageAdapter.js";
@@ -39,6 +40,7 @@ export function createEnvSourceAdapters(env: ReportsServiceEnv): ReportSourceAda
     new CertificatePfAdapter(env),
     new CertificatePjAdapter(env),
     new ContabilControlAdapter(env),
+    new ContabilDocumentsAdapter(env),
     new ContabilRelationshipAdapter(env),
     new ContabilResponsiblesAdapter(env),
     new ContabilTriageAdapter(env),

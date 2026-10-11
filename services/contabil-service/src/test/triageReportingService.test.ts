@@ -1421,3 +1421,194 @@ describe("extractTriageReportingPage: Relação Contábil", () => {
     expect(unanswered.rows).toEqual([{ name: "Gama" }]);
   });
 });
+
+describe("extractTriageReportingPage: documentos do Contábil por cliente e período", () => {
+  const routines = [
+    {
+      id: "1",
+      client_id: CLIENT_A,
+      competence: "2026-08",
+      type: "CONTABIL",
+      responsible_id: USER_ANA,
+      justification: null,
+      notes: "Extrato recebido",
+      triad_moviment: true,
+      settlement_date: new Date("2026-09-05T00:00:00.000Z"),
+      checklist: { financial_transactions: "COMPLETED", triaged_transactions: "COMPLETED" },
+      // Item desligado no movimento padrão do cliente.
+      item_notes: { inventory_control: { required: false } },
+    },
+    {
+      id: "2",
+      client_id: CLIENT_A,
+      competence: "2026-09",
+      type: "CONTABIL",
+      responsible_id: null,
+      justification: null,
+      notes: null,
+      settlement_date: null,
+      checklist: { financial_transactions: "PENDING", card_statements: "nao possui" },
+    },
+    {
+      id: "3",
+      client_id: CLIENT_B,
+      competence: "2026-09",
+      type: "CONTABIL",
+      responsible_id: USER_BRUNO,
+      justification: null,
+      notes: null,
+      settlement_date: null,
+      checklist: { financial_transactions: "COMPLETED" },
+    },
+  ];
+  const fields = [
+    "name",
+    "competence",
+    "settlement_date",
+    "financial_transactions",
+    "triaged_transactions",
+    "card_statements",
+    "notes",
+  ];
+
+  it("usa os rótulos da ficha: item desligado, movimento enviado e datas", async () => {
+    const prisma = delegates(routines);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.documents",
+        organizationId: ORG,
+        fields: ["competence", "inventory_control", "sends_movement", "download_date"],
+        limit: 2,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          competence: "2026-08",
+          inventory_control: "Desativado no movimento padrão",
+          sends_movement: true,
+          download_date: undefined,
+        },
+        {
+          competence: "2026-09",
+          inventory_control: "Não aplicável",
+          sends_movement: undefined,
+          download_date: undefined,
+        },
+      ],
+      reachedLimit: true,
+    });
+    expect(prisma.monthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: {
+          id: true,
+          client_id: true,
+          competence: true,
+          triad_moviment: true,
+          download_date: true,
+          checklist: true,
+          item_notes: true,
+        },
+      }),
+    );
+  });
+
+  it("mostra o mesmo estado documental que a grade da Triagem, com a data da baixa", async () => {
+    const prisma = delegates(routines);
+
+    const documents = await extractTriageReportingPage(prisma, {
+      source: "contabil.documents",
+      organizationId: ORG,
+      fields,
+      limit: 2,
+    });
+
+    expect(documents).toEqual({
+      rows: [
+        {
+          name: "Alfa",
+          competence: "2026-08",
+          settlement_date: new Date("2026-09-05T00:00:00.000Z"),
+          financial_transactions: "Concluído",
+          triaged_transactions: "Concluído",
+          card_statements: "Não aplicável",
+          notes: "Extrato recebido",
+        },
+        {
+          name: "Alfa",
+          competence: "2026-09",
+          settlement_date: null,
+          financial_transactions: "Pendente",
+          triaged_transactions: "Não aplicável",
+          card_statements: "Não possui",
+          notes: null,
+        },
+      ],
+      reachedLimit: true,
+    });
+    // O checklist é o da rotina Contábil vigente da Triagem, na organização do grant.
+    expect(prisma.monthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
+
+    // Mesmos itens e estados que a área da Triagem publica para a mesma rotina.
+    const shared = fields.filter((field) => field !== "settlement_date");
+    const triage = await extractTriageReportingPage(prisma, {
+      source: "contabil.triage_accounting_documents",
+      organizationId: ORG,
+      fields: shared,
+      limit: 2,
+    });
+    expect(triage.rows).toEqual(
+      documents.rows.map((row) => Object.fromEntries(shared.map((field) => [field, row[field]]))),
+    );
+  });
+
+  it("filtra por cliente e intervalo de competência com o mesmo total na lista e no resumo", async () => {
+    const prisma = delegates();
+    const database = {
+      $transaction: vi.fn(),
+      // A consulta com critérios pagina com `skip`: devolve a página pedida.
+      triageMonthly: {
+        findMany: vi.fn(async (query: { skip?: number }) => routines.slice(query.skip)),
+      },
+      client: prisma.clients,
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    const filters = [
+      { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+      {
+        field: "competence",
+        operator: "between",
+        parameter: "periodo",
+        value: ["2026-09", "2026-12"],
+      },
+    ];
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.documents",
+      fields: ["competence", "financial_transactions"],
+      limit: 50,
+      query: { filters },
+    });
+    expect(listed.rows).toEqual([{ competence: "2026-09", financial_transactions: "Pendente" }]);
+
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.documents",
+      fields: ["competence"],
+      limit: 50,
+      query: {
+        filters,
+        aggregations: [{ field: "competence", function: "count", alias: "competencias" }],
+      },
+    });
+    expect(totals.rows).toEqual([{ competencias: listed.rows.length }]);
+  });
+});

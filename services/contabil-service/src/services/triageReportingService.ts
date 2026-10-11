@@ -65,6 +65,18 @@ const contabilResponsibleColumns = {
   responsible_name: "person_responsible_id",
   posted_by_name: "posted_by_id",
 };
+// Rotina Contábil vigente da Triagem: o checklist que a grade do painel e a ficha mostram.
+const accountingDocuments: RowSource = {
+  delegate: "monthly",
+  where: { type: "CONTABIL", archived_at: null },
+  columns: { competence: "competence", justification: "justification", notes: "notes" },
+  responsibleColumns: ["responsible_id", "competence", "type"],
+  derived: {
+    columns: ["checklist"],
+    fields: TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
+    values: (row) => statusLabels(row.checklist, TRIAGE_ACCOUNTING_CHECKLIST_FIELDS),
+  },
+};
 // Nenhuma área esconde cliente inativado (`deletion_date` é a data da inativação): status e
 // data de inativação são campos, e o filtro é de quem monta o relatório.
 const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
@@ -145,15 +157,20 @@ const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
       values: fiscalSpecialDocuments,
     },
   },
-  "contabil.triage_accounting_documents": {
-    delegate: "monthly",
-    where: { type: "CONTABIL", archived_at: null },
-    columns: { competence: "competence", justification: "justification", notes: "notes" },
-    responsibleColumns: ["responsible_id", "competence", "type"],
+  "contabil.triage_accounting_documents": accountingDocuments,
+  // O relatório documental do Contábil é a mesma rotina, como a ficha a mostra.
+  "contabil.documents": {
+    ...accountingDocuments,
+    columns: {
+      ...accountingDocuments.columns,
+      sends_movement: "triad_moviment",
+      download_date: "download_date",
+      settlement_date: "settlement_date",
+    },
     derived: {
-      columns: ["checklist"],
+      columns: ["checklist", "item_notes"],
       fields: TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
-      values: (row) => statusLabels(row.checklist, TRIAGE_ACCOUNTING_CHECKLIST_FIELDS),
+      values: recordStatusLabels,
     },
   },
 };
@@ -169,6 +186,22 @@ function statusLabels(checklist: unknown, fields: readonly string[]): Row {
   const statuses = checklistStatuses(checklist, fields);
   return Object.fromEntries(
     fields.map((field, index) => [field, TRIAGE_DOCUMENT_STATUS_LABELS[statuses[index]]]),
+  );
+}
+
+/**
+ * Estado de cada item do checklist Contábil como a ficha mostra: o item desligado no
+ * movimento padrão do cliente tem rótulo próprio.
+ */
+function recordStatusLabels(row: Row): Row {
+  const itemNotes = jsonObject(row.item_notes);
+  return Object.fromEntries(
+    Object.entries(statusLabels(row.checklist, TRIAGE_ACCOUNTING_CHECKLIST_FIELDS)).map(
+      ([field, label]) => [
+        field,
+        jsonObject(itemNotes[field]).required === false ? "Desativado no movimento padrão" : label,
+      ],
+    ),
   );
 }
 
