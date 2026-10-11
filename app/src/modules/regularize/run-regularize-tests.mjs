@@ -2067,3 +2067,10 @@ await runTest("agenda tab mounts the shared department agenda for Regularize (#1
   assert.match(contractSource, /export type AgendaModule = [^;]*"regularize"/);
   assert.match(sectionSource, /regularize: "Regularize"/);
 });
+
+await runTest("regularize tabs wrap instead of scrolling sideways (#1739)", async () => {
+  const page = await readModuleSource("components/RegularizePage.tsx");
+  const nav = page.match(/<nav\s+aria-label="Abas do Regularize"[\s\S]*?<\/nav>/)?.[0] ?? "";
+  assert.match(nav, /<div role="tablist" className="[^"]*\bflex-wrap\b[^"]*">/);
+  assert.doesNotMatch(nav, /min-w-max|overflow-x/);
+});
