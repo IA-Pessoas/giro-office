@@ -11,6 +11,7 @@ const screenshotPath =
   process.env.CONTABIL_BROWSER_SCREENSHOT_PATH ??
   "output/playwright/contabil-portfolio-dashboard.png";
 const agendaScreenshotPath = "output/playwright/contabil-agenda.png";
+const agendaReportScreenshotPath = "output/playwright/issue-1734/agenda-relatorio.png";
 const now = new Date();
 const competence = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 const checklistFields = [
@@ -74,6 +75,7 @@ const agendaEvents = [
     status: "Pendente",
     obs: "Conferir balancete",
     location: null,
+    recurring_agenda_id: "r1000000-0000-4000-8000-000000000001",
   },
 ];
 
@@ -112,7 +114,7 @@ async function runBrowserProof() {
 
     const method = request.method();
     requests.push({
-      method, path: apiPath,
+      method, path: apiPath, query: Object.fromEntries(url.searchParams),
       body: request.headers()["content-type"]?.includes("application/json") ? request.postDataJSON() : null,
     });
     if (method === "POST" && apiPath === "/contabil/contingency") {
@@ -247,6 +249,64 @@ async function runBrowserProof() {
       obs: null,
     });
     await page.screenshot({ path: agendaScreenshotPath, fullPage: true });
+
+    // Relatório por intervalo: os mesmos eventos da tela, com estado e repetição (#1734).
+    await page.getByRole("button", { name: "Imprimir agenda", exact: true }).click();
+    const agendaReport = page.getByRole("article", {
+      name: "Relatório da agenda do departamento Contábil",
+      exact: true,
+    });
+    await expect(agendaReport.getByRole("row")).toHaveCount(4);
+    await expect(
+      agendaReport.getByRole("row", { name: /Fechamento mensal Conferir balancete Pendente Mensal/ }),
+    ).toBeVisible();
+    await expect(
+      agendaReport.getByRole("row", { name: /Entrega da ECD - Realizado -/ }),
+    ).toBeVisible();
+    await expect(agendaReport.getByText("2 eventos", { exact: true })).toBeVisible();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    await expect(agendaReport.getByLabel("De", { exact: true })).toHaveValue(`${competence}-01`);
+    await expect(agendaReport.getByLabel("Até", { exact: true })).toHaveValue(
+      `${competence}-${lastDay}`,
+    );
+    // Intervalo que deixa o dia 20 de fora: o evento sai do relatório sem nova consulta.
+    const agendaListCount = () =>
+      requests.filter((request) => request.method === "GET" && request.path === "/task/agenda").length;
+    const listedBefore = agendaListCount();
+    await agendaReport.getByLabel("Até", { exact: true }).fill(`${competence}-15`);
+    await expect(agendaReport.getByText("1 evento", { exact: true })).toBeVisible();
+    await expect(agendaReport.getByText("Entrega da ECD", { exact: true })).toBeHidden();
+    assert.equal(agendaListCount(), listedBefore);
+    await expect(agendaReport.getByText(/meses futuros do período/)).toBeHidden();
+    await agendaReport.getByLabel("Até", { exact: true }).fill(`${competence}-01`);
+    await agendaReport.getByLabel("De", { exact: true }).fill(`${competence}-02`);
+    await expect(agendaReport.getByText("Intervalo inválido", { exact: true })).toBeVisible();
+    await expect(agendaReport.getByRole("button", { name: "Imprimir", exact: true })).toBeDisabled();
+    await agendaReport.getByLabel("De", { exact: true }).fill(`${competence}-01`);
+    await agendaReport.getByLabel("Até", { exact: true }).fill(`${competence}-${lastDay}`);
+    await expect(agendaReport.getByText("2 eventos", { exact: true })).toBeVisible();
+    // Na impressão só o relatório aparece; os controles de tela ficam de fora.
+    await page.emulateMedia({ media: "print" });
+    await expect(agendaReport.getByRole("heading", { name: "Agenda Contábil", exact: true })).toBeVisible();
+    await expect(agendaReport.getByRole("button", { name: "Imprimir", exact: true })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Novo evento", exact: true })).toBeHidden();
+    // O Dialog é centralizado por `translate`: na impressão o relatório começa no canto da página.
+    const printBox = await agendaReport.evaluate((element) => {
+      const { left, top, width } = element.getBoundingClientRect();
+      return { left, top, width, viewport: window.innerWidth };
+    });
+    assert.deepEqual(printBox, { left: 0, top: 0, width: printBox.viewport, viewport: printBox.viewport });
+    await page.screenshot({ path: agendaReportScreenshotPath, fullPage: true });
+    await page.emulateMedia({ media: "screen" });
+    await page.keyboard.press("Escape");
+    await expect(agendaReport).toBeHidden();
+    assert.ok(
+      requests
+        .filter((request) => request.method === "GET" && request.path === "/task/agenda")
+        .every((request) => request.query?.module === "contabil"),
+    );
+    console.log("PASS relatório da agenda do Contábil filtra por intervalo e imprime só o relatório");
+
     await page.getByRole("button", { name: "Remover Fechamento mensal", exact: true }).click();
     await page.getByRole("button", { name: "Remover", exact: true }).click();
     await expect(page.getByText("Fechamento mensal", { exact: true })).toBeHidden();
