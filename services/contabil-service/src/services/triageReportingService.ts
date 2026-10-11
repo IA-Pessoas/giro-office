@@ -1,12 +1,8 @@
 import {
   CLIENT_INACTIVE_STATUS,
-  CONTABIL_CONTROL_REPORTING_SOURCES,
   CONTABIL_CONTROL_STEP_FIELDS,
-  CONTABIL_RESPONSIBLES_REPORTING_SOURCES,
-  CONTABIL_TRIAGE_REPORTING_SOURCES,
-  type ContabilControlReportingSource,
-  type ContabilResponsiblesReportingSource,
-  type ContabilTriageReportingSource,
+  CONTABIL_REPORTING_SOURCES,
+  type ContabilReportingSource,
   normalizeTriageDocumentStatus,
   TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
   TRIAGE_DOCUMENT_STATUS_LABELS,
@@ -26,6 +22,7 @@ export type TriageReportingPrisma = {
   clouds: TriageReportingDelegate;
   control: TriageReportingDelegate;
   monthly: TriageReportingDelegate;
+  relationships: TriageReportingDelegate;
   responsibles: TriageReportingDelegate;
   assignments: TriageReportingDelegate;
   configs: TriageReportingDelegate;
@@ -45,6 +42,7 @@ const clientColumns = [
   "deletion_date",
   "contabil",
   "fiscal",
+  "segment",
 ];
 const clientFlags = new Set(["contabil", "fiscal"]);
 const serviceLabels: Readonly<Record<string, string>> = { CONTABIL: "Contábil", FISCAL: "Fiscal" };
@@ -61,10 +59,12 @@ type RowSource = {
   /** Campos calculados a partir de uma coluna da linha. */
   derived?: { columns: readonly string[]; fields: readonly string[]; values(row: Row): Row };
 };
-type RowSourceKey =
-  | Exclude<ContabilTriageReportingSource, "contabil.triage_sgq">
-  | ContabilControlReportingSource
-  | ContabilResponsiblesReportingSource;
+type RowSourceKey = Exclude<ContabilReportingSource, "contabil.triage_sgq">;
+// Responsável e responsável pelo lançamento do cadastro de responsáveis do Contábil.
+const contabilResponsibleColumns = {
+  responsible_name: "person_responsible_id",
+  posted_by_name: "posted_by_id",
+};
 // Nenhuma área esconde cliente inativado (`deletion_date` é a data da inativação): status e
 // data de inativação são campos, e o filtro é de quem monta o relatório.
 const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
@@ -90,7 +90,19 @@ const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
     delegate: "clients",
     where: { contabil: true },
     columns: {},
-    userColumns: { responsible_name: "person_responsible_id", posted_by_name: "posted_by_id" },
+    userColumns: contabilResponsibleColumns,
+  },
+  // Uma linha por Relação Contábil, com os estados da ficha.
+  "contabil.relationship": {
+    delegate: "relationships",
+    where: {},
+    columns: { bidding: "bidding", tool: "tool", system: "system", note: "note" },
+    userColumns: contabilResponsibleColumns,
+    derived: {
+      columns: ["bidding", "chart_accounts"],
+      fields: ["bidding_status", "chart_accounts"],
+      values: relationshipStates,
+    },
   },
   "contabil.triage_clouds": { delegate: "clients", where: {}, columns: {} },
   // "Movimento enviado" é da rotina Contábil; a Fiscal não usa o marcador.
@@ -192,6 +204,19 @@ function accountingMetric(checklist: unknown): Row {
     completed_items: completed,
     applicable_items: applicable,
     completion_percent: applicable ? Math.round((completed / applicable) * 10_000) / 100 : null,
+  };
+}
+
+const NOT_SELECTED = "Não selecionado";
+
+/**
+ * Estados da Relação Contábil como a ficha mostra: sem resposta é "Não selecionado"; o texto
+ * livre antigo do plano de contas sai como está.
+ */
+function relationshipStates(row: Row): Row {
+  return {
+    bidding_status: row.bidding === true ? "Sim" : row.bidding === false ? "Não" : NOT_SELECTED,
+    chart_accounts: row.chart_accounts ?? NOT_SELECTED,
   };
 }
 
@@ -330,18 +355,9 @@ async function extractSgqPage(
   };
 }
 
-type ClientReportingSource =
-  | ContabilTriageReportingSource
-  | ContabilControlReportingSource
-  | ContabilResponsiblesReportingSource;
-
-/** Áreas que este extrator monta: as da Triagem, o Controle e os responsáveis do Contábil. */
-export function isClientReportingSource(source: string): source is ClientReportingSource {
-  return [
-    ...CONTABIL_TRIAGE_REPORTING_SOURCES,
-    ...CONTABIL_CONTROL_REPORTING_SOURCES,
-    ...CONTABIL_RESPONSIBLES_REPORTING_SOURCES,
-  ].some((candidate) => candidate === source);
+/** Áreas que o contabil-service publica; este extrator monta todas. */
+export function isContabilReportingSource(source: string): source is ContabilReportingSource {
+  return CONTABIL_REPORTING_SOURCES.some((candidate) => candidate === source);
 }
 
 function byClient(rows: readonly Row[]): Map<string, Row[]> {
@@ -377,14 +393,15 @@ function inheritedResponsible(
 /**
  * Página das áreas da Triagem e do Contábil na Central de Relatórios. A linha é o cliente em
  * `contabil.triage_clouds` e em `contabil.responsibles` (só os do Contábil), a atribuição
- * atual em `contabil.triage_responsibles`, o controle do mês em `contabil.control`, o mês em
- * `contabil.triage_sgq` e a rotina mensal nas demais. Quem chama já validou os campos contra o catálogo; a organização vem do grant
- * e limita todas as consultas.
+ * atual em `contabil.triage_responsibles`, o controle do mês em `contabil.control`, a
+ * relação em `contabil.relationship`, o mês em `contabil.triage_sgq` e a rotina mensal nas
+ * demais. Quem chama já validou os campos contra o catálogo; a organização vem do grant e
+ * limita todas as consultas.
  */
 export async function extractTriageReportingPage(
   prisma: TriageReportingPrisma,
   input: {
-    source: ClientReportingSource;
+    source: ContabilReportingSource;
     organizationId: string;
     fields: readonly string[];
     limit: number;

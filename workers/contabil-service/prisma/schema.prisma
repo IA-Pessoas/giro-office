@@ -15,6 +15,7 @@ model Client {
   cpf_cnpj           String           @default("")
   type               String           @default("PJ")
   regime             String?
+  segment            String?
   competence_entry   DateTime?
   competence_output  DateTime?
   contabil           Boolean?

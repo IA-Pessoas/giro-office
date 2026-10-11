@@ -171,6 +171,25 @@ it.each([
     rows: [{ company_name: "Alfa Ltda" }, { company_name: "Beta Ltda" }],
   },
   {
+    key: "contabil.relationship",
+    columns: ["company_name", "bidding_status", "chart_accounts", "note"],
+    filter: { field: "responsible_name", operator: "eq", value: "Ana Souza" },
+    rows: [
+      {
+        company_name: "Alfa Ltda",
+        bidding_status: "Sim",
+        chart_accounts: "Sim — Jonrick",
+        note: "",
+      },
+      {
+        company_name: "Beta Ltda",
+        bidding_status: "Não selecionado",
+        chart_accounts: "Não selecionado",
+        note: "Sem resposta",
+      },
+    ],
+  },
+  {
     key: "contabil.control",
     columns: ["competence", "completion_percent", "monthly_closing", "notes"],
     filter: { field: "competence", operator: "gte", value: "2026-08" },
