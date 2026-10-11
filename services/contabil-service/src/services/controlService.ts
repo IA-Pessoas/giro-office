@@ -528,13 +528,22 @@ export class ControlService {
       statements: statements.count,
       closings: closings.count,
     };
+    // Mesmo objeto do arquivamento (o controle): é o que o histórico documental da Triagem lê.
+    const restored = await this.prisma.controlContabil.findFirst({
+      where: {
+        organization_id: data.organizationId,
+        client_id: data.clientId,
+        competence: data.competence,
+      },
+      select: { id: true },
+    });
     await this.audit.createLog({
       userId: data.userId,
       organizationId: data.organizationId,
       permission: data.permission ?? null,
       action: "Restaurar competência contábil",
       referring: CONTROL_AUDIT_REFERRING,
-      referringId: data.clientId,
+      referringId: restored?.id ?? data.clientId,
       changes: JSON.stringify({ competence: data.competence, ...result }),
     });
     return result;

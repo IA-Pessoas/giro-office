@@ -2,11 +2,12 @@ import { reportingAggregations } from "./reportingCapabilities.js";
 
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const dateOperators = ["eq", "neq", "gt", "gte", "lt", "lte", "between"] as const;
+const booleanOperators = ["eq", "neq"] as const;
 
 function field(
   key: string,
   label: string,
-  value_type: "string" | "date",
+  value_type: "string" | "boolean" | "date",
   filter_operators: readonly string[],
 ) {
   return {
@@ -45,8 +46,18 @@ export const regularizeProcessReportingCatalog = {
         field("completion_date", "Data de conclusão", "date", dateOperators),
         field("expected_date", "Data prevista", "date", dateOperators),
         field("status", "Status", "string", stringOperators),
-        field("locking_type", "Bloqueio", "string", stringOperators),
+        field("locking_type", "Travamento", "string", stringOperators),
         field("urgency", "Urgência", "string", stringOperators),
+        field("locked", "Travado", "boolean", booleanOperators),
+        field("client_name", "Cliente", "string", stringOperators),
+        field("description", "Descrição", "string", stringOperators),
+        field("observation", "Observação", "string", stringOperators),
+        field("responsible1_name", "Responsável principal", "string", stringOperators),
+        // Os três responsáveis em um texto só: "contém" acha a pessoa em qualquer posição.
+        field("responsible_names", "Responsáveis", "string", stringOperators),
+        // Mês no formato AAAA-MM, para agrupar e filtrar por mês como no legado.
+        field("entry_month", "Mês de entrada", "string", stringOperators),
+        field("completion_month", "Mês de conclusão", "string", stringOperators),
       ],
     },
   ],

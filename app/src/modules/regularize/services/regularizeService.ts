@@ -21,7 +21,21 @@ import type {
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
   RegularizeDashboard,
+  RegularizeDteImport,
+  RegularizeDteImportPayload,
+  RegularizeDteImportsPage,
+  RegularizeDteNotice,
+  RegularizeDteNoticeListFilters,
+  RegularizeDteNoticeReadingPayload,
+  RegularizeDteNoticesPage,
+  RegularizeDteQueryGrid,
+  RegularizeDteQueryListsPayload,
+  RegularizeDteQueryListsResult,
+  RegularizeDteQueryStatusPayload,
+  RegularizeVeriComparison,
   RegularizeGuidance,
+  RegularizeGroupMap,
+  RegularizeGroupMapTreeNode,
   RegularizeGuidanceListFilters,
   RegularizeId,
   RegularizeLicenseDetail,
@@ -41,6 +55,7 @@ import type {
   RegularizePasswordListItem,
   RegularizeProcessDetail,
   RegularizeProcessListFilters,
+  RegularizeSavedGroupMap,
   RegularizeProcessListItem,
   RegularizeSitePasswordDetail,
   RegularizeSitePasswordListFilters,
@@ -61,6 +76,7 @@ import {
   buildRegularizeGuidanceListParams,
   buildRegularizeIdParams,
   buildRegularizeLicenseListParams,
+  buildRegularizeDteNoticeListParams,
   buildRegularizeMunicipalTaxesListParams,
   buildRegularizePartnerListParams,
   buildRegularizePasswordListParams,
@@ -71,6 +87,7 @@ import {
   unwrapRegularizeEnvelope,
   unwrapRegularizePage,
 } from "./regularizeService.contract";
+import { VERI_XLSX_MIME_TYPE } from "../utils/veriComparison";
 
 type RegularizeSitePasswordApiListItem = RegularizeSitePasswordListItem & {
   password?: string | null;
@@ -268,6 +285,30 @@ export const regularizeService = {
     return unwrapRegularizeEnvelope<RegularizePartner>(response.data);
   },
 
+  async getGroupMap(groupId: RegularizeId): Promise<RegularizeGroupMap> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.groupMap(groupId));
+
+    return unwrapRegularizeEnvelope<RegularizeGroupMap>(response.data);
+  },
+
+  async getSavedGroupMap(groupId: RegularizeId): Promise<RegularizeSavedGroupMap | null> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.groupMapSaved(groupId));
+
+    return unwrapRegularizeEnvelope<RegularizeSavedGroupMap | null>(response.data);
+  },
+
+  async saveGroupMap(
+    groupId: RegularizeId,
+    tree: RegularizeGroupMapTreeNode,
+  ): Promise<RegularizeSavedGroupMap> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.groupMapSaved(groupId), { tree });
+
+    return unwrapRegularizeEnvelope<RegularizeSavedGroupMap>(response.data);
+  },
+
   async deletePartner(id: RegularizeId): Promise<{ ok: true }> {
     const api = setupAPIClient();
     const response = await api.delete(REGULARIZE_ENDPOINTS.deletePartner(id));
@@ -293,6 +334,72 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEntity<RegularizeMunicipalTaxesDetail>(response.data);
+  },
+
+  async compareVeri(file: File): Promise<RegularizeVeriComparison> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.veriCompare, file, {
+      headers: { "Content-Type": VERI_XLSX_MIME_TYPE },
+    });
+
+    return unwrapRegularizeEnvelope<RegularizeVeriComparison>(response.data);
+  },
+
+  async importDte(payload: RegularizeDteImportPayload): Promise<RegularizeDteImport> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.dteImport, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteImport>(response.data);
+  },
+
+  async listDteImports(): Promise<RegularizeDteImportsPage> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dteImports);
+
+    return unwrapRegularizeEnvelope<RegularizeDteImportsPage>(response.data);
+  },
+
+  async listDteNotices(filters: RegularizeDteNoticeListFilters): Promise<RegularizeDteNoticesPage> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dteNotices, {
+      params: buildRegularizeDteNoticeListParams(filters),
+    });
+
+    return unwrapRegularizeEnvelope<RegularizeDteNoticesPage>(response.data);
+  },
+
+  async setDteNoticeReading(
+    payload: RegularizeDteNoticeReadingPayload,
+  ): Promise<RegularizeDteNotice> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.dteNoticeReading, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteNotice>(response.data);
+  },
+
+  async getDteQueryGrid(date: string): Promise<RegularizeDteQueryGrid> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dteQueries, { params: { date } });
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryGrid>(response.data);
+  },
+
+  async setDteQueryStatus(
+    payload: RegularizeDteQueryStatusPayload,
+  ): Promise<RegularizeDteQueryStatusPayload> {
+    const api = setupAPIClient();
+    const response = await api.put(REGULARIZE_ENDPOINTS.dteQueryStatus, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryStatusPayload>(response.data);
+  },
+
+  async importDteQueryLists(
+    payload: RegularizeDteQueryListsPayload,
+  ): Promise<RegularizeDteQueryListsResult> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.dteQueryImport, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeDteQueryListsResult>(response.data);
   },
 
   async createMunicipalTax(

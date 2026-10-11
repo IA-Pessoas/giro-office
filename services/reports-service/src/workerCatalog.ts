@@ -7,6 +7,7 @@ import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapte
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
 import { ContabilRelationshipAdapter } from "./integrations/contabilRelationshipAdapter.js";
 import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsiblesAdapter.js";
+import { ContabilTriageAdapter } from "./integrations/contabilTriageAdapter.js";
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
 import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
@@ -19,6 +20,7 @@ import { PessoalUnionsAdapter } from "./integrations/pessoalUnionsAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { RegularizeMunicipalTaxesAdapter } from "./integrations/regularizeMunicipalTaxesAdapter.js";
+import { RegularizePortfolioAdapter } from "./integrations/regularizePortfolioAdapter.js";
 import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
 import { RhAttendanceAdapter } from "./integrations/rhAttendanceAdapter.js";
 import { RhHolidayAdapter } from "./integrations/rhHolidayAdapter.js";
@@ -39,6 +41,7 @@ export function createEnvSourceAdapters(env: ReportsServiceEnv): ReportSourceAda
     new ContabilControlAdapter(env),
     new ContabilRelationshipAdapter(env),
     new ContabilResponsiblesAdapter(env),
+    new ContabilTriageAdapter(env),
     new TaskAdapter(env),
     new ProjectAdapter(env),
     new FiscalIcmsAdapter(env),
@@ -59,6 +62,7 @@ export function createEnvSourceAdapters(env: ReportsServiceEnv): ReportSourceAda
     new TiRequestsAdapter(env),
     new TiStockAdapter(env),
     new RegularizeMunicipalTaxesAdapter(env),
+    new RegularizePortfolioAdapter(env),
   ];
 }
 

@@ -920,11 +920,14 @@ html.dark .ui-input,
     }
 
     .marketing-print-report,
-    .marketing-print-report * {
+    .marketing-print-report *,
+    .print-report,
+    .print-report * {
         visibility: visible !important;
     }
 
-    .marketing-print-report {
+    .marketing-print-report,
+    .print-report {
         position: relative;
         inset: auto;
         width: 100%;
@@ -966,7 +969,8 @@ html.dark .ui-input,
         padding: 0 !important;
     }
 
-    .marketing-print-report * {
+    .marketing-print-report *,
+    .print-report * {
         color: #111827 !important;
         background: transparent !important;
         border-color: #d1d5db !important;
@@ -978,7 +982,8 @@ html.dark .ui-input,
     }
 
     #marketing-event-edition-report section,
-    .marketing-print-report tr {
+    .marketing-print-report tr,
+    .print-report tr {
         break-inside: avoid;
     }
 }

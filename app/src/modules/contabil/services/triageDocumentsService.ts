@@ -11,6 +11,7 @@ import type {
   TriageClosing,
   TriageClosingStatus,
   TriageDocumentField,
+  TriageDocumentHistoryPage,
   TriageFiscalSettings,
   TriageFiscalSpecialConfig,
   TriageMonthlyUpdate,
@@ -143,6 +144,22 @@ export const triageDocumentsService = {
     const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageFiscalSettings, {
       client_id: clientId,
       ...settings,
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getDocumentHistory(filters: {
+    clientId?: string;
+    competence?: ContabilCompetence;
+    page: number;
+    pageSize: number;
+  }): Promise<TriageDocumentHistoryPage> {
+    const response = await setupAPIClient().get("/triagem/documents/history", {
+      params: {
+        ...(filters.clientId ? { client_id: filters.clientId } : {}),
+        ...(filters.competence ? { competence: filters.competence } : {}),
+        page: filters.page,
+        pageSize: filters.pageSize,
+      },
     });
     return unwrapContabilEnvelope(response.data);
   },

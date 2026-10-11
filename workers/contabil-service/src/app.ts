@@ -60,12 +60,17 @@ import {
   listRelationshipHistory,
   type RelationshipHistoryPrisma,
 } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
+import {
+  listTriageDocumentHistory,
+  type TriageDocumentHistoryPrisma,
+} from "../../../services/contabil-service/src/services/triageDocumentHistoryService.js";
 import { createContabilAudit } from "./audit.js";
 import {
   authenticateContabilRequest,
   contabilPermission,
   requireContabilModule,
   requireContabilWrite,
+  requireTriagemAdmin,
   requireTriagemModule,
 } from "./auth.js";
 import type { ContabilWorkerEnv } from "./env.js";
@@ -98,6 +103,7 @@ import {
   statementSchema,
   triageConfigBodySchema,
   triageConfigQuerySchema,
+  triageDocumentHistorySchema,
 } from "./schemas.js";
 import {
   type AuthContext,
@@ -224,6 +230,67 @@ function apiDocsEnabled(env: ContabilWorkerEnv): boolean {
   );
 }
 
+// Rotas que só o Worker serve entram aqui, por cima da spec do serviço Node: cada operação de
+// `openapi/spec.ts` é exigida no manifesto de smoke, que roda contra o serviço Node, onde
+// estas rotas não existem.
+const WORKER_ONLY_OPENAPI_PATHS = {
+  "/triagem/documents/history": {
+    get: {
+      tags: ["Triage Documents"],
+      summary: "Listar histórico documental da Triagem",
+      description:
+        "Lido da auditoria, do mais recente para o mais antigo. Exige `contabil` ou `triagem` >= 1. Sem `client_id` lista a organização inteira e exige `contabil` ou `triagem` >= 3. Com `competence`, ficam de fora Cloud e configuração, que são do cliente. Evento sem campo exibível vem com `changes` vazio.",
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        {
+          name: "client_id",
+          in: "query",
+          required: false,
+          schema: { type: "string", format: "uuid" },
+        },
+        {
+          name: "competence",
+          in: "query",
+          required: false,
+          schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+        },
+        {
+          name: "page",
+          in: "query",
+          required: false,
+          schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 },
+        },
+        {
+          name: "pageSize",
+          in: "query",
+          required: false,
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+        },
+      ],
+      responses: {
+        "200": {
+          description:
+            "Página do histórico: `client_id`, `competence`, `page`, `pageSize`, `total` e `items` (ator, instante, ação, objeto e alterações campo a campo)",
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+          },
+        },
+        "400": { description: "Parâmetros inválidos" },
+        "401": { description: "Não autenticado" },
+        "403": { description: "Sem permissão, ou sem `client_id` por quem não é administrador" },
+        "404": { description: "Cliente não encontrado" },
+      },
+    },
+  },
+};
+
+function workerOpenApiSpec() {
+  const spec = buildContabilServiceOpenApiSpec({ port: 8787 } as Parameters<
+    typeof buildContabilServiceOpenApiSpec
+  >[0]);
+  return { ...spec, paths: { ...spec.paths, ...WORKER_ONLY_OPENAPI_PATHS } };
+}
+
 export function createContabilWorkerApp(options: ContabilOptions = {}) {
   const app = new Hono<ContabilContext>();
 
@@ -241,13 +308,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   });
 
   app.get("/openapi.json", (c) =>
-    apiDocsEnabled(options.env ?? c.env)
-      ? c.json(
-          buildContabilServiceOpenApiSpec({ port: 8787 } as Parameters<
-            typeof buildContabilServiceOpenApiSpec
-          >[0]),
-        )
-      : c.notFound(),
+    apiDocsEnabled(options.env ?? c.env) ? c.json(workerOpenApiSpec()) : c.notFound(),
   );
   app.get("/docs", (c) =>
     apiDocsEnabled(options.env ?? c.env)
@@ -834,6 +895,22 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const body = parseWithZod(cloudUpdateSchema, await readJson(c));
     const data = await withDocuments(c, (service) =>
       service.updateCloud(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/documents/history", async (c) => {
+    const query = parseWithZod(triageDocumentHistorySchema, c.req.query());
+    const auth = c.get("auth");
+    // Sem cliente é a organização inteira: alterações recentes, só para administrador.
+    if (!query.client_id) requireTriagemAdmin(auth);
+    const data = await withPrisma(c, options, (prisma) =>
+      listTriageDocumentHistory(prisma as unknown as TriageDocumentHistoryPrisma, {
+        organizationId: auth.organizationId,
+        ...(query.client_id ? { clientId: query.client_id } : {}),
+        ...(query.competence ? { competence: query.competence } : {}),
+        page: query.page,
+        pageSize: query.pageSize,
+      }),
     );
     return c.json(createSuccessResponse(data));
   });

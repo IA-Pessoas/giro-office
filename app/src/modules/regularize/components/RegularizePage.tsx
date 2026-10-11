@@ -10,8 +10,10 @@ import {
   Download,
   Eye,
   FileKey2,
+  FileSpreadsheet,
   Gavel,
   Landmark,
+  Mail,
   Network,
   Loader2,
   Pencil,
@@ -30,6 +32,7 @@ import {
 import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
+import { DepartmentAgendaSection } from "@modules/contabil";
 import { ClientCatalogPanel } from "@modules/clients/components/ClientCatalogPanel";
 import { ClientGroupsPanel } from "@modules/clients/components/ClientGroupsPanel";
 import { ClientLicitacaoBiddersPanel } from "@modules/clients/components/ClientLicitacaoPanels";
@@ -50,9 +53,14 @@ import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
 import { RegularizeClientPfForm } from "./RegularizeClientPfForm";
 import { RegularizeGuidanceActivityForm } from "./RegularizeGuidanceActivityForm";
+import { RegularizeGroupMap } from "./RegularizeGroupMap";
 import { RegularizeGuidanceForm } from "./RegularizeGuidanceForm";
 import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
 import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
+import { RegularizeDteInbox } from "./RegularizeDteInbox";
+import { RegularizeDtePanel } from "./RegularizeDtePanel";
+import { RegularizeDteQueries } from "./RegularizeDteQueries";
+import { RegularizeVeriComparison } from "./RegularizeVeriComparison";
 import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
@@ -241,7 +249,10 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "passwords", label: "Senhas", icon: FileKey2 },
   { id: "sites", label: "Sites", icon: ShieldCheck },
   { id: "taxes", label: "Tributos", icon: Landmark },
+  { id: "dte", label: "DTE", icon: Mail },
+  { id: "veri", label: "Veri", icon: FileSpreadsheet },
   { id: "groups", label: "Grupos", icon: Network },
+  { id: "agenda", label: "Agenda", icon: CalendarDays },
   { id: "bidders", label: "Licitantes", icon: Gavel },
   { id: "catalogs", label: "Catálogos", icon: Tags },
 ];
@@ -1984,18 +1995,18 @@ export function RegularizePage() {
         aria-label="Abas do Regularize"
         className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
       >
-        <div className="overflow-x-auto u-scrollbar-system">
-          <div role="tablist" className="flex min-w-max items-center justify-center gap-1 md:min-w-full">
-            {REGULARIZE_TABS.map((tab) => (
-              <TabButton
-                key={tab.id}
-                active={activeTab === tab.id}
-                icon={tab.icon}
-                label={tab.label}
-                onClick={() => setActiveTab(tab.id)}
-              />
-            ))}
-          </div>
+        {/* As abas quebram para a linha de baixo quando não cabem: com a rolagem lateral, as
+            últimas ficavam fora da tela em 1440px (#1739). */}
+        <div role="tablist" className="flex flex-wrap items-center justify-center gap-1">
+          {REGULARIZE_TABS.map((tab) => (
+            <TabButton
+              key={tab.id}
+              active={activeTab === tab.id}
+              icon={tab.icon}
+              label={tab.label}
+              onClick={() => setActiveTab(tab.id)}
+            />
+          ))}
         </div>
       </nav>
 
@@ -2920,10 +2931,30 @@ export function RegularizePage() {
 
       {activeTab === "groups" ? (
         // Mesma origem canônica dos grupos da Integração; edição exige Regularize nível 2 (#1742).
-        <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
+        <div className="space-y-4">
+          <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
+          <RegularizeGroupMap canEdit={regularizeAccess.canEdit} />
+        </div>
+      ) : null}
+
+      {activeTab === "agenda" ? (
+        // Sem agenda própria: é o recorte do departamento Regularize na agenda compartilhada (#1747).
+        <DepartmentAgendaSection module="regularize" canEdit={regularizeAccess.canEdit} />
       ) : null}
 
       {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}
+
+      {activeTab === "dte" ? (
+        // Caixa de avisos (#1745), importação (#1744) e consultas diárias (#1746) são fluxos
+        // separados na mesma aba.
+        <div className="space-y-4">
+          <RegularizeDteInbox canEdit={regularizeAccess.canEdit} />
+          <RegularizeDtePanel canEdit={regularizeAccess.canEdit} />
+          <RegularizeDteQueries canEdit={regularizeAccess.canEdit} />
+        </div>
+      ) : null}
+
+      {activeTab === "veri" ? <RegularizeVeriComparison /> : null}
 
       {activeTab === "catalogs" ? (
         // Regimes e segmentos que a ficha Regularize usa; editar exige Regularize nível 2 (#1740, #1741).

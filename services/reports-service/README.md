@@ -112,7 +112,7 @@ internas do catálogo.
 
 ## Critérios executados na origem
 
-Filtros, parâmetros, grupos AND/OR, ordenação e resumos são encaminhados às origens reais. A definição legada aceita `group_by` e `aggregations[].alias` opcionais. A [matriz de 29 áreas e a semântica completa](docs/criteria-origins.md) documentam capacidades, limites, aliases e conjuntos vazios. Não há execução composta nem nova UI nesta predecessora #1023.
+Filtros, parâmetros, grupos AND/OR, ordenação e resumos são encaminhados às origens reais. A definição legada aceita `group_by` e `aggregations[].alias` opcionais. A [matriz de 33 áreas e a semântica completa](docs/criteria-origins.md) documentam capacidades, limites, aliases e conjuntos vazios. Não há execução composta nem nova UI nesta predecessora #1023.
 
 ## Prévia composta
 POST /reports/preview aceita definition com version: 2 e areas. Cada área mantém source e fields e admite filters (field, operator, value), filterLogic (and/or), parameterValues, groupBy, aggregations (field, function) e orderBy (field, direction). Critérios vazios são válidos. A resposta contém blocks independentes com source, label, rows, presentation.columns, limit e hasMore. A validação de todas as áreas precede a extração; falhas não retornam blocos parciais. Não cria execução, histórico ou resultado persistido. A definição legada e sua resposta continuam compatíveis. Resumos retornam apenas grupos e totais; count conta valores não nulos. Ordenação de resumos usa campos agrupados.

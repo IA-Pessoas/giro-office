@@ -47,7 +47,17 @@ Exemplos de paths publicos:
 - `/regularize/pfs`
   - aceita `status`, `search`, `page` e `limit`; retorna uma página com `data`, `total` e `hasMore`.
 - `/regularize/partners`
+- `/regularize/groups/:id/map` - mapa gerado do grupo: cidade, sócio e empresas com vínculo societário vigente
+- `/regularize/groups/:id/map/saved` - lê (GET) ou substitui (PUT) a versão editada do mapa do grupo; gerar de novo não a altera
 - `/regularize/municipal-taxes`
+- `/regularize/dte/import` - importa avisos DTE colados em HTML ou JSON; leitor verificado só com casos sintéticos
+- `/regularize/dte/imports` - importações da organização, com recusas e duplicatas
+- `/regularize/dte/notices` - caixa de avisos importados; sem `from`, últimos 45 dias pela data de emissão do aviso
+- `/regularize/dte/notices/reading` - altera o estado de leitura de um aviso, com registro em `logs`
+- `/regularize/dte/queries?date=aaaa-mm-dd` - grade de consultas diárias ao DTE por cliente
+- `/regularize/dte/queries/status` - marca a consulta de um cliente como feita, não feita ou sem registro, com registro em `logs`
+- `/regularize/dte/queries/import` - registra as consultas do dia pelas listas de CPF/CNPJ feitas e não feitas
+- `/regularize/veri/compare` - compara um XLSX do Veri com a carteira pelo CPF/CNPJ; nada é gravado, por isso basta permissão Regularize 1; leitor verificado só com casos sintéticos
 - `/regularize/process`
 - `/regularize/processes`
 - `/regularize/guidance`
@@ -87,7 +97,7 @@ As rotas internas ficam montadas diretamente no servico sob `/internal` e exigem
 - `POST /internal/reconciliation/client-pf-status/run`
 - `POST /internal/reconciliation/client-pf-documents/run`
 - `GET /internal/reporting/catalog` e `POST /internal/reporting/extract` (fontes `regularize.licenses`,
-  `regularize.processes` e `regularize.municipal_taxes`, somente reports-service, fora do gateway; exigem token e grant de relatório)
+  `regularize.processes`, `regularize.municipal_taxes`, `regularize.clients`, `regularize.client_groups`, `regularize.clients_pf` e `regularize.partners`, somente reports-service, fora do gateway; exigem token e grant de relatório)
 
 ## Reconciliacao agendada
 

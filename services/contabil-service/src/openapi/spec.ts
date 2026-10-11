@@ -1,4 +1,8 @@
-import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
+import {
+  CONTABIL_REPORTING_SOURCES,
+  MAX_REPORTING_QUERY_LIMIT,
+  reportingQueryOpenApiSchema,
+} from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 
@@ -480,7 +484,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   properties: {
                     source: {
                       type: "string",
-                      enum: ["contabil.control", "contabil.responsibles", "contabil.relationship"],
+                      enum: [...CONTABIL_REPORTING_SOURCES],
                     },
                     fields: { type: "array", items: { type: "string" } },
                     limit: {

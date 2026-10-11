@@ -26,58 +26,26 @@ import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { FISCAL_DOCUMENTS, STATUSES } from "./TriageDocumentsSection";
-import { STATUS_LABELS } from "./triageDocumentLabels";
+import {
+  type FiscalTriagePortfolioLabels,
+  fiscalTriagePortfolioCsv,
+  fiscalTriagePortfolioExportTable,
+  fiscalTriageStatusLabel,
+} from "./fiscalTriagePortfolioExport";
 import { CONTABIL_OUTLINE_ACTION_CLASS, CONTABIL_TABLE_FILTER_CLASS } from "./contabilUiClasses";
 
 const PAGE_SIZE = 50;
 
 
-function statusLabel(status: string) {
-  return status === "NOT_STARTED"
-    ? "A configurar"
-    : (STATUS_LABELS[status as TriageDocumentStatus] ?? status);
-}
-
-function csvCell(value: string) {
-  const safe = /^\s*[=+\-@]/.test(value) ? `'${value}` : value;
-  return `"${safe.replaceAll('"', '""')}"`;
-}
-
-type DeliveryLabel = (code: string | null) => string;
-
-function exportTable(rows: FiscalTriagePortfolioItem[], deliveryLabel: DeliveryLabel) {
-  return [
-    [
-      "Empresa",
-      "CNPJ",
-      "Regime",
-      "Responsável",
-      "Prioridade",
-      "Meio de envio",
-      ...FISCAL_DOCUMENTS.map(([, label]) => label),
-    ],
-    ...rows.map((row) => [
-      row.legal_name,
-      row.cpf_cnpj,
-      row.regime ?? "",
-      row.responsible_name ?? "",
-      row.priority ? "Sim" : "Não",
-      deliveryLabel(row.delivery_method),
-      ...FISCAL_DOCUMENTS.map(([field]) => statusLabel(fiscalTriagePortfolioItemStatus(row, field))),
-    ]),
-  ];
-}
-
 function exportCsv(
   competence: string,
   rows: FiscalTriagePortfolioItem[],
-  deliveryLabel: DeliveryLabel,
+  labels: FiscalTriagePortfolioLabels,
 ) {
-  const content = exportTable(rows, deliveryLabel)
-    .map((line) => line.map(csvCell).join(","))
-    .join("\r\n");
   const url = URL.createObjectURL(
-    new Blob(["\uFEFF", content], { type: "text/csv;charset=utf-8" }),
+    new Blob(["\uFEFF", fiscalTriagePortfolioCsv(rows, labels)], {
+      type: "text/csv;charset=utf-8",
+    }),
   );
   const link = document.createElement("a");
   link.href = url;
@@ -89,7 +57,7 @@ function exportCsv(
 function printPortfolio(
   competence: string,
   rows: FiscalTriagePortfolioItem[],
-  deliveryLabel: DeliveryLabel,
+  labels: FiscalTriagePortfolioLabels,
 ) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) return false;
@@ -102,8 +70,11 @@ function printPortfolio(
   const title = printWindow.document.createElement("h1");
   title.textContent = `Triagem Fiscal · ${competence}`;
   printWindow.document.body.append(title);
+  const { columns, body: bodyRows, total } = fiscalTriagePortfolioExportTable(rows, labels);
+  const summary = printWindow.document.createElement("p");
+  summary.textContent = `Total: ${total}`;
+  printWindow.document.body.append(summary);
   const table = printWindow.document.createElement("table");
-  const [columns, ...bodyRows] = exportTable(rows, deliveryLabel);
   const head = printWindow.document.createElement("tr");
   for (const column of columns) {
     const cell = printWindow.document.createElement("th");
@@ -148,6 +119,14 @@ export function FiscalTriagePortfolioSection({
   );
   const deliveryLabel = (code: string | null) =>
     code ? (deliveryLabels.get(code) ?? code) : "Não informado";
+  const justifications = useTriageCatalogs("JUSTIFICATION");
+  const justificationLabels = new Map(
+    (justifications.data ?? []).map((item) => [item.code, item.label]),
+  );
+  const exportLabels: FiscalTriagePortfolioLabels = {
+    delivery: deliveryLabel,
+    justification: (code) => (code ? (justificationLabels.get(code) ?? code) : ""),
+  };
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState("");
   const [actionError, setActionError] = useState("");
@@ -289,7 +268,7 @@ export function FiscalTriagePortfolioSection({
           </div>
           <button
             type="button"
-            onClick={() => exportCsv(competence, filtered, deliveryLabel)}
+            onClick={() => exportCsv(competence, filtered, exportLabels)}
             disabled={!filtered.length}
             className={CONTABIL_OUTLINE_ACTION_CLASS}
           >
@@ -298,7 +277,7 @@ export function FiscalTriagePortfolioSection({
           <button
             type="button"
             onClick={() => {
-              if (!printPortfolio(competence, filtered, deliveryLabel))
+              if (!printPortfolio(competence, filtered, exportLabels))
                 setActionError("Permita a abertura da janela para salvar o PDF.");
             }}
             disabled={!filtered.length}
@@ -532,7 +511,7 @@ export function FiscalTriagePortfolioSection({
                               ))}
                             </select>
                           ) : (
-                            <span className="text-xs">{statusLabel(fiscalTriagePortfolioItemStatus(row, field))}</span>
+                            <span className="text-xs">{fiscalTriageStatusLabel(fiscalTriagePortfolioItemStatus(row, field))}</span>
                           )}
                         </td>
                       ))}

@@ -50,9 +50,18 @@ describe("regularize internal reporting OpenAPI", () => {
     expect(operation.post.security).toEqual([{ internalToken: [] }]);
     expect(operation.post.summary).toContain("processos");
     expect(operation.post.summary).toContain("tributos municipais");
+    expect(operation.post.summary).toContain("carteira");
     expect(
       operation.post.requestBody.content["application/json"].schema.properties.source.enum,
-    ).toEqual(["regularize.licenses", "regularize.processes", "regularize.municipal_taxes"]);
+    ).toEqual([
+      "regularize.licenses",
+      "regularize.processes",
+      "regularize.municipal_taxes",
+      "regularize.clients",
+      "regularize.client_groups",
+      "regularize.clients_pf",
+      "regularize.partners",
+    ]);
     expect(
       operation.post.requestBody.content["application/json"].schema.properties.limit.maximum,
     ).toBe(MAX_REPORTING_QUERY_LIMIT);

@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import type {
   contabilRelationshipReportingCatalog,
   contabilResponsiblesReportingCatalog,
+  contabilTriageReportingCatalog,
 } from "@workspace/shared";
 import {
   contabilControlReportingCatalog,
@@ -29,7 +30,8 @@ const relations: readonly ReportCatalogRelation[] = [];
 export type ContabilReportingCatalog =
   | typeof contabilControlReportingCatalog
   | typeof contabilRelationshipReportingCatalog
-  | typeof contabilResponsiblesReportingCatalog;
+  | typeof contabilResponsiblesReportingCatalog
+  | typeof contabilTriageReportingCatalog;
 
 function getReportSources(catalog: ContabilReportingCatalog): readonly ReportCatalogSource[] {
   return catalog.sources.map(

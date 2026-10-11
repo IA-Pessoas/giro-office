@@ -18,6 +18,7 @@ import { buildRegularizeServiceOpenApiSpec } from "./openapi/spec.js";
 import {
   RegularizeLicenseReportingService,
   RegularizeMunicipalTaxesReportingService,
+  RegularizePortfolioReportingService,
 } from "./reporting/internalReportingService.js";
 import { createRegularizeRoutes } from "./routes/index.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
@@ -64,6 +65,7 @@ export interface CreateAppOptions {
   runClientPfDocumentsReconciliation: () => Promise<Record<string, unknown>>;
   internalReportingService?: RegularizeLicenseReportingService;
   municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService;
+  portfolioReportingService?: RegularizePortfolioReportingService;
   protocolStorage?: LicenseProtocolStorage;
 }
 
@@ -78,6 +80,7 @@ export function createApp({
   runClientPfDocumentsReconciliation,
   internalReportingService: injectedInternalReportingService,
   municipalTaxesReportingService: injectedMunicipalTaxesReportingService,
+  portfolioReportingService: injectedPortfolioReportingService,
   protocolStorage,
 }: CreateAppOptions): express.Express {
   const app = express();
@@ -90,7 +93,8 @@ export function createApp({
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "regularize-service")));
-  app.use(express.json());
+  // 1mb como no gateway: a colagem de DTE (#1744) passa dos 100kb padrão.
+  app.use(express.json({ limit: "1mb" }));
   app.use(requestContext);
 
   app.get("/health", (_request, response) => {
@@ -129,6 +133,9 @@ export function createApp({
       municipalTaxesReportingService:
         injectedMunicipalTaxesReportingService ??
         new RegularizeMunicipalTaxesReportingService(prisma),
+      portfolioReportingService:
+        injectedPortfolioReportingService ??
+        new RegularizePortfolioReportingService(prisma as never),
     }),
   );
 

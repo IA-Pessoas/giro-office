@@ -3,8 +3,15 @@ import {
   type RegularizeLicenseReportingService as RegularizeLicenseReportingServiceType,
   RegularizeMunicipalTaxesReportingService as RegularizeMunicipalTaxesReportingServiceImpl,
   type RegularizeMunicipalTaxesReportingService as RegularizeMunicipalTaxesReportingServiceType,
+  RegularizePortfolioReportingService as RegularizePortfolioReportingServiceImpl,
+  type RegularizePortfolioReportingService as RegularizePortfolioReportingServiceType,
 } from "@workspace/regularize-service/src/reporting/internalReportingService.js";
 import { regularizeMunicipalTaxesReportingCatalog } from "@workspace/regularize-service/src/reporting/regularizeMunicipalTaxesReportingCatalog.js";
+import {
+  REGULARIZE_PORTFOLIO_REPORTING_SOURCES,
+  type RegularizePortfolioReportingSource,
+  regularizePortfolioReportingCatalog,
+} from "@workspace/regularize-service/src/reporting/regularizePortfolioReportingCatalog.js";
 import { regularizeReportingCatalog } from "@workspace/regularize-service/src/reporting/regularizeReportingCatalog.js";
 import {
   clientPfDetailQuerySchema,
@@ -13,6 +20,19 @@ import {
   updateClientPfBodySchema,
 } from "@workspace/regularize-service/src/schemas/clientPf.schemas.js";
 import { regularizeDashboardQuerySchema } from "@workspace/regularize-service/src/schemas/dashboard.schemas.js";
+import {
+  dteQueryGridQuerySchema,
+  importDteBodySchema,
+  importDteQueryListsBodySchema,
+  listDteImportsQuerySchema,
+  listDteNoticesQuerySchema,
+  updateDteNoticeReadingBodySchema,
+  updateDteQueryStatusBodySchema,
+} from "@workspace/regularize-service/src/schemas/dte.schemas.js";
+import {
+  groupMapParamsSchema,
+  parseSaveGroupMapBody,
+} from "@workspace/regularize-service/src/schemas/groupMap.schemas.js";
 import {
   addGuidanceActivityBodySchema,
   addGuidancePartnerBodySchema,
@@ -67,6 +87,10 @@ import {
 } from "@workspace/regularize-service/src/schemas/process.schemas.js";
 import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/schemas/status.schemas.js";
 import { ClientPfService } from "@workspace/regularize-service/src/services/clientPfService.js";
+import { DteImportService } from "@workspace/regularize-service/src/services/dteImportService.js";
+import { DteNoticeService } from "@workspace/regularize-service/src/services/dteNoticeService.js";
+import { DteQueryService } from "@workspace/regularize-service/src/services/dteQueryService.js";
+import { GroupMapService } from "@workspace/regularize-service/src/services/groupMapService.js";
 import {
   GuidanceService,
   type GuidanceService as GuidanceServiceType,
@@ -87,6 +111,11 @@ import {
   RegularizeReconciliationService as RegularizeReconciliationServiceImpl,
   type RegularizeReconciliationService as RegularizeReconciliationServiceType,
 } from "@workspace/regularize-service/src/services/regularizeReconciliationService.js";
+import { VeriComparisonService } from "@workspace/regularize-service/src/services/veriComparisonService.js";
+import {
+  VERI_LIMITS,
+  VERI_XLSX_MIME_TYPE,
+} from "@workspace/regularize-service/src/services/veriWorkbookParser.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   parseWithZod,
@@ -101,6 +130,7 @@ import {
 } from "@workspace/shared/http";
 import type { Context } from "hono";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { assertRegularizeInternalToken, authenticateRegularizeRequest } from "./auth.js";
 import type { RegularizeWorkerEnv } from "./env.js";
@@ -142,6 +172,9 @@ export type RegularizeMunicipalTaxesService = Pick<
   MunicipalTaxesService,
   "create" | "update" | "detail" | "list"
 >;
+export type RegularizeDteImportService = Pick<DteImportService, "importNotices" | "listImports">;
+export type RegularizeDteNoticeService = Pick<DteNoticeService, "list" | "setReading">;
+export type RegularizeDteQueryService = Pick<DteQueryService, "grid" | "setStatus" | "importLists">;
 export type RegularizeClientPfService = Pick<
   ClientPfService,
   "create" | "update" | "detail" | "list"
@@ -150,6 +183,7 @@ export type RegularizePartnersService = Pick<
   PartnersService,
   "create" | "update" | "detail" | "list" | "remove"
 >;
+export type RegularizeGroupMapService = Pick<GroupMapService, "generate" | "getSaved" | "save">;
 export type RegularizePasswordService = Pick<
   PasswordService,
   "create" | "update" | "list" | "detail" | "createSite" | "updateSite" | "listSites" | "detailSite"
@@ -183,20 +217,31 @@ export type RegularizeMunicipalTaxesReportingService = Pick<
   RegularizeMunicipalTaxesReportingServiceType,
   "extract"
 >;
+export type RegularizePortfolioReportingService = Pick<
+  RegularizePortfolioReportingServiceType,
+  "extract"
+>;
+export type RegularizeVeriComparisonService = Pick<VeriComparisonService, "compare">;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
   licenseService?: RegularizeLicenseService;
   processService?: RegularizeProcessService;
   municipalTaxesService?: RegularizeMunicipalTaxesService;
+  dteImportService?: RegularizeDteImportService;
+  dteNoticeService?: RegularizeDteNoticeService;
+  dteQueryService?: RegularizeDteQueryService;
+  veriComparisonService?: RegularizeVeriComparisonService;
   clientPfService?: RegularizeClientPfService;
   partnersService?: RegularizePartnersService;
+  groupMapService?: RegularizeGroupMapService;
   passwordService?: RegularizePasswordService;
   guidanceService?: RegularizeGuidanceService;
   dashboardService?: RegularizeDashboardService;
   reconciliationService?: RegularizeReconciliationService;
   reportingService?: RegularizeLicenseReportingService;
   municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService;
+  portfolioReportingService?: RegularizePortfolioReportingService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -233,6 +278,7 @@ const internalReportingCatalog = {
   sources: [
     ...regularizeReportingCatalog.sources,
     ...regularizeMunicipalTaxesReportingCatalog.sources,
+    ...regularizePortfolioReportingCatalog.sources,
   ],
   relations: [],
 } as const;
@@ -399,6 +445,9 @@ function localService(
   };
 }
 
+const MIN_REGULARIZE_READ_PERMISSION = 1;
+const MIN_REGULARIZE_WRITE_PERMISSION = 2;
+
 export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
   const app = new Hono<RegularizeWorkerContext>();
   app.get("/health", (c) =>
@@ -455,6 +504,33 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new MunicipalTaxesService(client as never)),
     );
   };
+  const withDteQueryService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeDteQueryService) => Promise<T>,
+  ) => {
+    if (options.dteQueryService) return callback(options.dteQueryService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new DteQueryService(client as never)),
+    );
+  };
+  const withDteNoticeService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeDteNoticeService) => Promise<T>,
+  ) => {
+    if (options.dteNoticeService) return callback(options.dteNoticeService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new DteNoticeService(client as never)),
+    );
+  };
+  const withDteImportService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeDteImportService) => Promise<T>,
+  ) => {
+    if (options.dteImportService) return callback(options.dteImportService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new DteImportService(client as never)),
+    );
+  };
   const withClientPfService = async <T>(
     c: RegularizeContext,
     callback: (service: RegularizeClientPfService) => Promise<T>,
@@ -474,6 +550,15 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       const prisma = client as never;
       return callback(new PartnersService(prisma, new RegularizeReconciliationServiceImpl(prisma)));
     });
+  };
+  const withGroupMapService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeGroupMapService) => Promise<T>,
+  ) => {
+    if (options.groupMapService) return callback(options.groupMapService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new GroupMapService(client as never)),
+    );
   };
   const withPasswordService = async <T>(
     c: RegularizeContext,
@@ -534,11 +619,22 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new RegularizeMunicipalTaxesReportingServiceImpl(client as never)),
     );
   };
-  const requirePasswordReveal = (c: RegularizeContext): void => {
-    if (Number(c.get("auth").claims.permission ?? 0) < 2) {
-      throw new ServiceError(403, "Permissão insuficiente para revelar credencial.");
+  const withPortfolioReportingService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizePortfolioReportingService) => Promise<T>,
+  ) => {
+    if (options.portfolioReportingService) return callback(options.portfolioReportingService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new RegularizePortfolioReportingServiceImpl(client as never)),
+    );
+  };
+  const requireWritePermission = (c: RegularizeContext, message: string): void => {
+    if (Number(c.get("auth").claims.permission ?? 0) < MIN_REGULARIZE_WRITE_PERMISSION) {
+      throw new ServiceError(403, message);
     }
   };
+  const requirePasswordReveal = (c: RegularizeContext): void =>
+    requireWritePermission(c, "Permissão insuficiente para revelar credencial.");
   const requireInternal = (c: RegularizeContext): void =>
     assertRegularizeInternalToken(c.req.raw, options.env ?? c.env);
   app.get("/internal/reporting/catalog", async (c) => {
@@ -570,6 +666,21 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
             await service.extract({
               organizationId: grant.organization_id,
               source: REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE,
+              fields: body.fields,
+              limit: body.limit,
+              ...(body.query ? { query: body.query } : {}),
+            }),
+          ),
+        ),
+      );
+    }
+    if ((REGULARIZE_PORTFOLIO_REPORTING_SOURCES as readonly string[]).includes(body.source)) {
+      return withPortfolioReportingService(c, async (service) =>
+        c.json(
+          createSuccessResponse(
+            await service.extract({
+              organizationId: grant.organization_id,
+              source: body.source as RegularizePortfolioReportingSource,
               fields: body.fields,
               limit: body.limit,
               ...(body.query ? { query: body.query } : {}),
@@ -890,6 +1001,136 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       );
     }),
   );
+  app.post("/regularize/dte/import", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para importar avisos DTE.");
+    return withDteImportService(c, async (service) => {
+      const body = parseWithZod(importDteBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.importNotices({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            ...body,
+          }),
+        ),
+        201,
+      );
+    });
+  });
+  app.get("/regularize/dte/notices", async (c) =>
+    withDteNoticeService(c, async (service) => {
+      const query = parseWithZod(listDteNoticesQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list({ organizationId: c.get("auth").organizationId, ...query }),
+        ),
+      );
+    }),
+  );
+  app.put("/regularize/dte/notices/reading", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para alterar a leitura do aviso DTE.");
+    return withDteNoticeService(c, async (service) => {
+      const body = parseWithZod(updateDteNoticeReadingBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.setReading({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            id: body.id,
+            pendingReading: body.pending_reading,
+          }),
+        ),
+      );
+    });
+  });
+  app.get("/regularize/dte/queries", async (c) =>
+    withDteQueryService(c, async (service) => {
+      const { date } = parseWithZod(dteQueryGridQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.grid({ organizationId: c.get("auth").organizationId, date }),
+        ),
+      );
+    }),
+  );
+  app.post(
+    "/regularize/veri/compare",
+    async (c, next) => {
+      // Mesma regra do serviço Express: a comparação não grava nada, basta a leitura (#1739).
+      if (Number(c.get("auth").claims.permission ?? 0) < MIN_REGULARIZE_READ_PERMISSION) {
+        throw new ServiceError(403, "Permissão insuficiente para comparar a planilha Veri.");
+      }
+      const contentType = c.req.header("content-type")?.split(";")[0].trim().toLowerCase();
+      if (contentType !== VERI_XLSX_MIME_TYPE) {
+        throw new ServiceError(415, "Envie um arquivo XLSX.");
+      }
+      return next();
+    },
+    bodyLimit({
+      maxSize: VERI_LIMITS.bytes,
+      onError: () => {
+        throw new ServiceError(413, "XLSX inválido ou maior que 2 MiB.");
+      },
+    }),
+    async (c) => {
+      const input = {
+        organizationId: c.get("auth").organizationId,
+        file: Buffer.from(await c.req.arrayBuffer()),
+      };
+      const comparison = options.veriComparisonService
+        ? await options.veriComparisonService.compare(input)
+        : await withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+            new VeriComparisonService(client as never).compare(input),
+          );
+      c.header("Cache-Control", "no-store");
+      return c.json(createSuccessResponse(comparison));
+    },
+  );
+  app.put("/regularize/dte/queries/status", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para alterar a consulta DTE.");
+    return withDteQueryService(c, async (service) => {
+      const body = parseWithZod(updateDteQueryStatusBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.setStatus({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            clientId: body.client_id,
+            date: body.date,
+            status: body.status,
+          }),
+        ),
+      );
+    });
+  });
+  app.post("/regularize/dte/queries/import", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para registrar consultas DTE.");
+    return withDteQueryService(c, async (service) => {
+      const body = parseWithZod(importDteQueryListsBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.importLists({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            date: body.date,
+            done: body.done,
+            notDone: body.not_done,
+          }),
+        ),
+        201,
+      );
+    });
+  });
+  app.get("/regularize/dte/imports", async (c) =>
+    withDteImportService(c, async (service) => {
+      const query = parseWithZod(listDteImportsQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.listImports({ organizationId: c.get("auth").organizationId, ...query }),
+        ),
+      );
+    }),
+  );
   app.post("/regularize/pf", async (c) =>
     withClientPfService(c, async (service) => {
       const body = parseWithZod(createClientPfBodySchema, await c.req.json());
@@ -980,6 +1221,46 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       );
     }),
   );
+  app.get("/regularize/groups/:id/map", async (c) =>
+    withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.generate({ organizationId: c.get("auth").organizationId, groupId: id }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/groups/:id/map/saved", async (c) =>
+    withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.getSaved({ organizationId: c.get("auth").organizationId, groupId: id }),
+        ),
+      );
+    }),
+  );
+  app.put("/regularize/groups/:id/map/saved", async (c) => {
+    // Mesmo nível de escrita do Express (authorizeRegularize): salvar o mapa exige nível 2.
+    if (Number(c.get("auth").claims.permission ?? 0) < 2) {
+      throw new ServiceError(403, "Permissão insuficiente para salvar o mapa do grupo.");
+    }
+    return withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      const { tree } = parseSaveGroupMapBody(await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.save({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            groupId: id,
+            tree,
+          }),
+        ),
+      );
+    });
+  });
   app.delete("/regularize/partners/:id", async (c) =>
     withPartnersService(c, async (service) => {
       const { id } = parseWithZod(partnerIdParamsSchema, { id: c.req.param("id") });

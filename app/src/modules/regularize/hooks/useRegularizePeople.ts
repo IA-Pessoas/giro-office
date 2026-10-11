@@ -15,9 +15,12 @@ import type {
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
+  RegularizeGroupMap,
+  RegularizeGroupMapTreeNode,
   RegularizeId,
   RegularizePartner,
   RegularizePartnerListFilters,
+  RegularizeSavedGroupMap,
   UpdateRegularizeClientPfPayload,
   UpdateRegularizePartnerPayload,
 } from "../types";
@@ -154,6 +157,48 @@ export function useDeleteRegularizePartnerMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (id) => regularizeService.deletePartner(id),
     onSuccess: () => invalidateRegularizePeople(queryClient, scope),
+  });
+}
+
+export function useRegularizeGroupMap(
+  groupId: RegularizeId,
+): UseQueryResult<RegularizeGroupMap, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(
+    regularizeQueryKeys.groupMap(groupId, scope),
+    () => regularizeService.getGroupMap(groupId),
+    // Sem cache entre visitas: grupo, cidade e regime mudam em telas do cadastro de clientes,
+    // que não invalidam as chaves do Regularize.
+    { enabled: Boolean(groupId), staleTime: 0 },
+  );
+}
+
+export function useRegularizeSavedGroupMap(
+  groupId: RegularizeId,
+): UseQueryResult<RegularizeSavedGroupMap | null, Error> {
+  const scope = useRegularizeQueryScope();
+
+  return useFetch(
+    regularizeQueryKeys.groupMapSaved(groupId, scope),
+    () => regularizeService.getSavedGroupMap(groupId),
+    { enabled: Boolean(groupId), staleTime: 0 },
+  );
+}
+
+export function useSaveRegularizeGroupMapMutation(): UseMutationResult<
+  RegularizeSavedGroupMap,
+  Error,
+  { groupId: RegularizeId; tree: RegularizeGroupMapTreeNode }
+> {
+  const queryClient = useQueryClient();
+  const scope = useRegularizeQueryScope();
+
+  return useMutation({
+    mutationFn: ({ groupId, tree }) => regularizeService.saveGroupMap(groupId, tree),
+    // A resposta já é a versão salva: entra direto no cache, sem nova consulta.
+    onSuccess: (saved, { groupId }) =>
+      queryClient.setQueryData(regularizeQueryKeys.groupMapSaved(groupId, scope), saved),
   });
 }
 

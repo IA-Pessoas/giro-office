@@ -16,6 +16,7 @@ export const departmentLabels: Readonly<Record<string, string>> = {
   regularize: "Regularize",
   rh: "Recursos Humanos",
   ti: "Tecnologia da Informação",
+  triagem: "Triagem",
 };
 
 /** Minúscula só na inicial e só quando não é sigla: "ICMS fiscal", "solicitações de RH". */

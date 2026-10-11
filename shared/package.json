@@ -123,6 +123,12 @@
       "import": "./dist/http/swaggerUi.js",
       "default": "./dist/http/swaggerUi.js"
     },
+    "./pdf": {
+      "types": "./dist/pdf/pdfText.d.ts",
+      "development": "./src/pdf/pdfText.ts",
+      "import": "./dist/pdf/pdfText.js",
+      "default": "./dist/pdf/pdfText.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
