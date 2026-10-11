@@ -93,6 +93,50 @@ describe("contabil Worker — OpenAPI docs", () => {
     expect(html).toContain('url: "/openapi.json"');
   });
 
+  it("documenta o histórico documental, rota de /triagem que só o Worker serve", async () => {
+    const response = await app({ ENABLE_API_DOCS: "true" }).request(
+      "https://contabil.test/openapi.json",
+    );
+    const { paths } = (await response.json()) as {
+      paths: Record<
+        string,
+        { get?: { parameters: Array<Record<string, unknown>>; responses: object } }
+      >;
+    };
+    const operation = paths["/triagem/documents/history"]?.get;
+
+    // Os mesmos parâmetros e limites de `triageDocumentHistorySchema`.
+    expect(operation?.parameters).toEqual([
+      {
+        name: "client_id",
+        in: "query",
+        required: false,
+        schema: { type: "string", format: "uuid" },
+      },
+      {
+        name: "competence",
+        in: "query",
+        required: false,
+        schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+      },
+      {
+        name: "page",
+        in: "query",
+        required: false,
+        schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 },
+      },
+      {
+        name: "pageSize",
+        in: "query",
+        required: false,
+        schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+      },
+    ]);
+    expect(Object.keys(operation?.responses ?? {})).toEqual(["200", "400", "401", "403", "404"]);
+    // As rotas do serviço Node seguem na mesma spec.
+    expect(paths).toHaveProperty("/triagem/statements");
+  });
+
   it.each([
     {},
     { ENABLE_API_DOCS: "false" },
