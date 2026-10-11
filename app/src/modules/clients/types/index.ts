@@ -187,6 +187,7 @@ export interface ClientInstagramProfileFilters {
   page: number;
   limit: number;
   search?: string;
+  status?: ClientStatus;
 }
 
 export interface ClientCompanyLookup {

@@ -6,6 +6,7 @@ import { MarketingDashboard } from "@modules/marketing/components/MarketingDashb
 import { MarketingCanonicalQueries } from "@modules/marketing/components/MarketingCanonicalQueries";
 import { MarketingAiUsageControls } from "@modules/marketing/components/MarketingAiUsageControls";
 import { MarketingInstagramProfiles } from "@modules/marketing/components/MarketingInstagramProfiles";
+import { MarketingInstagramReport } from "@modules/marketing/components/MarketingInstagramReport";
 import { MarketingPasswords } from "@modules/marketing/components/MarketingPasswords";
 import { MarketingEvents } from "@modules/marketing/components/MarketingEvents";
 import { MarketingStockReport } from "@modules/marketing/components/MarketingStockReport";
@@ -33,6 +34,7 @@ export default function MarketingPage() {
         <MarketingEvents />
         <MarketingAiUsageControls />
         <MarketingInstagramProfiles />
+        <MarketingInstagramReport />
         <MarketingUsers />
         <MarketingPasswords />
       </main>

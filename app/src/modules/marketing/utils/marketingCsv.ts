@@ -113,6 +113,30 @@ export function createMarketingStockCsv(
   ]);
 }
 
+// Tela, impressão e CSV usam as mesmas linhas; tela e impressão acrescentam o QR Code.
+export const INSTAGRAM_REPORT_COLUMNS = ["Cliente", "Perfil Instagram"];
+
+export function instagramReportRows(
+  items: readonly { name: string; instagram: string | null }[],
+): string[][] {
+  return items.map((item) => [item.name, item.instagram?.trim() || "Sem perfil"]);
+}
+
+export function instagramReportTotalsLabel(count: number): string {
+  return `${count} ${count === 1 ? "cliente ativo" : "clientes ativos"}`;
+}
+
+/** A última linha repete o total exibido na tela e na impressão. */
+export function createInstagramReportCsv(
+  items: Parameters<typeof instagramReportRows>[0],
+): string {
+  return createCsv([
+    INSTAGRAM_REPORT_COLUMNS,
+    ...instagramReportRows(items),
+    [`Total: ${instagramReportTotalsLabel(items.length)}`, ""],
+  ]);
+}
+
 export const AI_USAGE_REPORT_COLUMNS = ["Nome", "Competência"];
 
 /** `2026-04` → `04/2026`. */

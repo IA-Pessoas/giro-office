@@ -42,7 +42,19 @@ export type ClientFilters = {
   ref?: "integracao" | "deps";
 };
 
+export type InstagramProfileFilters = {
+  page: number;
+  pageSize: number;
+  profile: "all" | "with" | "without";
+  search?: string;
+  status?: string;
+};
+
 export type ClientWorkerService = {
+  listInstagramProfiles: (
+    organizationId: string,
+    filters: InstagramProfileFilters,
+  ) => Promise<unknown>;
   listByOrganization: (
     organizationId: string,
     filters: ClientFilters,
@@ -1014,6 +1026,59 @@ export class ClientService implements ClientWorkerService {
     });
     if (!row) throw new ServiceError(404, "Cliente não encontrado.");
     return row;
+  }
+
+  /**
+   * Paridade com o `listInstagramProfiles` do Node: perfil só com espaços conta como ausente.
+   * Uma consulta só, com página e total sobre o mesmo recorte.
+   */
+  async listInstagramProfiles(
+    organizationId: string,
+    filters: InstagramProfileFilters,
+  ): Promise<unknown> {
+    const { profile, page, pageSize } = filters;
+    const search = filters.search?.trim() ? `%${filters.search.trim()}%` : null;
+    const status = filters.status ?? null;
+    const rows = await this.prisma.$queryRaw<Array<{ total: number; items: unknown[] }>>`
+      WITH matched AS (
+        SELECT c.id, c.name, c.status, c.instagram
+        FROM clients c
+        WHERE c.organization_id = ${organizationId}
+          AND (
+            ${profile}::text = 'all'
+            OR (${profile}::text = 'with') = ((c.instagram ~ '[^[:space:]]') IS TRUE)
+          )
+          AND (${status}::text IS NULL OR c.status = ${status}::text)
+          AND (
+            ${search}::text IS NULL
+            OR c.name ILIKE ${search}::text
+            OR c.company_name ILIKE ${search}::text
+            OR c.fantasy_name ILIKE ${search}::text
+          )
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM matched) AS total,
+        COALESCE(
+          (
+            SELECT json_agg(p ORDER BY p.name ASC, p.id ASC)
+            FROM (
+              SELECT * FROM matched
+              ORDER BY name ASC, id ASC
+              LIMIT ${pageSize}::int
+              OFFSET ${(page - 1) * pageSize}::int
+            ) p
+          ),
+          '[]'::json
+        ) AS items
+    `;
+    const total = Number(rows[0]?.total ?? 0);
+    return {
+      items: rows[0]?.items ?? [],
+      total,
+      page,
+      pageSize,
+      hasMore: page * pageSize < total,
+    };
   }
 
   async listByOrganization(
