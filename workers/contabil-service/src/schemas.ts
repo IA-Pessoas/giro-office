@@ -1,4 +1,5 @@
 import {
+  TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
   TRIAGE_FISCAL_CHECKLIST_FIELDS,
   TRIAGE_FISCAL_CONFIGURABLE_FIELDS,
   TRIAGE_PORTFOLIO_DOCUMENT_STATUSES,
@@ -21,33 +22,8 @@ export const closingUpdateSchema = closingQuerySchema
   })
   .strict();
 
-const documentFields = [
-  "financial_transactions",
-  "triaged_transactions",
-  "inventory_control",
-  "accounts_payable_report",
-  "accounts_receivable_report",
-  "card_statements",
-  "loan_agreements",
-  "bank_reconciliation",
-  "bank_investments",
-  "card_sales_report",
-] as const;
-const fiscalChecklistFields = [
-  "inbound_report",
-  "outbound_report",
-  "nfse_provided",
-  "nfse_received",
-  "cte_documents",
-  "mei_documents",
-  "nfce_documents",
-  "sped_fiscal",
-  "sped_contributions",
-  "nfce_received",
-  "model_21_invoice",
-  "cte_as_issuer",
-  "services_provided_as_mei",
-] as const;
+const documentFields = TRIAGE_ACCOUNTING_CHECKLIST_FIELDS;
+const fiscalChecklistFields = TRIAGE_FISCAL_CHECKLIST_FIELDS;
 export const triageDocumentFields = documentFields;
 export const triageFiscalFields = [...fiscalChecklistFields, "billing_amount"] as const;
 export const triageDocumentStatuses = [
@@ -205,6 +181,15 @@ export const statementSchema = z
     status: z.enum(triageDocumentStatuses),
   })
   .strict();
+export const triageDocumentHistorySchema = z
+  .object({
+    client_id: uuid("client_id").optional(),
+    competence: competence.optional(),
+    page: z.coerce.number().int().min(1).max(10_000).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+
 export const statementHistorySchema = z
   .object({
     client_id: uuid("client_id"),

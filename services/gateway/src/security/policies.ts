@@ -141,7 +141,7 @@ const financeiroTaskAdminPolicy: AuthPolicy = {
 };
 const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 // Agenda compartilhada: módulos com tela de agenda; o task-service confere o nível do módulo pedido.
-const agendaModules = ["contabil", "pessoal", "triagem"];
+const agendaModules = ["contabil", "pessoal", "triagem", "regularize"];
 const agendaViewPolicy: AuthPolicy = {
   anyModulePermission: { modules: agendaModules, minPermission: moduleAccessPermission },
 };

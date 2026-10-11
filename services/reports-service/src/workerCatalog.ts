@@ -4,6 +4,7 @@ import { CertificatePfAdapter } from "./integrations/certificatePfAdapter.js";
 import { CertificatePjAdapter } from "./integrations/certificatePjAdapter.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
+import { ContabilTriageAdapter } from "./integrations/contabilTriageAdapter.js";
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
 import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
@@ -33,6 +34,7 @@ export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalog
     new CertificatePfAdapter(env),
     new CertificatePjAdapter(env),
     new ContabilControlAdapter(env),
+    new ContabilTriageAdapter(env),
     new TaskAdapter(env),
     new ProjectAdapter(env),
     new FiscalIcmsAdapter(env),

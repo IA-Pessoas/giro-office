@@ -191,6 +191,42 @@ export type UpdateRegularizeClientPfPayload = CreateRegularizeClientPfPayload & 
   id: RegularizeId;
 };
 
+// Mapa gerado de grupo (#1748). Sem capital social nem RBT12: o cadastro não tem esses dados.
+export type RegularizeGroupMapCompany = {
+  client_id: RegularizeId;
+  name: string;
+  cpf_cnpj: string | null;
+  status: string;
+  address: string | null;
+  regime: string | null;
+};
+
+export type RegularizeGroupMap = {
+  group: { id: RegularizeId; name: string };
+  cities: Array<{
+    name: string;
+    partners: Array<{
+      pf_id: RegularizeId;
+      name: string;
+      companies: RegularizeGroupMapCompany[];
+    }>;
+  }>;
+};
+
+// Item do mapa como é desenhado e salvo (#1749). color é a cor de fundo em #rrggbb.
+export type RegularizeGroupMapTreeNode = {
+  id: string;
+  lines: string[];
+  color?: string;
+  children: RegularizeGroupMapTreeNode[];
+};
+
+export type RegularizeSavedGroupMap = {
+  tree: RegularizeGroupMapTreeNode;
+  updated_at: string;
+  updated_by_user_id: RegularizeId;
+};
+
 export type RegularizePartner = {
   id: RegularizeId;
   pj_id: RegularizeId;

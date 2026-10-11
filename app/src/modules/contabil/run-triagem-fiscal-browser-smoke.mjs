@@ -188,6 +188,42 @@ await page.route("**/*", async (route) => {
       { id: "delivery-portal", code: "PORTAL", label: "Portal" },
     ] : []);
   }
+  if (request.method() === "GET" && apiPath === "/triagem/documents/history") {
+    // 21 eventos em páginas de 20: a segunda página só existe se a tela pedir (#1706).
+    const historyPage = Number(url.searchParams.get("page") ?? "1");
+    return json(route, {
+      client_id: url.searchParams.get("client_id"),
+      competence: url.searchParams.get("competence"),
+      page: historyPage,
+      pageSize: 20,
+      total: 21,
+      items: [
+        {
+          id: "history-" + historyPage,
+          at: "2026-09-11T10:00:00.000Z",
+          actor: { id: "u1", name: "Ana Souza" },
+          action: "Atualizar pendência documental",
+          object: {
+            kind: "triagem.monthly",
+            client_id: clientId,
+            client_name: "Cliente Demonstração",
+            competence,
+            routine_type: "FISCAL",
+          },
+          changes:
+            historyPage === 1
+              ? [{ field: "checklist.sped_fiscal", from: "PENDING", to: "COMPLETED" }]
+              : [
+                  {
+                    field: "item_notes.inbound_report.justification",
+                    from: null,
+                    to: "SEM_MOVIMENTO",
+                  },
+                ],
+        },
+      ],
+    });
+  }
   if (apiPath === "/triagem/config" && url.searchParams.get("type") === "FISCAL") {
     return json(route, fiscalSpecialConfig);
   }
@@ -370,11 +406,15 @@ try {
   await page.getByRole("button", { name: "CSV" }).click();
   const csv = await csvDownload;
   assert.equal(csv.suggestedFilename(), `triagem-fiscal-${competence}.csv`);
-  assert.match(readFileSync(await csv.path(), "utf8"), /Empresa sem rotina/);
+  const csvText = readFileSync(await csv.path(), "utf8");
+  assert.match(csvText, /Empresa sem rotina/);
+  // O total é o das linhas filtradas, o mesmo conjunto da tela (#1705).
+  assert.match(csvText, /"Total","\d+ empresas?"$/);
   const popup = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Imprimir / PDF" }).click();
   const pdfPage = await popup;
   await expect(pdfPage.getByRole("heading", { name: `Triagem Fiscal · ${competence}` })).toBeVisible();
+  await expect(pdfPage.getByText(/^Total: \d+ empresas?$/)).toBeVisible();
   await pdfPage.close();
   await page.bringToFront();
   await page.getByRole("button", { name: "Selecionar cliente" }).click();
@@ -384,6 +424,26 @@ try {
 
   await expect(page.getByRole("heading", { name: "Pendências documentais" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pendências fiscais" })).toBeVisible();
+  // Histórico documental do cliente: ator, objeto, valores e a página seguinte (#1706).
+  const documentHistory = page.getByRole("region", { name: "Histórico documental" });
+  await expect(documentHistory.getByText("Ana Souza")).toBeVisible();
+  await expect(
+    documentHistory.getByText(
+      `Cliente Demonstração · ${competence} · Rotina Fiscal · Atualizar pendência documental`,
+    ),
+  ).toBeVisible();
+  await expect(documentHistory.getByText("SPED Fiscal: Pendente → Concluído")).toBeVisible();
+  await expect(documentHistory.getByText("Página 1 de 2")).toBeVisible();
+  await documentHistory.getByRole("button", { name: "Próxima" }).click();
+  await expect(documentHistory.getByText("Página 2 de 2")).toBeVisible();
+  await expect(
+    documentHistory.getByText("Relatório de entradas · justificativa: (vazio) → SEM_MOVIMENTO"),
+  ).toBeVisible();
+  assert.ok(
+    requests.some(
+      (entry) => entry.startsWith("GET /triagem/documents/history") && entry.includes("page=2"),
+    ),
+  );
   await expect(page.locator('select[aria-label$=" status"]')).toHaveCount(23);
   await expect(page.getByLabel("Faturamento fiscal")).toHaveCount(1);
   await expect(page.getByLabel("Cliente prioritário")).toHaveValue("yes");

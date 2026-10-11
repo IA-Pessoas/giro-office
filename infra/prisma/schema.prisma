@@ -227,6 +227,7 @@ model Organization {
   proposalConfigs               ProposalConfig[]
   commercialProspectings        CommercialProspecting[]
   commercialTaskBillings        CommercialTaskBilling[]
+  groupSavedMaps                RegularizeGroupSavedMap[]
   licenses                      License[]
   municipalTaxes                MunicipalTaxes[]
   partners                      Partners[]
@@ -906,6 +907,7 @@ model Group {
   status          Boolean        @default(true)
   organization_id String
   clients         ClientsGroup[]
+  savedMaps       RegularizeGroupSavedMap[]
   organization    Organization   @relation(fields: [organization_id], references: [id])
 
   @@map("clients.group")
@@ -970,6 +972,23 @@ model ClientsGroup {
   // Um cliente pode estar em vários grupos, mas o par cliente+grupo é único (#1742).
   @@unique([group_id, client_id], map: "uq_clients_group_member")
   @@map("clients.clientsGroup")
+}
+
+// Versão salva do mapa de um grupo (#1749; tb_workspace.mapas_clientes no legado). Guarda a
+// árvore editada como foi salva: mudanças na carteira não mexem nela. Uma versão por grupo.
+model RegularizeGroupSavedMap {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  group_id           String
+  tree               Json
+  updated_by_user_id String
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+  organization       Organization @relation(fields: [organization_id], references: [id])
+  group              Group        @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, group_id], map: "uq_regularize_group_map_group")
+  @@map("regularize.group_maps")
 }
 
 model ClientTermination {
