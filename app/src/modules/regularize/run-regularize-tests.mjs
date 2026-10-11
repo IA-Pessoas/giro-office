@@ -1854,3 +1854,226 @@ await runTest("client picker warns when only active clients are listed (#1347)",
   assert.match(source, /filters\.status === "Ativo"/);
   assert.match(source, /Só clientes ativos aparecem aqui\./);
 });
+
+await runTest("group map tree shows status, address and regime without inventing values (#1748)", async () => {
+  const { buildGroupMapTree, layoutGroupMapTree, wrapGroupMapLine } = await import(
+    "./utils/groupMapTree.ts"
+  );
+  const map = {
+    group: { id: "g1", name: "Grupo Um" },
+    cities: [
+      {
+        name: "Salvador",
+        partners: [
+          {
+            pf_id: "pf1",
+            name: "Ana",
+            companies: [
+              {
+                client_id: "c1",
+                name: "Alfa LTDA",
+                cpf_cnpj: "11111111000111",
+                status: "Inativo",
+                address: "Rua A, 10 (Centro)",
+                regime: null,
+              },
+              {
+                client_id: "c2",
+                name: "Beta LTDA",
+                cpf_cnpj: null,
+                status: "Ativo",
+                address: null,
+                regime: "Simples Nacional",
+              },
+            ],
+          },
+        ],
+      },
+      { name: "", partners: [] },
+    ],
+  };
+
+  const tree = buildGroupMapTree(map);
+  const [city, noCity] = tree.children;
+  const [alfa, beta] = city.children[0].children;
+
+  assert.deepEqual(tree.lines, ["Grupo Um"]);
+  assert.deepEqual(noCity.lines, ["Cidade não informada"]);
+  assert.deepEqual(alfa.lines, ["Empresa: Alfa LTDA", "CNPJ: 11.111.111/0001-11"]);
+  // Empresa inativa aparece com a situação real; campo sem dado diz que não foi informado.
+  assert.deepEqual(alfa.children[0].lines, [
+    "Situação: Inativo",
+    "Sede: Rua A, 10 (Centro)",
+    "Regime: não informado",
+  ]);
+  assert.deepEqual(beta.children[0].lines, [
+    "Situação: Ativo",
+    "Sede: não informado",
+    "Regime: Simples Nacional",
+  ]);
+  assert.doesNotMatch(JSON.stringify(tree), /capital|rbt12/i);
+
+  assert.deepEqual(wrapGroupMapLine("um dois tres quatro", 9), ["um dois", "tres", "quatro"]);
+
+  // Cada nível numa coluna e nenhuma caixa da mesma coluna por cima da outra.
+  const layout = layoutGroupMapTree(tree);
+  assert.equal(layout.boxes.length, 8);
+  assert.equal(layout.links.length, 7);
+  const columns = new Map();
+  for (const box of layout.boxes) {
+    columns.set(box.x, [...(columns.get(box.x) ?? []), box]);
+  }
+  assert.equal(columns.size, 5);
+  for (const boxes of columns.values()) {
+    const sorted = boxes.sort((a, b) => a.y - b.y);
+    for (let index = 1; index < sorted.length; index++) {
+      assert.ok(sorted[index].y >= sorted[index - 1].y + sorted[index - 1].height);
+    }
+  }
+  assert.ok(layout.width > 0 && layout.height > 0);
+});
+
+await runTest("group map screen reads the generated map through the Regularize contract (#1748)", async () => {
+  const [contractSource, pageSource, componentSource] = await Promise.all([
+    readModuleSource("services/regularizeService.contract.ts"),
+    readModuleSource("components/RegularizePage.tsx"),
+    readModuleSource("components/RegularizeGroupMap.tsx"),
+  ]);
+
+  assert.match(contractSource, /\/regularize\/groups\/\$\{groupId\}\/map/);
+  assert.match(pageSource, /<RegularizeGroupMap canEdit=\{regularizeAccess\.canEdit\} \/>/);
+  assert.match(componentSource, /useRegularizeGroupMap\(groupId\)/);
+  // Os selects do mapa ficam abaixo do rótulo: sem block, a largura fixa os deixa ao lado do texto.
+  assert.match(componentSource, /className="mt-1\.5 block sm:w-80"/);
+  assert.match(componentSource, /className="mt-1\.5 block sm:w-48"/);
+});
+
+await runTest("group map edits change text, colour and items without touching the rest (#1749)", async () => {
+  const {
+    addGroupMapChild,
+    countGroupMapNodes,
+    findGroupMapNode,
+    GROUP_MAP_COLORS,
+    groupMapLinesFromText,
+    groupMapNodeDepth,
+    groupMapTextColor,
+    removeGroupMapNode,
+    updateGroupMapNode,
+  } = await import("./utils/groupMapTree.ts");
+  const tree = {
+    id: "raiz",
+    lines: ["Grupo"],
+    children: [
+      { id: "a", lines: ["A"], children: [{ id: "a1", lines: ["A1"], children: [] }] },
+      { id: "b", lines: ["B"], children: [] },
+    ],
+  };
+  const original = JSON.stringify(tree);
+
+  const edited = updateGroupMapNode(tree, "a", { lines: ["A novo"], color: "#ff0000" });
+  assert.deepEqual(findGroupMapNode(edited, "a"), {
+    id: "a",
+    lines: ["A novo"],
+    color: "#ff0000",
+    children: [{ id: "a1", lines: ["A1"], children: [] }],
+  });
+  assert.deepEqual(findGroupMapNode(edited, "b"), tree.children[1]);
+
+  const withChild = addGroupMapChild(tree, "b", ["Anotação"]);
+  assert.deepEqual(findGroupMapNode(withChild, "b").children, [
+    { id: "b/extra:1", lines: ["Anotação"], children: [] },
+  ]);
+  // O segundo item novo no mesmo lugar ganha outro id.
+  assert.equal(
+    findGroupMapNode(addGroupMapChild(withChild, "b", ["Outra"]), "b").children[1].id,
+    "b/extra:2",
+  );
+
+  // Remover leva junto o que está abaixo; o grupo (raiz) não sai.
+  const removed = removeGroupMapNode(tree, "a");
+  assert.equal(countGroupMapNodes(removed), 2);
+  assert.equal(findGroupMapNode(removed, "a1"), null);
+  assert.equal(removeGroupMapNode(tree, "raiz"), tree);
+
+  // Nenhuma edição mexe na árvore de origem.
+  assert.equal(JSON.stringify(tree), original);
+
+  assert.deepEqual(groupMapLinesFromText("  Linha um \n\n linha dois  "), ["Linha um", "linha dois"]);
+  assert.deepEqual(groupMapLinesFromText(" \n "), []);
+  assert.equal(groupMapLinesFromText("a\n".repeat(30)).length, 20);
+  // O que a API recusaria não sai da tela: palavra maior que a linha é cortada e caractere de
+  // controle vira espaço.
+  const longWord = groupMapLinesFromText("x".repeat(120));
+  assert.deepEqual(longWord.map((line) => line.length), [50, 50, 20]);
+  assert.deepEqual(groupMapLinesFromText("a\u0001b\u0000c"), ["a b c"]);
+  assert.equal(groupMapNodeDepth(tree, "raiz"), 1);
+  assert.equal(groupMapNodeDepth(tree, "a1"), 3);
+  assert.equal(groupMapNodeDepth(tree, "não existe"), 0);
+
+  // Texto legível sobre qualquer cor do seletor, como no legado.
+  assert.equal(GROUP_MAP_COLORS.length, 8);
+  assert.equal(groupMapTextColor("#ffffff"), "#000000");
+  assert.equal(groupMapTextColor("#ffff00"), "#000000");
+  assert.equal(groupMapTextColor("#000000"), "#ffffff");
+  assert.equal(groupMapTextColor("#0000ff"), "#ffffff");
+});
+
+await runTest("group map PNG comes from the on-screen SVG and saving is explicit (#1749)", async () => {
+  const [contractSource, componentSource, exportSource, hooksSource] = await Promise.all([
+    readModuleSource("services/regularizeService.contract.ts"),
+    readModuleSource("components/RegularizeGroupMap.tsx"),
+    readModuleSource("utils/groupMapExport.ts"),
+    readModuleSource("hooks/useRegularizePeople.ts"),
+  ]);
+  const { groupMapFileName } = await import("./utils/groupMapExport.ts");
+
+  assert.match(contractSource, /\/regularize\/groups\/\$\{groupId\}\/map\/saved/);
+  // O PNG é o SVG da tela serializado, sem o destaque do item selecionado.
+  assert.match(componentSource, /downloadGroupMapPng\(svgRef\.current, title\)/);
+  assert.match(exportSource, /querySelectorAll\("\[data-export-skip\]"\)/);
+  assert.match(componentSource, /data-export-skip=""/);
+  // O desenho não depende de classes para cor: elas não iriam para o arquivo.
+  assert.doesNotMatch(componentSource, /className="(?:fill|stroke)-/);
+  // Só o botão Salvar grava; gerar de novo e descartar mexem apenas no rascunho.
+  assert.equal(componentSource.match(/saveMutation\.mutateAsync/g)?.length, 1);
+  // O rascunho só nasce com as consultas terminadas, e descartá-lo com alterações pede
+  // confirmação.
+  assert.match(componentSource, /savedQuery\.isSuccess && !savedQuery\.isFetching/);
+  assert.match(componentSource, /if \(current\?\.dirty\) setPending\(\{ kind: "group"/);
+  assert.match(componentSource, /if \(current\?\.dirty\) setPending\(\{ kind: "regenerate" \}\)/);
+  assert.match(hooksSource, /regularizeService\.saveGroupMap\(groupId, tree\)/);
+
+  assert.equal(groupMapFileName("Mapa do grupo São João & Cia"), "mapa-do-grupo-sao-joao-cia.png");
+  assert.equal(groupMapFileName("///"), "mapa-do-grupo.png");
+});
+
+await runTest("agenda tab mounts the shared department agenda for Regularize (#1747)", async () => {
+  const [pageSource, policySource] = await Promise.all([
+    readModuleSource("components/RegularizePage.tsx"),
+    readModuleSource("utils/regularizeQueryPolicy.ts"),
+  ]);
+  const [contractSource, sectionSource] = await Promise.all([
+    readFile(new URL("../../shared/services/agendaService.contract.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../contabil/components/DepartmentAgendaSection.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(policySource, /\| "agenda"/);
+  assert.match(pageSource, /\{ id: "agenda", label: "Agenda", icon: CalendarDays \}/);
+  // Sem agenda própria: a aba monta a seção compartilhada, e o serviço filtra pelo módulo.
+  assert.match(
+    pageSource,
+    /<DepartmentAgendaSection module="regularize" canEdit=\{regularizeAccess\.canEdit\} \/>/,
+  );
+  assert.match(contractSource, /export type AgendaModule = [^;]*"regularize"/);
+  assert.match(sectionSource, /regularize: "Regularize"/);
+});
+
+await runTest("regularize tabs wrap instead of scrolling sideways (#1739)", async () => {
+  const page = await readModuleSource("components/RegularizePage.tsx");
+  const nav = page.match(/<nav\s+aria-label="Abas do Regularize"[\s\S]*?<\/nav>/)?.[0] ?? "";
+  assert.match(nav, /<div role="tablist" className="[^"]*\bflex-wrap\b[^"]*">/);
+  assert.doesNotMatch(nav, /min-w-max|overflow-x/);
+});

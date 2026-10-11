@@ -7,6 +7,7 @@ import {
   type RegularizeDteImportService,
   type RegularizeDteNoticeService,
   type RegularizeDteQueryService,
+  type RegularizeGroupMapService,
   type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
   type RegularizeLicenseReportingService,
@@ -706,6 +707,90 @@ describe("regularize Worker", () => {
       organizationId: ORGANIZATION_ID,
       userId: USER_ID,
       id: LICENSE_ID,
+    });
+  });
+
+  it("generates the group map scoped to the caller organization", async () => {
+    const GROUP_ID = "d0000000-0000-4000-8000-000000000001";
+    const groupMap: RegularizeGroupMapService = {
+      generate: vi.fn(async () => ({ group: { id: GROUP_ID, name: "Grupo" }, cities: [] })),
+      getSaved: vi.fn(async () => null),
+      save: vi.fn(async () => {
+        throw new Error("não usado neste teste");
+      }),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      groupMapService: groupMap,
+    });
+
+    const ok = await app.request(`https://regularize.test/regularize/groups/${GROUP_ID}/map`, {
+      headers: headers(),
+    });
+    const invalid = await app.request("https://regularize.test/regularize/groups/abc/map", {
+      headers: headers(),
+    });
+    const anonymous = await app.request(
+      `https://regularize.test/regularize/groups/${GROUP_ID}/map`,
+    );
+
+    expect([ok.status, invalid.status, anonymous.status]).toEqual([200, 400, 401]);
+    expect(groupMap.generate).toHaveBeenCalledTimes(1);
+    expect(groupMap.generate).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      groupId: GROUP_ID,
+    });
+  });
+
+  it("reads the saved group map and requires write permission to save it", async () => {
+    const GROUP_ID = "d0000000-0000-4000-8000-000000000001";
+    const tree = { id: "raiz", lines: ["Grupo"], children: [] };
+    const saved = {
+      tree,
+      updated_at: new Date("2026-10-10T12:00:00.000Z"),
+      updated_by_user_id: USER_ID,
+    };
+    const groupMap: RegularizeGroupMapService = {
+      generate: vi.fn(async () => ({ group: { id: GROUP_ID, name: "Grupo" }, cities: [] })),
+      getSaved: vi.fn(async () => saved),
+      save: vi.fn(async () => saved),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      groupMapService: groupMap,
+    });
+    const url = `https://regularize.test/regularize/groups/${GROUP_ID}/map/saved`;
+    const put = (permission: string, body: unknown) =>
+      app.request(url, {
+        method: "PUT",
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+    const statuses = [
+      (await app.request(url, { headers: headers() })).status,
+      (await put("1", { tree })).status,
+      (await put("2", { tree })).status,
+      (await put("2", { tree: { ...tree, color: "red" } })).status,
+    ];
+
+    expect(statuses).toEqual([200, 403, 200, 400]);
+    expect(groupMap.getSaved).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      groupId: GROUP_ID,
+    });
+    expect(groupMap.save).toHaveBeenCalledTimes(1);
+    expect(groupMap.save).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      groupId: GROUP_ID,
+      tree,
     });
   });
 
