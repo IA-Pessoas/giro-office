@@ -73,6 +73,11 @@ import {
   mapAssignableUsersToContabilOptions,
 } from "./components/contabilPartySection.helpers.ts";
 import {
+  AGENDA_REPORT_MAX_MONTHS,
+  agendaReportEvents,
+  agendaReportMonths,
+} from "./components/departmentAgendaReport.helpers.ts";
+import {
   getContabilCardState,
   shouldShowContabilNav,
 } from "./hooks/contabilAccessUi.ts";
@@ -1269,6 +1274,74 @@ await (async () => {
       "utf8",
     );
     assert.match(section, /agendaService\.list\(module, month, mine\)/);
+  });
+
+  await runTest("relatório da agenda: o intervalo vira os meses que o serviço lista (#1734)", () => {
+    assert.deepEqual(agendaReportMonths("2026-11-15", "2027-01-10"), [
+      "2026-11",
+      "2026-12",
+      "2027-01",
+    ]);
+    assert.deepEqual(agendaReportMonths("2026-10-01", "2026-10-31"), ["2026-10"]);
+    // Intervalo invertido, vazio ou com data impossível não consulta nada.
+    assert.deepEqual(agendaReportMonths("2026-10-02", "2026-10-01"), []);
+    assert.deepEqual(agendaReportMonths("", "2026-10-01"), []);
+    assert.deepEqual(agendaReportMonths("2026-13-01", "2026-13-02"), []);
+    // Ano pela metade, como o campo de data emite ao digitar: mês sempre com ano de 4 dígitos.
+    assert.deepEqual(agendaReportMonths("0002-11-01", "0003-01-31"), [
+      "0002-11",
+      "0002-12",
+      "0003-01",
+    ]);
+    assert.ok(agendaReportMonths("0002-10-01", "2026-10-31").length > AGENDA_REPORT_MAX_MONTHS);
+    assert.equal(agendaReportMonths("2026-01-01", "2026-12-31").length, AGENDA_REPORT_MAX_MONTHS);
+  });
+
+  await runTest("relatório da agenda: só os dias do intervalo, em ordem, com estado e recorrência (#1734)", () => {
+    const event = (id, date, agenda, extra = {}) => ({
+      id,
+      agenda,
+      date,
+      status: "Pendente",
+      obs: null,
+      location: null,
+      client: null,
+      participant: null,
+      recurring_agenda_id: null,
+      ...extra,
+    });
+    const listed = [
+      event("4", "2026-11-20T12:00:00.000Z", "Fora do intervalo"),
+      event("3", "2026-11-10T12:00:00.000Z", "Fechamento", { recurring_agenda_id: "regra" }),
+      event("2", "2026-10-15T12:00:00.000Z", "Reunião", { status: "Realizado" }),
+      event("1", "2026-10-14T12:00:00.000Z", "Antes do intervalo"),
+      event("5", "2026-10-15T12:00:00.000Z", "Entrega", { status: null }),
+    ];
+
+    const rows = agendaReportEvents(listed, "2026-10-15", "2026-11-10");
+
+    assert.deepEqual(
+      rows.map((row) => row.agenda),
+      ["Entrega", "Reunião", "Fechamento"],
+    );
+    // O evento sai como veio do serviço: estado legado vazio e ocorrência de recorrência.
+    assert.equal(rows[0].status, null);
+    assert.equal(rows[2].recurring_agenda_id, "regra");
+  });
+
+  await runTest("relatório da agenda: usa a agenda compartilhada e a impressão do app (#1734)", () => {
+    const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+    const report = read("./components/DepartmentAgendaReport.tsx");
+    // Uma consulta por mês, pelo mesmo serviço e módulo da tela: o departamento é do servidor.
+    assert.match(report, /agendaService\.list\(module, month\)/);
+    // Mesmo cache mensal da tela: mudar só o dia não refaz consulta e a escrita invalida os dois.
+    assert.match(report, /queryKey: departmentAgendaQueryKey\(module, month, false\)/);
+    assert.match(report, /className="print-report/);
+    assert.match(report, /printReport\(reportId\)/);
+    // Sem exportação própria: o CSV quebrado do legado não volta.
+    assert.doesNotMatch(report, /csv/i);
+    const section = read("./components/DepartmentAgendaSection.tsx");
+    assert.match(section, /<DepartmentAgendaReport\s+module=\{module\}/);
   });
 })();
 
