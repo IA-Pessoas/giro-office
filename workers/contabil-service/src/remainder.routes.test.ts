@@ -837,6 +837,83 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("extrai o Controle vigente com percentual sobre as 17 etapas e observação", async () => {
+    const controls = [
+      {
+        id: "1",
+        client_id: CLIENT,
+        competence: "2026-08",
+        notes: "Aguardando extratos",
+        monthly_closing: true,
+        depreciation: true,
+      },
+      {
+        id: "2",
+        client_id: "other-client",
+        competence: "2026-09",
+        notes: "",
+        monthly_closing: true,
+      },
+    ];
+    const prisma = {
+      controlContabil: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            controls.slice(skip, skip + take),
+          ),
+      },
+      client: { findMany: vi.fn().mockResolvedValue([{ id: CLIENT, cpf_cnpj: "11222333000181" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.control",
+      fields: ["competence", "completed_steps", "completion_percent", "notes"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: [...body.fields, "cpf_cnpj"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          {
+            competence: "2026-08",
+            completed_steps: 2,
+            completion_percent: 11.76,
+            notes: "Aguardando extratos",
+          },
+        ],
+        reachedLimit: false,
+      },
+    });
+    expect(prisma.controlContabil.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, archived_at: null } }),
+    );
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
   it("aplica filtro impossível no reporting em vez de devolver a página bruta", async () => {
     const delegate = { findMany: vi.fn().mockResolvedValue([{ competence: "2026-09" }]) };
     const prisma = {

@@ -161,9 +161,30 @@ describe.each(announced)("execução da fonte %s", (key) => {
   });
 });
 
-it("responsáveis: o filtro por usuário chega igual à origem na prévia e no job, com o mesmo total", async () => {
-  const key = "contabil.responsibles";
-  const rows = [{ company_name: "Alfa Ltda" }, { company_name: "Beta Ltda" }];
+// Prévia (tela) e job (de onde saem CSV e PDF) partem da mesma definição: o critério chega
+// igual à origem e as linhas são as mesmas.
+it.each([
+  {
+    key: "contabil.responsibles",
+    columns: ["company_name"],
+    filter: { field: "responsible_name", operator: "eq", value: "Ana Souza" },
+    rows: [{ company_name: "Alfa Ltda" }, { company_name: "Beta Ltda" }],
+  },
+  {
+    key: "contabil.control",
+    columns: ["competence", "completion_percent", "monthly_closing", "notes"],
+    filter: { field: "competence", operator: "gte", value: "2026-08" },
+    rows: [
+      { competence: "2026-08", completion_percent: 58.82, monthly_closing: true, notes: "Parcial" },
+      { competence: "2026-09", completion_percent: 0, monthly_closing: false, notes: "" },
+    ],
+  },
+])("$key: prévia e job levam o mesmo critério e as mesmas linhas", async ({
+  key,
+  columns,
+  filter,
+  rows,
+}) => {
   const fetchMock = vi.fn().mockImplementation(
     async () =>
       new Response(JSON.stringify({ success: true, data: { rows } }), {
@@ -174,26 +195,25 @@ it("responsáveis: o filtro por usuário chega igual à origem na prévia e no j
   vi.stubGlobal("fetch", fetchMock);
   const definition = reportDefinitionSchema.parse({
     sources: [key],
-    columns: [{ source: key, field: "company_name", alias: "company_name" }],
-    filters: [{ source: key, field: "responsible_name", operator: "eq", parameter: "usuario" }],
-    parameters: [{ name: "usuario", type: "string" }],
+    columns: columns.map((field) => ({ source: key, field, alias: field })),
+    filters: [{ source: key, field: filter.field, operator: filter.operator, parameter: "valor" }],
+    parameters: [{ name: "valor", type: "string" }],
   });
-  const parameterValues = { usuario: "Ana Souza" };
+  const parameterValues = { valor: filter.value };
   const catalog = createWorkerSourceCatalog(env);
   const definitions = new ReportDefinitionService(catalog);
 
   const preview = await new ReportPreviewService(catalog, definitions, 10).preview(
     definition,
     scope,
-    "request-1730",
+    "request-1720",
     parameterValues,
   );
-  // O CSV e o PDF saem do resultado do job.
   const job = await new ReportExecutionService(catalog, definitions).execute({
     definition,
     scope,
     parameterValues,
-    requestId: "request-1730",
+    requestId: "request-1720",
   });
 
   expect(preview.rows).toEqual(rows);
@@ -202,9 +222,7 @@ it("responsáveis: o filtro por usuário chega igual à origem na prévia e no j
     JSON.parse(String((request as RequestInit).body)),
   );
   expect(previewBody.query).toMatchObject({
-    filters: [
-      { field: "responsible_name", operator: "eq", parameter: "usuario", value: "Ana Souza" },
-    ],
+    filters: [{ ...filter, parameter: "valor" }],
   });
   expect(jobBody).toMatchObject({
     source: key,

@@ -1,6 +1,9 @@
 import "./envBootstrap.js";
 
-import { TRIAGE_ACCOUNTING_CHECKLIST_FIELDS } from "@workspace/shared";
+import {
+  CONTABIL_CONTROL_STEP_FIELDS,
+  TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
+} from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { InternalReportingService } from "../services/internalReportingService.js";
@@ -48,6 +51,7 @@ function delegates(monthly: readonly Record<string, unknown>[] = []) {
       ]),
     },
     monthly: { findMany: vi.fn().mockResolvedValue(monthly) },
+    control: { findMany: vi.fn().mockResolvedValue([]) },
     responsibles: {
       findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT_A, customer_with_movement: true }]),
     },
@@ -1074,5 +1078,136 @@ describe("extractTriageReportingPage: responsáveis do Contábil", () => {
       },
     });
     expect(byCompany.rows).toEqual([{ responsible_name: "Ana Souza", posted_by_name: null }]);
+  });
+});
+
+describe("extractTriageReportingPage: Controle Contábil", () => {
+  // Todas as 17 etapas marcadas, menos as que o teste desliga.
+  const steps = (pending: readonly string[] = []) =>
+    Object.fromEntries(CONTABIL_CONTROL_STEP_FIELDS.map((step) => [step, !pending.includes(step)]));
+  const controls = [
+    { id: "1", client_id: CLIENT_A, competence: "2026-07", notes: "Fechado", ...steps() },
+    {
+      id: "2",
+      client_id: CLIENT_A,
+      competence: "2026-08",
+      notes: "Aguardando extratos",
+      ...steps(CONTABIL_CONTROL_STEP_FIELDS.slice(0, 7)),
+    },
+    {
+      id: "3",
+      client_id: CLIENT_A,
+      competence: "2026-09",
+      notes: "",
+      ...steps(CONTABIL_CONTROL_STEP_FIELDS),
+    },
+    { id: "4", client_id: CLIENT_B, competence: "2026-08", notes: "Outro cliente", ...steps() },
+  ];
+
+  it("o percentual é concluídas sobre as 17 etapas do Controle", async () => {
+    expect(CONTABIL_CONTROL_STEP_FIELDS).toHaveLength(17);
+    const prisma = delegates();
+    prisma.control.findMany.mockResolvedValue(controls);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.control",
+        organizationId: ORG,
+        fields: [
+          "name",
+          "competence",
+          "completed_steps",
+          "completion_percent",
+          "monthly_closing",
+          "notes",
+        ],
+        limit: 3,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          name: "Alfa",
+          competence: "2026-07",
+          completed_steps: 17,
+          completion_percent: 100,
+          monthly_closing: true,
+          notes: "Fechado",
+        },
+        // Etapas parciais: 10 de 17.
+        {
+          name: "Alfa",
+          competence: "2026-08",
+          completed_steps: 10,
+          completion_percent: 58.82,
+          monthly_closing: true,
+          notes: "Aguardando extratos",
+        },
+        {
+          name: "Alfa",
+          competence: "2026-09",
+          completed_steps: 0,
+          completion_percent: 0,
+          monthly_closing: false,
+          notes: "",
+        },
+      ],
+      reachedLimit: true,
+    });
+    // Só o controle vigente da organização do grant; o arquivado fica no histórico.
+    expect(prisma.control.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, archived_at: null } }),
+    );
+    expect(prisma.clients.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, id: { in: [CLIENT_A] } } }),
+    );
+  });
+
+  it("filtra por cliente e intervalo de competência com o mesmo total na lista e no resumo", async () => {
+    const prisma = delegates();
+    const database = {
+      $transaction: vi.fn(),
+      // A consulta com critérios pagina com `skip`: devolve a página pedida.
+      controlContabil: {
+        findMany: vi.fn(async (query: { skip?: number }) => controls.slice(query.skip)),
+      },
+      client: prisma.clients,
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    const filters = [
+      { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+      {
+        field: "competence",
+        operator: "between",
+        parameter: "periodo",
+        value: ["2026-08", "2026-09"],
+      },
+    ];
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.control",
+      fields: ["competence", "completion_percent", "notes"],
+      limit: 50,
+      query: { filters, order_by: [{ field: "competence", direction: "desc" }] },
+    });
+    expect(listed.rows).toEqual([
+      { competence: "2026-09", completion_percent: 0, notes: "" },
+      { competence: "2026-08", completion_percent: 58.82, notes: "Aguardando extratos" },
+    ]);
+
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.control",
+      fields: ["competence"],
+      limit: 50,
+      query: {
+        filters,
+        aggregations: [{ field: "competence", function: "count", alias: "competencias" }],
+      },
+    });
+    expect(totals.rows).toEqual([{ competencias: listed.rows.length }]);
   });
 });
