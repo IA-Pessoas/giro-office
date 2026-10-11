@@ -60,12 +60,17 @@ import {
   listRelationshipHistory,
   type RelationshipHistoryPrisma,
 } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
+import {
+  listTriageDocumentHistory,
+  type TriageDocumentHistoryPrisma,
+} from "../../../services/contabil-service/src/services/triageDocumentHistoryService.js";
 import { createContabilAudit } from "./audit.js";
 import {
   authenticateContabilRequest,
   contabilPermission,
   requireContabilModule,
   requireContabilWrite,
+  requireTriagemAdmin,
   requireTriagemModule,
 } from "./auth.js";
 import type { ContabilWorkerEnv } from "./env.js";
@@ -98,6 +103,7 @@ import {
   statementSchema,
   triageConfigBodySchema,
   triageConfigQuerySchema,
+  triageDocumentHistorySchema,
 } from "./schemas.js";
 import {
   type AuthContext,
@@ -834,6 +840,22 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const body = parseWithZod(cloudUpdateSchema, await readJson(c));
     const data = await withDocuments(c, (service) =>
       service.updateCloud(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/documents/history", async (c) => {
+    const query = parseWithZod(triageDocumentHistorySchema, c.req.query());
+    const auth = c.get("auth");
+    // Sem cliente é a organização inteira: alterações recentes, só para administrador.
+    if (!query.client_id) requireTriagemAdmin(auth);
+    const data = await withPrisma(c, options, (prisma) =>
+      listTriageDocumentHistory(prisma as unknown as TriageDocumentHistoryPrisma, {
+        organizationId: auth.organizationId,
+        ...(query.client_id ? { clientId: query.client_id } : {}),
+        ...(query.competence ? { competence: query.competence } : {}),
+        page: query.page,
+        pageSize: query.pageSize,
+      }),
     );
     return c.json(createSuccessResponse(data));
   });

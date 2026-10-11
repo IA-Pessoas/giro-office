@@ -2,6 +2,7 @@ import {
   error as logError,
   warn as logWarn,
   ServiceError,
+  TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
   TRIAGE_DOCUMENT_STATUSES,
   TRIAGE_FISCAL_CHECKLIST_FIELDS,
   type TriageDocumentStatus,
@@ -17,18 +18,7 @@ import type {
   TriagemOverviewSummaryRequest,
 } from "../integrations/triagemOverviewClient.js";
 
-export const TRIAGE_DOCUMENT_FIELDS = [
-  "financial_transactions",
-  "triaged_transactions",
-  "inventory_control",
-  "accounts_payable_report",
-  "accounts_receivable_report",
-  "card_statements",
-  "loan_agreements",
-  "bank_reconciliation",
-  "bank_investments",
-  "card_sales_report",
-] as const;
+export const TRIAGE_DOCUMENT_FIELDS = TRIAGE_ACCOUNTING_CHECKLIST_FIELDS;
 
 // Definidos no shared: o Fiscal lê o mesmo checklist (controle mensal).
 export { TRIAGE_DOCUMENT_STATUSES, TRIAGE_FISCAL_CHECKLIST_FIELDS };
@@ -377,7 +367,14 @@ export class TriageDocumentsService {
             type: "FISCAL",
             archived_at: null,
           },
-          select: { id: true, checklist: true, item_notes: true },
+          select: {
+            id: true,
+            checklist: true,
+            item_notes: true,
+            billing_amount: true,
+            justification: true,
+            notes: true,
+          },
           take: 1,
         },
         triageCompetences: {
@@ -459,6 +456,9 @@ export class TriageDocumentsService {
                 id: monthly.id,
                 checklist: asChecklist(monthly.checklist, TRIAGE_FISCAL_CHECKLIST_FIELDS),
                 item_notes: asItemNotes(monthly.item_notes, TRIAGE_FISCAL_CHECKLIST_FIELDS),
+                billing_amount: monthly.billing_amount ?? null,
+                justification: monthly.justification ?? null,
+                notes: monthly.notes ?? null,
               }
             : null,
         };
