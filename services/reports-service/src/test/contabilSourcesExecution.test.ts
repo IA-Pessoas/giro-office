@@ -160,3 +160,55 @@ describe.each(announced)("execução da fonte %s", (key) => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+it("responsáveis: o filtro por usuário chega igual à origem na prévia e no job, com o mesmo total", async () => {
+  const key = "contabil.responsibles";
+  const rows = [{ company_name: "Alfa Ltda" }, { company_name: "Beta Ltda" }];
+  const fetchMock = vi.fn().mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ success: true, data: { rows } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  const definition = reportDefinitionSchema.parse({
+    sources: [key],
+    columns: [{ source: key, field: "company_name", alias: "company_name" }],
+    filters: [{ source: key, field: "responsible_name", operator: "eq", parameter: "usuario" }],
+    parameters: [{ name: "usuario", type: "string" }],
+  });
+  const parameterValues = { usuario: "Ana Souza" };
+  const catalog = createWorkerSourceCatalog(env);
+  const definitions = new ReportDefinitionService(catalog);
+
+  const preview = await new ReportPreviewService(catalog, definitions, 10).preview(
+    definition,
+    scope,
+    "request-1730",
+    parameterValues,
+  );
+  // O CSV e o PDF saem do resultado do job.
+  const job = await new ReportExecutionService(catalog, definitions).execute({
+    definition,
+    scope,
+    parameterValues,
+    requestId: "request-1730",
+  });
+
+  expect(preview.rows).toEqual(rows);
+  expect(job).toEqual(preview.rows);
+  const [previewBody, jobBody] = fetchMock.mock.calls.map(([, request]) =>
+    JSON.parse(String((request as RequestInit).body)),
+  );
+  expect(previewBody.query).toMatchObject({
+    filters: [
+      { field: "responsible_name", operator: "eq", parameter: "usuario", value: "Ana Souza" },
+    ],
+  });
+  expect(jobBody).toMatchObject({
+    source: key,
+    fields: previewBody.fields,
+    query: previewBody.query,
+  });
+});

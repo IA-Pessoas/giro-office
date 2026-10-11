@@ -950,3 +950,129 @@ describe("extractTriageReportingPage: grade Contábil do painel", () => {
     expect(totals.rows).toHaveLength(2);
   });
 });
+
+describe("extractTriageReportingPage: responsáveis do Contábil", () => {
+  const OUTSIDER = "usuario-de-outra-organizacao";
+  const records = [
+    {
+      client_id: CLIENT_A,
+      person_responsible_id: USER_ANA,
+      posted_by_id: OUTSIDER,
+      customer_with_movement: true,
+    },
+  ];
+
+  it("lista cada cliente do Contábil com responsável e responsável pelo lançamento", async () => {
+    const prisma = delegates();
+    prisma.responsibles.findMany.mockResolvedValue(records);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.responsibles",
+        organizationId: ORG,
+        fields: ["name", "responsible_name", "posted_by_name", "customer_with_movement"],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        // Usuário de outra organização não tem nome publicado.
+        {
+          name: "Alfa",
+          responsible_name: "Ana Souza",
+          posted_by_name: null,
+          customer_with_movement: true,
+        },
+        // Cliente sem responsável cadastrado aparece, como no relatório legado.
+        {
+          name: "Beta",
+          responsible_name: null,
+          posted_by_name: null,
+          customer_with_movement: false,
+        },
+      ],
+      reachedLimit: false,
+    });
+    // A linha é o cliente da organização do grant: cadastro apontando para cliente de outra
+    // organização não tem como entrar.
+    expect(prisma.clients.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.clients.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, contabil: true },
+        select: { id: true, name: true },
+      }),
+    );
+    expect(prisma.responsibles.findMany).toHaveBeenCalledWith({
+      where: { organization_id: ORG, client_id: { in: [CLIENT_A, CLIENT_B] } },
+      select: {
+        client_id: true,
+        customer_with_movement: true,
+        person_responsible_id: true,
+        posted_by_id: true,
+      },
+      orderBy: { id: "asc" },
+    });
+    expect(prisma.users.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, id: { in: [USER_ANA, OUTSIDER] } },
+      }),
+    );
+    expect(prisma.assignments.findMany).not.toHaveBeenCalled();
+  });
+
+  it("filtra por empresa e por usuário com o mesmo total na lista e no agrupamento", async () => {
+    const prisma = delegates();
+    prisma.responsibles.findMany.mockResolvedValue([
+      ...records,
+      { client_id: CLIENT_B, person_responsible_id: USER_BRUNO, posted_by_id: USER_ANA },
+    ]);
+    const database = {
+      $transaction: vi.fn(),
+      // A consulta com critérios pagina com `skip`: devolve a página pedida.
+      client: { findMany: vi.fn(async (query: { skip?: number }) => clientRows.slice(query.skip)) },
+      responsibleContabil: prisma.responsibles,
+      user: prisma.users,
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    const byUser = [
+      { field: "responsible_name", operator: "eq", parameter: "usuario", value: "Bruno Lima" },
+    ];
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.responsibles",
+      fields: ["name"],
+      limit: 50,
+      query: { filters: byUser },
+    });
+    expect(listed.rows).toEqual([{ name: "Beta" }]);
+
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.responsibles",
+      fields: ["responsible_name"],
+      limit: 50,
+      query: {
+        filters: byUser,
+        group_by: ["responsible_name"],
+        aggregations: [{ field: "responsible_name", function: "count", alias: "empresas" }],
+      },
+    });
+    expect(totals.rows).toEqual([{ responsible_name: "Bruno Lima", empresas: listed.rows.length }]);
+
+    const byCompany = await service.extract({
+      organizationId: ORG,
+      source: "contabil.responsibles",
+      fields: ["responsible_name", "posted_by_name"],
+      limit: 50,
+      query: {
+        filters: [
+          { field: "cpf_cnpj", operator: "eq", parameter: "empresa", value: "11222333000181" },
+        ],
+      },
+    });
+    expect(byCompany.rows).toEqual([{ responsible_name: "Ana Souza", posted_by_name: null }]);
+  });
+});

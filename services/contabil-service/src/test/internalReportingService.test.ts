@@ -85,12 +85,16 @@ describe("InternalReportingService", () => {
   });
 
   it("extrai o indicador de movimento de responsáveis com escopo da organização", async () => {
+    const client = { findMany: vi.fn().mockResolvedValue([{ id: "a" }, { id: "b" }]) };
     const responsible = {
-      findMany: vi
-        .fn()
-        .mockResolvedValue([{ customer_with_movement: true }, { customer_with_movement: false }]),
+      findMany: vi.fn().mockResolvedValue([{ client_id: "a", customer_with_movement: true }]),
     };
-    const service = new InternalReportingService({ responsibleContabil: responsible } as never);
+    const user = { findMany: vi.fn() };
+    const service = new InternalReportingService({
+      client,
+      responsibleContabil: responsible,
+      user,
+    } as never);
 
     await expect(
       service.extract({
@@ -103,11 +107,20 @@ describe("InternalReportingService", () => {
       rows: [{ customer_with_movement: true }],
       reachedLimit: true,
     });
-    expect(responsible.findMany).toHaveBeenCalledWith({
-      where: { organization_id: ORG_A },
-      select: { customer_with_movement: true },
+    expect(client.findMany).toHaveBeenCalledWith({
+      where: { organization_id: ORG_A, contabil: true },
+      select: { id: true },
+      orderBy: { id: "asc" },
+      skip: 0,
       take: 2,
     });
+    expect(responsible.findMany).toHaveBeenCalledWith({
+      where: { organization_id: ORG_A, client_id: { in: ["a"] } },
+      select: { client_id: true, customer_with_movement: true },
+      orderBy: { id: "asc" },
+    });
+    // Sem nome de responsável pedido, a tabela de usuários não é lida.
+    expect(user.findMany).not.toHaveBeenCalled();
   });
 
   it("não publica ids, organização ou observação do relacionamento", async () => {

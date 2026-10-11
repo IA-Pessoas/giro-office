@@ -105,6 +105,17 @@ describe("internal reporting routes", () => {
       (source: { key: string }) => source.key === "contabil.responsibles",
     );
     expect(responsibles.fields.map((field: { key: string }) => field.key)).toEqual([
+      "responsible_name",
+      "posted_by_name",
+      "name",
+      "company_name",
+      "cpf_cnpj",
+      "status",
+      "regime",
+      "competence_entry",
+      "deletion_date",
+      "contabil",
+      "fiscal",
       "customer_with_movement",
     ]);
     expect(responsibles.keys.map((field: { key: string }) => field.key)).toEqual([

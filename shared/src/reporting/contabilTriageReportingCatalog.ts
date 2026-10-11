@@ -24,9 +24,9 @@ function field(
   };
 }
 
-// Mesmos campos de cliente, serviço contratado e movimento em todas as áreas: o filtro vale
-// igual em cada uma.
-const clientFields = [
+// Mesmos campos de cliente, serviço contratado e movimento em todas as áreas, inclusive nos
+// responsáveis do Contábil: o filtro vale igual em cada uma.
+export const contabilClientReportingFields = [
   field("name", "Nome", "string", stringOperators),
   field("company_name", "Razão social", "string", stringOperators),
   field("cpf_cnpj", "CPF/CNPJ", "string", stringOperators),
@@ -60,7 +60,7 @@ export const contabilTriageReportingCatalog = {
       minimum_permission: 1,
       keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
       fields: [
-        ...clientFields,
+        ...contabilClientReportingFields,
         field("cloud_types", "Tipos de Cloud", "string", stringOperators),
         field("clouds", "Clouds (tipo e link)", "string", stringOperators),
       ],
@@ -74,7 +74,7 @@ export const contabilTriageReportingCatalog = {
       fields: [
         field("competence", "Competência", "string", competenceOperators),
         field("sends_movement", "Movimento enviado", "boolean", booleanOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -86,7 +86,7 @@ export const contabilTriageReportingCatalog = {
       fields: [
         field("type", "Serviço da Triagem", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -99,7 +99,7 @@ export const contabilTriageReportingCatalog = {
         field("competence", "Competência", "string", competenceOperators),
         field("type", "Serviço da Triagem", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -114,7 +114,7 @@ export const contabilTriageReportingCatalog = {
         field("completed_items", "Itens concluídos", "number", numberOperators),
         field("applicable_items", "Itens aplicáveis", "number", numberOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -151,7 +151,7 @@ export const contabilTriageReportingCatalog = {
         field("billing_amount", "Faturamento", "string", stringOperators),
         field("delivery_method", "Meio de envio", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -181,7 +181,7 @@ export const contabilTriageReportingCatalog = {
         field("justification", "Justificativa", "string", stringOperators),
         field("notes", "Observação", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
   ],

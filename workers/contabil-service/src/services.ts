@@ -24,7 +24,7 @@ import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import {
   extractTriageReportingPage,
-  isTriageReportingSource,
+  isClientReportingSource,
 } from "../../../services/contabil-service/src/services/triageReportingService.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
@@ -2067,7 +2067,7 @@ export function createReportingService(
     const allowed = getContabilReportingFields(input.source as never);
     if (input.fields.some((field) => !allowed.includes(field)))
       throw new ServiceError(403, "Campo não publicado para relatórios.");
-    if (isTriageReportingSource(input.source)) {
+    if (isClientReportingSource(input.source)) {
       return extractTriageReportingPage(
         {
           clients: input.prisma.client,
@@ -2086,9 +2086,7 @@ export function createReportingService(
     const delegate =
       input.source === "contabil.control"
         ? input.prisma.controlContabil
-        : input.source === "contabil.responsibles"
-          ? input.prisma.responsibleContabil
-          : input.prisma.relationshipContabil;
+        : input.prisma.relationshipContabil;
     const rows = await delegate.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
