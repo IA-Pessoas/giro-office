@@ -49,6 +49,28 @@ describe("veri routes", () => {
     expect(findMany.mock.calls[0]?.[0].where.organization_id).toBe(ORGANIZATION_ID);
   });
 
+  // A comparação não grava nada: basta a leitura do módulo, como nos relatórios do legado.
+  it("aceita o nível de leitura e mantém a escrita vizinha no nível 2", async () => {
+    const compare = vi
+      .spyOn(VeriComparisonService.prototype, "compare")
+      .mockResolvedValue({ rows: [], invalid: [], totals: {} } as never);
+    const app = createTestApp({} as PrismaClient);
+
+    await request(app)
+      .post("/regularize/veri/compare")
+      .set(gatewayHeaders({ permission: 1 }))
+      .set("content-type", VERI_XLSX_MIME_TYPE)
+      .send(veriWorkbook([["a"], ["b"]]))
+      .expect(200);
+    await request(app)
+      .post("/regularize/dte/import")
+      .set(gatewayHeaders({ permission: 1 }))
+      .send({ format: "json", content: "[]" })
+      .expect(403);
+
+    expect(compare).toHaveBeenCalledOnce();
+  });
+
   it("recusa quem não está autenticado, outro tipo de conteúdo e arquivo acima do limite", async () => {
     const compare = vi.spyOn(VeriComparisonService.prototype, "compare");
     const app = createTestApp({} as PrismaClient);
@@ -58,10 +80,9 @@ describe("veri routes", () => {
       .set("content-type", VERI_XLSX_MIME_TYPE)
       .send(Buffer.from([1]))
       .expect(401);
-    // Como todo POST do módulo, pede permissão de escrita.
     await request(app)
       .post("/regularize/veri/compare")
-      .set(gatewayHeaders({ permission: 1 }))
+      .set(gatewayHeaders({ permission: 0 }))
       .set("content-type", VERI_XLSX_MIME_TYPE)
       .send(Buffer.from([1]))
       .expect(403);

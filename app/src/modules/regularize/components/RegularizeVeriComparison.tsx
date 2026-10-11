@@ -21,8 +21,8 @@ import {
 } from "./regularizeFormControls";
 
 // Comparador Veri (#1755): a planilha é lida no serviço e nada fica gravado; o resultado só
-// existe nesta tela até a próxima comparação.
-export function RegularizeVeriComparison({ canEdit }: { canEdit: boolean }) {
+// existe nesta tela até a próxima comparação. Por isso basta o acesso de leitura ao módulo.
+export function RegularizeVeriComparison() {
   const [file, setFile] = useState<File | null>(null);
   const compareMutation = useCompareRegularizeVeriMutation();
   const comparison = compareMutation.data;
@@ -40,38 +40,32 @@ export function RegularizeVeriComparison({ canEdit }: { canEdit: boolean }) {
         real do Veri: confira o resultado.
       </p>
 
-      {canEdit ? (
-        <form
-          className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (file) compareMutation.mutate(file);
-          }}
+      <form
+        className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (file) compareMutation.mutate(file);
+        }}
+      >
+        <label className={regularizePanelLabelClassName}>
+          Planilha XLSX (até 2 MB)
+          <input
+            type="file"
+            accept={`.xlsx,${VERI_XLSX_MIME_TYPE}`}
+            className={`${regularizeTextFieldClassName} mt-1.5`}
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            disabled={compareMutation.isPending}
+            aria-invalid={tooLarge}
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={compareMutation.isPending || !file || tooLarge}
+          className={regularizePrimaryButtonClassName}
         >
-          <label className={regularizePanelLabelClassName}>
-            Planilha XLSX (até 2 MB)
-            <input
-              type="file"
-              accept={`.xlsx,${VERI_XLSX_MIME_TYPE}`}
-              className={`${regularizeTextFieldClassName} mt-1.5`}
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              disabled={compareMutation.isPending}
-              aria-invalid={tooLarge}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={compareMutation.isPending || !file || tooLarge}
-            className={regularizePrimaryButtonClassName}
-          >
-            {compareMutation.isPending ? "Comparando…" : "Comparar"}
-          </button>
-        </form>
-      ) : (
-        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-          Seu acesso não permite enviar planilhas para comparação.
-        </p>
-      )}
+          {compareMutation.isPending ? "Comparando…" : "Comparar"}
+        </button>
+      </form>
 
       {tooLarge ? (
         <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">

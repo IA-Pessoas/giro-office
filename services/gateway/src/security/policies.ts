@@ -381,6 +381,8 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/department(?:\/|$)/, policy: tiModulePolicy },
   { method: "ANY", path: /^\/department(?:\/|$)/, policy: tiEditPolicy },
   { method: "GET", path: /^\/regularize(?:\/|$)/, policy: regularizeModulePolicy },
+  // O comparador Veri só lê a carteira e não grava nada: basta o acesso de leitura (#1739).
+  { method: "POST", path: /^\/regularize\/veri\/compare$/, policy: regularizeModulePolicy },
   { method: "ANY", path: /^\/regularize(?:\/|$)/, policy: regularizeEditPolicy },
   { method: "GET", path: /^\/fiscal(?:\/|$)/, policy: fiscalModulePolicy },
   { method: "ANY", path: /^\/fiscal(?:\/|$)/, policy: fiscalEditPolicy },

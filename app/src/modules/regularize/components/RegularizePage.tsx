@@ -2945,7 +2945,7 @@ export function RegularizePage() {
         </div>
       ) : null}
 
-      {activeTab === "veri" ? <RegularizeVeriComparison canEdit={regularizeAccess.canEdit} /> : null}
+      {activeTab === "veri" ? <RegularizeVeriComparison /> : null}
 
       {activeTab === "catalogs" ? (
         // Regimes e segmentos que a ficha Regularize usa; editar exige Regularize nível 2 (#1740, #1741).

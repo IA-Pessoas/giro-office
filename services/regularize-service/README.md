@@ -55,7 +55,7 @@ Exemplos de paths publicos:
 - `/regularize/dte/queries?date=aaaa-mm-dd` - grade de consultas diárias ao DTE por cliente
 - `/regularize/dte/queries/status` - marca a consulta de um cliente como feita, não feita ou sem registro, com registro em `logs`
 - `/regularize/dte/queries/import` - registra as consultas do dia pelas listas de CPF/CNPJ feitas e não feitas
-- `/regularize/veri/compare` - compara um XLSX do Veri com a carteira pelo CPF/CNPJ; nada é gravado; leitor verificado só com casos sintéticos
+- `/regularize/veri/compare` - compara um XLSX do Veri com a carteira pelo CPF/CNPJ; nada é gravado, por isso basta permissão Regularize 1; leitor verificado só com casos sintéticos
 - `/regularize/process`
 - `/regularize/processes`
 - `/regularize/guidance`

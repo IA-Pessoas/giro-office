@@ -474,9 +474,20 @@ describe("regularize Worker", () => {
     expect((await post(new Uint8Array(2 * 1024 * 1024 + 1), xlsx)).status).toBe(413);
     expect((await post(new Uint8Array([1]), xlsx, {})).status).toBe(401);
     expect(
-      (await post(new Uint8Array([1]), xlsx, { ...headers(), "x-auth-permission": "1" })).status,
+      (await post(new Uint8Array([1]), xlsx, { ...headers(), "x-auth-permission": "0" })).status,
     ).toBe(403);
+    expect((await post(new Uint8Array([1]), xlsx, headers())).status).toBe(403);
     expect(veri.compare).toHaveBeenCalledOnce();
+
+    // A comparação não grava nada: basta a leitura do módulo. A escrita vizinha segue no nível 2.
+    const reader = { ...headers(), "x-auth-permission": "1" };
+    expect((await post(new Uint8Array([1]), xlsx, reader)).status).toBe(200);
+    const dteImport = await app.request("https://regularize.test/regularize/dte/import", {
+      method: "POST",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify({ format: "json", content: "[]" }),
+    });
+    expect(dteImport.status).toBe(403);
   });
 
   it("routes DTE import with write permission and lists imports by organization", async () => {

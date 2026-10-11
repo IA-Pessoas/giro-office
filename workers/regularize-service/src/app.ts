@@ -438,6 +438,7 @@ function localService(
   };
 }
 
+const MIN_REGULARIZE_READ_PERMISSION = 1;
 const MIN_REGULARIZE_WRITE_PERMISSION = 2;
 
 export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
@@ -1039,8 +1040,10 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
   app.post(
     "/regularize/veri/compare",
     async (c, next) => {
-      // Mesma regra do serviço Express: todo POST do módulo pede permissão de escrita.
-      requireWritePermission(c, "Permissão insuficiente para comparar a planilha Veri.");
+      // Mesma regra do serviço Express: a comparação não grava nada, basta a leitura (#1739).
+      if (Number(c.get("auth").claims.permission ?? 0) < MIN_REGULARIZE_READ_PERMISSION) {
+        throw new ServiceError(403, "Permissão insuficiente para comparar a planilha Veri.");
+      }
       const contentType = c.req.header("content-type")?.split(";")[0].trim().toLowerCase();
       if (contentType !== VERI_XLSX_MIME_TYPE) {
         throw new ServiceError(415, "Envie um arquivo XLSX.");
