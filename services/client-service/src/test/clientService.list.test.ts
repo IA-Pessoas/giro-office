@@ -327,6 +327,27 @@ describe("ClientService.listInstagramProfiles", () => {
     const pageQuery = queryRaw.mock.calls[0]?.[0] as { sql: string; values: unknown[] };
     expect(pageQuery.sql).toContain("c.instagram ~ '[^[:space:]]'");
     expect(pageQuery.values).toContain(TEST_ORG_ID);
+    expect(pageQuery.sql).not.toContain("c.status =");
+  });
+
+  it("restringe à situação pedida na página e no total", async () => {
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: 0n }]);
+    const service = new ClientService({ $queryRaw: queryRaw } as unknown as PrismaClient);
+
+    await service.listInstagramProfiles(TEST_ORG_ID, {
+      page: 1,
+      pageSize: 100,
+      profile: "without",
+      status: "Ativo",
+    });
+
+    for (const [query] of queryRaw.mock.calls as Array<[{ sql: string; values: unknown[] }]>) {
+      expect(query.sql).toContain("c.status =");
+      expect(query.values).toContain("Ativo");
+    }
   });
 });
 

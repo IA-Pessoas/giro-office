@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 /** Tabela dos relatórios imprimíveis de Marketing; recebe as mesmas linhas usadas no CSV. */
 export function MarketingReportTable({
   title,
@@ -9,7 +11,7 @@ export function MarketingReportTable({
   title: string;
   columns: readonly string[];
   ids: readonly string[];
-  rows: readonly (readonly string[])[];
+  rows: readonly (readonly ReactNode[])[];
   emptyMessage: string;
 }) {
   return (

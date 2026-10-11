@@ -17,6 +17,7 @@ import {
   createClientBodySchema,
   isAdminPermission,
   listClientsQuerySchema,
+  listInstagramProfilesQuerySchema,
   updateClientBodySchema,
 } from "../../../services/client-service/src/schemas/client.schemas.js";
 import {
@@ -251,6 +252,28 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
             },
             authz(c),
           ),
+        ),
+      );
+    }),
+  );
+
+  // Mesma regra do Node: leitura do Marketing ou da Integração; o escopo vem da sessão.
+  app.get("/client/instagram-profiles/report", async (c) =>
+    withService(c, async (service) => {
+      const query = parse(listInstagramProfilesQuerySchema, c.req.query());
+      const organization = organizationId(c);
+      if ((c.get("auth").claims.modules.marketing ?? 0) < 1) {
+        requireModule(c, "integracao", 1, true);
+      }
+      return c.json(
+        createSuccessResponse(
+          await service.listInstagramProfiles(organization, {
+            page: query.page,
+            pageSize: query.limit,
+            profile: query.profile,
+            search: query.search,
+            status: query.status,
+          }),
         ),
       );
     }),
