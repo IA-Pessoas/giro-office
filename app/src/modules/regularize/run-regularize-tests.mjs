@@ -1943,6 +1943,9 @@ await runTest("group map screen reads the generated map through the Regularize c
   assert.match(contractSource, /\/regularize\/groups\/\$\{groupId\}\/map/);
   assert.match(pageSource, /<RegularizeGroupMap canEdit=\{regularizeAccess\.canEdit\} \/>/);
   assert.match(componentSource, /useRegularizeGroupMap\(groupId\)/);
+  // Os selects do mapa ficam abaixo do rótulo: sem block, a largura fixa os deixa ao lado do texto.
+  assert.match(componentSource, /className="mt-1\.5 block sm:w-80"/);
+  assert.match(componentSource, /className="mt-1\.5 block sm:w-48"/);
 });
 
 await runTest("group map edits change text, colour and items without touching the rest (#1749)", async () => {

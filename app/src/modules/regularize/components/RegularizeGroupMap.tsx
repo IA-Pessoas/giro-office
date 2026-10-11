@@ -358,7 +358,7 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
       <label className={`${labelClassName} mt-5`}>
         Grupo
         <RegularizeNativeSelect
-          className="mt-1.5 sm:w-80"
+          className="mt-1.5 block sm:w-80"
           value={groupId}
           onChange={(event) => selectGroup(event.target.value)}
           disabled={groupsQuery.isLoading}
@@ -486,7 +486,7 @@ export function RegularizeGroupMap({ canEdit }: { canEdit: boolean }) {
                   <label className={labelClassName}>
                     Cor
                     <RegularizeNativeSelect
-                      className="mt-1.5 sm:w-48"
+                      className="mt-1.5 block sm:w-48"
                       value={editColor}
                       onChange={(event) => setEditColor(event.target.value)}
                     >
