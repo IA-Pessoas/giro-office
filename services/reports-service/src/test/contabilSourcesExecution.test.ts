@@ -1,8 +1,9 @@
-import { CONTABIL_REPORTING_SOURCES } from "@workspace/shared";
+import { CONTABIL_REPORTING_SOURCES, REPORTING_QUERY_ROW_LIMIT_CODE } from "@workspace/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { reportingSources } from "../../../../shared/src/reporting/reportingSources.js";
 
 import { parseReportsServiceEnv } from "../config/env.js";
+import { REPORT_SNAPSHOT_LIMIT_MESSAGE } from "../integrations/reportCriteria.js";
 import { reportDefinitionSchema } from "../schemas/reportDefinition.schemas.js";
 import { ReportDefinitionService } from "../services/reportDefinitionService.js";
 import { ReportExecutionService } from "../services/reportExecutionService.js";
@@ -97,6 +98,28 @@ describe.each(announced)("execução da fonte %s", (key) => {
       service.preview(definition(), scope, "request-1729", { flag: true }),
       `A prévia de ${key} não foi entregue.`,
     ).resolves.toMatchObject({ rows: [{ [String(field)]: true }] });
+  });
+
+  it("traduz o 422 de limite de linhas da origem na mensagem de limite global", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: REPORTING_QUERY_ROW_LIMIT_CODE }), {
+          status: 422,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    const catalog = createWorkerSourceCatalog(env);
+
+    await expect(
+      new ReportExecutionService(catalog, new ReportDefinitionService(catalog)).execute({
+        definition: definition(),
+        scope,
+        parameterValues: { flag: true },
+        requestId: "request-1729",
+      }),
+    ).rejects.toMatchObject({ statusCode: 422, message: REPORT_SNAPSHOT_LIMIT_MESSAGE });
   });
 
   it("recusa prévia e job sem permissão no Contábil, sem consultar a origem", async () => {
