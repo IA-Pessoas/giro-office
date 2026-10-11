@@ -1,6 +1,9 @@
 import "./envBootstrap.js";
 
-import { TRIAGE_ACCOUNTING_CHECKLIST_FIELDS } from "@workspace/shared";
+import {
+  CONTABIL_CONTROL_STEP_FIELDS,
+  TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
+} from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { InternalReportingService } from "../services/internalReportingService.js";
@@ -48,6 +51,8 @@ function delegates(monthly: readonly Record<string, unknown>[] = []) {
       ]),
     },
     monthly: { findMany: vi.fn().mockResolvedValue(monthly) },
+    control: { findMany: vi.fn().mockResolvedValue([]) },
+    relationships: { findMany: vi.fn().mockResolvedValue([]) },
     responsibles: {
       findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT_A, customer_with_movement: true }]),
     },
@@ -948,5 +953,662 @@ describe("extractTriageReportingPage: grade Contábil do painel", () => {
       ]),
     );
     expect(totals.rows).toHaveLength(2);
+  });
+});
+
+describe("extractTriageReportingPage: responsáveis do Contábil", () => {
+  const OUTSIDER = "usuario-de-outra-organizacao";
+  const records = [
+    {
+      client_id: CLIENT_A,
+      person_responsible_id: USER_ANA,
+      posted_by_id: OUTSIDER,
+      customer_with_movement: true,
+    },
+  ];
+
+  it("lista cada cliente do Contábil com responsável e responsável pelo lançamento", async () => {
+    const prisma = delegates();
+    prisma.responsibles.findMany.mockResolvedValue(records);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.responsibles",
+        organizationId: ORG,
+        fields: ["name", "responsible_name", "posted_by_name", "customer_with_movement"],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        // Usuário de outra organização não tem nome publicado.
+        {
+          name: "Alfa",
+          responsible_name: "Ana Souza",
+          posted_by_name: null,
+          customer_with_movement: true,
+        },
+        // Cliente sem responsável cadastrado aparece, como no relatório legado.
+        {
+          name: "Beta",
+          responsible_name: null,
+          posted_by_name: null,
+          customer_with_movement: false,
+        },
+      ],
+      reachedLimit: false,
+    });
+    // A linha é o cliente da organização do grant: cadastro apontando para cliente de outra
+    // organização não tem como entrar.
+    expect(prisma.clients.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.clients.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, contabil: true },
+        select: { id: true, name: true },
+      }),
+    );
+    expect(prisma.responsibles.findMany).toHaveBeenCalledWith({
+      where: { organization_id: ORG, client_id: { in: [CLIENT_A, CLIENT_B] } },
+      select: {
+        client_id: true,
+        customer_with_movement: true,
+        person_responsible_id: true,
+        posted_by_id: true,
+      },
+      orderBy: { id: "asc" },
+    });
+    expect(prisma.users.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, id: { in: [USER_ANA, OUTSIDER] } },
+      }),
+    );
+    expect(prisma.assignments.findMany).not.toHaveBeenCalled();
+  });
+
+  it("filtra por empresa e por usuário com o mesmo total na lista e no agrupamento", async () => {
+    const prisma = delegates();
+    prisma.responsibles.findMany.mockResolvedValue([
+      ...records,
+      { client_id: CLIENT_B, person_responsible_id: USER_BRUNO, posted_by_id: USER_ANA },
+    ]);
+    const database = {
+      $transaction: vi.fn(),
+      // A consulta com critérios pagina com `skip`: devolve a página pedida.
+      client: { findMany: vi.fn(async (query: { skip?: number }) => clientRows.slice(query.skip)) },
+      responsibleContabil: prisma.responsibles,
+      user: prisma.users,
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    const byUser = [
+      { field: "responsible_name", operator: "eq", parameter: "usuario", value: "Bruno Lima" },
+    ];
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.responsibles",
+      fields: ["name"],
+      limit: 50,
+      query: { filters: byUser },
+    });
+    expect(listed.rows).toEqual([{ name: "Beta" }]);
+
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.responsibles",
+      fields: ["responsible_name"],
+      limit: 50,
+      query: {
+        filters: byUser,
+        group_by: ["responsible_name"],
+        aggregations: [{ field: "responsible_name", function: "count", alias: "empresas" }],
+      },
+    });
+    expect(totals.rows).toEqual([{ responsible_name: "Bruno Lima", empresas: listed.rows.length }]);
+
+    const byCompany = await service.extract({
+      organizationId: ORG,
+      source: "contabil.responsibles",
+      fields: ["responsible_name", "posted_by_name"],
+      limit: 50,
+      query: {
+        filters: [
+          { field: "cpf_cnpj", operator: "eq", parameter: "empresa", value: "11222333000181" },
+        ],
+      },
+    });
+    expect(byCompany.rows).toEqual([{ responsible_name: "Ana Souza", posted_by_name: null }]);
+  });
+});
+
+describe("extractTriageReportingPage: Controle Contábil", () => {
+  // Todas as 17 etapas marcadas, menos as que o teste desliga.
+  const steps = (pending: readonly string[] = []) =>
+    Object.fromEntries(CONTABIL_CONTROL_STEP_FIELDS.map((step) => [step, !pending.includes(step)]));
+  const controls = [
+    { id: "1", client_id: CLIENT_A, competence: "2026-07", notes: "Fechado", ...steps() },
+    {
+      id: "2",
+      client_id: CLIENT_A,
+      competence: "2026-08",
+      notes: "Aguardando extratos",
+      ...steps(CONTABIL_CONTROL_STEP_FIELDS.slice(0, 7)),
+    },
+    {
+      id: "3",
+      client_id: CLIENT_A,
+      competence: "2026-09",
+      notes: "",
+      ...steps(CONTABIL_CONTROL_STEP_FIELDS),
+    },
+    { id: "4", client_id: CLIENT_B, competence: "2026-08", notes: "Outro cliente", ...steps() },
+  ];
+
+  it("o percentual é concluídas sobre as 17 etapas do Controle", async () => {
+    expect(CONTABIL_CONTROL_STEP_FIELDS).toHaveLength(17);
+    const prisma = delegates();
+    prisma.control.findMany.mockResolvedValue(controls);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.control",
+        organizationId: ORG,
+        fields: [
+          "name",
+          "competence",
+          "completed_steps",
+          "completion_percent",
+          "monthly_closing",
+          "notes",
+        ],
+        limit: 3,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          name: "Alfa",
+          competence: "2026-07",
+          completed_steps: 17,
+          completion_percent: 100,
+          monthly_closing: true,
+          notes: "Fechado",
+        },
+        // Etapas parciais: 10 de 17.
+        {
+          name: "Alfa",
+          competence: "2026-08",
+          completed_steps: 10,
+          completion_percent: 58.82,
+          monthly_closing: true,
+          notes: "Aguardando extratos",
+        },
+        {
+          name: "Alfa",
+          competence: "2026-09",
+          completed_steps: 0,
+          completion_percent: 0,
+          monthly_closing: false,
+          notes: "",
+        },
+      ],
+      reachedLimit: true,
+    });
+    // Só o controle vigente da organização do grant; o arquivado fica no histórico.
+    expect(prisma.control.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, archived_at: null } }),
+    );
+    expect(prisma.clients.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, id: { in: [CLIENT_A] } } }),
+    );
+  });
+
+  it("filtra por cliente e intervalo de competência com o mesmo total na lista e no resumo", async () => {
+    const prisma = delegates();
+    const database = {
+      $transaction: vi.fn(),
+      // A consulta com critérios pagina com `skip`: devolve a página pedida.
+      controlContabil: {
+        findMany: vi.fn(async (query: { skip?: number }) => controls.slice(query.skip)),
+      },
+      client: prisma.clients,
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    const filters = [
+      { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+      {
+        field: "competence",
+        operator: "between",
+        parameter: "periodo",
+        value: ["2026-08", "2026-09"],
+      },
+    ];
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.control",
+      fields: ["competence", "completion_percent", "notes"],
+      limit: 50,
+      query: { filters, order_by: [{ field: "competence", direction: "desc" }] },
+    });
+    expect(listed.rows).toEqual([
+      { competence: "2026-09", completion_percent: 0, notes: "" },
+      { competence: "2026-08", completion_percent: 58.82, notes: "Aguardando extratos" },
+    ]);
+
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.control",
+      fields: ["competence"],
+      limit: 50,
+      query: {
+        filters,
+        aggregations: [{ field: "competence", function: "count", alias: "competencias" }],
+      },
+    });
+    expect(totals.rows).toEqual([{ competencias: listed.rows.length }]);
+  });
+});
+
+describe("extractTriageReportingPage: Relação Contábil", () => {
+  const CLIENT_C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const clients = [
+    { ...clientRows[0], regime: "Simples Nacional", segment: "Comércio" },
+    { ...clientRows[1], regime: "Lucro Presumido", segment: null },
+    {
+      ...clientRows[0],
+      id: CLIENT_C,
+      name: "Gama",
+      cpf_cnpj: "33444555000199",
+      segment: "Serviços",
+    },
+  ];
+  // Os estados do legado: licitação sem resposta/Sim/Não; plano de contas sem resposta, as
+  // quatro opções e o texto livre antigo.
+  const relationships = [
+    {
+      id: "1",
+      client_id: CLIENT_A,
+      bidding: true,
+      chart_accounts: "Sim — Jonrick",
+      tool: "Domínio",
+      system: "ERP",
+      note: "Envia por e-mail",
+    },
+    {
+      id: "2",
+      client_id: CLIENT_B,
+      bidding: false,
+      chart_accounts: "Plano próprio",
+      tool: "Planilha",
+      system: "",
+      note: "",
+    },
+    {
+      id: "3",
+      client_id: CLIENT_C,
+      bidding: null,
+      chart_accounts: null,
+      tool: "",
+      system: "",
+      note: "",
+    },
+  ];
+  const responsibles = [
+    {
+      client_id: CLIENT_A,
+      person_responsible_id: USER_ANA,
+      posted_by_id: USER_BRUNO,
+      customer_with_movement: true,
+    },
+    { client_id: CLIENT_B, person_responsible_id: USER_BRUNO, posted_by_id: USER_ANA },
+    { client_id: CLIENT_C, person_responsible_id: USER_BRUNO, posted_by_id: null },
+  ];
+
+  it("lista cada relação com cliente, responsáveis e os estados da ficha", async () => {
+    const prisma = delegates();
+    prisma.relationships.findMany.mockResolvedValue(relationships);
+    prisma.clients.findMany.mockResolvedValue(clients);
+    prisma.responsibles.findMany.mockResolvedValue(responsibles);
+
+    const result = await extractTriageReportingPage(prisma, {
+      source: "contabil.relationship",
+      organizationId: ORG,
+      fields: [
+        "name",
+        "regime",
+        "segment",
+        "responsible_name",
+        "bidding",
+        "bidding_status",
+        "chart_accounts",
+        "customer_with_movement",
+        "tool",
+        "note",
+      ],
+      limit: 10,
+    });
+
+    expect(result).toEqual({
+      rows: [
+        {
+          name: "Alfa",
+          regime: "Simples Nacional",
+          segment: "Comércio",
+          responsible_name: "Ana Souza",
+          bidding: true,
+          bidding_status: "Sim",
+          chart_accounts: "Sim — Jonrick",
+          customer_with_movement: true,
+          tool: "Domínio",
+          note: "Envia por e-mail",
+        },
+        {
+          name: "Beta",
+          regime: "Lucro Presumido",
+          segment: null,
+          responsible_name: "Bruno Lima",
+          bidding: false,
+          bidding_status: "Não",
+          chart_accounts: "Plano próprio",
+          customer_with_movement: false,
+          tool: "Planilha",
+          note: "",
+        },
+        {
+          name: "Gama",
+          regime: null,
+          segment: "Serviços",
+          responsible_name: "Bruno Lima",
+          bidding: null,
+          bidding_status: "Não selecionado",
+          chart_accounts: "Não selecionado",
+          customer_with_movement: false,
+          tool: "",
+          note: "",
+        },
+      ],
+      reachedLimit: false,
+    });
+    for (const delegate of [
+      prisma.relationships,
+      prisma.clients,
+      prisma.responsibles,
+      prisma.users,
+    ]) {
+      expect(delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+      );
+    }
+  });
+
+  it("filtra por responsável em qualquer dos dois papéis e por cliente ativo, com o mesmo total", async () => {
+    const prisma = delegates();
+    prisma.clients.findMany.mockResolvedValue(clients);
+    prisma.responsibles.findMany.mockResolvedValue(responsibles);
+    const database = {
+      $transaction: vi.fn(),
+      // A consulta com critérios pagina com `skip`: devolve a página pedida.
+      relationshipContabil: {
+        findMany: vi.fn(async (query: { skip?: number }) => relationships.slice(query.skip)),
+      },
+      client: prisma.clients,
+      responsibleContabil: prisma.responsibles,
+      user: prisma.users,
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    // O legado lista as empresas em que o usuário é responsável ou responsável pelo lançamento.
+    const criteria = {
+      filters: [
+        { field: "responsible_name", operator: "eq", parameter: "responsavel", value: "Ana Souza" },
+        { field: "posted_by_name", operator: "eq", parameter: "lancamento", value: "Ana Souza" },
+        { field: "status", operator: "eq", parameter: "situacao", value: "Ativo" },
+      ],
+      filter_groups: [{ operator: "or" as const, filters: ["responsavel", "lancamento"] }],
+    };
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.relationship",
+      fields: ["name", "chart_accounts"],
+      limit: 50,
+      query: criteria,
+    });
+    // Beta também é da Ana (lançamento), mas está inativo.
+    expect(listed.rows).toEqual([{ name: "Alfa", chart_accounts: "Sim — Jonrick" }]);
+
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.relationship",
+      fields: ["name"],
+      limit: 50,
+      query: {
+        ...criteria,
+        aggregations: [{ field: "name", function: "count", alias: "empresas" }],
+      },
+    });
+    expect(totals.rows).toEqual([{ empresas: listed.rows.length }]);
+
+    // "Não selecionado" é filtrável nos dois campos de estado.
+    const unanswered = await service.extract({
+      organizationId: ORG,
+      source: "contabil.relationship",
+      fields: ["name"],
+      limit: 50,
+      query: {
+        filters: [
+          {
+            field: "bidding_status",
+            operator: "eq",
+            parameter: "licitacao",
+            value: "Não selecionado",
+          },
+          {
+            field: "chart_accounts",
+            operator: "eq",
+            parameter: "plano",
+            value: "Não selecionado",
+          },
+        ],
+      },
+    });
+    expect(unanswered.rows).toEqual([{ name: "Gama" }]);
+  });
+});
+
+describe("extractTriageReportingPage: documentos do Contábil por cliente e período", () => {
+  const routines = [
+    {
+      id: "1",
+      client_id: CLIENT_A,
+      competence: "2026-08",
+      type: "CONTABIL",
+      responsible_id: USER_ANA,
+      justification: null,
+      notes: "Extrato recebido",
+      triad_moviment: true,
+      settlement_date: new Date("2026-09-05T00:00:00.000Z"),
+      checklist: { financial_transactions: "COMPLETED", triaged_transactions: "COMPLETED" },
+      // Item desligado no movimento padrão do cliente.
+      item_notes: { inventory_control: { required: false } },
+    },
+    {
+      id: "2",
+      client_id: CLIENT_A,
+      competence: "2026-09",
+      type: "CONTABIL",
+      responsible_id: null,
+      justification: null,
+      notes: null,
+      settlement_date: null,
+      checklist: { financial_transactions: "PENDING", card_statements: "nao possui" },
+    },
+    {
+      id: "3",
+      client_id: CLIENT_B,
+      competence: "2026-09",
+      type: "CONTABIL",
+      responsible_id: USER_BRUNO,
+      justification: null,
+      notes: null,
+      settlement_date: null,
+      checklist: { financial_transactions: "COMPLETED" },
+    },
+  ];
+  const fields = [
+    "name",
+    "competence",
+    "settlement_date",
+    "financial_transactions",
+    "triaged_transactions",
+    "card_statements",
+    "notes",
+  ];
+
+  it("usa os rótulos da ficha: item desligado, movimento enviado e datas", async () => {
+    const prisma = delegates(routines);
+
+    await expect(
+      extractTriageReportingPage(prisma, {
+        source: "contabil.documents",
+        organizationId: ORG,
+        fields: ["competence", "inventory_control", "sends_movement", "download_date"],
+        limit: 2,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          competence: "2026-08",
+          inventory_control: "Desativado no movimento padrão",
+          sends_movement: true,
+          download_date: undefined,
+        },
+        {
+          competence: "2026-09",
+          inventory_control: "Não aplicável",
+          sends_movement: undefined,
+          download_date: undefined,
+        },
+      ],
+      reachedLimit: true,
+    });
+    expect(prisma.monthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: {
+          id: true,
+          client_id: true,
+          competence: true,
+          triad_moviment: true,
+          download_date: true,
+          checklist: true,
+          item_notes: true,
+        },
+      }),
+    );
+  });
+
+  it("mostra o mesmo estado documental que a grade da Triagem, com a data da baixa", async () => {
+    const prisma = delegates(routines);
+
+    const documents = await extractTriageReportingPage(prisma, {
+      source: "contabil.documents",
+      organizationId: ORG,
+      fields,
+      limit: 2,
+    });
+
+    expect(documents).toEqual({
+      rows: [
+        {
+          name: "Alfa",
+          competence: "2026-08",
+          settlement_date: new Date("2026-09-05T00:00:00.000Z"),
+          financial_transactions: "Concluído",
+          triaged_transactions: "Concluído",
+          card_statements: "Não aplicável",
+          notes: "Extrato recebido",
+        },
+        {
+          name: "Alfa",
+          competence: "2026-09",
+          settlement_date: null,
+          financial_transactions: "Pendente",
+          triaged_transactions: "Não aplicável",
+          card_statements: "Não possui",
+          notes: null,
+        },
+      ],
+      reachedLimit: true,
+    });
+    // O checklist é o da rotina Contábil vigente da Triagem, na organização do grant.
+    expect(prisma.monthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
+
+    // Mesmos itens e estados que a área da Triagem publica para a mesma rotina.
+    const shared = fields.filter((field) => field !== "settlement_date");
+    const triage = await extractTriageReportingPage(prisma, {
+      source: "contabil.triage_accounting_documents",
+      organizationId: ORG,
+      fields: shared,
+      limit: 2,
+    });
+    expect(triage.rows).toEqual(
+      documents.rows.map((row) => Object.fromEntries(shared.map((field) => [field, row[field]]))),
+    );
+  });
+
+  it("filtra por cliente e intervalo de competência com o mesmo total na lista e no resumo", async () => {
+    const prisma = delegates();
+    const database = {
+      $transaction: vi.fn(),
+      // A consulta com critérios pagina com `skip`: devolve a página pedida.
+      triageMonthly: {
+        findMany: vi.fn(async (query: { skip?: number }) => routines.slice(query.skip)),
+      },
+      client: prisma.clients,
+    };
+    database.$transaction.mockImplementation(
+      async (read: (transaction: unknown) => Promise<unknown>) => read(database),
+    );
+    const service = new InternalReportingService(database as never);
+    const filters = [
+      { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+      {
+        field: "competence",
+        operator: "between",
+        parameter: "periodo",
+        value: ["2026-09", "2026-12"],
+      },
+    ];
+
+    const listed = await service.extract({
+      organizationId: ORG,
+      source: "contabil.documents",
+      fields: ["competence", "financial_transactions"],
+      limit: 50,
+      query: { filters },
+    });
+    expect(listed.rows).toEqual([{ competence: "2026-09", financial_transactions: "Pendente" }]);
+
+    const totals = await service.extract({
+      organizationId: ORG,
+      source: "contabil.documents",
+      fields: ["competence"],
+      limit: 50,
+      query: {
+        filters,
+        aggregations: [{ field: "competence", function: "count", alias: "competencias" }],
+      },
+    });
+    expect(totals.rows).toEqual([{ competencias: listed.rows.length }]);
   });
 });

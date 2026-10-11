@@ -71,6 +71,12 @@ it("rh.attendance: filters derived rows beyond 101 and counts the complete set",
   });
   expect(count.rows).toEqual([{ total: 150 }]);
 });
+// Áreas do Contábil cujos primeiros campos de texto são calculados ou vêm de outra tabela
+// (cobertos em contabil-service/triageReportingService.test.ts): aqui vale a coluna direta.
+const directColumns: Readonly<Record<string, string>> = {
+  "contabil.responsibles": "name",
+  "contabil.relationship": "tool",
+};
 for (const source of reportingSources.filter(
   (source) =>
     source.key !== "rh.attendance" &&
@@ -84,6 +90,7 @@ for (const source of reportingSources.filter(
   describe(source.key, () => {
     it("orders the entire authorized set before the output cap", async () => {
       const field =
+        source.fields.find((field) => field.key === directColumns[source.key]) ??
         source.fields.find(
           (field) => field.value_type === "string" && !pessoalDerivedFields.has(field.key),
         ) ??

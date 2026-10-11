@@ -1,0 +1,275 @@
+import {
+  CONTABIL_REPORTING_SOURCES,
+  CONTABIL_TRIAGE_REPORTING_SOURCES,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
+} from "@workspace/shared";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { reportingSources } from "../../../../shared/src/reporting/reportingSources.js";
+
+import { parseReportsServiceEnv } from "../config/env.js";
+import { REPORT_SNAPSHOT_LIMIT_MESSAGE } from "../integrations/reportCriteria.js";
+import { reportDefinitionSchema } from "../schemas/reportDefinition.schemas.js";
+import { ReportDefinitionService } from "../services/reportDefinitionService.js";
+import { ReportExecutionService } from "../services/reportExecutionService.js";
+import { ReportPreviewService } from "../services/reportPreviewService.js";
+import { createEnvSourceAdapters, createWorkerSourceCatalog } from "../workerCatalog.js";
+
+const env = parseReportsServiceEnv({
+  DATABASE_URL: "postgresql://reports:reports@localhost:5432/reports",
+  JWT_SECRET: "test-jwt-secret",
+  CONTABIL_SERVICE_URL: "http://contabil.test",
+});
+const scope = {
+  organization_id: "10000000-0000-4000-8000-000000000001",
+  modules: { contabil: 1 },
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+// Literais de propósito: iterar a constante do shared esconderia uma fonte removida dela.
+const announced = [
+  "contabil.control",
+  "contabil.responsibles",
+  "contabil.relationship",
+  "contabil.documents",
+] as const;
+
+// As áreas da Triagem saem do mesmo serviço, mas são liberadas pelo módulo Triagem e
+// cobertas em workerCatalog.test.ts.
+it("o Contábil anuncia exatamente as quatro fontes executadas aqui", () => {
+  const triage: readonly string[] = CONTABIL_TRIAGE_REPORTING_SOURCES;
+  expect(CONTABIL_REPORTING_SOURCES.filter((source) => !triage.includes(source)).sort()).toEqual(
+    [...announced].sort(),
+  );
+});
+
+describe.each(announced)("execução da fonte %s", (key) => {
+  const published = reportingSources.find((source) => source.key === key);
+  const field = published?.fields.find((candidate) => candidate.value_type === "boolean")?.key;
+  const definition = () =>
+    reportDefinitionSchema.parse({
+      sources: [key],
+      columns: [{ source: key, field, alias: field }],
+      filters: [{ source: key, field, operator: "eq", parameter: "flag" }],
+      parameters: [{ name: "flag", type: "boolean" }],
+    });
+  const stubExtract = () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ success: true, data: { rows: [{ [String(field)]: true }] } }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  };
+
+  it("está anunciada no catálogo compartilhado e tem adapter registrado", () => {
+    expect(published, `${key} não está registrada em reportingSources (shared).`).toBeDefined();
+    expect(
+      createEnvSourceAdapters(env).filter((adapter) =>
+        adapter.sources.some((source) => source.key === key),
+      ),
+      `${key} não tem adapter registrado em createEnvSourceAdapters (HTTP e Worker).`,
+    ).toHaveLength(1);
+  });
+
+  it("completa o job do Worker e entrega o resultado com o filtro assinado", async () => {
+    const fetchMock = stubExtract();
+    const catalog = createWorkerSourceCatalog(env);
+    const service = new ReportExecutionService(catalog, new ReportDefinitionService(catalog));
+
+    await expect(
+      service.execute({
+        definition: definition(),
+        scope,
+        parameterValues: { flag: true },
+        requestId: "request-1729",
+      }),
+      `O job de ${key} não completou pelo catálogo do Worker.`,
+    ).resolves.toEqual([{ [String(field)]: true }]);
+
+    const [url, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(String(url)).toBe("http://contabil.test/internal/reporting/extract");
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      source: key,
+      fields: [field],
+      query: { filters: [{ field, operator: "eq", value: true }] },
+    });
+    expect(request.headers).toMatchObject({ "x-reports-grant": expect.any(String) });
+  });
+
+  it("entrega a prévia pela lista de adapters que HTTP e Worker compartilham", async () => {
+    stubExtract();
+    const catalog = createWorkerSourceCatalog(env);
+    const service = new ReportPreviewService(catalog, new ReportDefinitionService(catalog), 10);
+
+    await expect(
+      service.preview(definition(), scope, "request-1729", { flag: true }),
+      `A prévia de ${key} não foi entregue.`,
+    ).resolves.toMatchObject({ rows: [{ [String(field)]: true }] });
+  });
+
+  it("traduz o 422 de limite de linhas da origem na mensagem de limite global", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: REPORTING_QUERY_ROW_LIMIT_CODE }), {
+          status: 422,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    const catalog = createWorkerSourceCatalog(env);
+
+    await expect(
+      new ReportExecutionService(catalog, new ReportDefinitionService(catalog)).execute({
+        definition: definition(),
+        scope,
+        parameterValues: { flag: true },
+        requestId: "request-1729",
+      }),
+    ).rejects.toMatchObject({ statusCode: 422, message: REPORT_SNAPSHOT_LIMIT_MESSAGE });
+  });
+
+  it("recusa prévia e job sem permissão no Contábil, sem consultar a origem", async () => {
+    const fetchMock = stubExtract();
+    const catalog = createWorkerSourceCatalog(env);
+    const definitions = new ReportDefinitionService(catalog);
+    const denied = { ...scope, modules: { contabil: 0 } };
+    const refusal = {
+      statusCode: 403,
+      message: "A fonte não está autorizada para este relatório.",
+    };
+
+    await expect(
+      new ReportExecutionService(catalog, definitions).execute({
+        definition: definition(),
+        scope: denied,
+        parameterValues: { flag: true },
+        requestId: "request-1729",
+      }),
+    ).rejects.toMatchObject(refusal);
+    await expect(
+      new ReportPreviewService(catalog, definitions, 10).preview(
+        definition(),
+        denied,
+        "request-1729",
+        { flag: true },
+      ),
+    ).rejects.toMatchObject(refusal);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+// Prévia (tela) e job (de onde saem CSV e PDF) partem da mesma definição: o critério chega
+// igual à origem e as linhas são as mesmas.
+it.each([
+  {
+    key: "contabil.responsibles",
+    columns: ["company_name"],
+    filter: { field: "responsible_name", operator: "eq", value: "Ana Souza" },
+    rows: [{ company_name: "Alfa Ltda" }, { company_name: "Beta Ltda" }],
+  },
+  {
+    key: "contabil.relationship",
+    columns: ["company_name", "bidding_status", "chart_accounts", "note"],
+    filter: { field: "responsible_name", operator: "eq", value: "Ana Souza" },
+    rows: [
+      {
+        company_name: "Alfa Ltda",
+        bidding_status: "Sim",
+        chart_accounts: "Sim — Jonrick",
+        note: "",
+      },
+      {
+        company_name: "Beta Ltda",
+        bidding_status: "Não selecionado",
+        chart_accounts: "Não selecionado",
+        note: "Sem resposta",
+      },
+    ],
+  },
+  {
+    key: "contabil.documents",
+    columns: ["competence", "financial_transactions", "settlement_date", "notes"],
+    filter: { field: "cpf_cnpj", operator: "eq", value: "11222333000181" },
+    rows: [
+      {
+        competence: "2026-08",
+        financial_transactions: "Concluído",
+        settlement_date: "2026-09-05T00:00:00.000Z",
+        notes: "Extrato recebido",
+      },
+      {
+        competence: "2026-09",
+        financial_transactions: "Pendente",
+        settlement_date: null,
+        notes: null,
+      },
+    ],
+  },
+  {
+    key: "contabil.control",
+    columns: ["competence", "completion_percent", "monthly_closing", "notes"],
+    filter: { field: "competence", operator: "gte", value: "2026-08" },
+    rows: [
+      { competence: "2026-08", completion_percent: 58.82, monthly_closing: true, notes: "Parcial" },
+      { competence: "2026-09", completion_percent: 0, monthly_closing: false, notes: "" },
+    ],
+  },
+])("$key: prévia e job levam o mesmo critério e as mesmas linhas", async ({
+  key,
+  columns,
+  filter,
+  rows,
+}) => {
+  const fetchMock = vi.fn().mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ success: true, data: { rows } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  const definition = reportDefinitionSchema.parse({
+    sources: [key],
+    columns: columns.map((field) => ({ source: key, field, alias: field })),
+    filters: [{ source: key, field: filter.field, operator: filter.operator, parameter: "valor" }],
+    parameters: [{ name: "valor", type: "string" }],
+  });
+  const parameterValues = { valor: filter.value };
+  const catalog = createWorkerSourceCatalog(env);
+  const definitions = new ReportDefinitionService(catalog);
+
+  const preview = await new ReportPreviewService(catalog, definitions, 10).preview(
+    definition,
+    scope,
+    "request-1720",
+    parameterValues,
+  );
+  const job = await new ReportExecutionService(catalog, definitions).execute({
+    definition,
+    scope,
+    parameterValues,
+    requestId: "request-1720",
+  });
+
+  expect(preview.rows).toEqual(rows);
+  expect(job).toEqual(preview.rows);
+  const [previewBody, jobBody] = fetchMock.mock.calls.map(([, request]) =>
+    JSON.parse(String((request as RequestInit).body)),
+  );
+  expect(previewBody.query).toMatchObject({
+    filters: [{ ...filter, parameter: "valor" }],
+  });
+  expect(jobBody).toMatchObject({
+    source: key,
+    fields: previewBody.fields,
+    query: previewBody.query,
+  });
+});

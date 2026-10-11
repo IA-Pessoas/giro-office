@@ -24,9 +24,9 @@ function field(
   };
 }
 
-// Mesmos campos de cliente, serviço contratado e movimento em todas as áreas: o filtro vale
-// igual em cada uma.
-const clientFields = [
+// Mesmos campos de cliente, serviço contratado e movimento em todas as áreas, inclusive nos
+// responsáveis do Contábil: o filtro vale igual em cada uma.
+export const contabilClientReportingFields = [
   field("name", "Nome", "string", stringOperators),
   field("company_name", "Razão social", "string", stringOperators),
   field("cpf_cnpj", "CPF/CNPJ", "string", stringOperators),
@@ -37,6 +37,27 @@ const clientFields = [
   field("contabil", "Serviço Contábil", "boolean", booleanOperators),
   field("fiscal", "Serviço Fiscal", "boolean", booleanOperators),
   field("customer_with_movement", "Cliente com movimento", "boolean", booleanOperators),
+] as const;
+
+// Rotina Contábil da Triagem por cliente e competência: o mesmo checklist serve à grade do
+// painel da Triagem e ao relatório documental do Contábil.
+const accountingDocumentFields = [
+  field("competence", "Competência", "string", competenceOperators),
+  // Uma coluna por item do checklist Contábil, com o estado dele.
+  field("financial_transactions", "Movimentações financeiras", "string", stringOperators),
+  field("triaged_transactions", "Movimentações triadas", "string", stringOperators),
+  field("inventory_control", "Controle de estoque", "string", stringOperators),
+  field("accounts_payable_report", "Relatório de contas a pagar", "string", stringOperators),
+  field("accounts_receivable_report", "Relatório de contas a receber", "string", stringOperators),
+  field("card_statements", "Faturas de cartão", "string", stringOperators),
+  field("loan_agreements", "Contratos de empréstimo", "string", stringOperators),
+  field("bank_reconciliation", "Conciliação bancária", "string", stringOperators),
+  field("bank_investments", "Investimentos bancários", "string", stringOperators),
+  field("card_sales_report", "Relatório de vendas de cartão", "string", stringOperators),
+  field("justification", "Justificativa", "string", stringOperators),
+  field("notes", "Observação", "string", stringOperators),
+  field("responsible_name", "Responsável", "string", stringOperators),
+  ...contabilClientReportingFields,
 ] as const;
 
 export const CONTABIL_TRIAGE_REPORTING_SOURCES = [
@@ -60,7 +81,7 @@ export const contabilTriageReportingCatalog = {
       minimum_permission: 1,
       keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
       fields: [
-        ...clientFields,
+        ...contabilClientReportingFields,
         field("cloud_types", "Tipos de Cloud", "string", stringOperators),
         field("clouds", "Clouds (tipo e link)", "string", stringOperators),
       ],
@@ -74,7 +95,7 @@ export const contabilTriageReportingCatalog = {
       fields: [
         field("competence", "Competência", "string", competenceOperators),
         field("sends_movement", "Movimento enviado", "boolean", booleanOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -86,7 +107,7 @@ export const contabilTriageReportingCatalog = {
       fields: [
         field("type", "Serviço da Triagem", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -99,7 +120,7 @@ export const contabilTriageReportingCatalog = {
         field("competence", "Competência", "string", competenceOperators),
         field("type", "Serviço da Triagem", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -114,7 +135,7 @@ export const contabilTriageReportingCatalog = {
         field("completed_items", "Itens concluídos", "number", numberOperators),
         field("applicable_items", "Itens aplicáveis", "number", numberOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -151,7 +172,7 @@ export const contabilTriageReportingCatalog = {
         field("billing_amount", "Faturamento", "string", stringOperators),
         field("delivery_method", "Meio de envio", "string", stringOperators),
         field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...contabilClientReportingFields,
       ],
     },
     {
@@ -160,28 +181,31 @@ export const contabilTriageReportingCatalog = {
       module: "triagem",
       minimum_permission: 1,
       keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
+      fields: accountingDocumentFields,
+    },
+  ],
+  relations: [],
+} as const;
+
+export const CONTABIL_DOCUMENTS_REPORTING_SOURCES = ["contabil.documents"] as const;
+export type ContabilDocumentsReportingSource =
+  (typeof CONTABIL_DOCUMENTS_REPORTING_SOURCES)[number];
+
+// O relatório documental do Contábil lê o checklist da Triagem, sem checklist próprio, com
+// os rótulos da ficha; muda o módulo que libera a área.
+export const contabilDocumentsReportingCatalog = {
+  sources: [
+    {
+      key: "contabil.documents",
+      label: "Documentos Contábeis por cliente e período",
+      module: "contabil",
+      minimum_permission: 1,
+      keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
       fields: [
-        field("competence", "Competência", "string", competenceOperators),
-        // Uma coluna por item do checklist Contábil, com o estado dele: a grade do painel.
-        field("financial_transactions", "Movimentações financeiras", "string", stringOperators),
-        field("triaged_transactions", "Movimentações triadas", "string", stringOperators),
-        field("inventory_control", "Controle de estoque", "string", stringOperators),
-        field("accounts_payable_report", "Relatório de contas a pagar", "string", stringOperators),
-        field(
-          "accounts_receivable_report",
-          "Relatório de contas a receber",
-          "string",
-          stringOperators,
-        ),
-        field("card_statements", "Faturas de cartão", "string", stringOperators),
-        field("loan_agreements", "Contratos de empréstimo", "string", stringOperators),
-        field("bank_reconciliation", "Conciliação bancária", "string", stringOperators),
-        field("bank_investments", "Investimentos bancários", "string", stringOperators),
-        field("card_sales_report", "Relatório de vendas de cartão", "string", stringOperators),
-        field("justification", "Justificativa", "string", stringOperators),
-        field("notes", "Observação", "string", stringOperators),
-        field("responsible_name", "Responsável", "string", stringOperators),
-        ...clientFields,
+        ...accountingDocumentFields,
+        field("sends_movement", "Movimento enviado", "boolean", booleanOperators),
+        field("download_date", "Data de download", "date", dateOperators),
+        field("settlement_date", "Data de baixa", "date", dateOperators),
       ],
     },
   ],

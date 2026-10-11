@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ContabilRelationshipAdapter } from "../integrations/contabilRelationshipAdapter.js";
 
 describe("ContabilRelationshipAdapter", () => {
-  it("publica somente os campos seguros de relacionamento", () => {
+  it("publica a relação com cliente e responsáveis, sem ids nem organização", () => {
     const adapter = new ContabilRelationshipAdapter({
       contabilServiceUrl: "http://contabil.test",
       reportsInternalToken: "internal-token",
@@ -14,9 +14,24 @@ describe("ContabilRelationshipAdapter", () => {
     expect(adapter.sources.map((source) => source.key)).toEqual(["contabil.relationship"]);
     expect(adapter.sources[0]?.fields.map((field) => field.key)).toEqual([
       "bidding",
+      "bidding_status",
       "chart_accounts",
       "tool",
       "system",
+      "note",
+      "segment",
+      "responsible_name",
+      "posted_by_name",
+      "name",
+      "company_name",
+      "cpf_cnpj",
+      "status",
+      "regime",
+      "competence_entry",
+      "deletion_date",
+      "contabil",
+      "fiscal",
+      "customer_with_movement",
     ]);
   });
 

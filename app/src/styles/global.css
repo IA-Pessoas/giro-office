@@ -947,6 +947,10 @@ html.dark .ui-input,
         overflow: visible !important;
         transform: none !important;
         translate: none !important;
+        /* O minificador funde as duas linhas acima em um `transform` e descarta o `translate`:
+           zerar as variáveis do Tailwind é o que desfaz a centralização do Dialog. */
+        --tw-translate-x: 0 !important;
+        --tw-translate-y: 0 !important;
         border: 0 !important;
         border-radius: 0 !important;
         padding: 0 !important;
