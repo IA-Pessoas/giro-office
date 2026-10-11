@@ -62,6 +62,7 @@ describe("contabil-service OpenAPI reporting", () => {
         "contabil.control",
         "contabil.responsibles",
         "contabil.relationship",
+        "contabil.documents",
         "contabil.triage_clouds",
         "contabil.triage_movement",
         "contabil.triage_responsibles",

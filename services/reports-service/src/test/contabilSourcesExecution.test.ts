@@ -29,11 +29,16 @@ afterEach(() => {
 });
 
 // Literais de propósito: iterar a constante do shared esconderia uma fonte removida dela.
-const announced = ["contabil.control", "contabil.responsibles", "contabil.relationship"] as const;
+const announced = [
+  "contabil.control",
+  "contabil.responsibles",
+  "contabil.relationship",
+  "contabil.documents",
+] as const;
 
 // As áreas da Triagem saem do mesmo serviço, mas são liberadas pelo módulo Triagem e
 // cobertas em workerCatalog.test.ts.
-it("o Contábil anuncia exatamente as três fontes executadas aqui", () => {
+it("o Contábil anuncia exatamente as quatro fontes executadas aqui", () => {
   const triage: readonly string[] = CONTABIL_TRIAGE_REPORTING_SOURCES;
   expect(CONTABIL_REPORTING_SOURCES.filter((source) => !triage.includes(source)).sort()).toEqual(
     [...announced].sort(),
@@ -186,6 +191,25 @@ it.each([
         bidding_status: "Não selecionado",
         chart_accounts: "Não selecionado",
         note: "Sem resposta",
+      },
+    ],
+  },
+  {
+    key: "contabil.documents",
+    columns: ["competence", "financial_transactions", "settlement_date", "notes"],
+    filter: { field: "cpf_cnpj", operator: "eq", value: "11222333000181" },
+    rows: [
+      {
+        competence: "2026-08",
+        financial_transactions: "Concluído",
+        settlement_date: "2026-09-05T00:00:00.000Z",
+        notes: "Extrato recebido",
+      },
+      {
+        competence: "2026-09",
+        financial_transactions: "Pendente",
+        settlement_date: null,
+        notes: null,
       },
     ],
   },
