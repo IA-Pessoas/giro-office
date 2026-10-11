@@ -2043,3 +2043,27 @@ await runTest("group map PNG comes from the on-screen SVG and saving is explicit
   assert.equal(groupMapFileName("Mapa do grupo São João & Cia"), "mapa-do-grupo-sao-joao-cia.png");
   assert.equal(groupMapFileName("///"), "mapa-do-grupo.png");
 });
+
+await runTest("agenda tab mounts the shared department agenda for Regularize (#1747)", async () => {
+  const [pageSource, policySource] = await Promise.all([
+    readModuleSource("components/RegularizePage.tsx"),
+    readModuleSource("utils/regularizeQueryPolicy.ts"),
+  ]);
+  const [contractSource, sectionSource] = await Promise.all([
+    readFile(new URL("../../shared/services/agendaService.contract.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../contabil/components/DepartmentAgendaSection.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(policySource, /\| "agenda"/);
+  assert.match(pageSource, /\{ id: "agenda", label: "Agenda", icon: CalendarDays \}/);
+  // Sem agenda própria: a aba monta a seção compartilhada, e o serviço filtra pelo módulo.
+  assert.match(
+    pageSource,
+    /<DepartmentAgendaSection module="regularize" canEdit=\{regularizeAccess\.canEdit\} \/>/,
+  );
+  assert.match(contractSource, /export type AgendaModule = [^;]*"regularize"/);
+  assert.match(sectionSource, /regularize: "Regularize"/);
+});

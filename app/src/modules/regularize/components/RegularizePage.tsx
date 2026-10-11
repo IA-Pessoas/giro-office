@@ -31,6 +31,7 @@ import {
 import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
+import { DepartmentAgendaSection } from "@modules/contabil";
 import { ClientCatalogPanel } from "@modules/clients/components/ClientCatalogPanel";
 import { ClientGroupsPanel } from "@modules/clients/components/ClientGroupsPanel";
 import { ClientLicitacaoBiddersPanel } from "@modules/clients/components/ClientLicitacaoPanels";
@@ -248,6 +249,7 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "taxes", label: "Tributos", icon: Landmark },
   { id: "dte", label: "DTE", icon: Mail },
   { id: "groups", label: "Grupos", icon: Network },
+  { id: "agenda", label: "Agenda", icon: CalendarDays },
   { id: "bidders", label: "Licitantes", icon: Gavel },
   { id: "catalogs", label: "Catálogos", icon: Tags },
 ];
@@ -2930,6 +2932,11 @@ export function RegularizePage() {
           <ClientGroupsPanel canEdit={regularizeAccess.canEdit} />
           <RegularizeGroupMap canEdit={regularizeAccess.canEdit} />
         </div>
+      ) : null}
+
+      {activeTab === "agenda" ? (
+        // Sem agenda própria: é o recorte do departamento Regularize na agenda compartilhada (#1747).
+        <DepartmentAgendaSection module="regularize" canEdit={regularizeAccess.canEdit} />
       ) : null}
 
       {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}
