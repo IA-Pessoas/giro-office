@@ -26,6 +26,7 @@ import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompe
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
+import { DepartmentAgendaReport } from "./DepartmentAgendaReport";
 
 /** Nome do departamento nos textos da tela. */
 const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
@@ -157,6 +158,11 @@ export function DepartmentAgendaSection({
             </button>
           )}
           <ContabilCompetenceSelect value={month} onChange={setMonth} label="Mês da agenda" />
+          <DepartmentAgendaReport
+            module={module}
+            departmentLabel={departmentLabel}
+            assignable={assignable}
+          />
           {canEdit && (
             <button
               type="button"
