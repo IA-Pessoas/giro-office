@@ -807,6 +807,28 @@ export type RegularizeDteQueryListsResult = {
   unknown: string[];
 };
 
+// Comparador Veri (#1755): resultado da comparação da planilha com a carteira, por CPF/CNPJ.
+export type RegularizeVeriComparison = {
+  rows: Array<{
+    name: string;
+    document: string;
+    in_veri: boolean;
+    in_workspace: boolean;
+    status: "Ambos" | "Veri" | "Workspace";
+  }>;
+  invalid: Array<{ row: number; name: string; value: string; reason: string }>;
+  totals: {
+    veri: number;
+    workspace: number;
+    both: number;
+    veri_only: number;
+    workspace_only: number;
+    invalid: number;
+    workspace_without_document: number;
+    workspace_duplicate_documents: number;
+  };
+};
+
 export type RegularizeDteImportsPage = {
   data: RegularizeDteImport[];
   total: number;

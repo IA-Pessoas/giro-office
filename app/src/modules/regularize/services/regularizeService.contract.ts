@@ -34,6 +34,7 @@ export const REGULARIZE_ENDPOINTS = {
   dteQueries: "/regularize/dte/queries",
   dteQueryStatus: "/regularize/dte/queries/status",
   dteQueryImport: "/regularize/dte/queries/import",
+  veriCompare: "/regularize/veri/compare",
   processes: "/regularize/processes",
   process: "/regularize/process",
   sendToFiscal: "/regularize/process/send-to-fiscal",

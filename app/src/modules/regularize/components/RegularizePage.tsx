@@ -10,6 +10,7 @@ import {
   Download,
   Eye,
   FileKey2,
+  FileSpreadsheet,
   Gavel,
   Landmark,
   Mail,
@@ -59,6 +60,7 @@ import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
 import { RegularizeDteInbox } from "./RegularizeDteInbox";
 import { RegularizeDtePanel } from "./RegularizeDtePanel";
 import { RegularizeDteQueries } from "./RegularizeDteQueries";
+import { RegularizeVeriComparison } from "./RegularizeVeriComparison";
 import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
@@ -248,6 +250,7 @@ const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "sites", label: "Sites", icon: ShieldCheck },
   { id: "taxes", label: "Tributos", icon: Landmark },
   { id: "dte", label: "DTE", icon: Mail },
+  { id: "veri", label: "Veri", icon: FileSpreadsheet },
   { id: "groups", label: "Grupos", icon: Network },
   { id: "agenda", label: "Agenda", icon: CalendarDays },
   { id: "bidders", label: "Licitantes", icon: Gavel },
@@ -2950,6 +2953,8 @@ export function RegularizePage() {
           <RegularizeDteQueries canEdit={regularizeAccess.canEdit} />
         </div>
       ) : null}
+
+      {activeTab === "veri" ? <RegularizeVeriComparison /> : null}
 
       {activeTab === "catalogs" ? (
         // Regimes e segmentos que a ficha Regularize usa; editar exige Regularize nível 2 (#1740, #1741).

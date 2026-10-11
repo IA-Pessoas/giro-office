@@ -3387,6 +3387,14 @@ const baseManifest = [
     auth: "bearer",
   }),
   op({
+    service: "regularize-service",
+    method: "POST",
+    path: "/regularize/veri/compare",
+    action: "regularizeVeriCompare",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
     service: "task-service",
     method: "POST",
     path: "/task/integration",

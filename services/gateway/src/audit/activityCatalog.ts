@@ -978,6 +978,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/regularize\/veri\/compare$/,
+    description: { action: "comparou", item: "uma planilha do Veri com a carteira do Regularize" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/regularize\/process\/send-to-fiscal$/,
     description: { action: "enviou", item: "um processo de regularização ao Fiscal" },
   },

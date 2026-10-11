@@ -1048,6 +1048,29 @@ export function buildRegularizeServiceOpenApiSpec(
           },
         },
       },
+      "/regularize/veri/compare": {
+        post: {
+          tags: ["Veri"],
+          summary: "Comparar um XLSX do Veri com a carteira pelo CPF/CNPJ",
+          description:
+            "Lê da linha 3 em diante, razão social na coluna A e CNPJ na coluna C, e compara com os clientes ativos ou em processo de inativação da organização. Nada é gravado, por isso basta a permissão Regularize 1. Limites: 2 MiB no envio, 8 MiB descompactados, 5.000 linhas de dados e 64 colunas. Leitor verificado só com casos sintéticos.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                schema: { type: "string", format: "binary" },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Correspondências, ausências dos dois lados e entradas inválidas",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
+      },
       "/regularize/municipal-taxes": {
         get: {
           tags: ["MunicipalTaxes"],
@@ -1564,7 +1587,8 @@ export function buildRegularizeServiceOpenApiSpec(
       "/internal/reporting/extract": {
         post: {
           tags: ["Internal"],
-          summary: "Extrair licenças, processos e tributos municipais para o reports-service",
+          summary:
+            "Extrair licenças, processos, tributos municipais, carteira, grupos, PF e sócios para o reports-service",
           security: [{ internalToken: [] }],
           parameters: [
             {
@@ -1596,6 +1620,10 @@ export function buildRegularizeServiceOpenApiSpec(
                         "regularize.licenses",
                         "regularize.processes",
                         "regularize.municipal_taxes",
+                        "regularize.clients",
+                        "regularize.client_groups",
+                        "regularize.clients_pf",
+                        "regularize.partners",
                       ],
                     },
                     fields: {

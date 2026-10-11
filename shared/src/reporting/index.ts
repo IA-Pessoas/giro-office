@@ -20,6 +20,7 @@ export * from "./pessoalUnionsReportingCatalog.js";
 export * from "./projectReportingCatalog.js";
 export * from "./regularizeLicenseReportingCatalog.js";
 export * from "./regularizeMunicipalTaxesReportingCatalog.js";
+export * from "./regularizePortfolioReportingCatalog.js";
 export * from "./regularizeProcessReportingCatalog.js";
 export * from "./reportingCapabilities.js";
 export * from "./reportingQuery.js";

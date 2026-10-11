@@ -3,8 +3,15 @@ import {
   type RegularizeLicenseReportingService as RegularizeLicenseReportingServiceType,
   RegularizeMunicipalTaxesReportingService as RegularizeMunicipalTaxesReportingServiceImpl,
   type RegularizeMunicipalTaxesReportingService as RegularizeMunicipalTaxesReportingServiceType,
+  RegularizePortfolioReportingService as RegularizePortfolioReportingServiceImpl,
+  type RegularizePortfolioReportingService as RegularizePortfolioReportingServiceType,
 } from "@workspace/regularize-service/src/reporting/internalReportingService.js";
 import { regularizeMunicipalTaxesReportingCatalog } from "@workspace/regularize-service/src/reporting/regularizeMunicipalTaxesReportingCatalog.js";
+import {
+  REGULARIZE_PORTFOLIO_REPORTING_SOURCES,
+  type RegularizePortfolioReportingSource,
+  regularizePortfolioReportingCatalog,
+} from "@workspace/regularize-service/src/reporting/regularizePortfolioReportingCatalog.js";
 import { regularizeReportingCatalog } from "@workspace/regularize-service/src/reporting/regularizeReportingCatalog.js";
 import {
   clientPfDetailQuerySchema,
@@ -104,6 +111,11 @@ import {
   RegularizeReconciliationService as RegularizeReconciliationServiceImpl,
   type RegularizeReconciliationService as RegularizeReconciliationServiceType,
 } from "@workspace/regularize-service/src/services/regularizeReconciliationService.js";
+import { VeriComparisonService } from "@workspace/regularize-service/src/services/veriComparisonService.js";
+import {
+  VERI_LIMITS,
+  VERI_XLSX_MIME_TYPE,
+} from "@workspace/regularize-service/src/services/veriWorkbookParser.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   parseWithZod,
@@ -118,6 +130,7 @@ import {
 } from "@workspace/shared/http";
 import type { Context } from "hono";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { assertRegularizeInternalToken, authenticateRegularizeRequest } from "./auth.js";
 import type { RegularizeWorkerEnv } from "./env.js";
@@ -204,6 +217,11 @@ export type RegularizeMunicipalTaxesReportingService = Pick<
   RegularizeMunicipalTaxesReportingServiceType,
   "extract"
 >;
+export type RegularizePortfolioReportingService = Pick<
+  RegularizePortfolioReportingServiceType,
+  "extract"
+>;
+export type RegularizeVeriComparisonService = Pick<VeriComparisonService, "compare">;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
@@ -213,6 +231,7 @@ type RegularizeOptions = {
   dteImportService?: RegularizeDteImportService;
   dteNoticeService?: RegularizeDteNoticeService;
   dteQueryService?: RegularizeDteQueryService;
+  veriComparisonService?: RegularizeVeriComparisonService;
   clientPfService?: RegularizeClientPfService;
   partnersService?: RegularizePartnersService;
   groupMapService?: RegularizeGroupMapService;
@@ -222,6 +241,7 @@ type RegularizeOptions = {
   reconciliationService?: RegularizeReconciliationService;
   reportingService?: RegularizeLicenseReportingService;
   municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService;
+  portfolioReportingService?: RegularizePortfolioReportingService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -258,6 +278,7 @@ const internalReportingCatalog = {
   sources: [
     ...regularizeReportingCatalog.sources,
     ...regularizeMunicipalTaxesReportingCatalog.sources,
+    ...regularizePortfolioReportingCatalog.sources,
   ],
   relations: [],
 } as const;
@@ -424,6 +445,7 @@ function localService(
   };
 }
 
+const MIN_REGULARIZE_READ_PERMISSION = 1;
 const MIN_REGULARIZE_WRITE_PERMISSION = 2;
 
 export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
@@ -597,6 +619,15 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new RegularizeMunicipalTaxesReportingServiceImpl(client as never)),
     );
   };
+  const withPortfolioReportingService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizePortfolioReportingService) => Promise<T>,
+  ) => {
+    if (options.portfolioReportingService) return callback(options.portfolioReportingService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new RegularizePortfolioReportingServiceImpl(client as never)),
+    );
+  };
   const requireWritePermission = (c: RegularizeContext, message: string): void => {
     if (Number(c.get("auth").claims.permission ?? 0) < MIN_REGULARIZE_WRITE_PERMISSION) {
       throw new ServiceError(403, message);
@@ -635,6 +666,21 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
             await service.extract({
               organizationId: grant.organization_id,
               source: REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE,
+              fields: body.fields,
+              limit: body.limit,
+              ...(body.query ? { query: body.query } : {}),
+            }),
+          ),
+        ),
+      );
+    }
+    if ((REGULARIZE_PORTFOLIO_REPORTING_SOURCES as readonly string[]).includes(body.source)) {
+      return withPortfolioReportingService(c, async (service) =>
+        c.json(
+          createSuccessResponse(
+            await service.extract({
+              organizationId: grant.organization_id,
+              source: body.source as RegularizePortfolioReportingSource,
               fields: body.fields,
               limit: body.limit,
               ...(body.query ? { query: body.query } : {}),
@@ -1006,6 +1052,39 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
         ),
       );
     }),
+  );
+  app.post(
+    "/regularize/veri/compare",
+    async (c, next) => {
+      // Mesma regra do serviço Express: a comparação não grava nada, basta a leitura (#1739).
+      if (Number(c.get("auth").claims.permission ?? 0) < MIN_REGULARIZE_READ_PERMISSION) {
+        throw new ServiceError(403, "Permissão insuficiente para comparar a planilha Veri.");
+      }
+      const contentType = c.req.header("content-type")?.split(";")[0].trim().toLowerCase();
+      if (contentType !== VERI_XLSX_MIME_TYPE) {
+        throw new ServiceError(415, "Envie um arquivo XLSX.");
+      }
+      return next();
+    },
+    bodyLimit({
+      maxSize: VERI_LIMITS.bytes,
+      onError: () => {
+        throw new ServiceError(413, "XLSX inválido ou maior que 2 MiB.");
+      },
+    }),
+    async (c) => {
+      const input = {
+        organizationId: c.get("auth").organizationId,
+        file: Buffer.from(await c.req.arrayBuffer()),
+      };
+      const comparison = options.veriComparisonService
+        ? await options.veriComparisonService.compare(input)
+        : await withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+            new VeriComparisonService(client as never).compare(input),
+          );
+      c.header("Cache-Control", "no-store");
+      return c.json(createSuccessResponse(comparison));
+    },
   );
   app.put("/regularize/dte/queries/status", async (c) => {
     requireWritePermission(c, "Permissão insuficiente para alterar a consulta DTE.");

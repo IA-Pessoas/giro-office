@@ -447,6 +447,50 @@ describe("regularize Worker", () => {
     });
   });
 
+  it("compares a Veri XLSX within the authenticated organization and limits the upload", async () => {
+    const veri = { compare: vi.fn(async () => ({ rows: [], invalid: [], totals: {} })) };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      veriComparisonService: veri as never,
+    });
+    const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const writer = { ...headers(), "x-auth-permission": "2" };
+    const post = (body: BodyInit, contentType: string, extra: HeadersInit = writer) =>
+      app.request("https://regularize.test/regularize/veri/compare", {
+        method: "POST",
+        headers: { ...extra, "content-type": contentType },
+        body,
+      });
+
+    const compared = await post(new Uint8Array([1, 2, 3]), xlsx);
+    expect(compared.status).toBe(200);
+    expect(compared.headers.get("cache-control")).toBe("no-store");
+    expect(veri.compare).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      file: Buffer.from([1, 2, 3]),
+    });
+
+    expect((await post("{}", "application/json")).status).toBe(415);
+    expect((await post(new Uint8Array(2 * 1024 * 1024 + 1), xlsx)).status).toBe(413);
+    expect((await post(new Uint8Array([1]), xlsx, {})).status).toBe(401);
+    expect(
+      (await post(new Uint8Array([1]), xlsx, { ...headers(), "x-auth-permission": "0" })).status,
+    ).toBe(403);
+    expect((await post(new Uint8Array([1]), xlsx, headers())).status).toBe(403);
+    expect(veri.compare).toHaveBeenCalledOnce();
+
+    // A comparação não grava nada: basta a leitura do módulo. A escrita vizinha segue no nível 2.
+    const reader = { ...headers(), "x-auth-permission": "1" };
+    expect((await post(new Uint8Array([1]), xlsx, reader)).status).toBe(200);
+    const dteImport = await app.request("https://regularize.test/regularize/dte/import", {
+      method: "POST",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify({ format: "json", content: "[]" }),
+    });
+    expect(dteImport.status).toBe(403);
+  });
+
   it("routes DTE import with write permission and lists imports by organization", async () => {
     const dte: RegularizeDteImportService = {
       importNotices: vi.fn(async () => ({ id: "import-1", created_count: 1 })),
@@ -1086,5 +1130,48 @@ describe("regularize Worker", () => {
       fields: ["id"],
       limit: 10,
     });
+  });
+
+  it("routes signed portfolio extraction to the portfolio source", async () => {
+    const reporting = reportingService();
+    const portfolio = { extract: vi.fn(async () => ({ rows: [], reachedLimit: false })) };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      reportingService: reporting,
+      portfolioReportingService: portfolio,
+    });
+
+    for (const source of [
+      "regularize.clients",
+      "regularize.client_groups",
+      "regularize.clients_pf",
+      "regularize.partners",
+    ]) {
+      const body = { source, fields: ["name"], limit: 10 };
+      const response = await app.request("https://regularize.test/internal/reporting/extract", {
+        method: "POST",
+        headers: {
+          ...reportingHeaders({
+            operation: "extract",
+            source,
+            fields: body.fields,
+            body,
+            requestId: `reporting-${source}`,
+          }),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(response.status).toBe(200);
+      expect(portfolio.extract).toHaveBeenLastCalledWith({
+        organizationId: ORGANIZATION_ID,
+        source,
+        fields: ["name"],
+        limit: 10,
+      });
+    }
+    expect(reporting.extract).not.toHaveBeenCalled();
   });
 });

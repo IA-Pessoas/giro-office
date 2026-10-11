@@ -33,6 +33,7 @@ model License {
   protocol_file_uploaded_at         DateTime?
   protocol_file_uploaded_by_user_id String?
   client                            Client? @relation(fields: [client_id], references: [id])
+  responsible                       User? @relation(fields: [responsible_id], references: [id])
 
   @@map("regularize.license")
 }
@@ -88,15 +89,31 @@ model Client {
   competence_output DateTime?
   deletion_date   DateTime?
   dteQueries      RegularizeDteQuery[]
+  // Carteira publicada nos relatórios do Regularize (#1750).
+  type            String    @default("PJ")
+  size            String?
+  responsible     String?
+  municipal_registration String?
+  email           String?
+  coringa_status  String?
+  licitacao       Boolean?
+  contabil        Boolean?
+  fiscal          Boolean?
+  pessoal         Boolean?
+  infoproduto     Boolean?
+  consultoria     Boolean?
+  castelo_med     Boolean?
+  tecnologia      Boolean?
 
   @@map("clients")
 }
 
-// Recorte dos grupos de clientes (dono: client-service), só leitura para o mapa de grupo (#1748).
+// Recorte dos grupos de clientes (dono: client-service), só leitura: relatórios (#1750) e
+// mapa de grupo (#1748).
 model Group {
-  id              String @id @default(uuid())
+  id              String                    @id @default(uuid())
   name            String
-  status          Boolean @default(true)
+  status          Boolean                   @default(true)
   organization_id String
   clients         ClientsGroup[]
   savedMaps       RegularizeGroupSavedMap[]
@@ -110,7 +127,7 @@ model ClientsGroup {
   client_id       String
   organization_id String
   client          Client @relation(fields: [client_id], references: [id])
-  group           Group @relation(fields: [group_id], references: [id])
+  group           Group  @relation(fields: [group_id], references: [id])
 
   @@map("clients.clientsGroup")
 }
@@ -174,6 +191,7 @@ model User {
   responsible1    Process[] @relation("responsible1")
   responsible2    Process[] @relation("responsible2")
   responsible3    Process[] @relation("responsible3")
+  licenses        License[]
   logs            Logs[]
   permissions     Permission[]
   regularizeNotifications RegularizeNotification[]

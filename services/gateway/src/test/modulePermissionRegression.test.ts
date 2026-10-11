@@ -279,6 +279,27 @@ describe("matriz de regressão das políticas modulares", () => {
     }
   });
 
+  // O comparador Veri só lê a carteira e não grava nada: basta o acesso de leitura (#1739).
+  it("libera o comparador Veri para quem lê o Regularize e mantém as demais escritas no nível 2", () => {
+    const regularizeReader = authContext({ modules: { regularize: 1 } });
+    const noAccess = authContext({ modules: { regularize: 0 } });
+    const veri = requiredRoutePolicy("POST", "/regularize/veri/compare");
+
+    expect(canAccessRoute(regularizeReader, veri)).toBe(true);
+    expect(canAccessRoute(noAccess, veri)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), veri)).toBe(false);
+    for (const [method, path] of [
+      ["POST", "/regularize/dte/import"],
+      ["PUT", "/regularize/veri/compare"],
+      ["POST", "/regularize/veri/compare/other"],
+    ] as const) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(regularizeReader, policy), `Regularize 1: ${method} ${path}`).toBe(
+        false,
+      );
+    }
+  });
+
   it("libera os grupos de empresas para Integração e Regularize, e só para eles", () => {
     const regularizeReader = authContext({ modules: { regularize: 1 } });
     const regularizeEditor = authContext({ modules: { regularize: 2 } });

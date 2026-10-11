@@ -6751,6 +6751,21 @@ const handlers = {
     });
   },
 
+  async regularizeVeriCompare(op) {
+    const response = await httpRequest(op, {
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/veri/synthetic.xlsx")),
+    });
+    // scripts/fixtures/veri/README.md: duas linhas válidas e duas inválidas.
+    if (
+      !isBadExpectation(op) &&
+      (response.body?.data?.totals?.veri !== 2 || response.body?.data?.totals?.invalid !== 2)
+    )
+      throw new Error("Comparação Veri diverge do XLSX sintético.");
+  },
+
   async taskIntegrationCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

@@ -32,6 +32,7 @@ import type {
   RegularizeDteQueryListsPayload,
   RegularizeDteQueryListsResult,
   RegularizeDteQueryStatusPayload,
+  RegularizeVeriComparison,
   RegularizeGuidance,
   RegularizeGroupMap,
   RegularizeGroupMapTreeNode,
@@ -86,6 +87,7 @@ import {
   unwrapRegularizeEnvelope,
   unwrapRegularizePage,
 } from "./regularizeService.contract";
+import { VERI_XLSX_MIME_TYPE } from "../utils/veriComparison";
 
 type RegularizeSitePasswordApiListItem = RegularizeSitePasswordListItem & {
   password?: string | null;
@@ -332,6 +334,15 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEntity<RegularizeMunicipalTaxesDetail>(response.data);
+  },
+
+  async compareVeri(file: File): Promise<RegularizeVeriComparison> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.veriCompare, file, {
+      headers: { "Content-Type": VERI_XLSX_MIME_TYPE },
+    });
+
+    return unwrapRegularizeEnvelope<RegularizeVeriComparison>(response.data);
   },
 
   async importDte(payload: RegularizeDteImportPayload): Promise<RegularizeDteImport> {
