@@ -19,11 +19,7 @@ import type {
 } from "../catalog/types.js";
 import type { ReportsServiceEnv } from "../config/env.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
-import {
-  assertReportSourceResponse,
-  reportCriteria,
-  reportingQueryFields,
-} from "./reportCriteria.js";
+import { readReportSourcePayload, reportCriteria, reportingQueryFields } from "./reportCriteria.js";
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
@@ -149,8 +145,7 @@ export class ContabilControlAdapter implements ReportSourceAdapter {
           signal: AbortSignal.timeout(this.env.sourceTimeoutMs),
         },
       );
-      assertReportSourceResponse(response);
-      const payload: unknown = await response.json();
+      const payload: unknown = await readReportSourcePayload(response);
       if (!response.ok || !isExtractResponse(payload))
         throw new Error("Resposta interna inválida.");
       return typeof payload.data.reachedLimit === "boolean"
