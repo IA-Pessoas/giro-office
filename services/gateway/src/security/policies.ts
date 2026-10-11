@@ -63,7 +63,7 @@ const userPhotoEditPolicy: AuthPolicy = {
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
-    modules: ["rh", "contabil", "financeiro", "triagem"],
+    modules: ["rh", "contabil", "financeiro", "pessoal", "triagem"],
     minPermission: moduleAccessPermission,
   },
 };
@@ -141,7 +141,7 @@ const financeiroTaskAdminPolicy: AuthPolicy = {
 };
 const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 // Agenda compartilhada: módulos com tela de agenda; o task-service confere o nível do módulo pedido.
-const agendaModules = ["contabil", "triagem", "regularize"];
+const agendaModules = ["contabil", "pessoal", "triagem", "regularize"];
 const agendaViewPolicy: AuthPolicy = {
   anyModulePermission: { modules: agendaModules, minPermission: moduleAccessPermission },
 };

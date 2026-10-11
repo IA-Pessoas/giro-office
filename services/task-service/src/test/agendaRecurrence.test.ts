@@ -10,17 +10,24 @@ const viewer = { ...editor, level: 1 } as const;
 type Row = Record<string, unknown> & { id: string };
 type Where = Record<string, unknown>;
 
-/** Filtros que o serviço usa: igualdade, `in`, `lt` e `gte` (nulo nunca é menor). */
+/** Filtros que o serviço usa: igualdade, `in`, `lt`, `gt` e `gte` (nulo nunca é menor). */
 function matches(row: Row, where: Where): boolean {
   return Object.entries(where).every(([key, condition]) => {
     const value = row[key] as never;
     if (condition === null || typeof condition !== "object" || condition instanceof Date) {
       return value === condition;
     }
-    const { in: list, lt, gte } = condition as { in?: unknown[]; lt?: never; gte?: never };
+    const {
+      in: list,
+      lt,
+      gt,
+      gte,
+    } = condition as { in?: unknown[]; lt?: never; gt?: never; gte?: never };
     if (list) return list.includes(value);
     return (
-      (lt === undefined || (value != null && value < lt)) && (gte === undefined || value >= gte)
+      (lt === undefined || (value != null && value < lt)) &&
+      (gt === undefined || (value != null && value > gt)) &&
+      (gte === undefined || value >= gte)
     );
   });
 }
@@ -53,6 +60,8 @@ function setup() {
 
   const prisma = {
     department: { findMany: vi.fn().mockResolvedValue([{ id: TRIAGEM, name: "Triagem" }]) },
+    client: { count: vi.fn().mockResolvedValue(1) },
+    user: { count: vi.fn().mockResolvedValue(1) },
     agenda: {
       ...table(events),
       create: vi.fn(async ({ data }: { data: Where }) => {
@@ -92,7 +101,7 @@ function setup() {
   const service = new AgendaService(prisma as never, audit as never);
   const days = (month: string, now: string) =>
     service
-      .list(viewer, month, new Date(now))
+      .list(viewer, month, false, new Date(now))
       .then((rows) => rows.map((row) => `${row.date.toISOString().slice(0, 10)} ${row.agenda}`));
   return { prisma, audit, rules, events, service, days };
 }
@@ -303,6 +312,51 @@ describe("recorrência mensal da agenda (#1700)", () => {
     expect(await days("2026-12", "2026-12-10T12:00:00.000Z")).toEqual(["2026-12-09 Reunião"]);
   });
 
+  // #1774: a ocorrência do mês seguinte nasce com o cliente e o responsável da série.
+  it("as próximas ocorrências levam o cliente e o responsável da série", async () => {
+    const { events, service } = setup();
+    const first = await service.create(editor, {
+      ...monthly,
+      client_id: "cli-1",
+      participant_id: "user-2",
+    });
+
+    await service.list(viewer, "2026-12", false, new Date("2026-12-01T12:00:00.000Z"));
+    const december = events.find((row) => row.recurrence_month === "2026-12");
+    expect(december).toMatchObject({ client_id: "cli-1", participant_id: "user-2" });
+    expect(december?.id).not.toBe(first.id);
+
+    // Trocar o responsável na ocorrência mais recente vale para janeiro; limpar o cliente também.
+    await service.update(editor, String(december?.id), {
+      participant_id: "user-3",
+      client_id: null,
+    });
+    await service.list(viewer, "2027-01", false, new Date("2027-01-04T12:00:00.000Z"));
+    expect(events.find((row) => row.recurrence_month === "2027-01")).toMatchObject({
+      client_id: null,
+      participant_id: "user-3",
+    });
+    expect(events.filter((row) => row.recurring_agenda_id)).toHaveLength(3);
+  });
+
+  it("ligar a recorrência em evento com responsável mantém a atribuição na série", async () => {
+    const { events, service } = setup();
+    const single = await service.create(editor, {
+      agenda: "Folha",
+      date: noon("2026-11-16"),
+      client_id: "cli-1",
+      participant_id: "user-2",
+    });
+
+    await service.update(editor, single.id, { recurrent: true }, noon("2026-11-20"));
+    await service.list(viewer, "2026-12", false, new Date("2026-12-01T12:00:00.000Z"));
+
+    expect(events.find((row) => row.recurrence_month === "2026-12")).toMatchObject({
+      client_id: "cli-1",
+      participant_id: "user-2",
+    });
+  });
+
   it("religar a recorrência em uma ocorrência antiga não duplica o mês corrente", async () => {
     const { events, service, days } = setup();
     const first = await service.create(editor, monthly);
@@ -316,6 +370,18 @@ describe("recorrência mensal da agenda (#1700)", () => {
     expect(await days("2026-12", "2026-12-13T12:00:00.000Z")).toEqual(["2026-12-16 Fechamento"]);
     expect(await days("2027-01", "2027-01-20T12:00:00.000Z")).toEqual(["2027-01-15 Fechamento"]);
     expect(events).toHaveLength(3);
+  });
+
+  it("editar o evento antigo em que a recorrência foi ligada vale para a série", async () => {
+    const { service, days } = setup();
+    const past = await service.create(editor, { agenda: "Fechamento", date: noon("2026-10-16") });
+    const now = new Date("2026-12-12T12:00:00.000Z");
+    await service.update(editor, past.id, { recurrent: true }, now);
+
+    // Ainda é a ocorrência mais recente da série: não há outra depois dela.
+    await service.update(editor, past.id, { agenda: "Entrega", participant_id: "user-2" }, now);
+
+    expect(await days("2027-01", "2027-01-20T12:00:00.000Z")).toEqual(["2027-01-15 Entrega"]);
   });
 
   it("edição que não muda nada não grava nem deixa trilha", async () => {

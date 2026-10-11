@@ -27,6 +27,8 @@ function setup() {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    client: { count: vi.fn().mockResolvedValue(1) },
+    user: { count: vi.fn().mockResolvedValue(1) },
     recurringAgenda: {
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(async ({ data }) => ({
@@ -71,6 +73,21 @@ describe("agenda compartilhada por departamento (#1727)", () => {
       organization_id: ORG,
       department_control_id: { in: [CONTABIL] },
     });
+  });
+
+  it("minha agenda filtra pelo usuário autenticado e pelos eventos sem responsável (#1773)", async () => {
+    const { prisma, send } = setup();
+
+    const response = await send("GET", "/task/agenda?module=contabil&month=2026-12&mine=true");
+
+    expect(response.status).toBe(200);
+    expect(prisma.agenda.findMany.mock.calls[0][0].where).toMatchObject({
+      organization_id: ORG,
+      OR: [{ participant_id: "user-1" }, { participant_id: null }],
+    });
+    expect((await send("GET", "/task/agenda?module=contabil&month=2026-12&mine=1")).status).toBe(
+      400,
+    );
   });
 
   it("usa o nível do módulo pedido, não o de outro módulo", async () => {
@@ -135,6 +152,30 @@ describe("agenda compartilhada por departamento (#1727)", () => {
     expect(prisma.agenda.create).not.toHaveBeenCalled();
     expect(updated.status).toBe(200);
     expect(invalid.status).toBe(400);
+  });
+
+  it("aceita cliente e responsável e recusa o que não é desta organização (#1774)", async () => {
+    const { prisma, send } = setup();
+    const body = {
+      module: "contabil",
+      agenda: "Fechamento",
+      date: "2026-12-31T12:00:00.000Z",
+      client_id: "cli-1",
+      participant_id: "user-2",
+    };
+
+    expect((await send("POST", "/task/agenda", { body })).status).toBe(201);
+    expect(prisma.agenda.create.mock.calls[0][0].data).toMatchObject({
+      client_id: "cli-1",
+      participant_id: "user-2",
+    });
+
+    prisma.user.count.mockResolvedValue(0);
+    expect((await send("POST", "/task/agenda", { body })).status).toBe(404);
+    expect((await send("POST", "/task/agenda", { body: { ...body, client_id: "" } })).status).toBe(
+      400,
+    );
+    expect(prisma.agenda.create).toHaveBeenCalledTimes(1);
   });
 
   it("valida módulo, mês e estado", async () => {

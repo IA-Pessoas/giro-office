@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
+import { CalendarDays, Pencil, Plus, Repeat, Trash2, UserCheck } from "lucide-react";
 
+import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
+import { useAssignableUsers } from "@modules/rh";
 import { ConfirmationDialog } from "@shared/components";
 import { useFetch } from "@shared/hooks";
 import { agendaService } from "@shared/services/agendaService";
@@ -28,6 +30,7 @@ import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 /** Nome do departamento nos textos da tela. */
 const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
   contabil: "Contábil",
+  pessoal: "Pessoal",
   triagem: "Triagem",
   regularize: "Regularize",
 };
@@ -35,25 +38,42 @@ const DEPARTMENT_LABEL: Record<AgendaModule, string> = {
 interface DepartmentAgendaSectionProps {
   module: AgendaModule;
   canEdit: boolean;
+  /** Eventos com responsável e cliente: oferece "Minha agenda" e os dois campos no formulário. */
+  assignable?: boolean;
 }
 
 /** Visão de um departamento na agenda compartilhada: o serviço filtra pelo módulo pedido. */
-export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSectionProps) {
+export function DepartmentAgendaSection({
+  module,
+  canEdit,
+  assignable = false,
+}: DepartmentAgendaSectionProps) {
   const departmentLabel = DEPARTMENT_LABEL[module];
   const [month, setMonth] = useState<ContabilCompetence>(getCurrentContabilCompetence);
+  const [mine, setMine] = useState(false);
   const [editing, setEditing] = useState<AgendaEvent | "new" | null>(null);
   const [removing, setRemoving] = useState<AgendaEvent | null>(null);
+  const [client, setClient] = useState<ClientPickerOption | null>(null);
+  const [participantId, setParticipantId] = useState("");
+  const users = useAssignableUsers({ module, enabled: assignable && canEdit });
   const queryClient = useQueryClient();
-  const events = useFetch(departmentAgendaQueryKey(module, month), () =>
-    agendaService.list(module, month),
+  const events = useFetch(departmentAgendaQueryKey(module, month, mine), () =>
+    agendaService.list(module, month, mine),
   );
   const refresh = () => queryClient.invalidateQueries({ queryKey: departmentAgendaQueryKey(module) });
 
   const save = useMutation({
     mutationFn: (payload: AgendaEventPayload) => {
-      const { date, status, recurrent, ...rest } = payload;
+      const { date, status, recurrent, client_id, participant_id, ...rest } = payload;
+      const assignment = assignable ? { client_id, participant_id } : {};
       if (!editing || editing === "new") {
-        return agendaService.create(module, { ...rest, date, status, ...(recurrent ? { recurrent } : {}) });
+        return agendaService.create(module, {
+          ...rest,
+          ...assignment,
+          date,
+          status,
+          ...(recurrent ? { recurrent } : {}),
+        });
       }
       // Só o que mudou: evento legado mantém o horário e o estado que já tinha.
       return agendaService.update(module, editing.id, {
@@ -61,6 +81,8 @@ export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSec
         ...(agendaDay(date) === agendaDay(editing.date) ? {} : { date }),
         ...(status === editing.status ? {} : { status }),
         ...(recurrent === Boolean(editing.recurring_agenda_id) ? {} : { recurrent }),
+        ...(!assignable || client_id === (editing.client?.id ?? null) ? {} : { client_id }),
+        ...(!assignable || participant_id === (editing.participant?.id ?? null) ? {} : { participant_id }),
       });
     },
     onSuccess: async () => {
@@ -78,6 +100,8 @@ export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSec
 
   const openForm = (target: AgendaEvent | "new" | null) => {
     save.reset();
+    setClient(target && target !== "new" ? target.client : null);
+    setParticipantId((target && target !== "new" && target.participant?.id) || "");
     setEditing(target);
   };
 
@@ -90,6 +114,12 @@ export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSec
       status: form.get("status") as AgendaStatus,
       obs: String(form.get("obs")).trim() || null,
       recurrent: form.get("recurrent") === "on",
+      ...(assignable
+        ? {
+            client_id: client?.id ?? null,
+            participant_id: participantId || null,
+          }
+        : {}),
     });
   };
 
@@ -105,10 +135,27 @@ export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSec
         <div className="space-y-1">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Agenda</h2>
           <p className="text-sm text-gray-600 dark:text-slate-400">
-            Eventos do departamento {departmentLabel} na agenda compartilhada.
+            {mine ? "Seus eventos e os sem responsável do" : "Eventos do"} departamento{" "}
+            {departmentLabel} na agenda compartilhada.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {assignable && (
+            // Mesmo padrão do "Meus clientes" da carteira: desligado, é a agenda geral.
+            <button
+              type="button"
+              aria-pressed={mine}
+              onClick={() => setMine((current) => !current)}
+              className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                mine
+                  ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              <UserCheck aria-hidden="true" className="h-4 w-4" />
+              Minha agenda
+            </button>
+          )}
           <ContabilCompetenceSelect value={month} onChange={setMonth} label="Mês da agenda" />
           {canEdit && (
             <button
@@ -170,6 +217,59 @@ export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSec
               ))}
             </select>
           </div>
+          {assignable && (
+            <>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor={`${module}-agenda-participant`}
+                  className="text-sm font-medium text-gray-700 dark:text-slate-300"
+                >
+                  Responsável
+                </label>
+                <select
+                  id={`${module}-agenda-participant`}
+                  name="participant_id"
+                  className={CONTABIL_SELECT_CLASS}
+                  value={participantId}
+                  onChange={(event) => setParticipantId(event.target.value)}
+                >
+                  <option value="">Sem responsável</option>
+                  {current?.participant &&
+                    !users.data?.some((user) => user.id === current.participant?.id) && (
+                      <option value={current.participant.id}>{current.participant.name}</option>
+                    )}
+                  {users.data?.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+                {users.isError && (
+                  <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                    Não foi possível carregar os responsáveis.
+                  </p>
+                )}
+              </div>
+              {/* O seletor abre uma busca dentro do formulário: Enter nela não salva o evento. */}
+              <div
+                className="flex flex-col gap-1"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Cliente</span>
+                <ClientPickerModal
+                  selectedClient={client}
+                  onSelectClient={setClient}
+                  filters={{ status: "Ativo", legacyIntegrationStatusFilter: false }}
+                  triggerLabel="Sem cliente"
+                  allowClearSelection
+                />
+              </div>
+            </>
+          )}
           <div className="space-y-1 sm:col-span-2">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
               <input
@@ -241,6 +341,12 @@ export function DepartmentAgendaSection({ module, canEdit }: DepartmentAgendaSec
                 {event.obs && (
                   <p className="break-words text-sm text-gray-600 dark:text-slate-400">
                     {event.obs}
+                  </p>
+                )}
+                {(event.client || event.participant || assignable) && (
+                  <p className="break-words text-xs text-gray-500 dark:text-slate-400">
+                    {event.client?.name && `Cliente: ${event.client.name} · `}
+                    Responsável: {event.participant?.name ?? "Sem responsável"}
                   </p>
                 )}
               </div>
