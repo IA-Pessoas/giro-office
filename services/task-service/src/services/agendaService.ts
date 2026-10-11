@@ -283,8 +283,8 @@ export class AgendaService {
 
   /**
    * Mantém a regra coerente com a edição da ocorrência e devolve o vínculo a gravar nela.
-   * Só a ocorrência mais recente (a do marcador) altera a regra: editar uma antiga não muda
-   * as próximas. O estado nunca vai para a regra.
+   * Só a ocorrência mais recente da série altera a regra: editar uma antiga não muda as
+   * próximas. O estado nunca vai para a regra.
    */
   private async syncRecurrence(
     scope: AgendaScope,
@@ -323,10 +323,21 @@ export class AgendaService {
         day: sameMonth ? date.getUTCDate() : undefined,
       };
       if (Object.values(data).some((value) => value !== undefined)) {
-        await this.prisma.recurringAgenda.updateMany({
-          where: { id: ruleId, generated_through: existing.recurrence_month },
-          data,
+        // O marcador não serve de critério: série ligada em evento antigo nasce com o
+        // marcador no mês corrente, e esse evento ainda é a ocorrência mais recente.
+        const newer = await this.prisma.agenda.findFirst({
+          where: {
+            recurring_agenda_id: ruleId,
+            recurrence_month: { gt: existing.recurrence_month ?? "" },
+          },
+          select: { id: true },
         });
+        if (!newer) {
+          await this.prisma.recurringAgenda.updateMany({
+            where: { id: ruleId, organization_id: scope.organizationId },
+            data,
+          });
+        }
       }
       return {};
     }

@@ -10,17 +10,24 @@ const viewer = { ...editor, level: 1 } as const;
 type Row = Record<string, unknown> & { id: string };
 type Where = Record<string, unknown>;
 
-/** Filtros que o serviço usa: igualdade, `in`, `lt` e `gte` (nulo nunca é menor). */
+/** Filtros que o serviço usa: igualdade, `in`, `lt`, `gt` e `gte` (nulo nunca é menor). */
 function matches(row: Row, where: Where): boolean {
   return Object.entries(where).every(([key, condition]) => {
     const value = row[key] as never;
     if (condition === null || typeof condition !== "object" || condition instanceof Date) {
       return value === condition;
     }
-    const { in: list, lt, gte } = condition as { in?: unknown[]; lt?: never; gte?: never };
+    const {
+      in: list,
+      lt,
+      gt,
+      gte,
+    } = condition as { in?: unknown[]; lt?: never; gt?: never; gte?: never };
     if (list) return list.includes(value);
     return (
-      (lt === undefined || (value != null && value < lt)) && (gte === undefined || value >= gte)
+      (lt === undefined || (value != null && value < lt)) &&
+      (gt === undefined || (value != null && value > gt)) &&
+      (gte === undefined || value >= gte)
     );
   });
 }
@@ -363,6 +370,18 @@ describe("recorrência mensal da agenda (#1700)", () => {
     expect(await days("2026-12", "2026-12-13T12:00:00.000Z")).toEqual(["2026-12-16 Fechamento"]);
     expect(await days("2027-01", "2027-01-20T12:00:00.000Z")).toEqual(["2027-01-15 Fechamento"]);
     expect(events).toHaveLength(3);
+  });
+
+  it("editar o evento antigo em que a recorrência foi ligada vale para a série", async () => {
+    const { service, days } = setup();
+    const past = await service.create(editor, { agenda: "Fechamento", date: noon("2026-10-16") });
+    const now = new Date("2026-12-12T12:00:00.000Z");
+    await service.update(editor, past.id, { recurrent: true }, now);
+
+    // Ainda é a ocorrência mais recente da série: não há outra depois dela.
+    await service.update(editor, past.id, { agenda: "Entrega", participant_id: "user-2" }, now);
+
+    expect(await days("2027-01", "2027-01-20T12:00:00.000Z")).toEqual(["2027-01-15 Entrega"]);
   });
 
   it("edição que não muda nada não grava nem deixa trilha", async () => {
