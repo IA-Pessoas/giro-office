@@ -4,6 +4,8 @@ import type { PaginatedResult } from "@shared/pagination/pagination";
 export const PESSOAL_ENDPOINTS = {
   ldd: "/pessoal/ldd",
   lddDetail: (id: string) => `/pessoal/ldd/${id}`,
+  lddImport: "/pessoal/ldd/import",
+  lddImportPreview: "/pessoal/ldd/import/preview",
   overview: "/pessoal/overview",
   groups: "/pessoal/groups",
   groupDetail: (id: string) => `/pessoal/groups/${id}`,
@@ -19,7 +21,9 @@ export const PESSOAL_ENDPOINTS = {
   payroll: "/pessoal/payroll",
   payrollDetail: (clientId: string) => `/pessoal/payroll/${clientId}`,
   obligations: "/pessoal/obrigations",
+  obligationPortfolio: "/pessoal/obrigations/portfolio",
   obligationDetail: (id: string) => `/pessoal/obrigations/${id}`,
+  obligationHistory: (id: string) => `/pessoal/obrigations/${id}/history`,
   obligationGenerate: (competence: string) =>
     `/pessoal/obrigations/competences/${competence}/generate`,
   passwords: "/pessoal/passwords",
@@ -35,6 +39,7 @@ export const PESSOAL_TABS: PessoalTab[] = [
   { id: "obligations", label: "Obrigações" },
   { id: "tracking", label: "Acompanhamentos" },
   { id: "passwords", label: "Senhas" },
+  { id: "agenda", label: "Agenda" },
 ];
 
 export function unwrapPessoalEnvelope<T>(body: unknown): T {

@@ -116,18 +116,24 @@ describe("ControlService", () => {
         id: "b0000000-0000-4000-8000-000000000003",
         name: "Cliente C",
         company_name: null,
+        cpf_cnpj: "11222333000181",
+        regime: "Simples Nacional",
         controlContabil: [],
       },
       {
         id: "b0000000-0000-4000-8000-000000000002",
         name: "Cliente B",
         company_name: "Beta Contábil Ltda.",
+        cpf_cnpj: "11222333000181",
+        regime: "Lucro Presumido",
         controlContabil: [{ ...baseRow, client_id: "b0000000-0000-4000-8000-000000000002" }],
       },
       {
         id: "b0000000-0000-4000-8000-000000000001",
         name: "Cliente A",
         company_name: "Alfa Contábil Ltda.",
+        cpf_cnpj: "11222333000181",
+        regime: null,
         controlContabil: [],
       },
     ] as never);
@@ -139,6 +145,8 @@ describe("ControlService", () => {
         {
           client_id: "b0000000-0000-4000-8000-000000000001",
           legal_name: "Alfa Contábil Ltda.",
+          cpf_cnpj: "11222333000181",
+          regime: null,
           control: null,
           closing: {
             client_id: "b0000000-0000-4000-8000-000000000001",
@@ -150,6 +158,8 @@ describe("ControlService", () => {
         {
           client_id: "b0000000-0000-4000-8000-000000000002",
           legal_name: "Beta Contábil Ltda.",
+          cpf_cnpj: "11222333000181",
+          regime: "Lucro Presumido",
           control: { ...baseRow, client_id: "b0000000-0000-4000-8000-000000000002" },
           closing: {
             client_id: "b0000000-0000-4000-8000-000000000002",
@@ -161,6 +171,8 @@ describe("ControlService", () => {
         {
           client_id: "b0000000-0000-4000-8000-000000000003",
           legal_name: "Cliente C",
+          cpf_cnpj: "11222333000181",
+          regime: "Simples Nacional",
           control: null,
           closing: {
             client_id: "b0000000-0000-4000-8000-000000000003",
@@ -173,6 +185,7 @@ describe("ControlService", () => {
     });
     expect(prisma.client.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        select: expect.objectContaining({ cpf_cnpj: true, regime: true }),
         where: expect.objectContaining({
           organization_id: ORG_ID,
           AND: [
@@ -248,6 +261,8 @@ describe("ControlService", () => {
     const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
     vi.mocked(prisma.controlContabil.findFirst)
       .mockResolvedValueOnce({ ...baseRow, archived_at: new Date("2024-02-01") } as never)
+      // A restauração lê o controle para auditar no mesmo objeto do arquivamento.
+      .mockResolvedValueOnce(baseRow as never)
       .mockResolvedValueOnce(baseRow as never);
     vi.mocked(prisma.controlContabil.updateMany).mockResolvedValue({ count: 1 } as never);
     vi.mocked(prisma.triageMonthly.updateMany).mockResolvedValue({ count: 0 } as never);
@@ -272,6 +287,14 @@ describe("ControlService", () => {
     expect(prisma.controlContabil.create).not.toHaveBeenCalled();
     expect(prisma.controlContabil.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { archived_at: null } }),
+    );
+    // O histórico documental da Triagem acha a restauração pelo id do controle.
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Restaurar competência contábil",
+        referring: "contabil.control",
+        referringId: baseRow.id,
+      }),
     );
   });
 

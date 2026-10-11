@@ -15,7 +15,7 @@ export {
   normalizeAdminUserStatus,
 } from './services/adminUsersService';
 
-export type { UserItem, CreateUserData, UpdateUserData } from './types';
+export type { UserItem, UserDirectoryProfile, UserDirectoryProfilesPage, CreateUserData, UpdateUserData } from './types';
 export type { AdminUserStatus } from './services/adminUsersService';
 export type { AdminUserSession, UserDetailsPageProps, UsersIndexPageProps } from './types/pageProps';
 export type {

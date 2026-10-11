@@ -25,6 +25,7 @@ interface UserRouteMocks {
   };
   userServiceMock: {
     list: Mock;
+    listMarketingProfiles: Mock;
     getById: Mock;
     getByIdWithModules: Mock;
     getReportingAccessContext: Mock;
@@ -56,6 +57,7 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
     },
     userServiceMock: {
       list: vi.fn(),
+      listMarketingProfiles: vi.fn(),
       getById: vi.fn(),
       getByIdWithModules: vi.fn(),
       getReportingAccessContext: vi.fn(),

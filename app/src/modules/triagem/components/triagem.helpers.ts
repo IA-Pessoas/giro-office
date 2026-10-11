@@ -1,3 +1,9 @@
+export function triageUserLabel(
+  user: { name: string | null; full_name: string | null } | null,
+): string {
+  return user?.name || user?.full_name || "Não identificado";
+}
+
 // Validação do formulário de catálogo no padrão do app (mensagens em pt-BR), no lugar da
 // validação nativa do navegador, que aparece no idioma do sistema.
 export function validateTriageCatalogForm(values: {

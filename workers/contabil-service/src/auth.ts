@@ -168,6 +168,15 @@ export function requireContabilModule(auth: WorkerAuthContext, minimum = 1): voi
   }
 }
 
+/**
+ * Histórico documental de toda a organização (alterações recentes): só administrador do
+ * Contábil ou da Triagem. Com cliente informado vale a leitura comum de `/triagem`.
+ */
+export function requireTriagemAdmin(auth: WorkerAuthContext): void {
+  if (contabilPermission(auth) >= 3 || Number(auth.claims.modules?.triagem ?? 0) >= 3) return;
+  throw new ServiceError(403, "Informe o cliente para consultar o histórico documental.");
+}
+
 /** Policy `/triagem` do gateway Node: owner ou `contabil`/`triagem` >= 1. */
 export function requireTriagemModule(auth: WorkerAuthContext): void {
   if (contabilPermission(auth) >= 1 || Number(auth.claims.modules?.triagem ?? 0) >= 1) return;

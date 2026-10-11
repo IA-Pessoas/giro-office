@@ -256,10 +256,17 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     audit: "required",
     test: "client.groups.create",
   }),
-  routePolicy("PATCH", "/client/groups/:id", "client", "update", [writeRule(writeUser, ["name"])], {
-    audit: "required",
-    test: "client.groups.update",
-  }),
+  routePolicy(
+    "PATCH",
+    "/client/groups/:id",
+    "client",
+    "update",
+    [writeRule(writeUser, ["name", "status"])],
+    {
+      audit: "required",
+      test: "client.groups.update",
+    },
+  ),
   routePolicy(
     "PUT",
     "/client/groups/:id/clients",

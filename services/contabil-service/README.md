@@ -62,8 +62,83 @@ Infraestrutura direto no serviço: `GET http://localhost:3038/health` e `GET htt
 pnpm --filter @workspace/contabil-service dev
 ```
 
+## Conversão Noah
+
+`POST /contabil/noah?filename=comprovantes.zip` recebe bytes `application/zip` e exige
+permissão de edição no Contábil. Retorna 201 com identificador, rejeições por arquivo,
+quantidades, ator, instante e hashes SHA-256 da origem e do CSV. O resultado é imutável
+e persistido em `contabil.noah_conversions`; o ZIP/HTML só permanece em memória durante
+a requisição. `GET /contabil/noah/:id/csv` exige leitura e consulta somente a organização
+autenticada. O gateway encaminha o upload binário e o download pelo mesmo prefixo.
+
+Limites: ZIP de 5 MiB, 100 entradas, 1 MiB por HTML, 10 MiB expandidos e 10.000 pagamentos.
+Não extrai no filesystem, não executa HTML e rejeita caminhos inseguros, symlinks,
+arquivos corrompidos e pagamentos inválidos. O CSV usa UTF-8, ponto e vírgula e as quatro
+colunas `FORNECEDOR;DATA;VALOR;ARQUIVO`; células que poderiam executar fórmulas recebem
+um apóstrofo inicial. Nenhum lançamento, Controle ou checklist é alterado.
+
+Regras de extração: `classes/Contabil.php` do legado (tabela `TBLResultado`, colunas
+1/6/7 e alternativas 5/6). Validação usa casos sintéticos; compatibilidade com ZIPs
+reais permanece não validada conforme #1716. A migration
+`20261009214500_contabil_noah_conversions` deve ser aplicada pelo processo de publicação.
+
+### Comandos locais
+
+```bash
+pnpm --filter @workspace/contabil-service dev
+```
+
 Gerar cliente Prisma: `pnpm --filter @workspace/contabil-service prisma:generate`.
 
 ## Critérios de relatórios
 
 `POST /internal/reporting/extract` aceita `query` opcional com filtros tipados, grupos AND/OR, ordenação, agrupamento e agregações. O corpo completo e todos os campos utilizados pertencem ao grant assinado. A origem aplica o escopo organizacional e processa o conjunto completo em snapshot consistente antes do limite de saída; excesso de 50.000 registros/20 MiB retorna 422, sem resultado parcial. Payloads sem `query` preservam o contrato legado. Consulte a [matriz e semântica dos critérios](../reports-service/docs/criteria-origins.md) e o OpenAPI do serviço.
+
+## Simulação de Contingência
+
+`POST /contabil/contingency` recebe XLS binário em `application/vnd.ms-excel` e os
+parâmetros de query `client_id`, `company_name`, `cnpj`, `period_start`, `period_end`
+(AAAA-MM), `regime`, `annex`, `rate` (padrão 11) e `filename`. Exige edição no
+Contábil. Cliente é consultado com a organização autenticada; empresa/CNPJ devem
+coincidir com o cadastro. CNPJ identificado na planilha também deve coincidir;
+quando não existe identificação, o resultado informa `identity: not_found`.
+
+O XLS é processado em memória e não é armazenado. Aceita BIFF8/Excel 97–2003, até
+5 MiB, 10.000 linhas e 256 colunas na primeira planilha. Rótulos ausentes, células
+inválidas e fórmulas nos valores extraídos geram erro explícito. Valores monetários
+aceitam números e formatos decimal/BR com até duas casas e magnitude de até R$ 1
+trilhão, incluindo negativos entre parênteses. HTML não é interpretado.
+
+A extração segue `gerar_relatorio.php`: rótulos nas colunas I/J/K, valores em U
+(exceto bancos em S), mantendo a primeira ocorrência não zero. A resposta privada
+(`Cache-Control: no-store`) inclui valores em centavos, valor original e células de
+origem; diferença, transferências internas, cenários mínimo/máximo e parâmetros.
+Tributo usa a alíquota informada; multa 75%, juros 6%. Arredondamento de cada saída
+ocorre depois do cálculo, como no PHP. As classificações são hipóteses do modelo
+legado e não comprovam irregularidade. Não cria lançamentos nem altera Controle.
+O resultado é persistido em `contabil.contingency_drafts`, com `id` e `content_hash`.
+A query opcional `simulation_id` recalcula esse rascunho da organização e limpa a
+revisão anterior. Cada cálculo gera nova revisão do conteúdo, inclusive quando os
+valores se repetem, impedindo confirmação atrasada de uma versão anterior.
+
+`POST /contabil/contingency/:id/review`, JSON `{ "content_hash": "<sha256>" }`,
+confirma os valores e parâmetros atuais e registra ator da sessão, instante UTC e
+hash. `GET /contabil/contingency/:id/export?content_hash=<sha256>` retorna HTML
+imprimível apenas com confirmação correspondente. Ambos exigem edição e revalidam
+organização, identidade da empresa e contratação contábil. Hash desatualizado ou
+revisão ausente retorna 409. O HTML inclui hipóteses, parâmetros, cálculos e
+confirmação; o navegador permite imprimir/salvar como PDF. Nenhuma cidade é presumida.
+
+A migration `20261010004500_contabil_contingency_reviews` deve ser aplicada pelo
+processo de publicação antes de usar simulação/revisão. O XLS continua temporário;
+o resultado extraído e os parâmetros ficam persistidos. Esta entrega não aplica
+migrations nem comprova persistência com banco real.
+
+A fixture e os valores esperados ficam em `scripts/fixtures/contingency/README.md`.
+Amostras reais anonimizadas não estão disponíveis (#1716); compatibilidade real
+permanece não validada. O parser é `@e965/xlsx@0.20.3`, espelho npm fixado do SheetJS,
+pois a política do workspace recusa dependências por URL. Todos os arquivos do
+pacote foram comparados com o tarball oficial 0.20.3: só README e package.json
+mudam; `xlsx.mjs` tem SHA256
+`1a0fb062ee9781b13f6687371b202aaefc53b6ce55b530c027e01f9c087b77db`.
+Fonte oficial: https://docs.sheetjs.com/docs/getting-started/installation/nodejs/.

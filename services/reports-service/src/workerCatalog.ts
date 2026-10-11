@@ -1,9 +1,14 @@
 import { SourceCatalogService } from "./catalog/sourceCatalogService.js";
+import type { ReportSourceAdapter } from "./catalog/types.js";
 import type { ReportsServiceEnv } from "./config/env.js";
 import { CertificatePfAdapter } from "./integrations/certificatePfAdapter.js";
 import { CertificatePjAdapter } from "./integrations/certificatePjAdapter.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
+import { ContabilDocumentsAdapter } from "./integrations/contabilDocumentsAdapter.js";
+import { ContabilRelationshipAdapter } from "./integrations/contabilRelationshipAdapter.js";
+import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsiblesAdapter.js";
+import { ContabilTriageAdapter } from "./integrations/contabilTriageAdapter.js";
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
 import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
@@ -16,6 +21,7 @@ import { PessoalUnionsAdapter } from "./integrations/pessoalUnionsAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { RegularizeMunicipalTaxesAdapter } from "./integrations/regularizeMunicipalTaxesAdapter.js";
+import { RegularizePortfolioAdapter } from "./integrations/regularizePortfolioAdapter.js";
 import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
 import { RhAttendanceAdapter } from "./integrations/rhAttendanceAdapter.js";
 import { RhHolidayAdapter } from "./integrations/rhHolidayAdapter.js";
@@ -26,13 +32,18 @@ import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
 import { TiRequestsAdapter } from "./integrations/tiRequestsAdapter.js";
 import { TiStockAdapter } from "./integrations/tiStockAdapter.js";
 
-export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalogService {
-  return new SourceCatalogService([
+/** Adapters que só dependem do ambiente: a lista única da prévia HTTP e dos jobs do Worker. */
+export function createEnvSourceAdapters(env: ReportsServiceEnv): ReportSourceAdapter[] {
+  return [
     new ParcelamentoAdapter(env),
     new ClientIntegrationAdapter(env),
     new CertificatePfAdapter(env),
     new CertificatePjAdapter(env),
     new ContabilControlAdapter(env),
+    new ContabilDocumentsAdapter(env),
+    new ContabilRelationshipAdapter(env),
+    new ContabilResponsiblesAdapter(env),
+    new ContabilTriageAdapter(env),
     new TaskAdapter(env),
     new ProjectAdapter(env),
     new FiscalIcmsAdapter(env),
@@ -53,5 +64,10 @@ export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalog
     new TiRequestsAdapter(env),
     new TiStockAdapter(env),
     new RegularizeMunicipalTaxesAdapter(env),
-  ]);
+    new RegularizePortfolioAdapter(env),
+  ];
+}
+
+export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalogService {
+  return new SourceCatalogService(createEnvSourceAdapters(env));
 }

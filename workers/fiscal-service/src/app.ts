@@ -1,6 +1,35 @@
 import { buildFiscalServiceOpenApiSpec } from "@workspace/fiscal-service/src/openapi/spec.js";
 import { InternalReportingService } from "@workspace/fiscal-service/src/reporting/internalReportingService.js";
 import {
+  addAnnualDeclarationBodySchema,
+  annualControlIdParamsSchema,
+  annualDeclarationParamsSchema,
+  listAnnualControlsQuerySchema,
+  updateAnnualDeclarationBodySchema,
+} from "@workspace/fiscal-service/src/schemas/annualControl.schemas.js";
+import {
+  anticipationBatchIdParamsSchema,
+  anticipationItemParamsSchema,
+  checkAnticipationBatchBodySchema,
+  importAnticipationBatchBodySchema,
+  listAnticipationBatchesQuerySchema,
+  submitAnticipationBatchBodySchema,
+  updateAnticipationItemBodySchema,
+} from "@workspace/fiscal-service/src/schemas/anticipation.schemas.js";
+import {
+  clientWholesaleParamsSchema,
+  updateClientWholesaleBodySchema,
+} from "@workspace/fiscal-service/src/schemas/clientWholesale.schemas.js";
+import {
+  documentConferenceBodySchema,
+  invoicePdfTotalsBodySchema,
+  ipiSpreadsheetConferenceBodySchema,
+  sefazXmlConferenceBodySchema,
+  spedConferenceBodySchema,
+  xmlSelectionBodySchema,
+  xmlTaxTotalsBodySchema,
+} from "@workspace/fiscal-service/src/schemas/documentConference.schemas.js";
+import {
   createFiscalRateBodySchema,
   fiscalRateIdParamsSchema,
   listFiscalRatesQuerySchema,
@@ -20,6 +49,23 @@ import {
   updateIpiBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ipi.schemas.js";
 import {
+  createMalhaBodySchema,
+  listMalhasQuerySchema,
+  malhaIdParamsSchema,
+  updateMalhaBodySchema,
+} from "@workspace/fiscal-service/src/schemas/malha.schemas.js";
+import {
+  addMonthlyObligationBodySchema,
+  listMonthlyControlsQuerySchema,
+  monthlyControlIdParamsSchema,
+  monthlyObligationParamsSchema,
+  openMonthlyControlBodySchema,
+  responsibleReportQuerySchema,
+  transferMonthlyControlsBodySchema,
+  updateMonthlyControlBodySchema,
+  updateMonthlyObligationBodySchema,
+} from "@workspace/fiscal-service/src/schemas/monthlyControl.schemas.js";
+import {
   createMonthlyRevenueBodySchema,
   listMonthlyRevenuesQuerySchema,
   monthlyRevenueIdParamsSchema,
@@ -36,13 +82,36 @@ import {
   simplesPdfQuerySchema,
   simplesPreviewQuerySchema,
 } from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
+import { AnnualControlService } from "@workspace/fiscal-service/src/services/annualControlService.js";
+import { renderAnticipationDemonstrative } from "@workspace/fiscal-service/src/services/anticipationExportService.js";
+import { AnticipationService } from "@workspace/fiscal-service/src/services/anticipationService.js";
+import { ClientWholesaleService } from "@workspace/fiscal-service/src/services/clientWholesaleService.js";
+import {
+  compareDocumentSpreadsheets,
+  documentConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/documentConferenceService.js";
 import {
   fiscalRatePdfHeaders,
   renderFiscalRatePdf,
 } from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
+import {
+  invoicePdfTotalsCsvExport,
+  sumInvoicePdfs,
+} from "@workspace/fiscal-service/src/services/invoicePdfTotalsService.js";
+import {
+  compareIpiSpreadsheets,
+  ipiSpreadsheetConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/ipiSpreadsheetConferenceService.js";
+import { MalhaService } from "@workspace/fiscal-service/src/services/malhaService.js";
+import { MonthlyControlService } from "@workspace/fiscal-service/src/services/monthlyControlService.js";
+import { MonthlyObligationService } from "@workspace/fiscal-service/src/services/monthlyObligationService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
+import {
+  compareSefazWithXml,
+  sefazXmlConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/sefazXmlConferenceService.js";
 import { simplesRateCsvExport } from "@workspace/fiscal-service/src/services/simplesRateCsvService.js";
 import {
   renderSimplesRatePdf,
@@ -50,6 +119,15 @@ import {
 } from "@workspace/fiscal-service/src/services/simplesRatePdfService.js";
 import { SimplesRateService } from "@workspace/fiscal-service/src/services/simplesRateService.js";
 import { simplesRateZipExport } from "@workspace/fiscal-service/src/services/simplesRateZipService.js";
+import {
+  compareSpedWithXml,
+  spedConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/spedConferenceService.js";
+import { selectXmlFromZip } from "@workspace/fiscal-service/src/services/xmlSelectionService.js";
+import {
+  sumXmlTaxes,
+  xmlTaxTotalsCsvExport,
+} from "@workspace/fiscal-service/src/services/xmlTaxTotalsService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   fiscalIcmsReportingCatalog,
@@ -72,6 +150,7 @@ import { createFiscalAudit, requireAuditConfigured } from "./audit.js";
 import { authenticateFiscalRequest, authorizeFiscalRequest } from "./auth.js";
 import type { FiscalWorkerEnv } from "./env.js";
 import { FiscalSearchService, IpiService, NcmService } from "./fiscalServices.js";
+import { WorkerMalhaAttachmentStorage } from "./malhaAttachmentStorage.js";
 import { PrismaClient } from "./prisma.js";
 import { verifyReportingGrant } from "./reporting.js";
 
@@ -90,6 +169,21 @@ type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
 type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
+type WholesaleServiceLike = Pick<ClientWholesaleService, "get" | "set">;
+type MalhaServiceLike = Pick<
+  MalhaService,
+  "create" | "update" | "list" | "detail" | "replaceAttachment" | "attachmentAccess"
+>;
+type AnticipationServiceLike = Pick<
+  AnticipationService,
+  "importBatch" | "list" | "detail" | "updateItem" | "submit" | "check" | "demonstrative"
+>;
+type ControlServiceLike = Pick<
+  MonthlyControlService,
+  "list" | "open" | "update" | "triage" | "transfer" | "responsibles" | "responsibleReport"
+>;
+type ObligationServiceLike = Pick<MonthlyObligationService, "list" | "add" | "update">;
+type AnnualServiceLike = Pick<AnnualControlService, "list" | "items" | "addItem" | "updateItem">;
 type SimplesServiceLike = Pick<SimplesRateService, "preview" | "emission" | "batch">;
 
 interface FiscalWorkerOptions {
@@ -101,6 +195,12 @@ interface FiscalWorkerOptions {
   reportingService?: ReportingServiceLike;
   rateService?: RateServiceLike;
   revenueService?: RevenueServiceLike;
+  malhaService?: MalhaServiceLike;
+  anticipationService?: AnticipationServiceLike;
+  wholesaleService?: WholesaleServiceLike;
+  controlService?: ControlServiceLike;
+  obligationService?: ObligationServiceLike;
+  annualService?: AnnualServiceLike;
   simplesService?: SimplesServiceLike;
 }
 
@@ -117,6 +217,12 @@ type WorkerServices = {
   reportingService: ReportingServiceLike;
   rateService: RateServiceLike;
   revenueService: RevenueServiceLike;
+  malhaService: MalhaServiceLike;
+  anticipationService: AnticipationServiceLike;
+  wholesaleService: WholesaleServiceLike;
+  controlService: ControlServiceLike;
+  obligationService: ObligationServiceLike;
+  annualService: AnnualServiceLike;
   simplesService: SimplesServiceLike;
 };
 
@@ -240,6 +346,12 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         ConstructorParameters<typeof FiscalSearchService>[0] &
         ConstructorParameters<typeof FiscalRateService>[0] &
         ConstructorParameters<typeof MonthlyRevenueService>[0] &
+        ConstructorParameters<typeof MalhaService>[0] &
+        ConstructorParameters<typeof AnticipationService>[0] &
+        ConstructorParameters<typeof ClientWholesaleService>[0] &
+        ConstructorParameters<typeof MonthlyControlService>[0] &
+        ConstructorParameters<typeof MonthlyObligationService>[0] &
+        ConstructorParameters<typeof AnnualControlService>[0] &
         ConstructorParameters<typeof SimplesRateService>[0] &
         ConstructorParameters<typeof InternalReportingService>[0];
       const factories: { [S in keyof WorkerServices]: () => WorkerServices[S] } = {
@@ -250,6 +362,17 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         reportingService: () => new InternalReportingService(prisma),
         rateService: () => new FiscalRateService(prisma, createFiscalAudit(env)),
         revenueService: () => new MonthlyRevenueService(prisma, createFiscalAudit(env)),
+        malhaService: () =>
+          new MalhaService(
+            prisma,
+            createFiscalAudit(env),
+            WorkerMalhaAttachmentStorage.fromEnv(env),
+          ),
+        anticipationService: () => new AnticipationService(prisma, createFiscalAudit(env)),
+        wholesaleService: () => new ClientWholesaleService(prisma, createFiscalAudit(env)),
+        controlService: () => new MonthlyControlService(prisma, createFiscalAudit(env)),
+        obligationService: () => new MonthlyObligationService(prisma, createFiscalAudit(env)),
+        annualService: () => new AnnualControlService(prisma, createFiscalAudit(env)),
         simplesService: () => new SimplesRateService(prisma),
       };
       return callback(factories[key]());
@@ -320,6 +443,281 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     return c.json(createSuccessResponse(data));
   });
 
+  app.get("/fiscal/clients/:client_id/wholesale", async (c) => {
+    const { client_id } = parseWithZod(clientWholesaleParamsSchema, {
+      client_id: c.req.param("client_id"),
+    });
+    const data = await withService("wholesaleService", (service) =>
+      service.get(client_id, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/clients/:client_id/wholesale", async (c) => {
+    const { client_id } = parseWithZod(clientWholesaleParamsSchema, {
+      client_id: c.req.param("client_id"),
+    });
+    const { is_wholesale } = parseWithZod(updateClientWholesaleBodySchema, await readJson(c));
+    const data = await withService("wholesaleService", (service) =>
+      service.set({ ...actor(c), clientId: client_id, isWholesale: is_wholesale }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/anticipations/batches", async (c) => {
+    const body = parseWithZod(importAnticipationBatchBodySchema, await readJson(c));
+    const data = await withService("anticipationService", (service) =>
+      service.importBatch({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/anticipations/batches/list", async (c) => {
+    const query = parseWithZod(listAnticipationBatchesQuerySchema, {
+      client_id: c.req.query("client_id"),
+      competence: c.req.query("competence"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+    });
+    const data = await withService("anticipationService", (service) =>
+      service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/anticipations/batches/:id", async (c) => {
+    const { id } = parseWithZod(anticipationBatchIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("anticipationService", (service) =>
+      service.detail(id, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/anticipations/batches/:id/items/:item_id", async (c) => {
+    const { id, item_id } = parseWithZod(anticipationItemParamsSchema, {
+      id: c.req.param("id"),
+      item_id: c.req.param("item_id"),
+    });
+    const body = parseWithZod(updateAnticipationItemBodySchema, await readJson(c));
+    const data = await withService("anticipationService", (service) =>
+      service.updateItem({ ...actor(c), ...body, batchId: id, itemId: item_id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/anticipations/batches/:id/submit", async (c) => {
+    const { id } = parseWithZod(anticipationBatchIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(submitAnticipationBatchBodySchema, await readJson(c));
+    const data = await withService("anticipationService", (service) =>
+      service.submit({ ...actor(c), ...body, batchId: id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/anticipations/batches/:id/check", async (c) => {
+    const { id } = parseWithZod(anticipationBatchIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(checkAnticipationBatchBodySchema, await readJson(c));
+    const data = await withService("anticipationService", (service) =>
+      service.check({ ...actor(c), ...body, batchId: id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  for (const format of ["csv", "pdf"] as const) {
+    app.get(`/fiscal/anticipations/batches/:id/${format}`, async (c) => {
+      const { id } = parseWithZod(anticipationBatchIdParamsSchema, { id: c.req.param("id") });
+      const demonstrative = await withService("anticipationService", (service) =>
+        service.demonstrative(id, c.get("auth").organizationId),
+      );
+      const file = await renderAnticipationDemonstrative(demonstrative, format);
+      return new Response(file.body, { headers: file.headers });
+    });
+  }
+
+  app.post("/fiscal/malhas", async (c) => {
+    const body = parseWithZod(createMalhaBodySchema, await readJson(c));
+    const data = await withService("malhaService", (service) =>
+      service.create({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/malhas/list", async (c) => {
+    const query = parseWithZod(listMalhasQuerySchema, {
+      client_id: c.req.query("client_id"),
+      status: c.req.query("status"),
+      responsible_id: c.req.query("responsible_id"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+    });
+    const data = await withService("malhaService", (service) =>
+      service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/malhas/:id", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("malhaService", (service) =>
+      service.detail(id, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/malhas/:id", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(updateMalhaBodySchema, await readJson(c));
+    const data = await withService("malhaService", (service) =>
+      service.update({ ...actor(c), ...body, id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/malhas/:id/attachment", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    let form: FormData;
+    try {
+      form = await c.req.raw.formData();
+    } catch {
+      throw new ServiceError(400, "Upload inválido.");
+    }
+    const entry = form.get("file");
+    const file =
+      entry instanceof File
+        ? {
+            bytes: new Uint8Array(await entry.arrayBuffer()),
+            mimetype: entry.type,
+            originalname: entry.name,
+            size: entry.size,
+          }
+        : undefined;
+    const data = await withService("malhaService", (service) =>
+      service.replaceAttachment({ ...actor(c), id, file }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/malhas/:id/attachment", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("malhaService", (service) =>
+      service.attachmentAccess(id, c.get("auth").organizationId),
+    );
+    c.header("Cache-Control", "no-store");
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/monthly-controls", async (c) => {
+    const query = parseWithZod(listMonthlyControlsQuerySchema, {
+      competence: c.req.query("competence"),
+    });
+    const data = await withService("controlService", (service) => service.list(query, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/monthly-controls/responsibles", async (c) => {
+    const data = await withService("controlService", (service) => service.responsibles(actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/monthly-controls/responsibles-report", async (c) => {
+    const query = parseWithZod(responsibleReportQuerySchema, c.req.query());
+    const data = await withService("controlService", (service) =>
+      service.responsibleReport(query, actor(c)),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/monthly-controls/transfer", async (c) => {
+    const body = parseWithZod(transferMonthlyControlsBodySchema, await readJson(c));
+    const data = await withService("controlService", (service) =>
+      service.transfer({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/monthly-controls/:id/triage", async (c) => {
+    const { id } = parseWithZod(monthlyControlIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("controlService", (service) => service.triage(id, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/monthly-controls", async (c) => {
+    const body = parseWithZod(openMonthlyControlBodySchema, await readJson(c));
+    const result = await withService("controlService", (service) =>
+      service.open({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(result), result.created ? 201 : 200);
+  });
+
+  app.patch("/fiscal/monthly-controls/:id", async (c) => {
+    const { id } = parseWithZod(monthlyControlIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(updateMonthlyControlBodySchema, await readJson(c));
+    const data = await withService("controlService", (service) =>
+      service.update({ ...actor(c), ...body, id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/monthly-controls/:id/obligations", async (c) => {
+    const { id } = parseWithZod(monthlyControlIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("obligationService", (service) => service.list(id, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/monthly-controls/:id/obligations", async (c) => {
+    const { id } = parseWithZod(monthlyControlIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(addMonthlyObligationBodySchema, await readJson(c));
+    const data = await withService("obligationService", (service) =>
+      service.add(id, body, actor(c)),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.patch("/fiscal/monthly-controls/:id/obligations/:code", async (c) => {
+    const { id, code } = parseWithZod(monthlyObligationParamsSchema, {
+      id: c.req.param("id"),
+      code: c.req.param("code"),
+    });
+    const body = parseWithZod(updateMonthlyObligationBodySchema, await readJson(c));
+    const data = await withService("obligationService", (service) =>
+      service.update(id, code, body, actor(c)),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/annual-controls", async (c) => {
+    const query = parseWithZod(listAnnualControlsQuerySchema, { year: c.req.query("year") });
+    const data = await withService("annualService", (service) => service.list(query, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/annual-controls/:id/items", async (c) => {
+    const { id } = parseWithZod(annualControlIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("annualService", (service) => service.items(id, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/annual-controls/:id/items", async (c) => {
+    const { id } = parseWithZod(annualControlIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(addAnnualDeclarationBodySchema, await readJson(c));
+    const data = await withService("annualService", (service) =>
+      service.addItem(id, body, actor(c)),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.patch("/fiscal/annual-controls/:id/items/:code", async (c) => {
+    const { id, code } = parseWithZod(annualDeclarationParamsSchema, {
+      id: c.req.param("id"),
+      code: c.req.param("code"),
+    });
+    const body = parseWithZod(updateAnnualDeclarationBodySchema, await readJson(c));
+    const data = await withService("annualService", (service) =>
+      service.updateItem(id, code, body, actor(c)),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
   app.get("/fiscal/simples/preview", async (c) => {
     const query = parseWithZod(simplesPreviewQuerySchema, {
       client_id: c.req.query("client_id"),
@@ -358,6 +756,50 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       service.batch(body, c.get("auth").organizationId),
     );
     return c.json(createSuccessResponse(await simplesRateZipExport(batch)));
+  });
+
+  // Conferência de arquivos: processa só o que foi enviado, sem banco nem efeito em controles.
+  app.post("/fiscal/conferences/documents", async (c) => {
+    const body = parseWithZod(documentConferenceBodySchema, await readJson(c));
+    const result = compareDocumentSpreadsheets(body);
+    return c.json(createSuccessResponse({ ...result, ...documentConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/xml-selection", async (c) => {
+    const body = parseWithZod(xmlSelectionBodySchema, await readJson(c));
+    return c.json(createSuccessResponse(selectXmlFromZip(body)));
+  });
+
+  app.post("/fiscal/conferences/sefaz-xml", async (c) => {
+    const body = parseWithZod(sefazXmlConferenceBodySchema, await readJson(c));
+    const result = compareSefazWithXml(body);
+    return c.json(createSuccessResponse({ ...result, ...sefazXmlConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/sped-xml", async (c) => {
+    const body = parseWithZod(spedConferenceBodySchema, await readJson(c));
+    const result = compareSpedWithXml(body);
+    return c.json(createSuccessResponse({ ...result, ...spedConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/xml-taxes", async (c) => {
+    const body = parseWithZod(xmlTaxTotalsBodySchema, await readJson(c));
+    const result = sumXmlTaxes(body);
+    return c.json(createSuccessResponse({ ...result, ...xmlTaxTotalsCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/ipi-spreadsheets", async (c) => {
+    const body = parseWithZod(ipiSpreadsheetConferenceBodySchema, await readJson(c));
+    const result = compareIpiSpreadsheets(body);
+    return c.json(
+      createSuccessResponse({ ...result, ...ipiSpreadsheetConferenceCsvExport(result) }),
+    );
+  });
+
+  app.post("/fiscal/conferences/invoice-pdfs", async (c) => {
+    const body = parseWithZod(invoicePdfTotalsBodySchema, await readJson(c));
+    const result = sumInvoicePdfs(body);
+    return c.json(createSuccessResponse({ ...result, ...invoicePdfTotalsCsvExport(result) }));
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {

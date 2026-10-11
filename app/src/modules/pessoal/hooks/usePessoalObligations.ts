@@ -13,6 +13,9 @@ import type {
   PessoalObligationCreatePayload,
   PessoalObligationCreateResult,
   PessoalObligationGenerationResult,
+  PessoalObligationHistoryPage,
+  PessoalObligationPortfolioFilters,
+  PessoalObligationPortfolioPage,
   PessoalObligationUpdatePayload,
 } from "../types/obligations";
 import { pessoalQueryKey } from "./queryKeys";
@@ -52,17 +55,58 @@ export function useCreatePessoalObligationMutation(): UseMutationResult<
   });
 }
 
+/** Edição pela ficha: mesmo PATCH da carteira; invalida ficha, carteira e histórico. */
 export function useUpdatePessoalObligationMutation(
   id: string,
-  clientId: string,
-  competence: string,
 ): UseMutationResult<PessoalObligation, Error, PessoalObligationUpdatePayload> {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (payload) => pessoalService.updateObligationField(id, payload),
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: obligationKey(clientId, competence) });
+      await queryClient.invalidateQueries({ queryKey: pessoalQueryKey("obligations") });
+    },
+  });
+}
+
+function obligationHistoryKey(id: string, page?: number) {
+  return pessoalQueryKey("obligations", "history", id || "missing", page);
+}
+
+export function usePessoalObligationHistory(
+  id: string,
+  page: number,
+  pageSize: number,
+): UseQueryResult<PessoalObligationHistoryPage, Error> {
+  return useFetch(
+    obligationHistoryKey(id, page),
+    () => pessoalService.listObligationHistory(id, page, pageSize),
+    { enabled: id.length > 0 },
+  );
+}
+
+export function usePessoalObligationPortfolio(
+  filters: PessoalObligationPortfolioFilters,
+): UseQueryResult<PessoalObligationPortfolioPage, Error> {
+  return useFetch(
+    pessoalQueryKey("obligations", "portfolio", JSON.stringify(filters)),
+    () => pessoalService.listObligationPortfolio(filters),
+    { enabled: filters.competence.length > 0 },
+  );
+}
+
+/** Edição pela carteira: mesmo PATCH da ficha; invalida carteira e ficha individual. */
+export function useUpdatePessoalPortfolioObligationMutation(): UseMutationResult<
+  PessoalObligation,
+  Error,
+  { id: string; payload: PessoalObligationUpdatePayload }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => pessoalService.updateObligationField(id, payload),
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: pessoalQueryKey("obligations") });
     },
   });
 }

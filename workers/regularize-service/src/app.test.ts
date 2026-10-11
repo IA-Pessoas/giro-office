@@ -4,6 +4,10 @@ import {
   createRegularizeWorkerApp,
   type RegularizeClientPfService,
   type RegularizeDashboardService,
+  type RegularizeDteImportService,
+  type RegularizeDteNoticeService,
+  type RegularizeDteQueryService,
+  type RegularizeGroupMapService,
   type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
   type RegularizeLicenseReportingService,
@@ -443,6 +447,218 @@ describe("regularize Worker", () => {
     });
   });
 
+  it("compares a Veri XLSX within the authenticated organization and limits the upload", async () => {
+    const veri = { compare: vi.fn(async () => ({ rows: [], invalid: [], totals: {} })) };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      veriComparisonService: veri as never,
+    });
+    const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const writer = { ...headers(), "x-auth-permission": "2" };
+    const post = (body: BodyInit, contentType: string, extra: HeadersInit = writer) =>
+      app.request("https://regularize.test/regularize/veri/compare", {
+        method: "POST",
+        headers: { ...extra, "content-type": contentType },
+        body,
+      });
+
+    const compared = await post(new Uint8Array([1, 2, 3]), xlsx);
+    expect(compared.status).toBe(200);
+    expect(compared.headers.get("cache-control")).toBe("no-store");
+    expect(veri.compare).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      file: Buffer.from([1, 2, 3]),
+    });
+
+    expect((await post("{}", "application/json")).status).toBe(415);
+    expect((await post(new Uint8Array(2 * 1024 * 1024 + 1), xlsx)).status).toBe(413);
+    expect((await post(new Uint8Array([1]), xlsx, {})).status).toBe(401);
+    expect(
+      (await post(new Uint8Array([1]), xlsx, { ...headers(), "x-auth-permission": "0" })).status,
+    ).toBe(403);
+    expect((await post(new Uint8Array([1]), xlsx, headers())).status).toBe(403);
+    expect(veri.compare).toHaveBeenCalledOnce();
+
+    // A comparação não grava nada: basta a leitura do módulo. A escrita vizinha segue no nível 2.
+    const reader = { ...headers(), "x-auth-permission": "1" };
+    expect((await post(new Uint8Array([1]), xlsx, reader)).status).toBe(200);
+    const dteImport = await app.request("https://regularize.test/regularize/dte/import", {
+      method: "POST",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify({ format: "json", content: "[]" }),
+    });
+    expect(dteImport.status).toBe(403);
+  });
+
+  it("routes DTE import with write permission and lists imports by organization", async () => {
+    const dte: RegularizeDteImportService = {
+      importNotices: vi.fn(async () => ({ id: "import-1", created_count: 1 })),
+      listImports: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dteImportService: dte,
+    });
+    const post = (permission: string) =>
+      app.request("https://regularize.test/regularize/dte/import", {
+        method: "POST",
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ format: "json", content: "[]" }),
+      });
+
+    const denied = await post("1");
+    const created = await post("2");
+    const list = await app.request("https://regularize.test/regularize/dte/imports", {
+      headers: headers(),
+    });
+
+    expect([denied.status, created.status, list.status]).toEqual([403, 201, 200]);
+    expect(dte.importNotices).toHaveBeenCalledTimes(1);
+    expect(dte.importNotices).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      format: "json",
+      content: "[]",
+    });
+    expect(dte.listImports).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it("lists DTE notices by organization and changes reading only with write permission", async () => {
+    const notices: RegularizeDteNoticeService = {
+      list: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+      setReading: vi.fn(async () => ({ id: LICENSE_ID, pending_reading: false })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dteNoticeService: notices,
+    });
+    const put = (permission: string) =>
+      app.request("https://regularize.test/regularize/dte/notices/reading", {
+        method: "PUT",
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: LICENSE_ID, pending_reading: false }),
+      });
+
+    const list = await app.request(
+      "https://regularize.test/regularize/dte/notices?reading=Pendente&tipo=badge%20badge-warning",
+      { headers: headers() },
+    );
+    const denied = await put("1");
+    const updated = await put("2");
+
+    expect([list.status, denied.status, updated.status]).toEqual([200, 403, 200]);
+    expect(notices.list).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      tipo: "badge badge-warning",
+      search: "",
+      reading: "Pendente",
+      page: 1,
+      limit: 20,
+    });
+    expect(notices.setReading).toHaveBeenCalledTimes(1);
+    expect(notices.setReading).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      id: LICENSE_ID,
+      pendingReading: false,
+    });
+  });
+
+  it("shows the DTE query grid and requires write permission to change or import", async () => {
+    const queries: RegularizeDteQueryService = {
+      grid: vi.fn(async () => ({
+        date: "2026-10-09",
+        rows: [],
+        totals: { feita: 0, nao_feita: 0, sem_registro: 0 },
+      })),
+      setStatus: vi.fn(async () => ({
+        client_id: LICENSE_ID,
+        date: "2026-10-09",
+        status: "feita" as const,
+      })),
+      importLists: vi.fn(async () => ({
+        date: "2026-10-09",
+        done_count: 1,
+        not_done_count: 0,
+        conflicts: [],
+        unknown: [],
+      })),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dteQueryService: queries,
+    });
+    const send = (method: string, path: string, permission: string, body: unknown) =>
+      app.request(`https://regularize.test/regularize/dte/queries/${path}`, {
+        method,
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    const statusBody = { client_id: LICENSE_ID, date: "2026-10-09", status: "feita" };
+    const importBody = { date: "2026-10-09", done: "11111111000111", not_done: "" };
+
+    const grid = await app.request(
+      "https://regularize.test/regularize/dte/queries?date=2026-10-09",
+      {
+        headers: headers(),
+      },
+    );
+    const badDate = await app.request(
+      "https://regularize.test/regularize/dte/queries?date=09/10/2026",
+      {
+        headers: headers(),
+      },
+    );
+    const statuses = [
+      grid.status,
+      badDate.status,
+      (await send("PUT", "status", "1", statusBody)).status,
+      (await send("PUT", "status", "2", statusBody)).status,
+      (await send("POST", "import", "1", importBody)).status,
+      (await send("POST", "import", "2", importBody)).status,
+    ];
+
+    expect(statuses).toEqual([200, 400, 403, 200, 403, 201]);
+    const date = new Date("2026-10-09T00:00:00.000Z");
+    expect(queries.grid).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID, date });
+    expect(queries.setStatus).toHaveBeenCalledTimes(1);
+    expect(queries.setStatus).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      clientId: LICENSE_ID,
+      date,
+      status: "feita",
+    });
+    expect(queries.importLists).toHaveBeenCalledTimes(1);
+    expect(queries.importLists).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      date,
+      done: "11111111000111",
+      notDone: "",
+    });
+  });
+
   it("routes PF clients and partners through their scoped services", async () => {
     const clientPf = clientPfService();
     const partners = partnersService();
@@ -535,6 +751,90 @@ describe("regularize Worker", () => {
       organizationId: ORGANIZATION_ID,
       userId: USER_ID,
       id: LICENSE_ID,
+    });
+  });
+
+  it("generates the group map scoped to the caller organization", async () => {
+    const GROUP_ID = "d0000000-0000-4000-8000-000000000001";
+    const groupMap: RegularizeGroupMapService = {
+      generate: vi.fn(async () => ({ group: { id: GROUP_ID, name: "Grupo" }, cities: [] })),
+      getSaved: vi.fn(async () => null),
+      save: vi.fn(async () => {
+        throw new Error("não usado neste teste");
+      }),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      groupMapService: groupMap,
+    });
+
+    const ok = await app.request(`https://regularize.test/regularize/groups/${GROUP_ID}/map`, {
+      headers: headers(),
+    });
+    const invalid = await app.request("https://regularize.test/regularize/groups/abc/map", {
+      headers: headers(),
+    });
+    const anonymous = await app.request(
+      `https://regularize.test/regularize/groups/${GROUP_ID}/map`,
+    );
+
+    expect([ok.status, invalid.status, anonymous.status]).toEqual([200, 400, 401]);
+    expect(groupMap.generate).toHaveBeenCalledTimes(1);
+    expect(groupMap.generate).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      groupId: GROUP_ID,
+    });
+  });
+
+  it("reads the saved group map and requires write permission to save it", async () => {
+    const GROUP_ID = "d0000000-0000-4000-8000-000000000001";
+    const tree = { id: "raiz", lines: ["Grupo"], children: [] };
+    const saved = {
+      tree,
+      updated_at: new Date("2026-10-10T12:00:00.000Z"),
+      updated_by_user_id: USER_ID,
+    };
+    const groupMap: RegularizeGroupMapService = {
+      generate: vi.fn(async () => ({ group: { id: GROUP_ID, name: "Grupo" }, cities: [] })),
+      getSaved: vi.fn(async () => saved),
+      save: vi.fn(async () => saved),
+    };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      groupMapService: groupMap,
+    });
+    const url = `https://regularize.test/regularize/groups/${GROUP_ID}/map/saved`;
+    const put = (permission: string, body: unknown) =>
+      app.request(url, {
+        method: "PUT",
+        headers: {
+          ...headers(),
+          "x-auth-permission": permission,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+    const statuses = [
+      (await app.request(url, { headers: headers() })).status,
+      (await put("1", { tree })).status,
+      (await put("2", { tree })).status,
+      (await put("2", { tree: { ...tree, color: "red" } })).status,
+    ];
+
+    expect(statuses).toEqual([200, 403, 200, 400]);
+    expect(groupMap.getSaved).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      groupId: GROUP_ID,
+    });
+    expect(groupMap.save).toHaveBeenCalledTimes(1);
+    expect(groupMap.save).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      groupId: GROUP_ID,
+      tree,
     });
   });
 
@@ -830,5 +1130,48 @@ describe("regularize Worker", () => {
       fields: ["id"],
       limit: 10,
     });
+  });
+
+  it("routes signed portfolio extraction to the portfolio source", async () => {
+    const reporting = reportingService();
+    const portfolio = { extract: vi.fn(async () => ({ rows: [], reachedLimit: false })) };
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      reportingService: reporting,
+      portfolioReportingService: portfolio,
+    });
+
+    for (const source of [
+      "regularize.clients",
+      "regularize.client_groups",
+      "regularize.clients_pf",
+      "regularize.partners",
+    ]) {
+      const body = { source, fields: ["name"], limit: 10 };
+      const response = await app.request("https://regularize.test/internal/reporting/extract", {
+        method: "POST",
+        headers: {
+          ...reportingHeaders({
+            operation: "extract",
+            source,
+            fields: body.fields,
+            body,
+            requestId: `reporting-${source}`,
+          }),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(response.status).toBe(200);
+      expect(portfolio.extract).toHaveBeenLastCalledWith({
+        organizationId: ORGANIZATION_ID,
+        source,
+        fields: ["name"],
+        limit: 10,
+      });
+    }
+    expect(reporting.extract).not.toHaveBeenCalled();
   });
 });

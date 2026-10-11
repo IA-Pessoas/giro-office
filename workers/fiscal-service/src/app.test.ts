@@ -1,3 +1,4 @@
+import { createZip } from "@workspace/shared";
 import { ServiceError } from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
 import { createFiscalWorkerApp, type FiscalWorkerEnv } from "./app.js";
@@ -189,6 +190,511 @@ describe("fiscal Worker", () => {
     expect(simples.batch).toHaveBeenCalledTimes(2);
   });
 
+  it("confere planilhas Domínio × SEFAZ sem banco e só com edição Fiscal", async () => {
+    // Sem HYPERDRIVE/DATABASE_URL: qualquer acesso a dados operacionais responderia 503.
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor";
+    const body = {
+      dominio: { file_name: "d.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+      sefaz: { file_name: "s.csv", content: `${header}\n11222333000181;55;1;100;10,50` },
+    };
+    const post = (headers: HeadersInit, payload: unknown = body) =>
+      app.request("https://fiscal.test/fiscal/conferences/documents", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { status: string; summary: { divergent: number }; csv: string; file_name: string };
+    };
+    expect(payload.data).toMatchObject({ status: "complete", summary: { divergent: 1 } });
+    expect(payload.data.csv).toContain("Divergente;11222333000181|55|1|100;2;10,00;2;10,50");
+
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+    expect(
+      (await post(gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }))).status,
+    ).toBe(403);
+    const invalid = await post(gatewayHeaders(), {
+      ...body,
+      sefaz: { file_name: "s.csv", content: "Número\n100" },
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  it("seleciona XML de notas em ZIP sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CPF>12345678909</CPF></emit></infNFe></NFe>";
+    const body = {
+      file_name: "notas.zip",
+      zip_base64: createZip([{ fileName: "n.xml", body: Buffer.from(nfe) }]).toString("base64"),
+      requests: ["7", "8"],
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/xml-selection", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { status: string; selected: { entry: string }[]; not_found: { request: string }[] };
+    };
+    expect(payload.data).toMatchObject({
+      status: "partial",
+      selected: [{ entry: "n.xml" }],
+      not_found: [{ request: "8" }],
+    });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("confere CSV SEFAZ contra XML sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><total><ICMSTot><vNF>9.90</vNF></ICMSTot></total></infNFe></NFe>";
+    const body = {
+      sefaz: {
+        file_name: "s.csv",
+        content:
+          "CNPJ Emitente;Modelo;Série;Número;Valor\n11222333000181;55;1;7;9,90\n11222333000181;55;1;8;1,00",
+      },
+      xml: {
+        file_name: "x.zip",
+        zip_base64: createZip([{ fileName: "7.xml", body: Buffer.from(nfe) }]).toString("base64"),
+      },
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/sefaz-xml", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { summary: { matched: number; only_sefaz: number }; csv: string };
+    };
+    expect(payload.data.summary).toMatchObject({ matched: 1, only_sefaz: 1 });
+    expect(payload.data.csv).toContain("Só SEFAZ;11222333000181|55|1|8");
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("confere SPED C100/C170 contra XML sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd><CFOP>5102</CFOP><qCom>2</qCom><vProd>5.00</vProd></prod></det><total><ICMSTot><vNF>5.00</vNF></ICMSTot></total></infNFe></NFe>';
+    const body = {
+      sped: {
+        file_name: "sped.txt",
+        content:
+          "|0000|017|0|01082026|31082026|EMPRESA|11222333000181||SP|\n|C100|0|0||55|00|1|7||01082026|01082026|5,00|\n|C170|1|A||1|UN|5,00|0|0|000|5102|",
+      },
+      xml: {
+        file_name: "x.zip",
+        zip_base64: createZip([{ fileName: "7.xml", body: Buffer.from(nfe) }]).toString("base64"),
+      },
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/sped-xml", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { summary: { divergent: number; items_divergent: number }; csv: string };
+    };
+    expect(payload.data.summary).toMatchObject({ divergent: 1, items_divergent: 1 });
+    expect(payload.data.csv).toContain("Quantidade: SPED 1 × XML 2");
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("soma IPI e ICMS ST de XML sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd></prod><imposto><ICMS><ICMS10><vICMSST>0.30</vICMSST></ICMS10></ICMS><IPI><IPITrib><vIPI>0.10</vIPI></IPITrib></IPI></imposto></det><det nItem="2"><prod><cProd>B</cProd></prod><imposto><IPI><IPITrib><vIPI>0.20</vIPI></IPITrib></IPI></imposto></det></infNFe></NFe>';
+    const body = {
+      file_name: "x.zip",
+      zip_base64: createZip([{ fileName: "7.xml", body: Buffer.from(nfe) }]).toString("base64"),
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/xml-taxes", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { totals: { ipi: string; icms_st: string } } };
+    // 0.10 + 0.20 sem erro de ponto flutuante.
+    expect(payload.data.totals).toMatchObject({ ipi: "0.30", icms_st: "0.30" });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("confere IPI entre planilhas sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor IPI";
+    const body = {
+      first: {
+        file_name: "a.csv",
+        content: `${header}\n11222333000181;55;1;7;0,10\n11222333000181;55;1;8;0,20`,
+      },
+      second: {
+        file_name: "b.csv",
+        content: `${header}\n11222333000181;55;1;7;0,10\n11222333000181;55;1;8;0,20`,
+      },
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/ipi-spreadsheets", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { status: string; totals: { first: string } } };
+    expect(payload.data).toMatchObject({ status: "complete", totals: { first: "0.30" } });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("soma totais de faturas em PDF sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const content = "BT /F1 12 Tf 50 700 Td (Fatura 1) Tj 0 -20 Td (Valor total R$ 12,34) Tj ET";
+    const pdf = [
+      "%PDF-1.4",
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+      `4 0 obj << /Length ${content.length} >>\nstream\n${content}\nendstream endobj`,
+      "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      "trailer << /Root 1 0 R >>",
+    ].join("\n");
+    const body = {
+      files: [
+        { file_name: "f.pdf", content_base64: Buffer.from(pdf, "latin1").toString("base64") },
+      ],
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/invoice-pdfs", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { totals: { value: string; invoices: number } } };
+    expect(payload.data.totals).toEqual({ value: "12.34", invoices: 1 });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("controle mensal: lista com reconciliação, abre e altera no tenant, leitura sem escrita", async () => {
+    const control = {
+      id: ICMS_ID,
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      competence: "2026-08",
+      status: "PENDING" as const,
+      no_movement: false,
+      regime: null,
+      opening_reason: null,
+      responsible_id: null,
+      updated_by: USER_ID,
+      updatedAt: "2026-09-28T12:00:00.000Z",
+    };
+    const controls = {
+      list: vi.fn(async () => ({
+        competence: "2026-08",
+        items: [
+          {
+            ...control,
+            client_name: "Alfa",
+            pending_obligations: 0,
+            triage_pending: 0,
+            responsible_name: null,
+            default_responsible_id: null,
+            default_responsible_name: null,
+          },
+        ],
+      })),
+      open: vi.fn(async () => ({ control, created: true })),
+      update: vi.fn(async () => ({ ...control, status: "IN_PROGRESS" as const })),
+      transfer: vi.fn(async () => ({ transferred: [ICMS_ID], skipped: [] })),
+      responsibles: vi.fn(async () => [{ id: USER_ID, name: "Ana" }]),
+      responsibleReport: vi.fn(async () => ({
+        basis: "current" as const,
+        competence: null,
+        items: [],
+        file_name: "responsaveis-empresas-atual.csv",
+        csv: "\uFEFFResponsável;Empresa\r\n",
+      })),
+      triage: vi.fn(async () => ({
+        control_id: ICMS_ID,
+        competence: "2026-08",
+        source: "NONE" as const,
+        pending: null,
+        items: [],
+      })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), controlService: controls });
+    const reader = gatewayHeaders({
+      "x-auth-permission": "1",
+      "x-auth-modules": JSON.stringify({ fiscal: 1 }),
+    });
+
+    const listed = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls?competence=2026-08",
+      { headers: reader },
+    );
+    expect(listed.status).toBe(200);
+    expect(controls.list).toHaveBeenCalledWith(
+      { competence: "2026-08" },
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+
+    const transfer = await app.request("https://fiscal.test/fiscal/monthly-controls/transfer", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ control_ids: [ICMS_ID], to_user_id: USER_ID, reason: "Férias" }),
+    });
+    expect(transfer.status).toBe(200);
+    expect(controls.transfer).toHaveBeenCalledWith(
+      expect.objectContaining({ control_ids: [ICMS_ID], to_user_id: USER_ID, permission: 3 }),
+    );
+    const readerTransfer = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/transfer",
+      {
+        method: "POST",
+        headers: { ...reader, "content-type": "application/json" },
+        body: JSON.stringify({ control_ids: [ICMS_ID], to_user_id: USER_ID, reason: "Férias" }),
+      },
+    );
+    expect(readerTransfer.status).toBe(403);
+    const candidates = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles",
+      { headers: gatewayHeaders() },
+    );
+    expect(candidates.status).toBe(200);
+
+    const report = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles-report?basis=current&responsible_id=none",
+      { headers: reader },
+    );
+    expect(report.status).toBe(200);
+    expect(controls.responsibleReport).toHaveBeenCalledWith(
+      { basis: "current", responsible_id: "none" },
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+    const badReport = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles-report?basis=competence",
+      { headers: reader },
+    );
+    expect(badReport.status).toBe(400);
+    const withoutFiscal = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles-report?basis=current",
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 0 }) }) },
+    );
+    expect(withoutFiscal.status).toBe(403);
+    expect(controls.responsibleReport).toHaveBeenCalledTimes(1);
+
+    const triage = await app.request(
+      `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}/triage`,
+      { headers: reader },
+    );
+    expect(triage.status).toBe(200);
+    expect(controls.triage).toHaveBeenCalledWith(
+      ICMS_ID,
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+
+    const opened = await app.request("https://fiscal.test/fiscal/monthly-controls", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: control.client_id,
+        competence: "2026-08",
+        reason: "Avulso",
+      }),
+    });
+    expect(opened.status).toBe(201);
+    controls.open.mockResolvedValueOnce({ control, created: false });
+    const reopened = await app.request("https://fiscal.test/fiscal/monthly-controls", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ client_id: control.client_id, competence: "2026-08" }),
+    });
+    expect(reopened.status).toBe(200);
+
+    const updated = await app.request(`https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ status: "IN_PROGRESS" }),
+    });
+    expect(updated.status).toBe(200);
+    expect(controls.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ICMS_ID, status: "IN_PROGRESS", permission: 3 }),
+    );
+
+    const readerWrite = await app.request(
+      `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}`,
+      {
+        method: "PATCH",
+        headers: { ...reader, "content-type": "application/json" },
+        body: JSON.stringify({ status: "COMPLETED" }),
+      },
+    );
+    expect(readerWrite.status).toBe(403);
+    const invalid = await app.request(`https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ status: "DONE" }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(controls.update).toHaveBeenCalledOnce();
+  });
+
+  it("obrigações do controle: leitura nível 1, inclusão e cumprimento nível 2, contrato validado", async () => {
+    const item = {
+      code: "PGDAS_D" as const,
+      name: "PGDAS-D",
+      note: "",
+      source: "https://www.gov.br/",
+      origin: "SUGGESTED",
+      status: "PENDING" as const,
+      not_applicable_reason: null,
+      completed_on: null,
+      completed_by: null,
+      protocol: null,
+      updatedAt: "2026-09-10T12:00:00.000Z",
+    };
+    const obligations = {
+      list: vi.fn(async () => ({ control_id: ICMS_ID, items: [item], addable: [] })),
+      add: vi.fn(async () => item),
+      update: vi.fn(async () => ({ ...item, status: "COMPLETED" as const })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), obligationService: obligations });
+    const reader = gatewayHeaders({
+      "x-auth-permission": "1",
+      "x-auth-modules": JSON.stringify({ fiscal: 1 }),
+    });
+    const base = `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}/obligations`;
+
+    const listed = await app.request(base, { headers: reader });
+    expect(listed.status).toBe(200);
+    expect(obligations.list).toHaveBeenCalledWith(
+      ICMS_ID,
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+
+    const added = await app.request(base, {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ code: "DIRBI", reason: "Benefício fiscal" }),
+    });
+    expect(added.status).toBe(201);
+
+    const completed = await app.request(`${base}/PGDAS_D`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-09-10" }),
+    });
+    expect(completed.status).toBe(200);
+    expect(obligations.update).toHaveBeenCalledWith(
+      ICMS_ID,
+      "PGDAS_D",
+      { completed_on: "2026-09-10" },
+      expect.objectContaining({ userId: USER_ID }),
+    );
+
+    const readerWrite = await app.request(`${base}/PGDAS_D`, {
+      method: "PATCH",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-09-10" }),
+    });
+    expect(readerWrite.status).toBe(403);
+    const unknownCode = await app.request(`${base}/XPTO`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-09-10" }),
+    });
+    expect(unknownCode.status).toBe(400);
+    expect(obligations.update).toHaveBeenCalledOnce();
+  });
+
+  it("controle anual: leitura nível 1, declarações com escrita nível 2 e contrato validado", async () => {
+    const declaration = {
+      code: "DEFIS" as const,
+      name: "DEFIS",
+      note: "",
+      source: "https://www.gov.br/",
+      origin: "SUGGESTED",
+      status: "PENDING" as const,
+      not_applicable_reason: null,
+      completed_on: null,
+      completed_by: null,
+      protocol: null,
+      updatedAt: "2026-03-01T12:00:00.000Z",
+    };
+    const annual = {
+      list: vi.fn(async () => ({ year: 2025, items: [] })),
+      items: vi.fn(async () => ({ control_id: ICMS_ID, items: [declaration], addable: [] })),
+      addItem: vi.fn(async () => declaration),
+      updateItem: vi.fn(async () => declaration),
+    };
+    const app = createFiscalWorkerApp({ env: env(), annualService: annual });
+    const reader = gatewayHeaders({
+      "x-auth-permission": "1",
+      "x-auth-modules": JSON.stringify({ fiscal: 1 }),
+    });
+
+    const listed = await app.request("https://fiscal.test/fiscal/annual-controls?year=2025", {
+      headers: reader,
+    });
+    expect(listed.status).toBe(200);
+    expect(annual.list).toHaveBeenCalledWith(
+      { year: 2025 },
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+    const base = `https://fiscal.test/fiscal/annual-controls/${ICMS_ID}/items`;
+    expect((await app.request(base, { headers: reader })).status).toBe(200);
+
+    const added = await app.request(base, {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ code: "DIMOB", reason: "Imobiliária" }),
+    });
+    expect(added.status).toBe(201);
+    const readerWrite = await app.request(`${base}/DEFIS`, {
+      method: "PATCH",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-03-10" }),
+    });
+    expect(readerWrite.status).toBe(403);
+    const invalid = await app.request(`${base}/DIRBI`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-03-10" }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(annual.updateItem).not.toHaveBeenCalled();
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,
@@ -258,6 +764,286 @@ describe("fiscal Worker", () => {
     );
     expect(withoutFiscal.status).toBe(403);
     expect(revenues.list).toHaveBeenCalledOnce();
+  });
+
+  it("importa lote de antecipações no tenant autenticado e deixa nível 1 só consultar", async () => {
+    const clientId = "d0000000-0000-4000-8000-000000000001";
+    const batch = { id: ICMS_ID, client_id: clientId, status: "pending_review", items: [] };
+    const anticipations = {
+      importBatch: vi.fn(async () => batch),
+      list: vi.fn(async () => ({ data: [batch], total: 1, page: 1, limit: 50, hasMore: false })),
+      detail: vi.fn(async () => batch),
+      updateItem: vi.fn(async () => ({})),
+      submit: vi.fn(async () => batch),
+      check: vi.fn(async () => batch),
+      demonstrative: vi.fn(async () => ({
+        batch: {
+          ...batch,
+          competence: "2026-09",
+          file_name: "notas.zip",
+          responsible_id: USER_ID,
+          reviewer_id: null,
+          history: [],
+        },
+        client: { name: "Padaria Exemplo Ltda", document: "12.345.678/0001-90" },
+        people: {},
+      })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), anticipationService: anticipations as never });
+    const viewer = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
+    const body = JSON.stringify({
+      client_id: clientId,
+      competence: "2026-09",
+      file_name: "notas.zip",
+      zip_base64: "UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==",
+    });
+
+    const created = await app.request("https://fiscal.test/fiscal/anticipations/batches", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body,
+    });
+    expect(created.status).toBe(201);
+    expect(anticipations.importBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        client_id: clientId,
+        competence: "2026-09",
+      }),
+    );
+
+    const listed = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/list?client_id=${clientId}&competence=2026-09`,
+      { headers: viewer },
+    );
+    expect(listed.status).toBe(200);
+    expect(anticipations.list).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: clientId, competence: "2026-09" }),
+      ORGANIZATION_ID,
+    );
+
+    const detail = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}`,
+      {
+        headers: viewer,
+      },
+    );
+    expect(detail.status).toBe(200);
+    expect(anticipations.detail).toHaveBeenCalledWith(ICMS_ID, ORGANIZATION_ID);
+
+    const viewerImport = await app.request("https://fiscal.test/fiscal/anticipations/batches", {
+      method: "POST",
+      headers: { ...viewer, "content-type": "application/json" },
+      body,
+    });
+    expect(viewerImport.status).toBe(403);
+    expect(anticipations.importBatch).toHaveBeenCalledTimes(1);
+
+    const itemId = "e0000000-0000-4000-8000-000000000001";
+    const reviewed = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/items/${itemId}`,
+      {
+        method: "PUT",
+        headers: { ...gatewayHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ classification: "partial", reason: "Parcial" }),
+      },
+    );
+    expect(reviewed.status).toBe(200);
+    expect(anticipations.updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        batchId: ICMS_ID,
+        itemId,
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        classification: "partial",
+      }),
+    );
+
+    const submitted = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/submit`,
+      {
+        method: "POST",
+        headers: { ...gatewayHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ reviewer_id: USER_ID }),
+      },
+    );
+    expect(submitted.status).toBe(200);
+
+    const viewerCheck = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/check`,
+      {
+        method: "POST",
+        headers: { ...viewer, "content-type": "application/json" },
+        body: JSON.stringify({ decision: "approve" }),
+      },
+    );
+    expect(viewerCheck.status).toBe(403);
+    expect(anticipations.check).not.toHaveBeenCalled();
+
+    const csv = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/csv`,
+      {
+        headers: viewer,
+      },
+    );
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get("content-disposition")).toContain(".csv");
+    expect(await csv.text()).toContain("não houve apuração automática de imposto");
+    const pdf = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/pdf`,
+      {
+        headers: viewer,
+      },
+    );
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expect(anticipations.demonstrative).toHaveBeenCalledWith(ICMS_ID, ORGANIZATION_ID);
+  });
+
+  it("acompanha malhas no tenant autenticado, com anexo e leitura para nível 1", async () => {
+    const malha = {
+      id: ICMS_ID,
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      period_start: "2025-01",
+      period_end: "2025-12",
+      reason: "Divergência",
+      deadline: null,
+      status: "aberta",
+      responsible_id: null,
+      task_id: null,
+      attachment: null,
+    };
+    const malhas = {
+      create: vi.fn(async () => malha),
+      update: vi.fn(async () => ({ ...malha, status: "respondida" })),
+      list: vi.fn(async () => ({ data: [malha], total: 1, page: 1, limit: 50, hasMore: false })),
+      detail: vi.fn(async () => ({ ...malha, history: [] })),
+      replaceAttachment: vi.fn(async () => malha),
+      attachmentAccess: vi.fn(async () => ({ url: "https://signed", expires_in_seconds: 300 })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), malhaService: malhas as never });
+    const viewer = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
+
+    const created = await app.request("https://fiscal.test/fiscal/malhas", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: malha.client_id,
+        period_start: "2025-01",
+        period_end: "2025-12",
+        reason: "Divergência",
+      }),
+    });
+    expect(created.status).toBe(201);
+    expect(malhas.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        status: "aberta",
+      }),
+    );
+
+    const listed = await app.request(
+      `https://fiscal.test/fiscal/malhas/list?status=aberta&client_id=${malha.client_id}`,
+      { headers: viewer },
+    );
+    expect(listed.status).toBe(200);
+    expect(malhas.list).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "aberta", client_id: malha.client_id }),
+      ORGANIZATION_ID,
+    );
+
+    const detail = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}`, {
+      headers: viewer,
+    });
+    expect(detail.status).toBe(200);
+    expect(malhas.detail).toHaveBeenCalledWith(ICMS_ID, ORGANIZATION_ID);
+
+    const updated = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}`, {
+      method: "PUT",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ status: "respondida" }),
+    });
+    expect(updated.status).toBe(200);
+    expect(malhas.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: ICMS_ID,
+        status: "respondida",
+        organizationId: ORGANIZATION_ID,
+      }),
+    );
+
+    const form = new FormData();
+    form.append("file", new File(["%PDF-1.7"], "intimacao.pdf", { type: "application/pdf" }));
+    const attached = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}/attachment`, {
+      method: "POST",
+      headers: gatewayHeaders(),
+      body: form,
+    });
+    expect(attached.status).toBe(201);
+    expect(malhas.replaceAttachment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: ICMS_ID,
+        organizationId: ORGANIZATION_ID,
+        file: expect.objectContaining({ originalname: "intimacao.pdf", size: 8 }),
+      }),
+    );
+
+    const access = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}/attachment`, {
+      headers: viewer,
+    });
+    expect(access.status).toBe(200);
+    expect(access.headers.get("cache-control")).toBe("no-store");
+
+    const viewerWrite = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}`, {
+      method: "PUT",
+      headers: { ...viewer, "content-type": "application/json" },
+      body: JSON.stringify({ status: "encerrada" }),
+    });
+    expect(viewerWrite.status).toBe(403);
+    expect(malhas.update).toHaveBeenCalledOnce();
+  });
+
+  it("consulta e altera a condição de atacadista no tenant autenticado", async () => {
+    const clientId = "d0000000-0000-4000-8000-000000000001";
+    const state = {
+      client_id: clientId,
+      is_wholesale: true,
+      updated_at: null,
+      updated_by: null,
+      history: [],
+    };
+    const wholesale = { get: vi.fn(async () => state), set: vi.fn(async () => state) };
+    const app = createFiscalWorkerApp({ env: env(), wholesaleService: wholesale });
+    const viewer = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
+
+    const read = await app.request(`https://fiscal.test/fiscal/clients/${clientId}/wholesale`, {
+      headers: viewer,
+    });
+    expect(read.status).toBe(200);
+    expect(wholesale.get).toHaveBeenCalledWith(clientId, ORGANIZATION_ID);
+
+    const updated = await app.request(`https://fiscal.test/fiscal/clients/${clientId}/wholesale`, {
+      method: "PUT",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ is_wholesale: true }),
+    });
+    expect(updated.status).toBe(200);
+    expect(wholesale.set).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId, isWholesale: true, organizationId: ORGANIZATION_ID }),
+    );
+
+    const viewerWrite = await app.request(
+      `https://fiscal.test/fiscal/clients/${clientId}/wholesale`,
+      {
+        method: "PUT",
+        headers: { ...viewer, "content-type": "application/json" },
+        body: JSON.stringify({ is_wholesale: false }),
+      },
+    );
+    expect(viewerWrite.status).toBe(403);
+    expect(wholesale.set).toHaveBeenCalledOnce();
   });
 
   it("registra alíquota manual e entrega PDF no tenant autenticado", async () => {

@@ -1,5 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { AUDITED_TRANSACTION, changedFields, type MarketingAudit } from "../integrations/audit.js";
 
 const COMPETENCE_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
@@ -47,14 +48,32 @@ export type MarketingLegacyAiUsageRecord = MarketingAiUsageAnswers & {
 
 const USER_SUMMARY = { id: true, name: true, full_name: true } as const;
 const CONTROL_ORDER = [{ user: { name: "asc" as const } }, { id: "asc" as const }];
+const CONTROL_REFERRING = "marketing.aiUsageControls";
+const ANSWER_FIELDS = [
+  "knowledge",
+  "integration",
+  "frequency",
+  "purpose",
+  "perceived_gain",
+] as const satisfies ReadonlyArray<keyof MarketingAiUsageAnswers>;
+
+function answersOf(control: MarketingAiUsageAnswers): MarketingAiUsageAnswers {
+  return Object.fromEntries(
+    ANSWER_FIELDS.map((field) => [field, control[field]]),
+  ) as MarketingAiUsageAnswers;
+}
 
 export class MarketingAiUsageControlService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly audit: MarketingAudit,
+  ) {}
 
   async createForUser(
     organizationId: string,
     userId: string,
     competenceValue: string,
+    actorUserId: string,
   ): Promise<{ id: string }> {
     const competence = normalizeMarketingCompetence(competenceValue);
     const user = await this.prisma.user.findFirst({
@@ -64,10 +83,21 @@ export class MarketingAiUsageControlService {
     if (!user) throw new ServiceError(404, "Usuário ativo não encontrado nesta organização.");
 
     try {
-      return await this.prisma.marketingAiUsageControl.create({
-        data: { organization_id: organizationId, user_id: userId, competence },
-        select: { id: true },
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        const control = await tx.marketingAiUsageControl.create({
+          data: { organization_id: organizationId, user_id: userId, competence },
+          select: { id: true },
+        });
+        await this.audit({
+          organizationId,
+          userId: actorUserId,
+          action: "Cadastro",
+          referring: CONTROL_REFERRING,
+          referringId: control.id,
+          changes: changedFields({}, { userId, competence: competenceValue }),
+        });
+        return control;
+      }, AUDITED_TRANSACTION);
     } catch (error: unknown) {
       if (isUniqueConstraintError(error)) {
         throw new ServiceError(409, "Já existe um controle para este usuário e competência.");
@@ -240,6 +270,7 @@ export class MarketingAiUsageControlService {
     organizationId: string,
     controlId: string,
     answers: Partial<MarketingAiUsageAnswers>,
+    actorUserId: string,
   ) {
     if (Object.keys(answers).length === 0)
       throw new ServiceError(400, "Informe ao menos uma resposta.");
@@ -252,20 +283,35 @@ export class MarketingAiUsageControlService {
     }
 
     const where = { id: controlId, organization_id: organizationId };
-    const result = await this.prisma.marketingAiUsageControl.updateMany({ where, data: answers });
-    if (result.count === 0) throw new ServiceError(404, "Controle de IA não encontrado.");
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.marketingAiUsageControl.findFirst({ where });
+      if (!before) throw new ServiceError(404, "Controle de IA não encontrado.");
+      const result = await tx.marketingAiUsageControl.updateMany({ where, data: answers });
+      if (result.count === 0) throw new ServiceError(404, "Controle de IA não encontrado.");
 
-    const control = await this.prisma.marketingAiUsageControl.findFirst({
-      where,
-      include: { user: { select: USER_SUMMARY } },
-    });
-    if (!control) throw new ServiceError(404, "Controle de IA não encontrado.");
-    return control;
+      const control = await tx.marketingAiUsageControl.findFirst({
+        where,
+        include: { user: { select: USER_SUMMARY } },
+      });
+      if (!control) throw new ServiceError(404, "Controle de IA não encontrado.");
+      const changes = changedFields(answersOf(before), answersOf(control));
+      if (Object.keys(changes).length > 0) {
+        await this.audit({
+          organizationId,
+          userId: actorUserId,
+          action: "Edição",
+          referring: CONTROL_REFERRING,
+          referringId: controlId,
+          changes,
+        });
+      }
+      return control;
+    }, AUDITED_TRANSACTION);
   }
 
   async getReport(organizationId: string, competenceValue: string) {
     const competence = normalizeMarketingCompetence(competenceValue);
-    const [pending, withoutIntegration] = await Promise.all([
+    const [pending, unanswered, withoutIntegration] = await Promise.all([
       this.prisma.marketingAiUsageControl.findMany({
         where: {
           organization_id: organizationId,
@@ -281,13 +327,20 @@ export class MarketingAiUsageControlService {
         include: { user: { select: USER_SUMMARY } },
         orderBy: CONTROL_ORDER,
       }),
+      // Relatório legado "sem resposta": conhecimento=0, importado como nulo.
+      this.prisma.marketingAiUsageControl.findMany({
+        where: { organization_id: organizationId, competence, knowledge: null },
+        include: { user: { select: USER_SUMMARY } },
+        orderBy: CONTROL_ORDER,
+      }),
+      // Relatório legado "sem integração": integracao=1, a resposta "Não".
       this.prisma.marketingAiUsageControl.findMany({
         where: { organization_id: organizationId, competence, integration: false },
         include: { user: { select: USER_SUMMARY } },
         orderBy: CONTROL_ORDER,
       }),
     ]);
-    return { pending, withoutIntegration };
+    return { pending, unanswered, withoutIntegration };
   }
 
   async getPendingKnowledgeCount(organizationId: string, competence: Date): Promise<number> {

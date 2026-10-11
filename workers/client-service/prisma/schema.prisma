@@ -21,6 +21,11 @@ model Organization {
   pas               PA[]
   terminations      ClientTermination[]
   tasks             Task[]
+  clientRegimes     ClientRegime[]
+  clientSegments    ClientSegment[]
+  groups            Group[]
+  groupMembers      ClientsGroup[]
+  licitacaoHistory  ClientLicitacaoHistory[]
 
   @@map("organizations")
 }
@@ -56,6 +61,9 @@ model Client {
   regime                        String?
   size                          String?
   segment                       String?
+  coringa_status                String?
+  tecnologia                    Boolean?
+  licitacao                     Boolean?
   start_strike                  DateTime?
   end_strike                    DateTime?
   deletion_date                 DateTime?
@@ -85,6 +93,8 @@ model Client {
   pa                            PA?
   terminations                  ClientTermination[]
   tasks                         Task[]
+  groups                        ClientsGroup[]
+  licitacaoHistory              ClientLicitacaoHistory[]
 
   @@map("clients")
 }
@@ -205,4 +215,70 @@ model ClientCommercialProjectionEvent {
 
   @@index([organization_id, client_id, applied_at], map: "idx_client_commercial_projection_client")
   @@map("client.commercial_projection_events")
+}
+
+model ClientRegime {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_regime_org_normalized_name")
+  @@map("clients.regimes")
+}
+
+model ClientSegment {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  type            String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_segment_org_normalized_name")
+  @@map("clients.segments")
+}
+
+model Group {
+  id              String         @id @default(uuid())
+  name            String
+  status          Boolean        @default(true)
+  organization_id String
+  clients         ClientsGroup[]
+  organization    Organization   @relation(fields: [organization_id], references: [id])
+
+  @@map("clients.group")
+}
+
+model ClientsGroup {
+  id              String       @id @default(uuid())
+  group_id        String
+  client_id       String
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  group           Group        @relation(fields: [group_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([group_id, client_id], map: "uq_clients_group_member")
+  @@map("clients.clientsGroup")
+}
+
+model ClientLicitacaoHistory {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  previous_value  Boolean?
+  new_value       Boolean?
+  actor_user_id   String
+  created_at      DateTime     @default(now())
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, client_id, created_at], map: "idx_client_licitacao_history_client")
+  @@map("clients.licitacao_history")
 }

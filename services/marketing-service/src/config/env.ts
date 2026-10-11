@@ -14,6 +14,13 @@ const marketingServiceEnvSchema = z
     jwtSecret: z.string().min(1, "JWT_SECRET não definido."),
     internalServiceToken: z.string().min(1, "MARKETING_SERVICE_INTERNAL_TOKEN não definido."),
     mtkEncryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY não definido."),
+    auditEnabled: z
+      .string()
+      .optional()
+      .default("true")
+      .transform((value) => value === "true" || value === "1"),
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
+    auditServiceToken: z.string().default("audit-service-token"),
     allowedOrigins: z
       .string()
       .optional()
@@ -39,6 +46,12 @@ const marketingServiceEnvSchema = z
       envName: "MARKETING_SERVICE_INTERNAL_TOKEN",
       token: env.internalServiceToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "marketing-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: env.auditServiceToken,
+    });
     validateProductionCorsOrigins({
       nodeEnv: env.nodeEnv,
       serviceName: "marketing-service",
@@ -53,6 +66,9 @@ const marketingServiceEnvSchema = z
       jwtSecret: env.jwtSecret,
       internalServiceToken: env.internalServiceToken,
       mtkEncryptionKey: env.mtkEncryptionKey,
+      auditEnabled: env.auditEnabled,
+      auditServiceUrl: env.auditServiceUrl,
+      auditServiceToken: env.auditServiceToken,
       allowedOrigins: env.allowedOrigins,
       enableApiDocs,
       logLevel: env.logLevel,
@@ -70,6 +86,9 @@ export function getMarketingServiceEnv(): MarketingServiceEnv {
     jwtSecret: process.env.JWT_SECRET,
     internalServiceToken: process.env.MARKETING_SERVICE_INTERNAL_TOKEN,
     mtkEncryptionKey: process.env.MTK_ENCRYPTION_KEY,
+    auditEnabled: process.env.AUDIT_ENABLED,
+    auditServiceUrl: process.env.AUDIT_SERVICE_URL,
+    auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     logLevel: process.env.LOG_LEVEL,

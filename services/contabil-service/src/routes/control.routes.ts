@@ -10,6 +10,7 @@ import { Router } from "express";
 import { isAuthenticated, requireContabilWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   controlCompetenceBodySchema,
+  controlHistoryQuerySchema,
   controlIdParamsSchema,
   createControlBodySchema,
   createYearControlsBodySchema,
@@ -26,6 +27,7 @@ export type ControlRouteDeps = Pick<
   | "create"
   | "createYear"
   | "detail"
+  | "history"
   | "list"
   | "restoreCompetence"
   | "updateField"
@@ -152,6 +154,34 @@ export function createControlRoutes(service: ControlRouteDeps): ReturnType<typeo
         res.status(created ? 201 : 200).json(createSuccessResponse(control));
       } catch (err) {
         logError("Erro ao criar ou obter controle contábil", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/controls/history",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(controlHistoryQuerySchema, {
+          client_id: firstQueryString(req.query.client_id),
+          competence: firstQueryString(req.query.competence),
+          page: firstQueryString(req.query.page),
+          pageSize: firstQueryString(req.query.pageSize),
+        });
+        const auth = requireAuthenticatedRequestContext(req);
+        const result = await service.history({
+          organizationId: auth.organization_id,
+          clientId: query.client_id,
+          competence: query.competence,
+          page: query.page,
+          pageSize: query.pageSize,
+        });
+
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao buscar histórico do controle contábil", { err });
         next(err);
       }
     },

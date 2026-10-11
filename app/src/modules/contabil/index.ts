@@ -8,7 +8,9 @@ export {
   ContabilResponsibleSection,
   ContabilShell,
   ContabilStateBox,
+  DepartmentAgendaSection,
   TriageDocumentsSection,
+  TriageDocumentHistorySection,
   FiscalTriagePortfolioSection,
 } from "./components";
 export {
@@ -17,6 +19,7 @@ export {
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
+  TRIAGE_DOCUMENT_HISTORY_QUERY_KEY,
   getContabilCardState,
   shouldShowContabilNav,
   syncContabilRelationshipQueryCache,
@@ -52,6 +55,7 @@ export {
   normalizeContabilCompetence,
   unwrapContabilEnvelope,
 } from "./services";
+export { getCurrentContabilCompetence } from "./components/contabilControlSection.helpers";
 export type {
   ContabilCompetence,
   FiscalTriagePortfolio,

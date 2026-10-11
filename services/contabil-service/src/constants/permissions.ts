@@ -1,0 +1,2 @@
+export const CONTABIL_READ_PERMISSION = 1;
+export const CONTABIL_WRITE_PERMISSION = 2;

@@ -114,3 +114,108 @@ describe("MarketingDashboardService", () => {
     }
   });
 });
+
+describe("MarketingDashboardService.getMonthlyBirthdays", () => {
+  it("lista o mês inteiro de colaboradores e clientes PF vinculados a empresas ativas", async () => {
+    const employees = [
+      { id: "employee-1", name: "Ana", birthDate: "1990-05-01", day: 1, department: "Marketing" },
+      { id: "employee-2", name: "Bruno", birthDate: "1985-05-31", day: 31, department: null },
+    ];
+    const clients = [
+      { id: "pf-1", name: "Carla", birthDate: "1970-05-15", day: 15, companies: "Alfa, Beta" },
+    ];
+    const prisma = {
+      $queryRaw: vi.fn().mockResolvedValueOnce(employees).mockResolvedValueOnce(clients),
+      $transaction: vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations)),
+    };
+
+    const report = await new MarketingDashboardService(prisma as never).getMonthlyBirthdays(
+      organizationId,
+      5,
+    );
+
+    expect(report).toEqual({
+      month: 5,
+      employees: { total: 2, items: employees },
+      clients: { total: 1, items: clients },
+    });
+
+    const [employeeCall, clientCall] = prisma.$queryRaw.mock.calls;
+    const employeeSql = employeeCall?.[0]?.join("?") ?? "";
+    expect(employeeSql).toContain("employee.status = 'active'");
+    expect(employeeSql).toContain("employee.termination_date IS NULL");
+    expect(employeeSql).toContain("LEFT JOIN departments");
+    expect(employeeSql).not.toContain("calendar.day");
+    expect(employeeCall?.slice(1)).toEqual([organizationId, organizationId, organizationId, 5]);
+
+    const clientSql = clientCall?.[0]?.join("?") ?? "";
+    expect(clientSql).toContain('"regularize.partners"');
+    expect(clientSql).toContain("partner.part > 0");
+    expect(clientSql).toContain("partner.exit IS NULL");
+    expect(clientSql).toContain("company.status = 'Ativo'");
+    expect(clientSql).not.toContain("calendar.day");
+    expect(clientCall?.slice(1)).toEqual([organizationId, organizationId, organizationId, 5]);
+  });
+});
+
+describe("MarketingDashboardService.getMarketingStock", () => {
+  it("lista o estoque do departamento Marketing do cadastro com as últimas movimentações", async () => {
+    const items = [
+      {
+        id: "s-1",
+        name: "Banner",
+        quantity: 3,
+        lastEntryAt: "2026-09-30T13:00:00.000Z",
+        lastExitAt: null,
+      },
+      {
+        id: "s-2",
+        name: "Caneta",
+        quantity: 40,
+        lastEntryAt: null,
+        lastExitAt: "2026-10-01T09:30:00.000Z",
+      },
+    ];
+    const prisma = {
+      $queryRaw: vi
+        .fn()
+        .mockResolvedValueOnce([{ id: "dep-mkt", name: "Marketing" }])
+        .mockResolvedValueOnce(items),
+    };
+
+    const report = await new MarketingDashboardService(prisma as never).getMarketingStock(
+      organizationId,
+    );
+
+    expect(report).toEqual({
+      department: { id: "dep-mkt", name: "Marketing" },
+      totals: { items: 2, quantity: 43 },
+      items,
+    });
+    const [departmentCall, stockCall] = prisma.$queryRaw.mock.calls;
+    const departmentSql = departmentCall?.[0]?.join("?") ?? "";
+    expect(departmentSql).toContain("lower(btrim(department.name)) = ?");
+    expect(departmentSql).not.toMatch(/\b22\b/);
+    expect(departmentCall?.slice(1)).toEqual([organizationId, "marketing"]);
+
+    const stockSql = stockCall?.[0]?.join("?") ?? "";
+    expect(stockSql).toContain("max(entry.entry_date)");
+    expect(stockSql).toContain("max(exit.exit_date)");
+    expect(stockSql).toContain("item.status = true");
+    expect(stockCall?.slice(1)).toEqual([
+      organizationId,
+      organizationId,
+      "dep-mkt",
+      organizationId,
+    ]);
+  });
+
+  it("responde 404 quando a organização não tem departamento Marketing", async () => {
+    const prisma = { $queryRaw: vi.fn().mockResolvedValueOnce([]) };
+
+    await expect(
+      new MarketingDashboardService(prisma as never).getMarketingStock(organizationId),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+});

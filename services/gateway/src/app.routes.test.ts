@@ -2313,6 +2313,11 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/fiscal/ncm"]).toBeTruthy();
     expect(body.paths["/contabil/controls"]).toBeTruthy();
     expect(body.paths["/contabil/controls/list"]).toBeTruthy();
+    expect(body.paths["/contabil/noah"]).toBeTruthy();
+    expect(body.paths["/contabil/noah/{id}/csv"]).toBeTruthy();
+    expect(body.paths["/contabil/contingency"]).toBeTruthy();
+    expect(body.paths["/contabil/contingency/{id}/review"]).toBeTruthy();
+    expect(body.paths["/contabil/contingency/{id}/export"]).toBeTruthy();
     expect(body.paths["/ti/requests/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/{id}/file"]).toBeTruthy();
@@ -5226,6 +5231,59 @@ it("denies Fiscal routes when the user lacks the module read level", async () =>
   }
 });
 
+it("encaminha bytes ZIP Noah e devolve CSV privado sem alterar o conteúdo", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { contabil: 2 },
+  });
+  const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff, 0x80]);
+  const csv = "FORNECEDOR;DATA;VALOR;ARQUIVO\r\n";
+  let received = Buffer.alloc(0);
+  let seenPath = "";
+  const upstream = createServer(async (request, response) => {
+    if (request.method === "POST") {
+      seenPath = request.url ?? "";
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      received = Buffer.concat(chunks);
+      response.writeHead(201, { "content-type": "application/json" });
+      response.end(JSON.stringify({ success: true, data: { id: "conversion" } }));
+    } else {
+      response.writeHead(200, {
+        "content-type": "text/csv",
+        "content-disposition": "attachment; filename=NOAH.csv",
+        "cache-control": "no-store",
+      });
+      response.end(csv);
+    }
+  });
+  const contabilServiceUrl = await startServer(upstream);
+  const gateway = createServer(createApp(createEnv({ contabilServiceUrl }), createTestLogger()));
+  const url = await startServer(gateway);
+  try {
+    const created = await fetch(`${url}/contabil/noah?filename=noah.zip`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/zip" },
+      body: zip,
+    });
+    expect(created.status).toBe(201);
+    expect(received).toEqual(zip);
+    expect(seenPath).toBe("/contabil/noah?filename=noah.zip");
+    const downloaded = await fetch(`${url}/contabil/noah/conversion/csv`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(downloaded.status).toBe(200);
+    expect(downloaded.headers.get("cache-control")).toBe("no-store");
+    expect(downloaded.headers.get("content-disposition")).toContain("attachment");
+    expect(await downloaded.text()).toBe(csv);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("denies Contabil routes when the user lacks the module read level", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -5359,6 +5417,105 @@ it("returns bad request for malformed JSON before proxying", async () => {
     expect(body.code).toBe("BAD_REQUEST");
     expect(body.requestId).toBeTruthy();
     expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("preserves Contingency XLS bytes, query and organization through the gateway", async () => {
+  const token = createToken({
+    user_id: "actor",
+    organization_id: "organization-a",
+    permission: 3,
+    modules: { contabil: 3 },
+  });
+  const bytes = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 255]);
+  let received = Buffer.alloc(0);
+  let seenPath = "";
+  let organization: string | undefined;
+  const upstream = createServer(async (request, response) => {
+    seenPath = request.url ?? "";
+    organization = request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined;
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    received = Buffer.concat(chunks);
+    response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    response.end(JSON.stringify({ success: true, data: { classification: "legacy_hypothesis" } }));
+  });
+  const contabilServiceUrl = await startServer(upstream);
+  const gateway = createServer(createApp(createEnv({ contabilServiceUrl }), createTestLogger()));
+  const url = await startServer(gateway);
+  try {
+    const response = await fetch(`${url}/contabil/contingency?filename=balancete.xls`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/vnd.ms-excel" },
+      body: bytes,
+    });
+    expect(response.status).toBe(200);
+    expect(received).toEqual(bytes);
+    expect(seenPath).toBe("/contabil/contingency?filename=balancete.xls");
+    expect(organization).toBe("organization-a");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("preserves Contingency review body and printable HTML through the gateway", async () => {
+  const token = createToken({
+    user_id: "actor",
+    organization_id: "organization-a",
+    permission: 3,
+    modules: { contabil: 3 },
+  });
+  const hash = "a".repeat(64);
+  const html =
+    '<!doctype html><html lang="pt-BR"><body>Simulação legada de Contingência</body></html>';
+  let received = "";
+  let seenPath = "";
+  const upstream = createServer(async (request, response) => {
+    seenPath = request.url ?? "";
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    received = Buffer.concat(chunks).toString();
+    if (request.method === "POST") {
+      response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      response.end(JSON.stringify({ success: true, data: { reviewed_hash: hash } }));
+    } else {
+      response.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename=contingencia.html",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      });
+      response.end(html);
+    }
+  });
+  const contabilServiceUrl = await startServer(upstream);
+  const gateway = createServer(createApp(createEnv({ contabilServiceUrl }), createTestLogger()));
+  const url = await startServer(gateway);
+  try {
+    const reviewed = await fetch(`${url}/contabil/contingency/draft/review`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ content_hash: hash }),
+    });
+    expect(reviewed.status).toBe(200);
+    expect(JSON.parse(received)).toEqual({ content_hash: hash });
+    expect(seenPath).toBe("/contabil/contingency/draft/review");
+    const downloaded = await fetch(
+      `${url}/contabil/contingency/draft/export?content_hash=${hash}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    expect(downloaded.status).toBe(200);
+    expect(seenPath).toBe(`/contabil/contingency/draft/export?content_hash=${hash}`);
+    expect(downloaded.headers.get("content-type")).toContain("text/html");
+    expect(downloaded.headers.get("content-disposition")).toContain("attachment");
+    expect(downloaded.headers.get("cache-control")).toBe("no-store");
+    expect(downloaded.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(await downloaded.text()).toBe(html);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

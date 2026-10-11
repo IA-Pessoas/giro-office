@@ -13,6 +13,12 @@ function parseBoolean(value: unknown): boolean {
   throw new Error("Booleano inválido.");
 }
 
+// Dia AAAA-MM-DD que existe no calendário: "2024-02-31" não pode rolar para março em silêncio.
+export function isCalendarDay(day: string): boolean {
+  const date = new Date(day);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
+}
+
 export const idQuerySchema = z
   .object({
     id: z.string().uuid("id inválido."),

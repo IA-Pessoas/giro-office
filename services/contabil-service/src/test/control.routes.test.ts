@@ -61,6 +61,7 @@ function createMockDeps(): ControlRouteDeps {
       created: true,
     })) as unknown as ControlRouteDeps["create"],
     detail: vi.fn(async () => ({ id: CONTROL_ID })) as unknown as ControlRouteDeps["detail"],
+    history: vi.fn(async () => ({ total: 0, items: [] })) as unknown as ControlRouteDeps["history"],
     updateField: vi.fn(async () => ({
       id: CONTROL_ID,
       depreciation: true,
@@ -125,6 +126,39 @@ describe("control routes", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: { competence: "2024-01", items: [] } });
     expect(deps.list).toHaveBeenCalledWith("2024-01", ORG_ID);
+  });
+
+  it("GET /contabil/controls/history pagina na organização autenticada (#1722)", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/contabil/controls/history")
+      .query({ client_id: CLIENT_ID, competence: "2024-01", page: "3", pageSize: "5" })
+      .set(gatewayHeaders(0));
+    const forged = await request(app)
+      .get("/contabil/controls/history")
+      .query({ client_id: CLIENT_ID, competence: "2024-01", organization_id: "forged" })
+      .set(gatewayHeaders(0));
+    const tooLarge = await request(app)
+      .get("/contabil/controls/history")
+      .query({ client_id: CLIENT_ID, competence: "2024-01", pageSize: "500" })
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(200);
+    expect(deps.history).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      clientId: CLIENT_ID,
+      competence: "2024-01",
+      page: 3,
+      pageSize: 5,
+    });
+    expect(forged.status).toBe(200);
+    expect(deps.history).toHaveBeenLastCalledWith(
+      expect.objectContaining({ organizationId: ORG_ID }),
+    );
+    expect(tooLarge.status).toBe(400);
+    expect(deps.history).toHaveBeenCalledTimes(2);
   });
 
   it("GET /contabil/controls/list rejeita competência inválida antes de consultar a carteira", async () => {

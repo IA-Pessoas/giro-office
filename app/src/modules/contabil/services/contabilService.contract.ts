@@ -9,8 +9,14 @@ import type {
 } from "../types";
 
 export const CONTABIL_ENDPOINTS = {
+  noah: "/contabil/noah",
+  noahCsv: (id: string) => `/contabil/noah/${id}/csv`,
+  contingency: "/contabil/contingency",
+  contingencyReview: (id: string) => `/contabil/contingency/${id}/review`,
+  contingencyExport: (id: string) => `/contabil/contingency/${id}/export`,
   controls: "/contabil/controls",
   controlsList: "/contabil/controls/list",
+  controlsHistory: "/contabil/controls/history",
   controlById: (controlId: string) => `/contabil/controls/${controlId}`,
   controlItems: (controlId: string) => `/contabil/controls/${controlId}/items`,
   controlsYear: "/contabil/controls/year",
@@ -21,11 +27,16 @@ export const CONTABIL_ENDPOINTS = {
   relationships: "/contabil/relationships",
   relationshipById: (relationshipId: string) => `/contabil/relationships/${relationshipId}`,
   relationshipByClient: (clientId: string) => `/contabil/relationships/client/${clientId}`,
+  relationshipHistory: (clientId: string) => `/contabil/relationships/client/${clientId}/history`,
   triageMonthly: "/triagem/monthly",
   triageEditability: "/triagem/editability",
   triageMonthlyItem: (monthlyId: string) => `/triagem/monthly/${monthlyId}/item`,
   triageMonthlyItems: (monthlyId: string) => `/triagem/monthly/${monthlyId}/items`,
+  triageMonthlyById: (monthlyId: string) => `/triagem/monthly/${monthlyId}`,
+  triageConfig: "/triagem/config",
+  triageFiscalSettings: "/triagem/fiscal-settings",
   triageStatements: "/triagem/statements",
+  triageStatementHistory: "/triagem/statements/history",
   triageClosing: "/triagem/closing",
 } as const;
 

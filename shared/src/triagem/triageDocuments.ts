@@ -1,0 +1,122 @@
+/** Status de um documento no checklist da Triagem. */
+export const TRIAGE_DOCUMENT_STATUSES = [
+  "PENDING",
+  "COMPLETED",
+  "ATTENTION",
+  "UNDER_REVIEW",
+  "NOT_PRESENT",
+  "NOT_APPLICABLE",
+] as const;
+
+export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
+
+/** Rótulo de cada estado fora da tela (relatórios e exportações); o app tem os seus. */
+export const TRIAGE_DOCUMENT_STATUS_LABELS: Readonly<Record<TriageDocumentStatus, string>> = {
+  PENDING: "Pendente",
+  COMPLETED: "Concluído",
+  ATTENTION: "Atenção",
+  UNDER_REVIEW: "Em revisão",
+  NOT_PRESENT: "Não possui",
+  NOT_APPLICABLE: "Não aplicável",
+};
+
+/**
+ * Status que ainda pendem: PENDING aguarda o documento; ATTENTION e UNDER_REVIEW aguardam
+ * conferência. NOT_PRESENT e NOT_APPLICABLE não pendem.
+ */
+export const TRIAGE_PENDING_DOCUMENT_STATUSES = [
+  "PENDING",
+  "ATTENTION",
+  "UNDER_REVIEW",
+] as const satisfies readonly TriageDocumentStatus[];
+
+/**
+ * Status do cadastro de cliente inativado (client-service, `inactivate`), que também grava
+ * `deletion_date` com a data da inativação.
+ */
+export const CLIENT_INACTIVE_STATUS = "Inativo";
+
+/** Itens do checklist da rotina contábil da Triagem. */
+export const TRIAGE_ACCOUNTING_CHECKLIST_FIELDS = [
+  "financial_transactions",
+  "triaged_transactions",
+  "inventory_control",
+  "accounts_payable_report",
+  "accounts_receivable_report",
+  "card_statements",
+  "loan_agreements",
+  "bank_reconciliation",
+  "bank_investments",
+  "card_sales_report",
+] as const;
+
+/** Itens do checklist da rotina fiscal da Triagem. */
+export const TRIAGE_FISCAL_CHECKLIST_FIELDS = [
+  "inbound_report",
+  "outbound_report",
+  "nfse_provided",
+  "nfse_received",
+  "cte_documents",
+  "mei_documents",
+  "nfce_documents",
+  "sped_fiscal",
+  "sped_contributions",
+  "nfce_received",
+  "model_21_invoice",
+  "cte_as_issuer",
+  "services_provided_as_mei",
+] as const;
+
+export type TriageFiscalChecklistField = (typeof TRIAGE_FISCAL_CHECKLIST_FIELDS)[number];
+
+/**
+ * Documentos fiscais especiais: só entram na rotina do cliente que os tem configurados
+ * (legado `tb_triagem.campos`: nfce, sped, spedContribuicoes, nfce_tomados, modelo_21,
+ * cte_emitente, prestadas_mei). Faturamento é valor (`billing_amount`), não item.
+ */
+export const TRIAGE_FISCAL_SPECIAL_FIELDS = [
+  "nfce_documents",
+  "sped_fiscal",
+  "sped_contributions",
+  "nfse_received",
+  "model_21_invoice",
+  "cte_as_issuer",
+  "services_provided_as_mei",
+] as const satisfies readonly TriageFiscalChecklistField[];
+
+export type TriageFiscalSpecialField = (typeof TRIAGE_FISCAL_SPECIAL_FIELDS)[number];
+
+/**
+ * Configuráveis por cliente na rotina fiscal: os documentos especiais e o faturamento
+ * (legado `tb_triagem.campos.faturamento`), que é valor e não estado, mas também só se aplica
+ * a quem o tem configurado.
+ */
+export const TRIAGE_FISCAL_CONFIGURABLE_FIELDS = [
+  ...TRIAGE_FISCAL_SPECIAL_FIELDS,
+  "billing_amount",
+] as const;
+
+export type TriageFiscalConfigurableField = (typeof TRIAGE_FISCAL_CONFIGURABLE_FIELDS)[number];
+
+/**
+ * Estados gravados pelo legado (`TriageStatus`, igual nas rotinas Contábil e Fiscal):
+ * vazio é pendente. Mapeamento explícito para os estados atuais.
+ */
+export const TRIAGE_LEGACY_DOCUMENT_STATUSES: ReadonlyMap<string, TriageDocumentStatus> = new Map<
+  string,
+  TriageDocumentStatus
+>([
+  ["", "PENDING"],
+  ["nao possui", "NOT_PRESENT"],
+  ["atenção", "ATTENTION"],
+  ["atencao", "ATTENTION"],
+  ["concluido", "COMPLETED"],
+]);
+
+/** Estado atual de um item (também os do legado); `null` para valor desconhecido. */
+export function normalizeTriageDocumentStatus(value: unknown): TriageDocumentStatus | null {
+  if (typeof value !== "string") return null;
+  if ((TRIAGE_DOCUMENT_STATUSES as readonly string[]).includes(value))
+    return value as TriageDocumentStatus;
+  return TRIAGE_LEGACY_DOCUMENT_STATUSES.get(value) ?? null;
+}

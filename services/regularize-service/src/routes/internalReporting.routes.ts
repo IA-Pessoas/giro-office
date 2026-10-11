@@ -14,8 +14,14 @@ import type { RegularizeServiceEnv } from "../config/env.js";
 import type {
   RegularizeLicenseReportingService,
   RegularizeMunicipalTaxesReportingService,
+  RegularizePortfolioReportingService,
 } from "../reporting/internalReportingService.js";
 import { regularizeMunicipalTaxesReportingCatalog } from "../reporting/regularizeMunicipalTaxesReportingCatalog.js";
+import {
+  REGULARIZE_PORTFOLIO_REPORTING_SOURCES,
+  type RegularizePortfolioReportingSource,
+  regularizePortfolioReportingCatalog,
+} from "../reporting/regularizePortfolioReportingCatalog.js";
 import { regularizeReportingCatalog as regularizeProcessesReportingCatalog } from "../reporting/regularizeReportingCatalog.js";
 import {
   type InternalReportingGrant,
@@ -29,9 +35,14 @@ const regularizeReportingCatalog = {
   sources: [
     ...regularizeProcessesReportingCatalog.sources,
     ...regularizeMunicipalTaxesReportingCatalog.sources,
+    ...regularizePortfolioReportingCatalog.sources,
   ],
   relations: [],
 } as const;
+
+function isPortfolioSource(source: string): source is RegularizePortfolioReportingSource {
+  return (REGULARIZE_PORTFOLIO_REPORTING_SOURCES as readonly string[]).includes(source);
+}
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -118,6 +129,7 @@ export function createInternalReportingRouter(options: {
   env: Pick<RegularizeServiceEnv, "regularizeReportingToken" | "regularizeReportingGrantSecret">;
   reportingService: RegularizeLicenseReportingService;
   municipalTaxesReportingService: RegularizeMunicipalTaxesReportingService;
+  portfolioReportingService: RegularizePortfolioReportingService;
 }): ReturnType<typeof Router> {
   const router = Router();
 
@@ -149,22 +161,21 @@ export function createInternalReportingRouter(options: {
       fields: reportingQueryFields(body.fields, body.query),
       body,
     });
+    const extraction = {
+      organizationId: grant.organization_id,
+      fields: body.fields,
+      limit: body.limit,
+      ...(body.query ? { query: body.query } : {}),
+    };
     const result =
       body.source === REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE
         ? await options.municipalTaxesReportingService.extract({
-            organizationId: grant.organization_id,
+            ...extraction,
             source: body.source,
-            fields: body.fields,
-            limit: body.limit,
-            ...(body.query ? { query: body.query } : {}),
           })
-        : await options.reportingService.extract({
-            organizationId: grant.organization_id,
-            source: body.source,
-            fields: body.fields,
-            limit: body.limit,
-            ...(body.query ? { query: body.query } : {}),
-          });
+        : isPortfolioSource(body.source)
+          ? await options.portfolioReportingService.extract({ ...extraction, source: body.source })
+          : await options.reportingService.extract({ ...extraction, source: body.source });
     response.json(createSuccessResponse(result));
   });
 

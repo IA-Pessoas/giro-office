@@ -29,3 +29,14 @@ export type {
 } from "./triagemOverviewService";
 export { triagemAuditService } from "./triagemAuditService";
 export type { TriageAuditItem, TriageAuditTimeline } from "./triagemAuditService";
+export { triagemCloudService } from "./triagemCloudService";
+export type { TriageClientCloud, TriageClientCloudInput } from "./triagemCloudService";
+export { triagemSolicitationService } from "./triagemSolicitationService";
+export type {
+  TriageSolicitation,
+  TriageSolicitationInput,
+  TriageSolicitationStatus,
+  TriageNoteCounts,
+  TriageNoteCountsInput,
+  TriageSolicitationIndicators,
+} from "./triagemSolicitationService";

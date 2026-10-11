@@ -37,6 +37,57 @@ function loadEnvFile(filePath) {
 loadEnvFile(path.join(rootDir, "services", "gateway", ".env"));
 loadEnvFile(path.join(rootDir, ".env"));
 
+/** ZIP de um arquivo sem compressão (método 0), para o smoke da seleção de XML. */
+function storedZip(fileName, body) {
+  let crc = 0xffffffff;
+  for (const byte of body) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  crc = (crc ^ 0xffffffff) >>> 0;
+  const name = Buffer.from(fileName, "utf8");
+  const local = Buffer.alloc(30 + name.length);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt32LE(crc, 14);
+  local.writeUInt32LE(body.length, 18);
+  local.writeUInt32LE(body.length, 22);
+  local.writeUInt16LE(name.length, 26);
+  name.copy(local, 30);
+  const central = Buffer.alloc(46 + name.length);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt32LE(crc, 16);
+  central.writeUInt32LE(body.length, 20);
+  central.writeUInt32LE(body.length, 24);
+  central.writeUInt16LE(name.length, 28);
+  name.copy(central, 46);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(local.length + body.length, 16);
+  return Buffer.concat([local, body, central, end]);
+}
+
+/** NF-e mínima com chave de acesso válida e número aleatório: cada rodada importa nota nova. */
+function smokeNfeWithAccessKey() {
+  const issuer = "11222333000181";
+  const number = String(Math.floor(Math.random() * 999_999_999) + 1);
+  const base = `352610${issuer}55001${number.padStart(9, "0")}100000001`;
+  let weight = 2;
+  let sum = 0;
+  for (let i = base.length - 1; i >= 0; i -= 1) {
+    sum += Number(base[i]) * weight;
+    weight = weight === 9 ? 2 : weight + 1;
+  }
+  const rest = sum % 11;
+  const key = `${base}${rest < 2 ? 0 : 11 - rest}`;
+  return `<NFe><infNFe Id="NFe${key}"><ide><mod>55</mod><serie>1</serie><nNF>${number}</nNF></ide><emit><CNPJ>${issuer}</CNPJ></emit><det nItem="1"><prod><cProd>P1</cProd><xProd>Smoke</xProd><NCM>22030000</NCM><CFOP>6102</CFOP><qCom>1</qCom><vProd>10.00</vProd></prod></det></infNFe></NFe>`;
+}
+
 const { manifest } = await import(
   pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href
 );
@@ -111,6 +162,10 @@ const env = {
   marketingEventsSmokeEnabled:
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "true" ||
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "1",
+  // Opt in only when the smoke organization has a "Marketing" department.
+  marketingStockSmokeEnabled:
+    process.env.MARKETING_STOCK_SMOKE_ENABLED === "true" ||
+    process.env.MARKETING_STOCK_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -268,6 +323,7 @@ const state = {
   triagemLinkTypeCode: "",
   triagemUrgentRequestId: "",
   triagemUrgentRequestCompetence: "",
+  triagemSolicitationId: "",
   contabilResponsibleId: "",
   contabilRelationshipId: "",
   pessoalLddId: "",
@@ -302,6 +358,8 @@ const executed = [];
 const skipped = [];
 const actionExecutionRank = {
   marketingDashboard: 1050,
+  marketingBirthdays: 1050,
+  marketingStock: 1050,
   marketingEventsList: 1051,
   marketingEventsCreate: 1052,
   marketingEventsUpdate: 1053,
@@ -723,6 +781,7 @@ async function httpRequest(op, options) {
     query,
     json,
     form,
+    raw,
     headers: optionHeaders = {},
     expectedStatus: optionExpectedStatus,
     expectEnvelope: optionExpectEnvelope,
@@ -756,7 +815,9 @@ async function httpRequest(op, options) {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   };
 
-  if (json !== undefined) {
+  if (raw !== undefined) {
+    fetchOptions.body = raw;
+  } else if (json !== undefined) {
     requestHeaders.set("content-type", "application/json");
     fetchOptions.body = JSON.stringify(json);
   } else if (form) {
@@ -1613,6 +1674,17 @@ async function platformHttpRequest(op, options = {}) {
 const handlers = {
   async marketingDashboard(op) {
     await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async marketingStock(op) {
+    await httpRequest(op, { expectedStatus: op.expectedStatus });
+  },
+
+  async marketingBirthdays(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      query: { month: isBadExpectation(op) ? 13 : 5 },
+    });
   },
 
   async marketingEventsList(op) {
@@ -4151,6 +4223,86 @@ const handlers = {
     });
   },
 
+  async regularizeGroupMap(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/regularize/groups/${requireState("clientGroupId")}/map`,
+    });
+  },
+
+  // O grupo é o criado pelo próprio smoke: a versão salva some junto com ele.
+  async regularizeGroupMapSave(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/regularize/groups/${requireState("clientGroupId")}/map/saved`,
+      json: { tree: { id: "raiz", lines: ["QA_ smoke mapa de grupo"], children: [] } },
+    });
+  },
+
+  async regularizeGroupMapSaved(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/regularize/groups/${requireState("clientGroupId")}/map/saved`,
+    });
+  },
+
+  async clientRegimesList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/regimes" });
+  },
+
+  async clientRegimeCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/client/regimes",
+      json: { name: uniqueText("Smoke Regime") },
+    });
+    if (!isBadExpectation(op)) {
+      state.clientRegimeId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async clientRegimePatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/regimes/${requireState("clientRegimeId")}`,
+      json: { name: uniqueText("Smoke Regime Updated") },
+    });
+  },
+
+  async clientSegmentsList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/segments" });
+  },
+
+  async clientSegmentCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/client/segments",
+      json: { name: uniqueText("Smoke Segmento"), type: "servico" },
+    });
+    if (!isBadExpectation(op)) {
+      state.clientSegmentId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async clientSegmentPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/segments/${requireState("clientSegmentId")}`,
+      json: { type: "comercio" },
+    });
+  },
+
+  async clientLicitacaoBidders(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/licitacao/bidders" });
+  },
+
+  async clientLicitacaoHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/${requireState("primaryClientId")}/licitacao/history`,
+    });
+  },
+
   async clientCoringaList(op) {
     await httpRequest(op, { expectedStatus: [200], query: { page: 1, limit: 5 } });
   },
@@ -4194,7 +4346,7 @@ const handlers = {
         name: uniqueText("Smoke Client"),
         organization_id: requireState("session").organization_id,
         status: "Ativo",
-        cpf_cnpj: uniqueDigits(14),
+        cpf_cnpj: uniqueCnpj("primary-client"),
         prospecting_status: "Lead",
         type: "PJ",
         type_registration: "Novo",
@@ -4675,6 +4827,118 @@ const handlers = {
     });
   },
 
+  async fiscalMonthlyControlList(op) {
+    await httpRequest(op, { query: { competence: "2026-01" } });
+  },
+
+  async fiscalMonthlyControlOpen(op) {
+    // Motivo enviado sempre: o cliente do smoke pode não ter Fiscal ativo (abertura excepcional).
+    const response = await httpRequest(op, {
+      expectedStatus: [200, 201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-01",
+        reason: "Smoke de serviços",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalMonthlyControlId = pickFirst(response.body, "data.control.id");
+    }
+  },
+
+  async fiscalMonthlyControlUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}`,
+      json: { status: "IN_PROGRESS", no_movement: true },
+    });
+  },
+
+  async fiscalMonthlyObligationList(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations`,
+    });
+  },
+
+  async fiscalResponsibleReport(op) {
+    await httpRequest(op, { query: { basis: "competence", competence: "2026-08" } });
+  },
+
+  async fiscalMonthlyControlResponsibles(op) {
+    const response = await httpRequest(op);
+    if (!isBadExpectation(op)) {
+      state.fiscalResponsibleId = pickFirst(response.body, "data.0.id") ?? null;
+    }
+  },
+
+  async fiscalMonthlyControlTransfer(op) {
+    // Sem candidato com acesso ao Fiscal no ambiente do smoke, o destino inválido dá 400.
+    const target = state.fiscalResponsibleId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      expectedStatus: state.fiscalResponsibleId ? [200] : [400],
+      json: {
+        control_ids: [requireState("fiscalMonthlyControlId")],
+        to_user_id: target,
+        reason: "Smoke de serviços",
+      },
+    });
+  },
+
+  async fiscalAnnualControlList(op) {
+    const response = await httpRequest(op, { query: { year: "2025" } });
+    if (!isBadExpectation(op)) {
+      state.fiscalAnnualControlId = pickFirst(response.body, "data.items.0.id") ?? null;
+    }
+  },
+
+  async fiscalAnnualControlItems(op) {
+    // Sem cliente com Fiscal ativo no ambiente do smoke, não há controle anual: 404 esperado.
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items`,
+      expectedStatus: state.fiscalAnnualControlId ? [200] : [404],
+    });
+  },
+
+  async fiscalAnnualControlItemAdd(op) {
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items`,
+      expectedStatus: state.fiscalAnnualControlId ? [201, 409] : [404],
+      json: { code: "DIMOB", reason: "Smoke de serviços" },
+    });
+  },
+
+  async fiscalAnnualControlItemUpdate(op) {
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items/DIMOB`,
+      expectedStatus: state.fiscalAnnualControlId ? [200] : [404],
+      json: { applicable: false, reason: "Smoke de serviços" },
+    });
+  },
+
+  async fiscalMonthlyControlTriage(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/triage`,
+    });
+  },
+
+  async fiscalMonthlyObligationAdd(op) {
+    // DCTFWeb é incluível em qualquer regime (no Simples, com folha). Repetir dá 409.
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations`,
+      expectedStatus: [201, 409],
+      json: { code: "DCTFWEB", reason: "Smoke de serviços" },
+    });
+  },
+
+  async fiscalMonthlyObligationUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations/DCTFWEB`,
+      json: { applicable: false, reason: "Smoke de serviços" },
+    });
+  },
+
   async fiscalSimplesPreview(op) {
     const response = await httpRequest(op, {
       query: { client_id: requireState("primaryClientId"), competence: "2026-02" },
@@ -4723,6 +4987,204 @@ const handlers = {
     }
   },
 
+  async fiscalDocumentConference(op) {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor";
+    const response = await httpRequest(op, {
+      json: {
+        dominio: { file_name: "dominio.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+        sefaz: { file_name: "sefaz.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(
+        `Conferência Domínio × SEFAZ inesperada: ${JSON.stringify(response.body?.data)}`,
+      );
+    }
+  },
+
+  async fiscalDocumentConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        dominio: { file_name: "dominio.csv", content: "Número;Valor\n100;10,00" },
+        sefaz: { file_name: "sefaz.csv", content: "Número;Valor\n100;10,00" },
+      },
+    });
+  },
+
+  async fiscalXmlSelection(op) {
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit></infNFe></NFe>";
+    const response = await httpRequest(op, {
+      json: {
+        file_name: "notas.zip",
+        zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        requests: ["100"],
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.selected?.length !== 1) {
+      throw new Error(`Seleção de XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalXmlSelectionInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { file_name: "notas.zip", zip_base64: "bm9wZQ==", requests: ["100"] },
+    });
+  },
+
+  async fiscalSefazXmlConference(op) {
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><total><ICMSTot><vNF>10.00</vNF></ICMSTot></total></infNFe></NFe>";
+    const response = await httpRequest(op, {
+      json: {
+        sefaz: {
+          file_name: "sefaz.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número;Valor\n11222333000181;55;1;100;10,00",
+        },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência SEFAZ × XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSefazXmlConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        sefaz: { file_name: "sefaz.csv", content: "Número;Valor\n100;10,00" },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from("<NFe/>")).toString("base64"),
+        },
+      },
+    });
+  },
+
+  async fiscalSpedXmlConference(op) {
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd><CFOP>5102</CFOP><qCom>1</qCom><vProd>10.00</vProd></prod></det><total><ICMSTot><vNF>10.00</vNF></ICMSTot></total></infNFe></NFe>';
+    const response = await httpRequest(op, {
+      json: {
+        sped: {
+          file_name: "sped.txt",
+          content: [
+            "|0000|017|0|01082026|31082026|EMPRESA|11222333000181||SP|",
+            "|C100|0|0||55|00|1|100||01082026|01082026|10,00|",
+            "|C170|1|A||1|UN|10,00|0|0|000|5102|",
+          ].join("\n"),
+        },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência SPED × XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSpedXmlConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        sped: { file_name: "sped.txt", content: "|0000|017|" },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from("<NFe/>")).toString("base64"),
+        },
+      },
+    });
+  },
+
+  async fiscalXmlTaxTotals(op) {
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd></prod><imposto><IPI><IPITrib><vIPI>1.10</vIPI></IPITrib></IPI></imposto></det></infNFe></NFe>';
+    const response = await httpRequest(op, {
+      json: {
+        file_name: "xml.zip",
+        zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.totals?.ipi !== "1.10") {
+      throw new Error(`Totais de IPI/ICMS ST inesperados: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalXmlTaxTotalsInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { file_name: "xml.zip", zip_base64: "bm9wZQ==" },
+    });
+  },
+
+  async fiscalIpiSpreadsheetConference(op) {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor IPI";
+    const response = await httpRequest(op, {
+      json: {
+        first: { file_name: "a.csv", content: `${header}\n11222333000181;55;1;100;1,00` },
+        second: { file_name: "b.csv", content: `${header}\n11222333000181;55;1;100;1,00` },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência de IPI inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalIpiSpreadsheetConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        first: {
+          file_name: "a.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número\n11222333000181;55;1;100",
+        },
+        second: {
+          file_name: "b.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número\n11222333000181;55;1;100",
+        },
+      },
+    });
+  },
+
+  async fiscalInvoicePdfTotals(op) {
+    // PDF mínimo de uma página (Helvetica, sem compressão) com o total da fatura.
+    const content = "BT /F1 12 Tf 50 700 Td (Total a pagar R$ 10,00) Tj ET";
+    const pdf = [
+      "%PDF-1.4",
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+      `4 0 obj << /Length ${content.length} >>\nstream\n${content}\nendstream endobj`,
+      "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      "trailer << /Root 1 0 R >>",
+    ].join("\n");
+    const response = await httpRequest(op, {
+      json: {
+        files: [
+          {
+            file_name: "fatura.pdf",
+            content_base64: Buffer.from(pdf, "latin1").toString("base64"),
+          },
+        ],
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.totals?.value !== "10.00") {
+      throw new Error(`Total de faturas em PDF inesperado: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalInvoicePdfTotalsInvalid(op) {
+    await httpRequest(op, { expectedStatus: [400], json: { files: [] } });
+  },
+
   async fiscalSimplesZipInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],
@@ -4734,6 +5196,200 @@ const handlers = {
     await httpRequest(op, {
       path: `/fiscal/revenues/${requireState("fiscalRevenueId")}`,
       json: { amount: "12000.00" },
+    });
+  },
+
+  async fiscalClientWholesaleGet(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/clients/${requireState("primaryClientId")}/wholesale`,
+    });
+    if (!isBadExpectation(op) && typeof response.body?.data?.is_wholesale !== "boolean") {
+      throw new Error(`atacadista sem valor atual: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalClientWholesaleUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/clients/${requireState("primaryClientId")}/wholesale`,
+      json: { is_wholesale: true },
+    });
+  },
+
+  async fiscalClientWholesaleUpdateInvalid(op) {
+    await httpRequest(op, {
+      path: `/fiscal/clients/${requireState("primaryClientId")}/wholesale`,
+      expectedStatus: [400],
+      json: { is_wholesale: "sim" },
+    });
+  },
+
+  async fiscalAnticipationImport(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+        file_name: "smoke-antecipacoes.zip",
+        zip_base64: storedZip("nota.xml", Buffer.from(smokeNfeWithAccessKey())).toString("base64"),
+      },
+    });
+    if (!isBadExpectation(op)) {
+      if (
+        response.body?.data?.status !== "pending_review" ||
+        response.body?.data?.item_count !== 1
+      ) {
+        throw new Error(`Lote de antecipações inesperado: ${JSON.stringify(response.body?.data)}`);
+      }
+      state.fiscalAnticipationBatchId = pickFirst(response.body, "data.id");
+      state.fiscalAnticipationItemId = pickFirst(response.body, "data.items.0.id");
+    }
+  },
+
+  async fiscalAnticipationImportInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+        file_name: "smoke-invalido.zip",
+        zip_base64: storedZip("a.xml", Buffer.from("<NFe/>")).toString("base64"),
+      },
+    });
+  },
+
+  async fiscalAnticipationList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), competence: "2026-09" },
+    });
+  },
+
+  async fiscalAnticipationDetail(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}`,
+    });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.items)) {
+      throw new Error(`Lote sem itens: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalAnticipationItemUpdate(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/items/${requireState("fiscalAnticipationItemId")}`,
+      json: { classification: "total", reason: "Smoke: classificação manual" },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.classification !== "total") {
+      throw new Error(`Item não classificado: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalAnticipationItemUpdateInvalid(op) {
+    await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/items/${requireState("fiscalAnticipationItemId")}`,
+      expectedStatus: [400],
+      json: { classification: "total" },
+    });
+  },
+
+  async fiscalAnticipationSubmit(op) {
+    await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/submit`,
+      json: { reviewer_id: requireState("session").id },
+    });
+  },
+
+  async fiscalAnticipationCheck(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/check`,
+      json: { decision: "approve" },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.status !== "checked") {
+      throw new Error(`Lote não conferido: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalAnticipationCsv(op) {
+    await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/csv`,
+      expectEnvelope: false,
+    });
+  },
+
+  async fiscalAnticipationPdf(op) {
+    await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/pdf`,
+      expectEnvelope: false,
+    });
+  },
+
+  async fiscalMalhaCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        period_start: "2025-01",
+        period_end: "2025-12",
+        reason: "Smoke: divergência em declaração",
+        deadline: "2026-12-15",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalMalhaId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    }
+  },
+
+  async fiscalMalhaCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        client_id: requireState("primaryClientId"),
+        period_start: "2025-12",
+        period_end: "2025-01",
+        reason: "Smoke: período invertido",
+      },
+    });
+  },
+
+  async fiscalMalhaList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), status: "aberta" },
+    });
+  },
+
+  async fiscalMalhaDetail(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/malhas/${requireState("fiscalMalhaId")}`,
+    });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.history)) {
+      throw new Error(`malha sem histórico: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalMalhaUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/malhas/${requireState("fiscalMalhaId")}`,
+      json: { status: "em_andamento" },
+    });
+  },
+
+  async fiscalMalhaAttachmentReplace(op) {
+    await httpRequest(op, {
+      path: `/fiscal/malhas/${requireState("fiscalMalhaId")}/attachment`,
+      expectedStatus: [201],
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-malha.png",
+          contentType: "image/png",
+        },
+      },
+    });
+  },
+
+  async fiscalMalhaAttachmentAccess(op) {
+    await httpRequest(op, {
+      path: `/fiscal/malhas/${requireState("fiscalMalhaId")}/attachment`,
+      expectedStatus: [200],
     });
   },
 
@@ -4855,6 +5511,100 @@ const handlers = {
     });
   },
 
+  async contabilNoahCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      query: { filename: "noah-synthetic.zip" },
+      headers: { "content-type": "application/zip" },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/noah/synthetic.zip")),
+    });
+    if (!isBadExpectation(op)) {
+      if (response.body?.data?.row_count !== 1)
+        throw new Error("Noah deve extrair um pagamento sintético.");
+      state.contabilNoahId = response.body.data.id;
+    }
+  },
+
+  async contabilNoahDownload(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/noah/${requireState("contabilNoahId")}/csv`,
+      expectedStatus: [200],
+      expectEnvelope: false,
+    });
+    if (
+      !isBadExpectation(op) &&
+      !response.text.includes("Fornecedor Sintético;09/10/2026;100,00;comprovante.html")
+    ) {
+      throw new Error("CSV Noah diverge do comprovante sintético.");
+    }
+  },
+
+  async contabilContingencySimulate(op) {
+    let company = { name: "Smoke Client", cpf_cnpj: uniqueCnpj("primary-client") };
+    if (!isBadExpectation(op)) {
+      const response = await httpRequest(op, {
+        method: "GET",
+        path: `/client/${requireState("primaryClientId")}`,
+        expectedStatus: [200],
+      });
+      company = response.body.data;
+    }
+    const response = await httpRequest(op, {
+      query: {
+        client_id: requireState("primaryClientId"),
+        company_name: company.company_name?.trim() || company.name,
+        cnpj: company.cpf_cnpj,
+        period_start: "2026-01",
+        period_end: "2026-06",
+        regime: "Simples Nacional",
+        annex: "III",
+        filename: "synthetic.xls",
+      },
+      headers: { "content-type": "application/vnd.ms-excel" },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/contingency/synthetic.xls")),
+    });
+    if (
+      !isBadExpectation(op) &&
+      (response.body?.data?.minimum?.totalCents !== 398200 ||
+        response.body?.data?.maximum?.totalCents !== 955680)
+    )
+      throw new Error("Simulação de Contingência diverge do XLS sintético.");
+    if (!isBadExpectation(op)) {
+      state.contabilContingencyId = response.body.data.id;
+      state.contabilContingencyHash = response.body.data.content_hash;
+    }
+  },
+
+  async contabilContingencyReview(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/contingency/${requireState("contabilContingencyId")}/review`,
+      json: { content_hash: requireState("contabilContingencyHash") },
+    });
+    if (
+      !isBadExpectation(op) &&
+      (!response.body.data.reviewed_by ||
+        !response.body.data.reviewed_at ||
+        response.body.data.reviewed_hash !== state.contabilContingencyHash)
+    ) {
+      throw new Error("Conferência de Contingência sem ator, instante ou hash correspondente.");
+    }
+  },
+
+  async contabilContingencyExport(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/contingency/${requireState("contabilContingencyId")}/export`,
+      query: { content_hash: requireState("contabilContingencyHash") },
+      expectEnvelope: false,
+    });
+    if (
+      !isBadExpectation(op) &&
+      (!response.text.includes("Simulação legada de Contingência") ||
+        !response.text.includes(state.contabilContingencyHash))
+    ) {
+      throw new Error("Conclusão imprimível não identifica a simulação e a conferência.");
+    }
+  },
+
   async contabilControlCreate(op) {
     const competence = "2026-09";
     state.contabilControlCompetence = competence;
@@ -4929,6 +5679,17 @@ const handlers = {
       query: {
         client_id: requireState("primaryClientId"),
         competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
+  async contabilControlHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+        pageSize: "5",
       },
     });
   },
@@ -5193,6 +5954,75 @@ const handlers = {
     });
   },
 
+  async triagemSolicitationCreate(op) {
+    // Categoria própria do smoke: o catálogo REQUEST_CATEGORY não tem seed.
+    let categoryId = crypto.randomUUID();
+    if (!isBadExpectation(op)) {
+      const category = await httpRequest(op, {
+        method: "POST",
+        path: "/triagem/catalogs",
+        expectedStatus: [201],
+        json: {
+          kind: "REQUEST_CATEGORY",
+          code: `SMOKE_REQUEST_${crypto.randomUUID().slice(0, 8)}`,
+          label: "Categoria de solicitação (smoke)",
+        },
+      });
+      categoryId = pickFirst(category.body, "data.id") ?? findFirstId(category.body?.data);
+    }
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+        category_id: categoryId,
+        description: "Solicitação criada pelo smoke",
+        responsible_id: requireState("session").id,
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemSolicitationId = id;
+  },
+
+  async triagemSolicitationList(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { status: "OPEN" } });
+  },
+
+  async triagemSolicitationGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/solicitations/${requireState("triagemSolicitationId")}`,
+    });
+  },
+
+  async triagemNoteCountsUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/solicitations/${requireState("triagemSolicitationId")}/note-counts`,
+      json: { xml_inbound: 3, xml_outbound: 5, nfse_issued: 2, nfse_received: 1 },
+    });
+  },
+
+  async triagemNoteCountsGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/solicitations/${requireState("triagemSolicitationId")}/note-counts`,
+    });
+  },
+
+  async triagemSolicitationIndicators(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { competence: "2026-09" } });
+  },
+
+  async triagemSolicitationClose(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/solicitations/${requireState("triagemSolicitationId")}/close`,
+    });
+  },
+
   async triageMonthlyGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -5343,7 +6173,7 @@ const handlers = {
       json: {
         client_id: requireState("primaryClientId"),
         bidding: false,
-        chart_accounts: uniqueText("Smoke chart"),
+        chart_accounts: "Não",
         tool: "Ferramenta smoke",
         system: "Sistema smoke",
         note: uniqueText("Smoke relationship note"),
@@ -5369,6 +6199,14 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/contabil/relationships/client/${requireState("primaryClientId")}`,
+    });
+  },
+
+  async contabilRelationshipHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/client/${requireState("primaryClientId")}/history`,
+      query: { pageSize: "5" },
     });
   },
 
@@ -5419,6 +6257,57 @@ const handlers = {
       return;
     }
     state.pessoalLddId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async pessoalLddImportPreview(op) {
+    // PDF mínimo de uma página (Helvetica, sem compressão) com uma linha CP- elegível.
+    const content = "BT /F1 10 Tf 40 700 Td (CP-SEGUR. 01/2024 20/02/2024 10,00 10,00) Tj ET";
+    const pdf = [
+      "%PDF-1.4",
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+      `4 0 obj << /Length ${content.length} >>\nstream\n${content}\nendstream endobj`,
+      "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      "trailer << /Root 1 0 R >>",
+    ].join("\n");
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        file_name: "ldd.pdf",
+        content_base64: Buffer.from(pdf, "latin1").toString("base64"),
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.rows?.[0]?.balance_amount !== 10) {
+      throw new Error(`Prévia de LDD inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async pessoalLddImportConfirm(op) {
+    // Hash novo a cada execução: o mesmo arquivo só pode ser importado uma vez por cliente.
+    // Chave em 2099, que nenhum débito real usa: o LDD é sempre criado aqui e removido em seguida.
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        file_name: "ldd.pdf",
+        file_hash: crypto.randomBytes(32).toString("hex"),
+        rows: [{ period: "12/2099", due_date: "2099-12-31", balance_amount: 0.01 }],
+      },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const importedId = pickFirst(response.body, "data.records.0.id");
+    if (importedId) {
+      await httpRequest(op, {
+        method: "DELETE",
+        path: `/pessoal/ldd/${importedId}`,
+        expectedStatus: [200],
+        label: `${op.id}:cleanup`,
+      });
+    }
   },
 
   async pessoalLddPatch(op) {
@@ -5615,11 +6504,25 @@ const handlers = {
     });
   },
 
+  async pessoalObligationPortfolio(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: requireState("pessoalCompetence"), state: "pending" },
+    });
+  },
+
   async pessoalObligationPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/pessoal/obrigations/${requireState("pessoalObligationId")}`,
       json: { payroll: true },
+    });
+  },
+
+  async pessoalObligationHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/obrigations/${requireState("pessoalObligationId")}/history`,
     });
   },
 
@@ -5786,6 +6689,81 @@ const handlers = {
       pickFirst(response.body, "data.id") ??
       pickFirst(response.body, "data.create.id") ??
       findFirstId(response.body?.data);
+  },
+
+  // Conteúdo fixo: a chave de duplicata impede que cada rodada crie um aviso novo.
+  async regularizeDteImport(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        format: "json",
+        content: JSON.stringify([
+          { tipo: "", cell3: "QA_ smoke aviso DTE", cell4: "00000000000191", cell5: "QA_ smoke" },
+        ]),
+      },
+    });
+  },
+
+  async regularizeDteImportsList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  // Período aberto: o aviso de smoke só é criado na primeira rodada e sai da janela de 45 dias.
+  async regularizeDteNoticesList(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      query: { from: "2000-01-01", search: "QA_ smoke aviso DTE" },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.regularizeDteNoticeId = response.body?.data?.data?.[0]?.id;
+  },
+
+  async regularizeDteNoticeReadingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { id: requireState("regularizeDteNoticeId"), pending_reading: false },
+    });
+  },
+
+  // Dia fixo e antigo, sem gravar nada: "sem_registro" em quem não tem registro e uma lista só
+  // com documento desconhecido.
+  async regularizeDteQueriesGrid(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { date: "2000-01-01" } });
+  },
+
+  async regularizeDteQueryStatusUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        date: "2000-01-01",
+        status: "sem_registro",
+      },
+    });
+  },
+
+  async regularizeDteQueryListsImport(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: { date: "2000-01-01", done: "00000000000191", not_done: "" },
+    });
+  },
+
+  async regularizeVeriCompare(op) {
+    const response = await httpRequest(op, {
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/veri/synthetic.xlsx")),
+    });
+    // scripts/fixtures/veri/README.md: duas linhas válidas e duas inválidas.
+    if (
+      !isBadExpectation(op) &&
+      (response.body?.data?.totals?.veri !== 2 || response.body?.data?.totals?.invalid !== 2)
+    )
+      throw new Error("Comparação Veri diverge do XLSX sintético.");
   },
 
   async taskIntegrationCreate(op) {
@@ -7732,6 +8710,9 @@ function matchesFilter(op) {
 function disabledConditionReason(condition) {
   if (condition === "marketingEventsSmokeEnabled" && !env.marketingEventsSmokeEnabled) {
     return "MARKETING_EVENTS_SMOKE_ENABLED is false";
+  }
+  if (condition === "marketingStockSmokeEnabled" && !env.marketingStockSmokeEnabled) {
+    return "MARKETING_STOCK_SMOKE_ENABLED is false";
   }
   if (condition === "platformImpersonationSmokeEnabled") {
     if (!env.platformImpersonationSmokeEnabled) {

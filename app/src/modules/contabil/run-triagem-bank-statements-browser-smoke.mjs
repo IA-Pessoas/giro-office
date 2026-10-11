@@ -3,6 +3,8 @@ import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
+import { EMPTY_SOLICITATION_INDICATORS } from "../triagem/triagemSmokeFixtures.mjs";
+
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const port = process.env.TRIAGE_BROWSER_SMOKE_PORT ?? "3126";
 const baseUrl = configuredBaseUrl ?? `http://127.0.0.1:${port}`;
@@ -54,7 +56,16 @@ const statements = [
     status: "COMPLETED",
     archived_at: null,
   },
+  {
+    id: "s1000000-0000-4000-8000-000000000002",
+    client_id: clientId,
+    competence: "2026-06",
+    bank_id: "237",
+    status: "PENDING",
+    archived_at: null,
+  },
 ];
+const PENDING_STATUSES = new Set(["PENDING", "ATTENTION", "UNDER_REVIEW"]);
 const user = {
   id: "c0000000-0000-4000-8000-000000000001",
   name: "Analista Contábil",
@@ -103,6 +114,8 @@ await context.addCookies([
 ]);
 
 const page = await context.newPage();
+// A competência inicial é a do relógio; fixar o mês mantém o smoke estável fora de 2026-09.
+await page.clock.setFixedTime(new Date("2026-09-15T12:00:00-03:00"));
 const requests = [];
 await page.route("**/*", async (route) => {
   const request = route.request();
@@ -155,8 +168,27 @@ await page.route("**/*", async (route) => {
   if (request.method() === "GET" && apiPath === "/triagem/monthly") {
     return json(route, monthlyFixture);
   }
+  if (request.method() === "GET" && apiPath === "/triagem/statements/history") {
+    const pendingOnly = new URL(request.url()).searchParams.get("pending") === "true";
+    const rows = statements
+      .filter((item) => item.archived_at === null && (!pendingOnly || PENDING_STATUSES.has(item.status)))
+      .sort((a, b) => b.competence.localeCompare(a.competence) || a.bank_id.localeCompare(b.bank_id));
+    const competences = [...new Set(rows.map((item) => item.competence))].map((key) => {
+      const group = rows.filter((item) => item.competence === key);
+      return {
+        competence: key,
+        pending: group.filter((item) => PENDING_STATUSES.has(item.status)).length,
+        statements: group.map(({ bank_id, status }) => ({ bank_id, status })),
+      };
+    });
+    return json(route, { client_id: clientId, truncated: false, competences });
+  }
   if (request.method() === "GET" && apiPath === "/triagem/statements") {
-    return json(route, statements.filter((statement) => statement.archived_at === null));
+    const selected = new URL(request.url()).searchParams.get("competence");
+    return json(
+      route,
+      statements.filter((statement) => statement.archived_at === null && statement.competence === selected),
+    );
   }
   if (request.method() === "GET" && apiPath === "/triagem/closing") {
     return json(route, {
@@ -192,6 +224,9 @@ await page.route("**/*", async (route) => {
     statement.archived_at = "2026-09-17T10:00:00.000Z";
     return json(route, statement);
   }
+  if (request.method() === "GET" && apiPath === "/triagem/solicitations/indicators") {
+    return json(route, EMPTY_SOLICITATION_INDICATORS);
+  }
   return json(route, []);
 });
 
@@ -203,6 +238,9 @@ try {
   await expect(page.getByRole("heading", { name: "Pendências documentais" })).toBeVisible();
   const bankStatus = page.getByLabel("Status do banco 001");
   await expect(bankStatus).toHaveValue("COMPLETED");
+  const history = page.locator('section[aria-labelledby="triage-statement-history-title"]');
+  await expect(history.getByText("Competência 2026-06 · 1 pendente(s)")).toBeVisible();
+  await expect(history.getByText("Competência 2026-09")).toHaveCount(0);
 
   await bankStatus.selectOption("UNDER_REVIEW");
   await expect.poll(() =>
@@ -211,6 +249,8 @@ try {
     ).length,
   ).toBe(1);
   assert.equal(requests.find((request) => request.method === "PUT").body.status, "UNDER_REVIEW");
+  // A mudança no banco aparece no histórico sem recarregar a página.
+  await expect(history.getByText("Competência 2026-09 · 1 pendente(s)")).toBeVisible();
 
   await page.getByRole("button", { name: "Arquivar marcador do banco 001" }).click();
   await page
@@ -232,11 +272,14 @@ try {
   );
   assert.ok(reopenRequest);
 
+  await history.getByRole("button", { name: "Abrir competência 2026-06" }).click();
+  await expect(page.getByLabel("Status do banco 237")).toHaveValue("PENDING");
+
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log(
     JSON.stringify({
       url: page.url(),
-      bankStatus: await page.getByLabel("Status do banco 001").inputValue(),
+      bankStatus: await page.getByLabel("Status do banco 237").inputValue(),
       requestCount: requests.length,
       screenshotPath,
     }),

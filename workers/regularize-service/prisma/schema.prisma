@@ -33,6 +33,7 @@ model License {
   protocol_file_uploaded_at         DateTime?
   protocol_file_uploaded_by_user_id String?
   client                            Client? @relation(fields: [client_id], references: [id])
+  responsible                       User? @relation(fields: [responsible_id], references: [id])
 
   @@map("regularize.license")
 }
@@ -52,6 +53,9 @@ model Organization {
   sitePasswordsRegularize SitePasswordsRegularize[]
   passwordsRegularize PasswordRegularize[]
   proceduralGuidances ProceduralGuidance[]
+  dteImports RegularizeDteImport[]
+  dteNotices RegularizeDteNotice[]
+  dteQueries RegularizeDteQuery[]
 
   @@map("organizations")
 }
@@ -64,6 +68,11 @@ model Client {
   cpf_cnpj        String?
   status          String
   city            String?
+  address         String?
+  number          String?
+  neighborhood    String?
+  regime          String?
+  groups          ClientsGroup[]
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   processes       Process[] @relation("processClientPJ")
@@ -72,8 +81,70 @@ model Client {
   passwordsRegularize PasswordRegularize[]
   proceduralGuidances ProceduralGuidance[] @relation("proceduralGuidanceClientPJ")
   licenses        License[]
+  fantasy_name    String?
+  state           String?
+  state_registration String?
+  segment         String?
+  customer_since  DateTime?
+  competence_output DateTime?
+  deletion_date   DateTime?
+  dteQueries      RegularizeDteQuery[]
+  // Carteira publicada nos relatórios do Regularize (#1750).
+  type            String    @default("PJ")
+  size            String?
+  responsible     String?
+  municipal_registration String?
+  email           String?
+  coringa_status  String?
+  licitacao       Boolean?
+  contabil        Boolean?
+  fiscal          Boolean?
+  pessoal         Boolean?
+  infoproduto     Boolean?
+  consultoria     Boolean?
+  castelo_med     Boolean?
+  tecnologia      Boolean?
 
   @@map("clients")
+}
+
+// Recorte dos grupos de clientes (dono: client-service), só leitura: relatórios (#1750) e
+// mapa de grupo (#1748).
+model Group {
+  id              String                    @id @default(uuid())
+  name            String
+  status          Boolean                   @default(true)
+  organization_id String
+  clients         ClientsGroup[]
+  savedMaps       RegularizeGroupSavedMap[]
+
+  @@map("clients.group")
+}
+
+model ClientsGroup {
+  id              String @id @default(uuid())
+  group_id        String
+  client_id       String
+  organization_id String
+  client          Client @relation(fields: [client_id], references: [id])
+  group           Group  @relation(fields: [group_id], references: [id])
+
+  @@map("clients.clientsGroup")
+}
+
+// Versão salva do mapa de um grupo (#1749). Uma versão por grupo.
+model RegularizeGroupSavedMap {
+  id                 String   @id @default(uuid())
+  organization_id    String
+  group_id           String
+  tree               Json
+  updated_by_user_id String
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  group              Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, group_id], map: "uq_regularize_group_map_group")
+  @@map("regularize.group_maps")
 }
 
 model ClientPF {
@@ -120,6 +191,7 @@ model User {
   responsible1    Process[] @relation("responsible1")
   responsible2    Process[] @relation("responsible2")
   responsible3    Process[] @relation("responsible3")
+  licenses        License[]
   logs            Logs[]
   permissions     Permission[]
   regularizeNotifications RegularizeNotification[]
@@ -338,4 +410,86 @@ model MunicipalTaxes {
   organization         Organization @relation(fields: [organization_id], references: [id])
 
   @@map("regularize.municipalTaxes")
+}
+
+// Importação manual de avisos DTE (#1744). Guarda o resumo e o que foi recusado ou
+// repetido, para conferência; o conteúdo colado não é armazenado.
+model RegularizeDteImport {
+  id              String                @id @default(uuid())
+  organization_id String
+  user_id         String
+  format          String
+  total_rows      Int
+  created_count   Int
+  duplicate_count Int
+  rejected_count  Int
+  duplicates      Json
+  rejections      Json
+  created_at      DateTime              @default(now())
+  organization    Organization          @relation(fields: [organization_id], references: [id])
+  notices         RegularizeDteNotice[]
+
+  @@index([organization_id, created_at], map: "idx_regularize_dte_import_org_created")
+  @@map("regularize.dte_imports")
+}
+
+// Aviso DTE (tb_regularize.dte do legado). Datas ficam como o texto da origem; a de emissão
+// também é lida como dd/mm/aaaa hh:mm em data_emissao_at, que a caixa de avisos usa no período
+// (dte/home.php). dedupe_key = SHA-256 dos nove campos de Fiscal::cadastrarDTE;
+// pending_reading = coluna `lido` do legado.
+model RegularizeDteNotice {
+  id              String              @id @default(uuid())
+  organization_id String
+  import_id       String
+  dedupe_key      String
+  tipo            String
+  aviso           String
+  cnpj_cpf        String
+  destinatario    String
+  remetente       String
+  data_emissao    String?
+  data_emissao_at DateTime?
+  assunto         String
+  data_leitura    String?
+  data_ciencia    String?
+  registro        String?
+  pending_reading Boolean
+  created_at      DateTime            @default(now())
+  organization    Organization        @relation(fields: [organization_id], references: [id])
+  import          RegularizeDteImport @relation(fields: [import_id], references: [id])
+
+  @@unique([organization_id, dedupe_key], map: "uq_regularize_dte_notice_dedupe")
+  @@index([organization_id, created_at], map: "idx_regularize_dte_notice_org_created")
+  @@index([organization_id, data_emissao_at], map: "idx_regularize_dte_notice_org_emissao")
+  @@map("regularize.dte_notices")
+}
+
+// Consulta diária ao DTE por cliente (#1746). O legado (tb_regularize.dte_status) guardava
+// duas listas de CPF/CNPJ por dia; aqui é uma linha por cliente e dia, então o cliente não
+// tem como estar em "feitas" e "não feitas" ao mesmo tempo. Sem linha = sem registro.
+model RegularizeDteQuery {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  client_id          String
+  date               DateTime     @db.Date
+  done               Boolean
+  updated_by_user_id String
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+  organization       Organization @relation(fields: [organization_id], references: [id])
+  client             Client       @relation(fields: [client_id], references: [id])
+
+  @@unique([organization_id, client_id, date], map: "uq_regularize_dte_query_client_date")
+  @@index([organization_id, date], map: "idx_regularize_dte_query_org_date")
+  @@map("regularize.dte_queries")
+}
+
+// Recorte do catálogo de segmentos: o tipo define quem entra na grade de consultas DTE.
+model ClientSegment {
+  id              String @id @default(uuid())
+  name            String
+  type            String
+  organization_id String
+
+  @@map("clients.segments")
 }

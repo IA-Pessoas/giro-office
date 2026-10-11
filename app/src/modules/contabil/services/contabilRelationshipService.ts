@@ -2,6 +2,7 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   ContabilRelationship,
+  ContabilRelationshipHistoryPage,
   CreateContabilRelationshipPayload,
   UpdateContabilRelationshipPayload,
 } from "../types";
@@ -17,6 +18,17 @@ export const contabilRelationshipService = {
     return executeNullableContabilRequest<ContabilRelationship>(() =>
       api.get(CONTABIL_ENDPOINTS.relationshipByClient(clientId)),
     );
+  },
+
+  async getRelationshipHistory(
+    clientId: string,
+    page: number,
+    pageSize: number,
+  ): Promise<ContabilRelationshipHistoryPage> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.relationshipHistory(clientId), {
+      params: { page, pageSize },
+    });
+    return unwrapContabilEnvelope<ContabilRelationshipHistoryPage>(response.data);
   },
 
   async createRelationship(

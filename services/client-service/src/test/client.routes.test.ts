@@ -14,6 +14,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../app.js";
 import { getClientServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type { ClientEntityAudit } from "../integrations/audit.js";
 import type { InternalCommercialRouteDeps } from "../routes/internalCommercial.routes.js";
 import {
   type ClientListPage,
@@ -101,6 +102,7 @@ function buildTestApp(
     cnpjLookupProvider?: CnpjLookupProvider;
     env?: Partial<ReturnType<typeof getClientServiceEnv>>;
     commercialProjectionService?: InternalCommercialRouteDeps;
+    audit?: ClientEntityAudit;
   },
 ) {
   const env = { ...getClientServiceEnv(), ...overrides?.env };
@@ -124,6 +126,7 @@ function buildTestApp(
     historyStorage,
     cnpjLookupProvider: overrides?.cnpjLookupProvider,
     commercialProjectionService: overrides?.commercialProjectionService,
+    audit: overrides?.audit ?? vi.fn(async () => {}),
   });
 }
 
@@ -163,12 +166,17 @@ function bearerToken(
   permission?: number,
   integracao = 1,
   pessoal?: number,
+  marketing?: number,
 ): string {
   return jwt.sign(
     {
       user_id: "user-test-1",
       organization_id: organizationId,
-      modules: { integracao, ...(pessoal !== undefined ? { pessoal } : {}) },
+      modules: {
+        integracao,
+        ...(pessoal !== undefined ? { pessoal } : {}),
+        ...(marketing !== undefined ? { marketing } : {}),
+      },
       ...(permission !== undefined ? { permission } : {}),
     },
     TEST_JWT_SECRET,
@@ -353,6 +361,81 @@ describe("client-service", () => {
       profile: "with",
       search: undefined,
     });
+  });
+
+  it("GET /client/instagram-profiles/report allows Marketing viewers without Integration access", async () => {
+    const report = {
+      items: [{ id: TEST_CLIENT_ID, name: "Cliente A", status: "Ativo", instagram: "@cliente" }],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      hasMore: false,
+    };
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      listInstagramProfiles: vi.fn().mockResolvedValue(report),
+    };
+
+    const response = await request(buildTestApp(mock))
+      .get("/client/instagram-profiles/report")
+      .set("Authorization", `Bearer ${bearerToken(TEST_ORG_ID, undefined, 0, undefined, 1)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(report);
+    expect(mock.listInstagramProfiles).toHaveBeenCalledWith(TEST_ORG_ID, {
+      page: 1,
+      pageSize: 20,
+      profile: "all",
+      search: undefined,
+    });
+  });
+
+  it("PATCH /client/:id/integration lets Marketing editors update only Instagram", async () => {
+    const update = vi
+      .fn()
+      .mockResolvedValue({ id: TEST_CLIENT_ID, name: "Cliente A", instagram: "@acme" });
+    const client = {
+      findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID, type: "PJ", cpf_cnpj: "123" }),
+      update,
+    };
+    const prisma = {
+      client,
+      $transaction: vi.fn((run: (tx: unknown) => unknown) => run({ client })),
+    } as unknown as PrismaClient;
+    const audit = vi.fn(async () => {});
+    const response = await request(buildTestApp({ ...mockServiceBase() }, { prisma, audit }))
+      .patch(`/client/${TEST_CLIENT_ID}/integration`)
+      .set("Authorization", `Bearer ${bearerToken(TEST_ORG_ID, undefined, 0, undefined, 2)}`)
+      .send({ instagram: "@acme" });
+
+    expect(response.status).toBe(200);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: TEST_CLIENT_ID }, data: { instagram: "@acme" } }),
+    );
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: TEST_ORG_ID,
+        referringId: TEST_CLIENT_ID,
+        changes: { instagram: { from: null, to: "@acme" } },
+      }),
+    );
+  });
+
+  it("PATCH /client/:id/integration denies Marketing editors changes beyond Instagram", async () => {
+    const update = vi.fn();
+    const prisma = {
+      client: {
+        findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID, type: "PJ", cpf_cnpj: "123" }),
+        update,
+      },
+    } as unknown as PrismaClient;
+    const response = await request(buildTestApp({ ...mockServiceBase() }, { prisma }))
+      .patch(`/client/${TEST_CLIENT_ID}/integration`)
+      .set("Authorization", `Bearer ${bearerToken(TEST_ORG_ID, undefined, 0, undefined, 2)}`)
+      .send({ instagram: "@acme", email: "contato@acme.com" });
+
+    expect(response.status).toBe(403);
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("GET /client/instagram-profiles/report rejects client-selected organization scope", async () => {

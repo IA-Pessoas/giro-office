@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   BarChart3,
   Boxes,
+  CalendarDays,
   CheckSquare,
   ClipboardList,
   KeyRound,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { DepartmentAgendaSection } from "@modules/contabil";
 
 import { PESSOAL_TABS } from "../services/pessoalService.contract";
 import type { PessoalClientOption, PessoalTabId } from "../types";
@@ -34,6 +36,7 @@ const tabIcons = {
   obligations: CheckSquare,
   tracking: ClipboardList,
   passwords: KeyRound,
+  agenda: CalendarDays,
 } satisfies Record<PessoalTabId, typeof BarChart3>;
 
 export function PessoalShell() {
@@ -116,20 +119,29 @@ export function PessoalShell() {
       ) : activeTab === "unions" ? (
         <PessoalUnionsSection canEdit={access.canEdit} />
       ) : activeTab === "payroll" ? (
-        <PessoalPayrollSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
+        <PessoalPayrollSection
+          selectedClientId={selectedClientId}
+          selectedClient={selectedClient}
+          canEdit={access.canEdit}
+        />
       ) : activeTab === "obligations" ? (
         <PessoalObligationsSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
       ) : activeTab === "tracking" ? (
-        <PessoalTrackingSection selectedClientId={selectedClientId} canEdit={access.canEdit} />
+        <PessoalTrackingSection
+          selectedClientId={selectedClientId}
+          selectedClient={selectedClient}
+          canEdit={access.canEdit}
+        />
       ) : activeTab === "passwords" ? (
         <PessoalPasswordsSection
           key={selectedClientId}
           selectedClientId={selectedClientId}
           canEdit={access.canEdit}
         />
-      ) : (
-        null
-      )}
+      ) : activeTab === "agenda" ? (
+        // Recorte do departamento na agenda compartilhada; o Pessoal não tem agenda própria.
+        <DepartmentAgendaSection module="pessoal" canEdit={access.canEdit} assignable />
+      ) : null}
     </div>
   );
 }

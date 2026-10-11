@@ -14,6 +14,9 @@ edições, com dados isolados por organização.
 - `MTK_ENCRYPTION_KEY` para compatibilidade criptográfica com as credenciais legadas do Office
   (chave base64 de 32 bytes; usar a mesma chave configurada no serviço legado).
 - `SERVICE_ALLOWED_ORIGINS` e `ENABLE_API_DOCS` para CORS e documentação.
+- `AUDIT_ENABLED`, `AUDIT_SERVICE_URL` e `AUDIT_SERVICE_TOKEN` para a trilha exigida de eventos,
+  edições e avaliações: sem auditoria, essas alterações respondem 503 e não são salvas. No Worker,
+  o envio usa o binding `AUDIT_SERVICE` e o secret `AUDIT_SERVICE_TOKEN`.
 
 ## Gateway
 

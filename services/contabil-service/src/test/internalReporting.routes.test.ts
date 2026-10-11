@@ -87,24 +87,56 @@ describe("internal reporting routes", () => {
       .expect(200);
 
     expect(response.body.data.sources[0].key).toBe("contabil.control");
-    expect(
-      response.body.data.sources[0].fields.map((field: { key: string }) => field.key),
-    ).not.toEqual(expect.arrayContaining(["client_id", "id", "notes"]));
+    const controlFields: string[] = response.body.data.sources[0].fields.map(
+      (field: { key: string }) => field.key,
+    );
+    expect(controlFields).toEqual(
+      expect.arrayContaining(["competence", "completion_percent", "monthly_closing", "notes"]),
+    );
+    for (const internal of ["client_id", "id", "organization_id", "archived_at"]) {
+      expect(controlFields).not.toContain(internal);
+    }
 
     const relationship = response.body.data.sources.find(
       (source: { key: string }) => source.key === "contabil.relationship",
     );
     expect(relationship.fields.map((field: { key: string }) => field.key)).toEqual([
       "bidding",
+      "bidding_status",
       "chart_accounts",
       "tool",
       "system",
+      "note",
+      "segment",
+      "responsible_name",
+      "posted_by_name",
+      "name",
+      "company_name",
+      "cpf_cnpj",
+      "status",
+      "regime",
+      "competence_entry",
+      "deletion_date",
+      "contabil",
+      "fiscal",
+      "customer_with_movement",
     ]);
     expect(relationship.keys.map((field: { key: string }) => field.key)).toEqual(["client_id"]);
     const responsibles = response.body.data.sources.find(
       (source: { key: string }) => source.key === "contabil.responsibles",
     );
     expect(responsibles.fields.map((field: { key: string }) => field.key)).toEqual([
+      "responsible_name",
+      "posted_by_name",
+      "name",
+      "company_name",
+      "cpf_cnpj",
+      "status",
+      "regime",
+      "competence_entry",
+      "deletion_date",
+      "contabil",
+      "fiscal",
       "customer_with_movement",
     ]);
     expect(responsibles.keys.map((field: { key: string }) => field.key)).toEqual([

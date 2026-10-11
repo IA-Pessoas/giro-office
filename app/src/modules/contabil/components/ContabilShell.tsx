@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   Calculator,
+  CalendarDays,
   CheckSquare,
   FileText,
   ReceiptText,
@@ -10,7 +11,9 @@ import {
 } from "lucide-react";
 
 import { useContabilControlPortfolio } from "../hooks";
+import { DepartmentAgendaSection } from "./DepartmentAgendaSection";
 import { ContabilControlSection } from "./ContabilControlSection";
+import { ContabilContingencySection } from "./ContabilContingencySection";
 import { CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilPortfolioSection } from "./ContabilPortfolioSection";
@@ -19,8 +22,16 @@ import { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 import { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { TriageDocumentsSection } from "./TriageDocumentsSection";
+import { ContabilNoahSection } from "./ContabilNoahSection";
 
-type ContabilTabId = "control" | "responsible" | "relationship" | "documents";
+type ContabilTabId =
+  | "control"
+  | "responsible"
+  | "relationship"
+  | "documents"
+  | "noah"
+  | "contingency"
+  | "agenda";
 
 interface ContabilShellProps {
   clientId?: string;
@@ -62,6 +73,9 @@ export function ContabilShell({
       icon: Waypoints,
     },
     { id: "documents", label: "Documentos", icon: FileText },
+    { id: "noah", label: "Noah", icon: FileText },
+    { id: "contingency", label: "Contingência", icon: Calculator },
+    { id: "agenda", label: "Agenda", icon: CalendarDays },
   ];
 
   return (
@@ -124,6 +138,7 @@ export function ContabilShell({
         <ContabilActiveTabPanel
           activeTab={activeTab}
           clientId={clientId}
+          clientName={clientName}
           canEdit={canEdit}
           pickedClientId={pickedClientId}
           onPickClient={setPickedClientId}
@@ -175,16 +190,33 @@ function ContabilClientSelect({
 function ContabilActiveTabPanel({
   activeTab,
   clientId,
+  clientName,
   canEdit,
   pickedClientId,
   onPickClient,
 }: {
   activeTab: ContabilTabId;
   clientId?: string;
+  clientName?: string;
   canEdit: boolean;
   pickedClientId: string;
   onPickClient: (clientId: string) => void;
 }) {
+  if (activeTab === "noah") {
+    return (
+      <div role="tabpanel" id="contabil-panel-noah" aria-labelledby="contabil-tab-noah">
+        <ContabilNoahSection canEdit={canEdit} />
+      </div>
+    );
+  }
+  // A agenda é do departamento, não de uma empresa.
+  if (activeTab === "agenda") {
+    return (
+      <div role="tabpanel" id="contabil-panel-agenda" aria-labelledby="contabil-tab-agenda">
+        <DepartmentAgendaSection module="contabil" canEdit={canEdit} />
+      </div>
+    );
+  }
   if (!clientId) {
     if (activeTab === "control") {
       return (
@@ -215,14 +247,26 @@ function ContabilActiveTabPanel({
         <div className="space-y-4">
           <ContabilClientSelect value={pickedClientId} onChange={onPickClient} />
           {pickedClientId ? (
-            activeTab === "documents" ? (
-              <TriageDocumentsSection clientId={pickedClientId} canEdit={canEdit} canEditClosing={canEdit} />
+            activeTab === "contingency" ? (
+              <ContabilContingencySection clientId={pickedClientId} canEdit={canEdit} />
+            ) : activeTab === "documents" ? (
+              <TriageDocumentsSection
+                clientId={pickedClientId}
+                canEdit={canEdit}
+                canEditClosing={canEdit}
+              />
             ) : (
               <ContabilRelationshipSection clientId={pickedClientId} canEdit={canEdit} />
             )
           ) : (
             <ContabilStateBox icon={Calculator} title="Selecione uma empresa para começar">
-              Escolha a empresa acima para abrir o {activeTab === "documents" ? "controle de documentos" : "relacionamento contábil"}.
+              Escolha a empresa acima para abrir{" "}
+              {activeTab === "contingency"
+                ? "a simulação de Contingência"
+                : activeTab === "documents"
+                  ? "o controle de documentos"
+                  : "o relacionamento contábil"}
+              .
             </ContabilStateBox>
           )}
         </div>
@@ -233,7 +277,7 @@ function ContabilActiveTabPanel({
   if (activeTab === "control") {
     return (
       <div role="tabpanel" id="contabil-panel-control" aria-labelledby="contabil-tab-control">
-        <ContabilControlSection clientId={clientId} canEdit={canEdit} />
+        <ContabilControlSection clientId={clientId} clientName={clientName} canEdit={canEdit} />
       </div>
     );
   }
@@ -251,7 +295,23 @@ function ContabilActiveTabPanel({
   }
 
   if (activeTab === "documents") {
-    return <div role="tabpanel" id="contabil-panel-documents" aria-labelledby="contabil-tab-documents"><TriageDocumentsSection clientId={clientId} canEdit={canEdit} canEditClosing={canEdit} /></div>;
+    return (
+      <div role="tabpanel" id="contabil-panel-documents" aria-labelledby="contabil-tab-documents">
+        <TriageDocumentsSection clientId={clientId} canEdit={canEdit} canEditClosing={canEdit} />
+      </div>
+    );
+  }
+
+  if (activeTab === "contingency") {
+    return (
+      <div
+        role="tabpanel"
+        id="contabil-panel-contingency"
+        aria-labelledby="contabil-tab-contingency"
+      >
+        <ContabilContingencySection clientId={clientId} canEdit={canEdit} />
+      </div>
+    );
   }
 
   return (
@@ -260,7 +320,7 @@ function ContabilActiveTabPanel({
       id="contabil-panel-relationship"
       aria-labelledby="contabil-tab-relationship"
     >
-      <ContabilRelationshipSection clientId={clientId} canEdit={canEdit} />
+      <ContabilRelationshipSection clientId={clientId} clientName={clientName} canEdit={canEdit} />
     </div>
   );
 }

@@ -69,12 +69,7 @@ export function createClientGroupsRouter(deps: ClientRouterDeps) {
         const params = parseWithZod(clientGroupParamsSchema, request.params);
         const body = parseWithZod(updateClientGroupBodySchema, request.body);
         const organizationId = resolveOrganizationId(request, undefined);
-        const group = await service.update(
-          params.id,
-          organizationId,
-          body.name,
-          authorization(request),
-        );
+        const group = await service.update(params.id, organizationId, body, authorization(request));
         response.json(createSuccessResponse(group));
       } catch (err) {
         logError("Erro ao atualizar grupo de clientes", { err });

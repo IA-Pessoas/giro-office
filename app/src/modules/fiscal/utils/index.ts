@@ -1,4 +1,14 @@
 export { downloadFile } from "./downloadFile";
+export {
+  FISCAL_CONTROL_STATUS_LABELS,
+  fiscalControlStatusChange,
+  fiscalObligationActions,
+  formatTriagePending,
+  formatAnnualDeclaration,
+  formatTransferResult,
+  matchesResponsible,
+  todayInputDate,
+} from "./fiscalControl";
 export { getFiscalErrorMessage } from "./fiscalError";
 export { formatFiscalDateLabel, toFiscalInputDate, toFiscalIsoDate } from "./fiscalDate";
 export {
@@ -15,3 +25,15 @@ export {
   parseBatchDocuments,
   toRevenueAmount,
 } from "./fiscalRevenue";
+export { parseNoteRequests } from "./xmlSelection";
+export { formatMoney } from "./formatMoney";
+export {
+  buildAnticipationItemChanges,
+  FISCAL_ANTICIPATION_CLASSIFICATION_LABELS,
+  FISCAL_ANTICIPATION_FIELD_LABELS,
+  FISCAL_ANTICIPATION_ISSUE_LABELS,
+  FISCAL_ANTICIPATION_STATUS_LABELS,
+  formatAnticipationHistoryField,
+  formatAnticipationHistoryValue,
+  formatAnticipationSummary,
+} from "./fiscalAnticipation";

@@ -12,8 +12,59 @@ export function fiscalRevenuesQueryKey(clientId: string) {
   return [...FISCAL_QUERY_KEY, "revenues", clientId] as const;
 }
 
+/** Prefixo das carteiras de controle; invalidá-lo atualiza as pendências de todas. */
+export const FISCAL_MONTHLY_CONTROLS_QUERY_KEY = [...FISCAL_QUERY_KEY, "monthly-controls"] as const;
+
+export function fiscalMonthlyControlsQueryKey(competence: string) {
+  return [...FISCAL_MONTHLY_CONTROLS_QUERY_KEY, competence] as const;
+}
+
+/** Sob o prefixo das carteiras: transferências também atualizam o relatório. */
+export function fiscalResponsibleReportQueryKey(basis: string, competence: string, responsibleId: string) {
+  return [...FISCAL_MONTHLY_CONTROLS_QUERY_KEY, "responsibles-report", basis, competence, responsibleId] as const;
+}
+
+export const FISCAL_RESPONSIBLES_QUERY_KEY = [...FISCAL_QUERY_KEY, "responsibles"] as const;
+
+/** Prefixo das carteiras anuais; invalidá-lo atualiza o andamento de todas. */
+export const FISCAL_ANNUAL_CONTROLS_QUERY_KEY = [...FISCAL_QUERY_KEY, "annual-controls"] as const;
+
+export function fiscalAnnualControlsQueryKey(year: number) {
+  return [...FISCAL_ANNUAL_CONTROLS_QUERY_KEY, year] as const;
+}
+
+export function fiscalAnnualItemsQueryKey(controlId: string) {
+  return [...FISCAL_QUERY_KEY, "annual-items", controlId] as const;
+}
+
+export function fiscalControlTriageQueryKey(controlId: string) {
+  return [...FISCAL_QUERY_KEY, "monthly-control-triage", controlId] as const;
+}
+
+export function fiscalMonthlyObligationsQueryKey(controlId: string) {
+  return [...FISCAL_QUERY_KEY, "monthly-obligations", controlId] as const;
+}
+
 export function fiscalSimplesPreviewQueryKey(clientId: string, competence: string) {
   return [...fiscalRevenuesQueryKey(clientId), "simples-preview", competence] as const;
+}
+
+/** Lotes de antecipações do cliente; invalidá-lo também atualiza o detalhe aberto. */
+export function fiscalAnticipationsQueryKey(clientId: string) {
+  return [...FISCAL_QUERY_KEY, "anticipations", clientId] as const;
+}
+
+/** Prefixo das malhas do cliente; invalidá-lo também atualiza o histórico aberto. */
+export function fiscalMalhasQueryKey(clientId: string) {
+  return [...FISCAL_QUERY_KEY, "malhas", clientId] as const;
+}
+
+export function fiscalMalhaDetailQueryKey(clientId: string, malhaId: string) {
+  return [...fiscalMalhasQueryKey(clientId), "detail", malhaId] as const;
+}
+
+export function fiscalWholesaleQueryKey(clientId: string) {
+  return [...FISCAL_QUERY_KEY, "wholesale", clientId] as const;
 }
 
 export function fiscalNcmSearchQueryKey(ncmCode: string) {

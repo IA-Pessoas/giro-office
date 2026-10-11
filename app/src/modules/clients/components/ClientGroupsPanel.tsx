@@ -1,10 +1,18 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useMemo, useState } from "react";
 
 import { clientService } from "../services/clientService";
 import type { ClientGroup } from "../types";
-import { useClients } from "../hooks/useClients";
-import { clientTextFieldClassName } from "../form/clientFormControls";
+import { CLIENT_GROUPS_QUERY_KEY, useClientGroups, useClients } from "../hooks/useClients";
+import { ClientNativeSelect } from "../form/ClientNativeSelect";
+import {
+  clientPrimaryButtonClassName,
+  clientSecondaryButtonClassName,
+  clientTextFieldClassName,
+} from "../form/clientFormControls";
+import { ClientListState, clientListClassName } from "./ClientListState";
+
+const secondaryButtonClassName = `${clientSecondaryButtonClassName} px-4 py-2.5 text-sm`;
 
 interface ClientGroupsPanelProps {
   canEdit: boolean;
@@ -12,8 +20,12 @@ interface ClientGroupsPanelProps {
 
 export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
   const queryClient = useQueryClient();
-  const groupsQuery = useQuery({ queryKey: ["client-groups"], queryFn: clientService.listGroups });
-  const groups = groupsQuery.data ?? [];
+  const groupsQuery = useClientGroups();
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const allGroups = groupsQuery.data ?? [];
+  const groups = allGroups.filter(
+    (group) => statusFilter === "all" || group.status === (statusFilter === "active"),
+  );
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
@@ -29,7 +41,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
     limit: 100,
     legacyIntegrationStatusFilter: false,
   });
-  const selectedGroup = groups.find((group) => group.id === selectedGroupId);
+  const selectedGroup = allGroups.find((group) => group.id === selectedGroupId);
   const selectedMemberSet = useMemo(() => new Set(selectedClientIds), [selectedClientIds]);
 
   function selectGroup(group: ClientGroup) {
@@ -47,7 +59,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
       const group = await clientService.createGroup(newGroupName.trim());
       selectGroup(group);
       setNewGroupName("");
-      await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
+      await queryClient.invalidateQueries({ queryKey: CLIENT_GROUPS_QUERY_KEY });
     } catch {
       setError("Não foi possível criar o grupo. Confira o nome e tente novamente.");
     } finally {
@@ -60,10 +72,24 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
     setIsSaving(true);
     setError("");
     try {
-      await clientService.updateGroup(selectedGroup.id, groupName.trim());
-      await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
+      await clientService.updateGroup(selectedGroup.id, { name: groupName.trim() });
+      await queryClient.invalidateQueries({ queryKey: CLIENT_GROUPS_QUERY_KEY });
     } catch {
       setError("Não foi possível renomear o grupo. Confira o nome e tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function toggleStatus() {
+    if (!canEdit || !selectedGroup) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      await clientService.updateGroup(selectedGroup.id, { status: !selectedGroup.status });
+      await queryClient.invalidateQueries({ queryKey: CLIENT_GROUPS_QUERY_KEY });
+    } catch {
+      setError("Não foi possível alterar o status do grupo. Tente novamente.");
     } finally {
       setIsSaving(false);
     }
@@ -75,7 +101,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
     setError("");
     try {
       await clientService.replaceGroupClients(selectedGroup.id, selectedClientIds);
-      await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
+      await queryClient.invalidateQueries({ queryKey: CLIENT_GROUPS_QUERY_KEY });
     } catch {
       setError("Não foi possível salvar as empresas do grupo. Atualize a lista e tente novamente.");
     } finally {
@@ -114,7 +140,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
           <button
             type="submit"
             disabled={isSaving || !newGroupName.trim()}
-            className="self-end rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`self-end ${clientPrimaryButtonClassName}`}
           >
             Criar grupo
           </button>
@@ -132,25 +158,28 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.2fr)]">
         <div>
-          <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Grupos cadastrados
-          </h3>
-          {groupsQuery.isLoading ? (
-            <p
-              role="status"
-              className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-slate-950/40 dark:text-slate-400"
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Grupos cadastrados
+            </h3>
+            <ClientNativeSelect
+              aria-label="Filtrar grupos por status"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
             >
-              Carregando grupos…
-            </p>
-          ) : groupsQuery.error ? (
-            <p
-              role="alert"
-              className="rounded-xl bg-rose-50 px-3 py-4 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
-            >
-              Não foi possível carregar os grupos. Tente novamente.
-            </p>
-          ) : groups.length ? (
-            <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+              <option value="all">Todos</option>
+              <option value="active">Ativos</option>
+              <option value="inactive">Inativos</option>
+            </ClientNativeSelect>
+          </div>
+          <ClientListState
+            query={groupsQuery}
+            isEmpty={!groups.length}
+            loading="Carregando grupos…"
+            error="Não foi possível carregar os grupos. Tente novamente."
+            empty="Nenhum grupo cadastrado. Crie um grupo para começar."
+          >
+            <ul className={clientListClassName}>
               {groups.map((group) => (
                 <li key={group.id}>
                   <button
@@ -159,7 +188,14 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                     aria-pressed={selectedGroupId === group.id}
                     className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${selectedGroupId === group.id ? "bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100" : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"}`}
                   >
-                    <span className="font-medium">{group.name}</span>
+                    <span className="font-medium">
+                      {group.name}
+                      {group.status ? null : (
+                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          Inativo
+                        </span>
+                      )}
+                    </span>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
                       {group.clients.length} {group.clients.length === 1 ? "empresa" : "empresas"}
                     </span>
@@ -167,11 +203,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-400">
-              Nenhum grupo cadastrado. Crie um grupo para começar.
-            </p>
-          )}
+          </ClientListState>
         </div>
 
         <div>
@@ -195,9 +227,19 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                     disabled={
                       isSaving || !groupName.trim() || groupName.trim() === selectedGroup.name
                     }
-                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className={secondaryButtonClassName}
                   >
                     Salvar nome
+                  </button>
+                ) : null}
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => void toggleStatus()}
+                    disabled={isSaving}
+                    className={secondaryButtonClassName}
+                  >
+                    {selectedGroup.status ? "Inativar grupo" : "Reativar grupo"}
                   </button>
                 ) : null}
               </div>
@@ -299,7 +341,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                   type="button"
                   onClick={() => void saveClients()}
                   disabled={isSaving}
-                  className="rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={clientPrimaryButtonClassName}
                 >
                   {isSaving ? "Salvando…" : "Substituir clientes do grupo"}
                 </button>

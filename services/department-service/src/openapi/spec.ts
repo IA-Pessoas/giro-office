@@ -126,6 +126,12 @@ export function buildDepartmentServiceOpenApiSpec(env: DepartmentServiceEnv): Op
               description: "Use true para a consulta administrativa de departamentos.",
               schema: { type: "string", enum: ["true"] },
             },
+            {
+              name: "marketing",
+              in: "query",
+              description: "Use true para consultar departamentos no contexto Marketing.",
+              schema: { type: "string", enum: ["true"] },
+            },
           ],
           responses: { "200": { description: "Lista", ...successJson } },
         },

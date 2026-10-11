@@ -105,6 +105,107 @@ describe("user routes", () => {
     });
   });
 
+  it("GET /user libera ao Marketing somente a projeção de perfil da organização", async () => {
+    userServiceMock.listMarketingProfiles.mockResolvedValue({
+      users: [
+        {
+          id: "user-1",
+          name: "Ana",
+          status: "active",
+          photo_url: "users/user-1/a.png",
+          department: { name: "Fiscal" },
+        },
+      ],
+      total: 1,
+      skip: 0,
+      take: 20,
+    });
+    storageServiceMock.readUserPhoto.mockReturnValue("https://cdn.test/a.png");
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/user")
+      .set(gatewayAuthHeaders({ permission: 0, type: "user", modules: { marketing: 1 } }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.users[0]).toEqual({
+      id: "user-1",
+      name: "Ana",
+      status: "active",
+      photo_url: "https://cdn.test/a.png",
+      department: { name: "Fiscal" },
+    });
+    expect(userServiceMock.listMarketingProfiles).toHaveBeenCalledWith({
+      skip: 0,
+      take: 20,
+      organizationId: "a0000000-0000-4000-8000-000000000001",
+    });
+    expect(userServiceMock.list).not.toHaveBeenCalled();
+  });
+
+  it("Marketing viewer pode consultar foto sem abrir detalhe administrativo", async () => {
+    userServiceMock.getById.mockResolvedValue({ id: "user-3", photo_url: "users/user-3/a.png" });
+    storageServiceMock.readUserPhoto.mockReturnValue("https://cdn.test/a.png");
+    const app = createTestApp();
+    const headers = gatewayAuthHeaders({ permission: 0, type: "user", modules: { marketing: 1 } });
+
+    const photo = await request(app).get("/user/user-3/photo").set(headers);
+    const detail = await request(app).get("/user/user-3").set(headers);
+
+    expect(photo.status).toBe(200);
+    expect(detail.status).toBe(403);
+  });
+
+  it("Marketing editor altera somente a foto de usuário da organização", async () => {
+    userServiceMock.getById.mockResolvedValue({ id: "user-3", organization_id: "org" });
+    storageServiceMock.uploadUserPhoto.mockResolvedValue("https://cdn.test/a.png");
+    userServiceMock.update.mockResolvedValue({ id: "user-3", photo_url: "https://cdn.test/a.png" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user/user-3/photo")
+      .set(gatewayAuthHeaders({ permission: 0, type: "user", modules: { marketing: 2 } }));
+
+    expect(res.status).toBe(200);
+    expect(userServiceMock.getById).toHaveBeenCalledWith(
+      "user-3",
+      "a0000000-0000-4000-8000-000000000001",
+    );
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-3",
+      { photo_url: "https://cdn.test/a.png" },
+      "a0000000-0000-4000-8000-000000000001",
+      "c0000000-0000-4000-8000-000000000001",
+      "UPDATE_PHOTO",
+    );
+  });
+
+  it("Marketing editor não envia foto quando o usuário está fora da organização", async () => {
+    userServiceMock.getById.mockRejectedValue(new ServiceError(404, "Usuário não encontrado."));
+    const app = createTestApp();
+
+    const res = await request(app)
+      .post("/user/user-3/photo")
+      .set(gatewayAuthHeaders({ permission: 0, type: "user", modules: { marketing: 2 } }));
+
+    expect(res.status).toBe(404);
+    expect(storageServiceMock.uploadUserPhoto).not.toHaveBeenCalled();
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("Marketing level 1 cannot upload or delete photos", async () => {
+    const app = createTestApp();
+    const headers = gatewayAuthHeaders({ permission: 0, type: "user", modules: { marketing: 1 } });
+
+    const upload = await request(app).post("/user/user-3/photo").set(headers);
+    const deletion = await request(app).delete("/user/user-3/photo").set(headers);
+
+    expect(upload.status).toBe(403);
+    expect(deletion.status).toBe(403);
+    expect(storageServiceMock.uploadUserPhoto).not.toHaveBeenCalled();
+    expect(storageServiceMock.deleteUserPhoto).not.toHaveBeenCalled();
+  });
+
   it("GET /user bloqueia admin de outro modulo", async () => {
     const app = createTestApp();
 

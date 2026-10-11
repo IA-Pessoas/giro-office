@@ -80,7 +80,7 @@ describe("department routes", () => {
     expect(res.body.data?.status).toBe("ok");
   });
 
-  it("documenta o filtro administrativo uma única vez no OpenAPI", () => {
+  it("documenta os filtros administrativo e Marketing uma única vez no OpenAPI", () => {
     const spec = buildDepartmentServiceOpenApiSpec(getDepartmentServiceEnv());
     const route = spec.paths["/department/list"] as {
       get?: { parameters?: Array<{ name?: string }> };
@@ -88,6 +88,9 @@ describe("department routes", () => {
 
     expect(
       route.get?.parameters?.filter((parameter) => parameter.name === "administrative"),
+    ).toHaveLength(1);
+    expect(
+      route.get?.parameters?.filter((parameter) => parameter.name === "marketing"),
     ).toHaveLength(1);
   });
 
@@ -112,6 +115,43 @@ describe("department routes", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: [{ id: "dep-1" }] });
     expect(departmentServiceMock.list).toHaveBeenCalledWith("Ativo", ORGANIZATION_ID);
+  });
+
+  it("GET /department/list no contexto Marketing exige nível 1 e mantém o escopo da organização", async () => {
+    departmentServiceMock.list = vi.fn(async () => [{ id: "dep-1" }]);
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .get("/department/list")
+      .set(gatewayHeaders({ marketing: 1 }))
+      .query({ marketing: "true" });
+
+    expect(res.status).toBe(200);
+    expect(departmentServiceMock.list).toHaveBeenCalledWith(undefined, ORGANIZATION_ID);
+  });
+
+  it("GET /department/list no contexto Marketing recusa nível 0", async () => {
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .get("/department/list")
+      .set(gatewayHeaders({ marketing: 0 }))
+      .query({ marketing: "true" });
+
+    expect(res.status).toBe(403);
+    expect(departmentServiceMock.list).not.toHaveBeenCalled();
+  });
+
+  it("GET /department/list recusa a combinação dos contextos administrativo e Marketing", async () => {
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .get("/department/list")
+      .set(gatewayHeaders({ marketing: 3, ti: 3 }))
+      .query({ administrative: "true", marketing: "true" });
+
+    expect(res.status).toBe(400);
+    expect(departmentServiceMock.list).not.toHaveBeenCalled();
   });
 
   it("GET /department/list permite consultas operacionais autenticadas", async () => {
@@ -258,6 +298,43 @@ describe("department routes", () => {
       .send({ dep_id: "dep-1", color: "#0F766E" });
 
     expect(res.status).toBe(403);
+    expect(departmentServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PUT /department permite ao Marketing nível 3 alterar somente a cor", async () => {
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .put("/department")
+      .set(gatewayHeaders({ marketing: 3 }))
+      .send({ dep_id: "dep-1", color: "#0F766E" });
+
+    expect(res.status).toBe(200);
+    expect(departmentServiceMock.update).toHaveBeenCalledWith({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      dep_id: "dep-1",
+      name: undefined,
+      color: "#0F766E",
+      status: undefined,
+      solution: undefined,
+    });
+  });
+
+  it("PUT /department recusa Marketing nível 2 e dados além da cor no nível 3", async () => {
+    const app = createTestApp(departmentServiceMock);
+
+    const editor = await request(app)
+      .put("/department")
+      .set(gatewayHeaders({ marketing: 2 }))
+      .send({ dep_id: "dep-1", color: "#0F766E" });
+    const extraFields = await request(app)
+      .put("/department")
+      .set(gatewayHeaders({ marketing: 3 }))
+      .send({ dep_id: "dep-1", color: "#0F766E", name: "Outro nome" });
+
+    expect(editor.status).toBe(403);
+    expect(extraFields.status).toBe(403);
     expect(departmentServiceMock.update).not.toHaveBeenCalled();
   });
 });

@@ -344,3 +344,408 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   assert.match(batch, /nenhum arquivo gerado/);
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
+
+await runTest("fiscal anticipations summary shows imported items and what stayed outside", async () => {
+  const { formatAnticipationSummary } = await import("./utils/fiscalAnticipation.ts");
+  assert.equal(
+    formatAnticipationSummary({ entry_count: 2, note_count: 1, item_count: 3, issues: [] }),
+    "3 item(ns) de 1 nota(s), 2 arquivo(s) no ZIP",
+  );
+  assert.equal(
+    formatAnticipationSummary({
+      entry_count: 4,
+      note_count: 1,
+      item_count: 1,
+      issues: [{ kind: "duplicate" }, { kind: "duplicate" }, { kind: "error" }],
+    }),
+    "1 item(ns) de 1 nota(s), 4 arquivo(s) no ZIP; fora do lote: 2 duplicata(s), 1 erro(s)",
+  );
+});
+
+await runTest("fiscal anticipation review sends only changed fields and labels history", async () => {
+  const {
+    buildAnticipationItemChanges,
+    formatAnticipationHistoryField,
+    formatAnticipationHistoryValue,
+  } = await import("./utils/fiscalAnticipation.ts");
+  const item = { classification: "total", manual_value: "7.50", corrections: { cfop: "6403" } };
+  assert.equal(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7.50",
+      corrections: { cfop: "6403", ncm: "" },
+    }),
+    null,
+  );
+  assert.deepEqual(
+    buildAnticipationItemChanges(item, {
+      classification: "freight",
+      manual_value: "",
+      corrections: { cfop: "", value: "9,90" },
+    }),
+    { classification: "freight", manual_value: null, corrections: { cfop: null, value: "9.90" } },
+  );
+  assert.equal(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7,5",
+      corrections: { cfop: "6403", value: "1.234,5", quantity: "2,500" },
+    })?.corrections?.value,
+    "1234.50",
+  );
+  assert.deepEqual(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7,5",
+      corrections: { cfop: "6403", quantity: "2,500" },
+    }),
+    { corrections: { quantity: "2.5" } },
+  );
+  assert.equal(formatAnticipationHistoryField("correction.icms_st"), "Correção de ICMS ST");
+  assert.equal(formatAnticipationHistoryValue("status", "awaiting_check", () => undefined), "Aguardando conferência");
+  assert.equal(formatAnticipationHistoryValue("reviewer_id", "u1", () => "Ana"), "Ana");
+});
+
+await runTest("fiscal malhas formats dates, periods and history values", async () => {
+  const { formatMalhaDate, formatMalhaHistoryValue, formatMalhaPeriod } = await import(
+    "./utils/fiscalMalha.ts"
+  );
+  assert.equal(formatMalhaDate("2026-11-10"), "10/11/2026");
+  assert.equal(formatMalhaDate(null), "Sem prazo");
+  assert.equal(formatMalhaPeriod("2025-01", "2025-12"), "01/2025 a 12/2025");
+  assert.equal(formatMalhaPeriod("2025-03", "2025-03"), "03/2025");
+  const names = (id) => (id === "u1" ? "Ana" : undefined);
+  assert.equal(formatMalhaHistoryValue("status", "aguardando_cliente", names), "Aguardando cliente");
+  assert.equal(formatMalhaHistoryValue("responsible_id", "u1", names), "Ana");
+  assert.equal(formatMalhaHistoryValue("responsible_id", "u2", names), "Usuário sem acesso atual");
+  assert.equal(formatMalhaHistoryValue("responsible_id", null, names), "Nenhum");
+  assert.equal(formatMalhaHistoryValue("deadline", null, names), "Sem prazo");
+});
+
+await runTest("fiscal malhas tab gates edits, keeps states and refreshes history", async () => {
+  const section = await readSource("./components/FiscalMalhasSection.tsx");
+  const client = await readSource("./services/fiscalMalhaService.ts");
+  const queryKeys = await readSource("./hooks/queryKeys.ts");
+  assert.match(fiscalSources.shell, /<FiscalMalhasSection canEdit=\{canEdit\} canTransfer=\{canDelete\} \/>/);
+  assert.match(section, /disabled=\{Boolean\(editing\?\.responsible_id\) && !canTransfer\}/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando malhas"/);
+  assert.match(section, /list\.error \? \(\s*<div role="alert">/);
+  assert.match(section, /Nenhuma malha encontrada/);
+  assert.match(section, /id="fiscal-malha-form-error" role="alert"/);
+  // Nível 1 consulta e vê histórico; formulário, edição e anexo só com edição Fiscal.
+  assert.match(section, /\{client && canEdit \? \(\s*<form/);
+  assert.match(section, /\{canEdit \? \(\s*<>\s*<button type="button" onClick=\{\(\) => startEditing\(item\)\}/);
+  assert.match(section, /useAssignableUsers\(\{ enabled: Boolean\(client\), module: "fiscal" \}\)/);
+  // Salvar ou anexar invalida o prefixo que também cobre o histórico aberto.
+  assert.match(queryKeys, /\[\.\.\.fiscalMalhasQueryKey\(clientId\), "detail", malhaId\]/);
+  assert.match(section, /invalidateQueries\(\{ queryKey: fiscalMalhasQueryKey\(clientId\) \}\)/);
+  assert.match(client, /form\.append\("file", file\)/);
+  assert.match(section, /window\.open\(await fiscalMalhaService\.attachmentUrl\(id\), "_blank", "noopener,noreferrer"\)/);
+});
+
+await runTest("fiscal wholesale tab shows current value and history, editing gated", async () => {
+  const section = await readSource("./components/FiscalWholesaleSection.tsx");
+  const client = await readSource("./services/fiscalWholesaleService.ts");
+  assert.match(fiscalSources.shell, /<FiscalWholesaleSection canEdit=\{canEdit\} \/>/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading"/);
+  assert.match(section, /state\.error \? \(\s*<div role="alert">/);
+  // Nível 1 vê valor atual e histórico; só edição Fiscal alterna a marcação.
+  assert.match(section, /\{canEdit \? \(\s*<button type="button" disabled=\{save\.isPending\}/);
+  assert.match(section, /\{wholesaleLabel\(entry\.previous_value\)\} → \{wholesaleLabel\(entry\.new_value\)\}/);
+  assert.match(section, /Não dispara nenhum cálculo/);
+  assert.match(client, /api\(\)\.put\(`\/fiscal\/clients\/\$\{clientId\}\/wholesale`, \{\s*is_wholesale: isWholesale,/);
+});
+
+await runTest("fiscal Domínio × SEFAZ conference reads files and shows partial results", async () => {
+  const { readSpreadsheetText } = await import("./utils/readSpreadsheetText.ts");
+  assert.equal(await readSpreadsheetText(new File(["Série;Número"], "a.csv")), "Série;Número");
+  // Exportação em Windows-1252: "é" é o byte 0xE9, inválido em UTF-8.
+  assert.equal(await readSpreadsheetText(new File([Uint8Array.of(0x53, 0xe9, 0x72)], "b.csv")), "Sér");
+
+  const section = await readSource("./components/FiscalConferencesSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /id: "conferences",\s*label: "Conferências"/);
+  assert.match(fiscalSources.shell, /<FiscalConferencesSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/documents", \{/);
+  // Viewer não executa; resultado parcial vira alerta, nunca "completo".
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /exige permissão de edição no Fiscal/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  // Arquivo acima do teto do gateway é barrado antes do envio.
+  assert.match(section, /const MAX_FILE_BYTES = 450_000;/);
+  assert.match(section, /size \?\? 0\) > MAX_FILE_BYTES/);
+  assert.match(section, /catch \(error\) \{\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
+});
+
+await runTest("fiscal XML selection parses requests, encodes the ZIP and shows ambiguous items", async () => {
+  const { parseNoteRequests } = await import("./utils/xmlSelection.ts");
+  const { fileToBase64 } = await import("../../shared/utils/fileToBase64.ts");
+  assert.deepEqual(parseNoteRequests(" 100\r\n\n11.222.333/0001-81;1;101, 2;7 \n"), [
+    "100",
+    "11.222.333/0001-81;1;101",
+    "2;7",
+  ]);
+  const bytes = Uint8Array.from({ length: 70_000 }, (_, index) => index % 256);
+  assert.equal(await fileToBase64(new Blob([bytes])), Buffer.from(bytes).toString("base64"));
+
+  const section = await readSource("./components/FiscalXmlSelectionSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalXmlSelectionSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/xml-selection", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Só oferece o ZIP quando o servidor selecionou algo; o relatório sempre pode ser baixado.
+  assert.match(section, /\{result\.zip_base64 \? \(/);
+  assert.match(section, /Baixar relatório CSV/);
+  assert.match(section, /const MAX_ZIP_BYTES = 650_000;/);
+});
+
+await runTest("fiscal SEFAZ × XML conference posts both files and separates situations", async () => {
+  const section = await readSource("./components/FiscalSefazXmlSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalSefazXmlSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/sefaz-xml", \{/);
+  assert.match(client, /zip_base64: zipBase64/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Chave usada visível por par; não comparável separado de ausência.
+  assert.match(section, /<th className="px-4 py-2">Chave usada<\/th>/);
+  assert.match(section, /"Não comparável"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  assert.match(section, /const MAX_ZIP_BYTES = 450_000;/);
+  // Ordem da tabela igual à do CSV exportado: Coincidente primeiro.
+  assert.match(section, /const SITUATIONS = \[\s*"Coincidente",/);
+  assert.match(section, /return \[\s*\.\.\.result\.matched\.map/);
+  assert.match(section, /Identidade: \{result\.identity_rule\}/);
+});
+
+await runTest("fiscal SPED × XML conference keeps items under their document", async () => {
+  const section = await readSource("./components/FiscalSpedXmlSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalSpedXmlSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/sped-xml", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Linha do documento seguida dos itens dele, na ordem do CSV.
+  assert.match(section, /list\.flatMap\(\(pair\) => \[\s*\{ level: "Documento"/);
+  assert.match(section, /\.\.\.pair\.items\.map\(\(item\) => \(\{ level: "Item"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  assert.match(section, /const MAX_SPED_BYTES = 300_000;/);
+});
+
+await runTest("fiscal IPI/ICMS ST totals show composition and excluded XML", async () => {
+  const section = await readSource("./components/FiscalXmlTaxesSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalXmlTaxesSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/xml-taxes", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Nota seguida dos itens que compõem o valor; excluídos visíveis, fora da soma.
+  assert.match(section, /result\.notes\.flatMap\(\(note\) => \[/);
+  assert.match(section, /result\.excluded\.map/);
+  assert.match(section, /Não é apuração de imposto/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
+
+await runTest("fiscal money formatting avoids floating point", async () => {
+  const { formatMoney } = await import("./utils/formatMoney.ts");
+  assert.equal(formatMoney("99999999999.99"), "R$ 99.999.999.999,99");
+  assert.equal(formatMoney("0.30"), "R$ 0,30");
+  assert.equal(formatMoney("-1234.5"), "-R$ 1.234,50");
+  assert.equal(formatMoney(null), "—");
+  assert.equal(formatMoney(null, "sem valor"), "sem valor");
+  for (const name of ["FiscalConferencesSection", "FiscalSefazXmlSection", "FiscalSpedXmlSection", "FiscalXmlTaxesSection"]) {
+    const source = await readSource(`./components/${name}.tsx`);
+    assert.doesNotMatch(source, /Intl\.NumberFormat/);
+    assert.match(source, /formatMoney\(value/);
+  }
+});
+
+await runTest("fiscal IPI spreadsheet conference shows each source and the difference", async () => {
+  const section = await readSource("./components/FiscalIpiSpreadsheetSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalIpiSpreadsheetSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/ipi-spreadsheets", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /Diferença \(2 − 1\)/);
+  assert.match(section, /formatMoney\(pair\.difference\)/);
+  assert.match(section, /IPI vazio aparece como erro, não como zero/);
+  assert.match(section, /result\.not_comparable\.map/);
+  assert.match(section, /uma linha por nota/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
+
+await runTest("fiscal invoice PDF totals show origin, ambiguous and unprocessed files", async () => {
+  const section = await readSource("./components/FiscalInvoicePdfSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalInvoicePdfSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/invoice-pdfs", \{ files: payload \}\)/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /Formato suportado: \{result\.supported_format\}/);
+  assert.match(section, /\{invoice\.origin\.page\}/);
+  assert.match(section, /invoice\.occurrences > 1/);
+  assert.match(section, /result\.not_processed\.map/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
+
+await runTest("fiscal control reopening needs level 3 and a reason", async () => {
+  const { fiscalControlStatusChange, FISCAL_CONTROL_STATUS_LABELS } = await import(
+    "./utils/fiscalControl.ts"
+  );
+  assert.equal(fiscalControlStatusChange("PENDING", "PENDING", false), "none");
+  assert.equal(fiscalControlStatusChange("PENDING", "COMPLETED", false), "direct");
+  assert.equal(fiscalControlStatusChange("AWAITING_CLIENT", "IN_PROGRESS", false), "direct");
+  assert.equal(fiscalControlStatusChange("COMPLETED", "IN_PROGRESS", false), "forbidden");
+  assert.equal(fiscalControlStatusChange("COMPLETED", "PENDING", true), "reason");
+  // Concluir com pendência (ou sem registro) na Triagem pede nível 3 e justificativa.
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", false, 0), "direct");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", false, 2), "forbidden");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", true, 2), "reason");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", true, null), "reason");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "AWAITING_CLIENT", false, 2), "direct");
+  assert.equal(FISCAL_CONTROL_STATUS_LABELS.AWAITING_CLIENT, "Aguardando cliente");
+});
+
+await runTest("fiscal monthly control tab keeps viewer read-only and reasons required", async () => {
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(
+    fiscalSources.shell,
+    /<FiscalControlsSection canEdit=\{canEdit\} canAuthorize=\{canDelete\} \/>/,
+  );
+  assert.match(client, /api\.get\("\/fiscal\/monthly-controls"/);
+  assert.match(client, /api\.post\("\/fiscal\/monthly-controls"/);
+  assert.match(client, /api\.patch\(`\/fiscal\/monthly-controls\/\$\{id\}`/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando controles"/);
+  assert.match(section, /list\.error \? \(\s*<div role="alert">/);
+  assert.match(section, /Nenhum cliente com Fiscal ativo nesta competência/);
+  // Visualizador: sem formulário de abertura, sem select de situação, checkbox desabilitado.
+  assert.match(section, /\{canEdit && openingForm \? \(/);
+  assert.match(section, /\{canEdit \? \(\s*<select/);
+  assert.match(section, /disabled=\{!canEdit \|\| item\.status === "COMPLETED" \|\| update\.isPending\}/);
+  assert.match(section, /id="fiscal-control-authorization-error" role="alert"/);
+  assert.match(section, /if \(reason\.length < 3\) \{\s*setAuthorizationError/);
+});
+
+await runTest("fiscal obligations: actions follow status and lock with the control", async () => {
+  const { fiscalObligationActions, todayInputDate } = await import("./utils/fiscalControl.ts");
+  assert.deepEqual(fiscalObligationActions("PENDING", true), ["complete", "dispense"]);
+  assert.deepEqual(fiscalObligationActions("COMPLETED", true), ["undo"]);
+  assert.deepEqual(fiscalObligationActions("NOT_APPLICABLE", true), ["restore"]);
+  assert.deepEqual(fiscalObligationActions("PENDING", false), []);
+  assert.equal(todayInputDate(new Date(2026, 0, 5)), "2026-01-05");
+
+  const panel = await readSource("./components/FiscalControlObligationsPanel.tsx");
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.get\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/obligations`\)/);
+  assert.match(client, /api\.patch\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/obligations\/\$\{code\}`/);
+  // Pendência só informa; a situação do controle não muda por ela.
+  assert.match(section, /item\.pending_obligations/);
+  assert.match(section, /locked=\{item\.status === "COMPLETED"\}/);
+  assert.match(panel, /const editable = canEdit && !locked;/);
+  // Dispensa sem motivo é barrada antes da API; condicional pede motivo na inclusão.
+  assert.match(panel, /action\.kind === "dispense" && trimmed\.length < 3/);
+  assert.match(panel, /definition\.conditional \|\| trimmed\) && trimmed\.length < 3/);
+  assert.match(panel, /max=\{todayInputDate\(\)\}/);
+  assert.match(panel, /queryKey: source\.portfolioKey/);
+});
+
+await runTest("fiscal control reads Triagem documents without editing them", async () => {
+  const { formatTriagePending } = await import("./utils/fiscalControl.ts");
+  assert.equal(formatTriagePending(null), "Sem registro");
+  assert.equal(formatTriagePending(0), "Em dia");
+  assert.equal(formatTriagePending(1), "1 pendente");
+
+  const panel = await readSource("./components/FiscalControlTriagePanel.tsx");
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.get\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/triage`\)/);
+  // Só leitura: nenhum PATCH/POST para a Triagem a partir do Fiscal.
+  assert.doesNotMatch(panel, /useMutation|api\.(post|patch|put)/);
+  assert.match(section, /control\.triage_pending,/);
+  assert.match(section, /Concluir com pendência na Triagem/);
+  assert.match(section, /Há documentos pendentes na Triagem: concluir exige Fiscal nível 3 e justificativa\./);
+});
+
+await runTest("fiscal responsibles: portfolio by competence or current, transfer for level 3", async () => {
+  const { formatTransferResult, matchesResponsible } = await import("./utils/fiscalControl.ts");
+  const item = { responsible_id: "ana", default_responsible_id: "bruno" };
+  assert.equal(matchesResponsible(item, { userId: "", basis: "competence" }), true);
+  assert.equal(matchesResponsible(item, { userId: "ana", basis: "competence" }), true);
+  assert.equal(matchesResponsible(item, { userId: "ana", basis: "current" }), false);
+  assert.equal(matchesResponsible(item, { userId: "bruno", basis: "current" }), true);
+  assert.equal(
+    matchesResponsible(
+      { responsible_id: null, default_responsible_id: "bruno" },
+      { userId: "none", basis: "competence" },
+    ),
+    true,
+  );
+  assert.equal(formatTransferResult({ transferred: ["a"], skipped: [] }), "1 transferido.");
+  assert.equal(
+    formatTransferResult({
+      transferred: [],
+      skipped: [
+        { id: "b", reason: "Controle concluído." },
+        { id: "c", reason: "Controle concluído." },
+      ],
+    }),
+    "0 transferidos, 2 ignorados (Controle concluído.).",
+  );
+
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const dialog = await readSource("./components/FiscalControlTransferDialog.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.post\("\/fiscal\/monthly-controls\/transfer", payload\)/);
+  assert.match(client, /api\.get\("\/fiscal\/monthly-controls\/responsibles"\)/);
+  // Seleção e transferência só para nível 3; concluídos não são selecionáveis.
+  assert.match(section, /\{canAuthorize && selectedIds\.length \? \(/);
+  assert.match(section, /disabled=\{item\.status === "COMPLETED"\} title=\{item\.status === "COMPLETED" \? "Controle concluído não é transferido\." : undefined\}/);
+  assert.match(section, /Carteira atual: \{item\.default_responsible_name/);
+  assert.match(dialog, /if \(reason\.trim\(\)\.length < 3\) \{/);
+  assert.match(dialog, /enabled: open/);
+});
+
+await runTest("fiscal annual control shows each declaration and reuses the item rules", async () => {
+  const { formatAnnualDeclaration } = await import("./utils/fiscalControl.ts");
+  assert.equal(formatAnnualDeclaration(undefined), "—");
+  assert.equal(formatAnnualDeclaration({ status: "PENDING", completed_on: null }), "Pendente");
+  assert.equal(
+    formatAnnualDeclaration({ status: "COMPLETED", completed_on: "2026-03-20" }),
+    "Cumprida em 20/03/2026",
+  );
+  assert.equal(formatAnnualDeclaration({ status: "NOT_APPLICABLE", completed_on: null }), "Não aplicável");
+
+  const section = await readSource("./components/FiscalAnnualControlsSection.tsx");
+  const client = await readSource("./services/fiscalAnnualService.ts");
+  assert.match(fiscalSources.shell, /<FiscalAnnualControlsSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.get\("\/fiscal\/annual-controls", \{ params: \{ year \} \}\)/);
+  assert.match(client, /api\.patch\(`\/fiscal\/annual-controls\/\$\{controlId\}\/items\/\$\{code\}`/);
+  // Sem situação geral: só as colunas de cada declaração, sem DIRBI.
+  assert.doesNotMatch(section, /item\.status/);
+  assert.doesNotMatch(client, /DIRBI/);
+  assert.match(section, /<FiscalControlObligationsPanel source=\{annualItemSource\(item\.id\)\}/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando controles anuais"/);
+});
+
+await runTest("fiscal responsibles report: screen and CSV share one response, competence uses the control", async () => {
+  const section = await readSource("./components/FiscalResponsibleReportSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  const queryKeys = await readSource("./hooks/queryKeys.ts");
+  assert.match(fiscalSources.shell, /<FiscalResponsibleReportSection \/>/);
+  assert.match(client, /api\.get\("\/fiscal\/monthly-controls\/responsibles-report", \{ params \}\)/);
+  // O CSV baixado é o do mesmo retorno que preenche a tabela.
+  assert.match(section, /downloadFile\(new Blob\(\[data\.csv\]/);
+  assert.match(section, /data\.items\.map\(\(item\) =>/);
+  assert.match(section, /competence: byCompetence \? competence : undefined/);
+  assert.match(section, /<option value="none">Sem responsável<\/option>/);
+  assert.match(section, /for \(const item of data\?\.items \?\? \[\]\) \{\s*if \(item\.responsible_id && !options\.has\(item\.responsible_id\)\)/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando relatório"/);
+  assert.match(section, /report\.error \? \(\s*<div role="alert">/);
+  // Transferências invalidam o prefixo das carteiras, que cobre o relatório.
+  assert.match(queryKeys, /\[\.\.\.FISCAL_MONTHLY_CONTROLS_QUERY_KEY, "responsibles-report", basis, competence, responsibleId\]/);
+});

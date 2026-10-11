@@ -1,10 +1,16 @@
 import {
   INTEGRACAO_PERMISSION_LEVEL,
   type IntegracaoServiceAuthorization,
+  normalizeModulePermission,
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import {
+  AUDITED_TRANSACTION,
+  auditUnavailable,
+  type ClientEntityAudit,
+} from "../integrations/audit.js";
 import type {
   CreateIntegrationBody,
   UpdateIntegrationBody,
@@ -14,8 +20,12 @@ import {
   isClientDocumentUniqueConstraintError,
 } from "../utils/clientDocuments.js";
 import { cleanDocument } from "../utils/documents.js";
+import { MARKETING_CLIENT_PROFILE_ACCESS } from "../utils/moduleAuthorization.js";
 
-type ClientAuthorization = IntegracaoServiceAuthorization & { userId: string };
+type ClientAuthorization = IntegracaoServiceAuthorization & {
+  marketingLevel?: number;
+  userId: string;
+};
 
 export async function createIntegrationClient(
   prisma: PrismaClient,
@@ -105,23 +115,34 @@ export async function updateIntegrationClient(
     level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
     isOwner: false,
   },
+  audit?: ClientEntityAudit,
 ): Promise<Record<string, unknown>> {
+  const requestedFields = Object.keys(input);
+  const isMarketingInstagramUpdate =
+    requestedFields.length === 1 && requestedFields[0] === "instagram";
+  const hasMarketingInstagramEditAccess =
+    isMarketingInstagramUpdate &&
+    normalizeModulePermission(authorization.marketingLevel) >=
+      MARKETING_CLIENT_PROFILE_ACCESS.EDITOR;
+
+  if (!hasMarketingInstagramEditAccess) {
+    requireIntegracaoRouteAccess("PATCH", "/client/:id/integration", {
+      userId: authorization.userId,
+      level: authorization.level,
+      organizationId,
+      resourceOrganizationId: organizationId,
+      isOwner: authorization.isOwner,
+      requestedFields,
+    });
+  }
+
   const exists = await prisma.client.findFirst({
     where: { id: clientId, organization_id: organizationId },
-    select: { id: true, type: true, cpf_cnpj: true },
+    select: { id: true, type: true, cpf_cnpj: true, instagram: true },
   });
   if (!exists) {
     throw new ServiceError(404, "Cliente não encontrado.");
   }
-
-  requireIntegracaoRouteAccess("PATCH", "/client/:id/integration", {
-    userId: authorization.userId,
-    level: authorization.level,
-    organizationId,
-    resourceOrganizationId: organizationId,
-    isOwner: authorization.isOwner,
-    requestedFields: Object.keys(input),
-  });
 
   const documentType = input.type ?? exists.type;
   const cleanedCpfCnpj =
@@ -260,13 +281,37 @@ export async function updateIntegrationClient(
     type_registration: true,
     service_unique: true,
   };
+  const marketingProfileSelect = {
+    id: true,
+    name: true,
+    status: true,
+    instagram: true,
+  } as const;
+
+  // O perfil Instagram (editável pelo Marketing) tem trilha exigida: sem ela, nada é salvo.
+  const instagramChanged =
+    data.instagram !== undefined && (exists.instagram ?? null) !== (data.instagram ?? null);
+  if (instagramChanged && !audit) throw auditUnavailable();
 
   try {
-    const updated = await prisma.client.update({
-      where: { id: clientId },
-      data,
-      select,
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.client.update({
+        where: { id: clientId },
+        data,
+        select: hasMarketingInstagramEditAccess ? marketingProfileSelect : select,
+      });
+      if (instagramChanged && audit) {
+        await audit({
+          organizationId,
+          userId: authorization.userId,
+          action: "update",
+          referring: "clients",
+          referringId: clientId,
+          changes: { instagram: { from: exists.instagram ?? null, to: data.instagram ?? null } },
+        });
+      }
+      return row;
+    }, AUDITED_TRANSACTION);
 
     return updated as Record<string, unknown>;
   } catch (error) {

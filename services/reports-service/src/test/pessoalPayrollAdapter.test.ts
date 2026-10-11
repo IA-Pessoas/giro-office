@@ -57,10 +57,16 @@ describe("PessoalPayrollAdapter", () => {
 
     expect(adapter.sources[0]?.fields.map((field) => field.key)).toEqual([
       "client_name",
+      "client_code",
+      "client_document",
+      "client_status",
       "responsible_name",
       "union_name",
       "group_name",
       "group_state",
+      "previous",
+      "info",
+      "contact",
       "advance",
       "advance_type",
       "advance_amount",

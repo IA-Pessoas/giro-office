@@ -4,6 +4,10 @@ import { clientIntegrationReportingCatalog } from "./clientIntegrationReportingC
 import { contabilControlReportingCatalog } from "./contabilControlReportingCatalog.js";
 import { contabilRelationshipReportingCatalog } from "./contabilRelationshipReportingCatalog.js";
 import { contabilResponsiblesReportingCatalog } from "./contabilResponsiblesReportingCatalog.js";
+import {
+  contabilDocumentsReportingCatalog,
+  contabilTriageReportingCatalog,
+} from "./contabilTriageReportingCatalog.js";
 import { fiscalIcmsReportingCatalog } from "./fiscalIcmsReportingCatalog.js";
 import { fiscalIpiReportingCatalog } from "./fiscalIpiReportingCatalog.js";
 import { fiscalNcmReportingCatalog } from "./fiscalNcmReportingCatalog.js";
@@ -17,6 +21,7 @@ import { pessoalUnionsReportingCatalog } from "./pessoalUnionsReportingCatalog.j
 import { projectReportingCatalog } from "./projectReportingCatalog.js";
 import { regularizeLicenseReportingCatalog } from "./regularizeLicenseReportingCatalog.js";
 import { regularizeMunicipalTaxesReportingCatalog } from "./regularizeMunicipalTaxesReportingCatalog.js";
+import { regularizePortfolioReportingCatalog } from "./regularizePortfolioReportingCatalog.js";
 import { regularizeProcessReportingCatalog } from "./regularizeProcessReportingCatalog.js";
 import { rhAttendanceReportingCatalog } from "./rhAttendanceReportingCatalog.js";
 import { rhHolidayReportingCatalog } from "./rhHolidayReportingCatalog.js";
@@ -32,8 +37,10 @@ export const reportingSources = [
   ...certificatePjReportingCatalog.sources,
   ...clientIntegrationReportingCatalog.sources,
   ...contabilControlReportingCatalog.sources,
+  ...contabilDocumentsReportingCatalog.sources,
   ...contabilRelationshipReportingCatalog.sources,
   ...contabilResponsiblesReportingCatalog.sources,
+  ...contabilTriageReportingCatalog.sources,
   ...fiscalIcmsReportingCatalog.sources,
   ...fiscalIpiReportingCatalog.sources,
   ...fiscalNcmReportingCatalog.sources,
@@ -47,6 +54,7 @@ export const reportingSources = [
   ...projectReportingCatalog.sources,
   ...regularizeLicenseReportingCatalog.sources,
   ...regularizeMunicipalTaxesReportingCatalog.sources,
+  ...regularizePortfolioReportingCatalog.sources,
   ...regularizeProcessReportingCatalog.sources,
   ...rhAttendanceReportingCatalog.sources,
   ...rhHolidayReportingCatalog.sources,

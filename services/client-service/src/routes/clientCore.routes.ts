@@ -19,7 +19,10 @@ import {
   listInstagramProfilesQuerySchema,
   updateClientBodySchema,
 } from "../schemas/client.schemas.js";
-import { hasClientListModuleAccess } from "../utils/moduleAuthorization.js";
+import {
+  hasClientListModuleAccess,
+  MARKETING_CLIENT_PROFILE_ACCESS,
+} from "../utils/moduleAuthorization.js";
 import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 function getIntegrationAuthorization(request: Request) {
@@ -45,6 +48,20 @@ function getClientListAuthorization(request: Request) {
   return authorization;
 }
 
+function requireInstagramProfileReadAccess(request: Request, organizationId: string): void {
+  if (
+    normalizeModulePermission(request.modules?.marketing) >= MARKETING_CLIENT_PROFILE_ACCESS.VIEWER
+  ) {
+    return;
+  }
+
+  requireIntegracaoRouteAccess("GET", "/client/list", {
+    ...getIntegrationAuthorization(request),
+    organizationId,
+    resourceOrganizationId: organizationId,
+  });
+}
+
 export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   const { clientService } = deps;
   const router: ReturnType<typeof Router> = Router();
@@ -56,11 +73,7 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
       try {
         const query = parseWithZod(listInstagramProfilesQuerySchema, request.query);
         const organizationId = resolveOrganizationId(request, undefined);
-        requireIntegracaoRouteAccess("GET", "/client/list", {
-          ...getIntegrationAuthorization(request),
-          organizationId,
-          resourceOrganizationId: organizationId,
-        });
+        requireInstagramProfileReadAccess(request, organizationId);
         const report = await clientService.listInstagramProfiles(organizationId, {
           page: query.page,
           pageSize: query.limit,

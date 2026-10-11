@@ -7,6 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import { AUDIT_CREATE_ACTION, AUDIT_UPDATE_ACTION } from "./auditActions.js";
 
 export type ResponsibleServicePrisma = typeof prismaClient;
 
@@ -71,14 +72,16 @@ export class ResponsibleService {
         },
       });
 
-      await this.audit.createLog({
+      // Diff contra objeto vazio, como no Worker: valores iniciais como `null → valor`.
+      await this.audit.logUpdateIfChanged({
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Cadastro",
+        action: AUDIT_CREATE_ACTION,
         referring: "contabil.responsibles",
         referringId: responsible.id,
-        changes: "{}",
+        oldData: {},
+        updatedData: responsible as unknown as Record<string, unknown>,
       });
 
       return responsible;
@@ -134,7 +137,7 @@ export class ResponsibleService {
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Atualização",
+        action: AUDIT_UPDATE_ACTION,
         referring: "contabil.responsibles",
         referringId: id,
         oldData: exists as unknown as Record<string, unknown>,

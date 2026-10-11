@@ -13,15 +13,22 @@ import {
   groupAssignmentPreviewQuerySchema,
 } from "@workspace/pessoal-service/src/schemas/groupAssignment.schemas.js";
 import {
+  type ConfirmLddImportBody,
+  confirmLddImportBodySchema,
   createLddBodySchema,
   lddIdParamsSchema,
   listLddQuerySchema,
+  previewLddImportBodySchema,
   updateLddBodySchema,
 } from "@workspace/pessoal-service/src/schemas/ldd.schemas.js";
 import {
   createObligationBodySchema,
   detailObligationQuerySchema,
   generateObligationsParamsSchema,
+  type ListObligationPortfolioQuery,
+  listObligationPortfolioQuerySchema,
+  type ObligationHistoryQuery,
+  obligationHistoryQuerySchema,
   obligationIdParamsSchema,
   updateObligationFieldBodySchema,
 } from "@workspace/pessoal-service/src/schemas/obligation.schemas.js";
@@ -48,6 +55,21 @@ import {
   unionIdParamsSchema,
   updateUnionBodySchema,
 } from "@workspace/pessoal-service/src/schemas/union.schemas.js";
+import {
+  buildLddImportPreview,
+  confirmLddImport,
+  findLddImportDate,
+  LDD_IMPORT_AUDIT_REFERRING,
+  type LddImportStore,
+} from "@workspace/pessoal-service/src/services/lddPdfImportService.js";
+import {
+  listObligationHistory,
+  OBLIGATION_AUDIT_REFERRING,
+  OBLIGATION_UPDATE_ACTION,
+  type ObligationHistoryPrisma,
+  obligationFieldChange,
+} from "@workspace/pessoal-service/src/services/obligationHistoryService.js";
+import { listObligationPortfolio } from "@workspace/pessoal-service/src/services/obligationPortfolioService.js";
 import {
   NO_OBLIGATIONS_GROUP_POLICY,
   NORMAL_GROUP_POLICY,
@@ -131,6 +153,14 @@ export type PessoalSituationService = {
 };
 export type PessoalLddService = {
   list(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  previewImport(
+    context: Record<string, unknown>,
+    body: { client_id: string; file_name: string; content_base64: string },
+  ): Promise<unknown>;
+  confirmImport(
+    context: { organizationId: string; userId: string; permission: number },
+    body: ConfirmLddImportBody,
+  ): Promise<unknown>;
   create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
   update(
     context: Record<string, unknown>,
@@ -161,6 +191,15 @@ export type PessoalPayrollService = {
 };
 export type PessoalObligationService = {
   detail(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  listPortfolio(
+    context: { organizationId: string },
+    query: ListObligationPortfolioQuery,
+  ): Promise<unknown>;
+  history(
+    context: { organizationId: string },
+    id: string,
+    query: ObligationHistoryQuery,
+  ): Promise<unknown>;
   create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
   updateField(
     context: Record<string, unknown>,
@@ -733,6 +772,50 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
         select,
         orderBy: { due_date: "asc" },
       }),
+    async previewImport(context, body) {
+      const client = await prisma.client.findFirst({
+        where: { id: body.client_id, organization_id: String(context.organizationId) },
+        select: { id: true },
+      });
+      if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
+      const preview = buildLddImportPreview(body);
+      const already_imported_at = await findLddImportDate(prisma as unknown as LddImportStore, {
+        organizationId: String(context.organizationId),
+        clientId: body.client_id,
+        fileHash: preview.file_hash,
+      });
+      return { ...preview, already_imported_at };
+    },
+    // `prisma` aqui já é a transação da rota (withDomainClient): arquivo, saldos e auditoria
+    // confirmam juntos.
+    async confirmImport(context, body) {
+      const client = await prisma.client.findFirst({
+        where: { id: body.client_id, organization_id: context.organizationId },
+        select: { id: true },
+      });
+      if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
+      const result = await confirmLddImport(prisma as unknown as LddImportStore, context, body);
+      await audit(env, {
+        organizationId: context.organizationId,
+        userId: context.userId,
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: LDD_IMPORT_AUDIT_REFERRING,
+        referringId: result.import_id,
+        // Mesmos metadados que o serviço Express audita; nada do conteúdo do PDF.
+        changes: {
+          client_id: body.client_id,
+          rows_count: result.rows_count,
+          total_amount: result.total_amount,
+          ldd_ids: result.records.map((record) => record.id),
+        },
+        department: "pessoal",
+      });
+      return result;
+    },
     async create(context, body) {
       const organizationId = String(context.organizationId);
       const client = await prisma.client.findFirst({
@@ -1277,6 +1360,17 @@ function localObligationService(
         select,
       });
     },
+    async listPortfolio(context, query) {
+      return listObligationPortfolio(prisma, context.organizationId, query);
+    },
+    async history(context, id, query) {
+      return listObligationHistory(
+        prisma as unknown as ObligationHistoryPrisma,
+        context.organizationId,
+        id,
+        query,
+      );
+    },
     async create(context, body) {
       const organizationId = String(context.organizationId);
       await ensureClient(organizationId, body.client_id);
@@ -1348,9 +1442,10 @@ function localObligationService(
         statusCode: 200,
         outcome: "success",
         serviceSource: "pessoal-service",
-        action: "Atualizacao",
-        referring: "pessoal.obligations",
+        action: OBLIGATION_UPDATE_ACTION,
+        referring: OBLIGATION_AUDIT_REFERRING,
         referringId: id,
+        changes: obligationFieldChange(existing, body),
         department: "pessoal",
       });
       return updated;
@@ -1837,6 +1932,23 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       return c.json(createSuccessResponse(await service.create(domainContext(c), body)), 201);
     }),
   );
+  app.post("/pessoal/ldd/import", (c) =>
+    withLddService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(confirmLddImportBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(await service.confirmImport(domainContext(c), body)),
+        201,
+      );
+    }),
+  );
+  app.post("/pessoal/ldd/import/preview", (c) =>
+    withLddService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(previewLddImportBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.previewImport(domainContext(c), body)));
+    }),
+  );
   app.patch("/pessoal/ldd/:id", (c) =>
     withLddService(c, async (service) => {
       requirePessoalPermission(c.get("auth"), 2);
@@ -1929,6 +2041,29 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       return c.json(
         createSuccessResponse(
           await service.detail({ organizationId: c.get("auth").organizationId }, query),
+        ),
+      );
+    }),
+  );
+  app.get("/pessoal/obrigations/:id/history", (c) =>
+    withObligationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const { id } = parseWithZod(obligationIdParamsSchema, { id: c.req.param("id") });
+      const query = parseWithZod(obligationHistoryQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.history({ organizationId: c.get("auth").organizationId }, id, query),
+        ),
+      );
+    }),
+  );
+  app.get("/pessoal/obrigations/portfolio", (c) =>
+    withObligationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const query = parseWithZod(listObligationPortfolioQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.listPortfolio({ organizationId: c.get("auth").organizationId }, query),
         ),
       );
     }),

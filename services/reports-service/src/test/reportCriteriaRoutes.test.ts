@@ -64,6 +64,7 @@ for (const source of reportingSources.filter((source) => source.key !== "marketi
         env: new Proxy({}, { get: () => "fixture-secret" }),
         reportingService: stub,
         municipalTaxesReportingService: stub,
+        portfolioReportingService: stub,
       } as never),
     );
     app.use(

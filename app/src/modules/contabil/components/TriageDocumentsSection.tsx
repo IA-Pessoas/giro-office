@@ -29,42 +29,14 @@ import type {
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
+import { FiscalClientSettingsPanel } from "./FiscalClientSettingsPanel";
+import { FiscalSpecialDocumentsPanel } from "./FiscalSpecialDocumentsPanel";
+import { TriageMovementPanel } from "./TriageMovementPanel";
+import { TriageStatementHistoryPanel } from "./TriageStatementHistoryPanel";
+import { CONTABIL_DOCUMENTS, FISCAL_DOCUMENTS, STATUSES } from "./triageDocumentLabels";
 
-const CONTABIL_DOCUMENTS = [
-  ["financial_transactions", "Movimentações financeiras"],
-  ["triaged_transactions", "Movimentações triadas"],
-  ["inventory_control", "Controle de estoque"],
-  ["accounts_payable_report", "Relatório de contas a pagar"],
-  ["accounts_receivable_report", "Relatório de contas a receber"],
-  ["card_statements", "Faturas de cartão"],
-  ["loan_agreements", "Contratos de empréstimo"],
-  ["bank_reconciliation", "Conciliação bancária"],
-  ["bank_investments", "Investimentos bancários"],
-  ["card_sales_report", "Relatório de vendas de cartão"],
-] as const;
-export const FISCAL_DOCUMENTS = [
-  ["inbound_report", "Relatório de entradas"],
-  ["outbound_report", "Relatório de saídas"],
-  ["nfse_provided", "NFSe prestados"],
-  ["nfse_received", "NFSe recebidos"],
-  ["cte_documents", "Documentos CTe"],
-  ["mei_documents", "Documentos MEI"],
-  ["nfce_documents", "Documentos NFCe"],
-  ["sped_fiscal", "SPED Fiscal"],
-  ["sped_contributions", "SPED Contribuições"],
-  ["nfce_received", "NFCe recebidos"],
-  ["model_21_invoice", "Nota fiscal modelo 21"],
-  ["cte_as_issuer", "CTe como emitente"],
-  ["services_provided_as_mei", "Serviços prestados como MEI"],
-] as const;
-export const STATUSES: Array<[TriageDocumentStatus, string]> = [
-  ["PENDING", "Pendente"],
-  ["COMPLETED", "Concluído"],
-  ["ATTENTION", "Atenção"],
-  ["UNDER_REVIEW", "Em revisão"],
-  ["NOT_PRESENT", "Não recebido"],
-  ["NOT_APPLICABLE", "Não aplicável"],
-];
+export { FISCAL_DOCUMENTS, STATUSES };
+
 const CLOSING_STATUSES: Array<[TriageClosingStatus, string]> = [
   ["NOT_RECEIVED", "Não recebido"],
   ["RECEIVED", "Recebido"],
@@ -100,18 +72,21 @@ export function TriageDocumentsSection({
   canEdit,
   canEditClosing,
   documentType = "CONTABIL",
+  fixedCompetence,
 }: {
   clientId: string;
   canEdit: boolean;
   canEditClosing: boolean;
   documentType?: TriageRoutineType;
+  /** Competência travada (ex.: detalhe da solicitação); sem ela, o seletor fica livre. */
+  fixedCompetence?: ContabilCompetence;
 }) {
   const documents = documentType === "FISCAL" ? FISCAL_DOCUMENTS : CONTABIL_DOCUMENTS;
   const titleId = documentType === "FISCAL"
     ? "triage-fiscal-documents-title"
     : "triage-contabil-documents-title";
   const [competence, setCompetence] = useState<ContabilCompetence>(
-    getCurrentContabilCompetence(),
+    fixedCompetence ?? getCurrentContabilCompetence(),
   );
   const [bankId, setBankId] = useState("");
   // O item fica guardado após fechar para o texto não sumir durante a animação de saída.
@@ -163,6 +138,11 @@ export function TriageDocumentsSection({
     }));
   }
 
+  // Item fora do movimento padrão na criação da rotina contábil: o backend recusa alterar.
+  function isDisabled(field: string) {
+    return documentType === "CONTABIL" && record?.item_notes[field]?.required === false;
+  }
+
   async function confirmBankArchive() {
     if (!pendingBankArchive) return;
     await mutations.archiveStatement.mutateAsync({
@@ -208,11 +188,15 @@ export function TriageDocumentsSection({
         <div className="text-sm font-medium text-gray-700 dark:text-slate-300">
           Competência
           <span className="ml-2">
-            <ContabilCompetenceSelect
-              label={documentType === "FISCAL" ? "Competência fiscal" : "Competência documental"}
-              value={competence}
-              onChange={setCompetence}
-            />
+            {fixedCompetence ? (
+              <span>{fixedCompetence}</span>
+            ) : (
+              <ContabilCompetenceSelect
+                label={documentType === "FISCAL" ? "Competência fiscal" : "Competência documental"}
+                value={competence}
+                onChange={setCompetence}
+              />
+            )}
           </span>
         </div>
       </div>
@@ -268,6 +252,24 @@ export function TriageDocumentsSection({
           )}
         </div>
       ) : null}
+      {documentType === "FISCAL" ? (
+        <>
+          <FiscalClientSettingsPanel key={clientId} clientId={clientId} canEdit={canEdit} />
+          <FiscalSpecialDocumentsPanel key={`special-${clientId}`} clientId={clientId} canEdit={canEdit} />
+        </>
+      ) : null}
+      {documentType === "CONTABIL" ? (
+        <TriageMovementPanel
+          clientId={clientId}
+          competence={competence}
+          canEdit={canEdit}
+          record={record}
+          justifications={justifications.data ?? []}
+        />
+      ) : null}
+      {documentType === "CONTABIL" ? (
+        <TriageStatementHistoryPanel clientId={clientId} onOpenCompetence={setCompetence} />
+      ) : null}
       {!record ? (
         <ContabilStateBox
           icon={FileText}
@@ -294,7 +296,11 @@ export function TriageDocumentsSection({
             {record.summary.completed}/{record.summary.applicable} aplicáveis ·{" "}
             {record.summary.attention} em atenção
           </div>
-          {documentType === "FISCAL" ? (
+          {documentType === "FISCAL" && record.item_notes.billing_amount?.required === false ? (
+            <p className="text-sm text-gray-600 dark:text-slate-400">
+              Faturamento não se aplica a este cliente nesta competência.
+            </p>
+          ) : documentType === "FISCAL" ? (
             <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
                 Faturamento
@@ -367,7 +373,11 @@ export function TriageDocumentsSection({
                   ) : null}
                 </span>
                 <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
-                  {canEdit ? (
+                  {isDisabled(field) ? (
+                    <span className="text-sm text-gray-500 dark:text-slate-400">
+                      Desativado no movimento padrão
+                    </span>
+                  ) : canEdit ? (
                     <select
                       aria-label={`${label} status`}
                       value={statusDrafts[field] ?? record.checklist[field]}
@@ -398,7 +408,7 @@ export function TriageDocumentsSection({
                       {STATUSES.find(([value]) => value === record.checklist[field])?.[1]}
                     </span>
                   )}
-                  {canEdit ? (
+                  {canEdit && !isDisabled(field) ? (
                     <div className="grid w-full gap-2 sm:min-w-[22rem] sm:grid-cols-2">
                       <label className="text-xs text-gray-600 dark:text-slate-300">
                         Nota

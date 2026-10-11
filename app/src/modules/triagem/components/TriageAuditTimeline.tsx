@@ -21,7 +21,11 @@ function formatContext(value: unknown): string {
 
 export function TriageAuditTimeline({ competenceId }: { competenceId: string }) {
   const [open, setOpen] = useState(false);
-  const history = useTriageAudit(competenceId, open);
+  const [page, setPage] = useState(1);
+  const history = useTriageAudit(competenceId, open, page);
+  const pageCount = history.data
+    ? Math.max(1, Math.ceil(history.data.total / history.data.page_size))
+    : 1;
 
   return (
     <div className="mt-3 rounded-lg border border-gray-200 dark:border-slate-700">
@@ -99,6 +103,33 @@ export function TriageAuditTimeline({ competenceId }: { competenceId: string }) 
                 </li>
               ))}
             </ol>
+          ) : null}
+
+          {pageCount > 1 ? (
+            <nav
+              aria-label="Paginação do histórico da competência"
+              className="mt-3 flex items-center justify-between gap-3 text-sm"
+            >
+              <button
+                type="button"
+                onClick={() => setPage(page - 1)}
+                disabled={page <= 1 || history.isFetching}
+                className="rounded-md border border-gray-300 px-2 py-1 font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Anterior
+              </button>
+              <span className="text-gray-600 dark:text-slate-400">
+                Página {page} de {pageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage(page + 1)}
+                disabled={page >= pageCount || history.isFetching}
+                className="rounded-md border border-gray-300 px-2 py-1 font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Próxima
+              </button>
+            </nav>
           ) : null}
         </div>
       ) : null}

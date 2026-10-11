@@ -6,7 +6,13 @@ export type RegularizeTabId =
   | "partners"
   | "passwords"
   | "sites"
-  | "taxes";
+  | "taxes"
+  | "dte"
+  | "veri"
+  | "groups"
+  | "agenda"
+  | "bidders"
+  | "catalogs";
 
 export interface RegularizeQueryPolicy {
   dashboard: boolean;

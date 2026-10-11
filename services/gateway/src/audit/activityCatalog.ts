@@ -75,6 +75,46 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/client\/regimes$/,
+    description: { action: "consultou", item: "a lista de regimes" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/regimes$/,
+    description: { action: "cadastrou", item: "um novo regime" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/client\/regimes\/[^/]+$/,
+    description: { action: "atualizou", item: "um regime" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/licitacao\/bidders$/,
+    description: { action: "consultou", item: "a lista de licitantes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/[^/]+\/licitacao\/history$/,
+    description: { action: "consultou", item: "o histórico de licitação de um cliente" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/segments$/,
+    description: { action: "consultou", item: "a lista de segmentos" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/segments$/,
+    description: { action: "cadastrou", item: "um novo segmento" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/client\/segments\/[^/]+$/,
+    description: { action: "atualizou", item: "um segmento" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/client\/coringa\/list$/,
     description: { action: "consultou", item: "a Lista Coringa de clientes" },
   },
@@ -92,6 +132,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/marketing\/dashboard$/,
     description: { action: "consultou", item: "o dashboard do Marketing" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/birthdays$/,
+    description: { action: "consultou", item: "os aniversariantes do mês do Marketing" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/stock$/,
+    description: { action: "consultou", item: "o estoque do Marketing" },
   },
   {
     methods: ["GET"],
@@ -200,6 +250,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/pessoal\/group-assignments\/eligible$/,
     description: { action: "consultou", item: "os clientes elegíveis para atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/ldd\/import$/,
+    description: { action: "importou", item: "débitos de LDD de um PDF" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/ldd\/import\/preview$/,
+    description: { action: "gerou", item: "uma prévia de importação de LDD em PDF" },
   },
   {
     methods: ["POST"],
@@ -335,9 +395,86 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o histórico de relatórios" },
   },
   {
+    // O último segmento é o código da declaração (DEFIS), não um id.
+    methods: ["PATCH"],
+    pattern: /^\/fiscal\/annual-controls\/[^/]+\/items\/[A-Z_]+$/,
+    description: { action: "atualizou", item: "uma declaração fiscal anual" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/monthly-controls\/responsibles-report$/,
+    description: { action: "consultou", item: "o relatório Responsáveis × Empresas" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/monthly-controls\/responsibles$/,
+    description: { action: "consultou", item: "os responsáveis fiscais disponíveis" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/monthly-controls\/transfer$/,
+    description: { action: "transferiu", item: "controles fiscais para outro responsável" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/triage$/,
+    description: { action: "consultou", item: "os documentos da Triagem de um controle fiscal" },
+  },
+  {
+    // O último segmento é o código da obrigação (PGDAS_D), não um id.
+    methods: ["PATCH"],
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/obligations\/[A-Z_]+$/,
+    description: { action: "atualizou", item: "uma obrigação fiscal mensal" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/fiscal\/rates\/[^/]+\/pdf$/,
     description: { action: "baixou", item: "um PDF de alíquota fiscal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/clients\/[^/]+\/wholesale$/,
+    description: { action: "consultou", item: "a condição de atacadista de um cliente" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/fiscal\/clients\/[^/]+\/wholesale$/,
+    description: { action: "alterou", item: "a condição de atacadista de um cliente" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/anticipations\/batches$/,
+    description: { action: "importou", item: "um lote de XML para antecipações" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/(?:csv|pdf)$/,
+    description: { action: "exportou", item: "o demonstrativo de um lote de antecipações" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/items\/[^/]+$/,
+    description: { action: "revisou", item: "um item de antecipação" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/submit$/,
+    description: { action: "enviou à conferência", item: "um lote de antecipações" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/check$/,
+    description: { action: "conferiu", item: "um lote de antecipações" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/malhas\/[^/]+\/attachment$/,
+    description: { action: "anexou", item: "um arquivo a uma malha fiscal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/malhas\/[^/]+\/attachment$/,
+    description: { action: "abriu", item: "o anexo de uma malha fiscal" },
   },
   {
     methods: ["GET"],
@@ -358,6 +495,41 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/fiscal\/simples\/zip$/,
     description: { action: "exportou", item: "os PDFs de alíquotas do Simples em lote" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/documents$/,
+    description: { action: "conferiu", item: "planilhas Domínio e SEFAZ" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/xml-selection$/,
+    description: { action: "selecionou", item: "XML de notas em um ZIP" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/sefaz-xml$/,
+    description: { action: "conferiu", item: "o CSV da SEFAZ contra XML de notas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/sped-xml$/,
+    description: { action: "conferiu", item: "o SPED (C100/C170) contra XML de notas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/xml-taxes$/,
+    description: { action: "somou", item: "IPI e ICMS ST de XML de notas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/ipi-spreadsheets$/,
+    description: { action: "conferiu", item: "o IPI entre duas planilhas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/invoice-pdfs$/,
+    description: { action: "somou", item: "totais de faturas em PDF" },
   },
   {
     methods: ["GET"],
@@ -771,6 +943,46 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/regularize\/dte\/import$/,
+    description: { action: "importou", item: "avisos DTE no Regularize" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/imports$/,
+    description: { action: "consultou", item: "a lista de importações de avisos DTE" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/notices$/,
+    description: { action: "consultou", item: "a caixa de avisos DTE" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/dte\/notices\/reading$/,
+    description: { action: "alterou", item: "a leitura de um aviso DTE" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/queries$/,
+    description: { action: "consultou", item: "a grade de consultas diárias ao DTE" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/dte\/queries\/status$/,
+    description: { action: "alterou", item: "a situação de uma consulta diária ao DTE" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/dte\/queries\/import$/,
+    description: { action: "registrou", item: "consultas diárias ao DTE por lista" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/veri\/compare$/,
+    description: { action: "comparou", item: "uma planilha do Veri com a carteira do Regularize" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/regularize\/process\/send-to-fiscal$/,
     description: { action: "enviou", item: "um processo de regularização ao Fiscal" },
   },
@@ -816,6 +1028,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/pessoal\/obrigations\/competences\/[^/]+\/generate$/,
     description: { action: "gerou", item: "obrigações da competência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/obrigations\/portfolio$/,
+    description: { action: "consultou", item: "a carteira de obrigações" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/obrigations\/[^/]+\/history$/,
+    description: { action: "consultou", item: "o histórico de uma obrigação trabalhista" },
   },
   {
     methods: ["GET"],
@@ -934,6 +1156,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/regularize\/groups\/[^/]+\/map$/,
+    description: { action: "consultou", item: "o mapa de um grupo de clientes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/groups\/[^/]+\/map\/saved$/,
+    description: { action: "consultou", item: "a versão salva do mapa de um grupo" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/groups\/[^/]+\/map\/saved$/,
+    description: { action: "salvou", item: "o mapa de um grupo de clientes" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/regularize\/guidance\/detail$/,
     description: { action: "consultou", item: "os detalhes de uma orientação de regularização" },
   },
@@ -1033,9 +1270,29 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "marcou", item: "notificações de solicitações de RH como lidas" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/contabil\/noah$/,
+    description: { action: "converteu", item: "comprovantes Noah em CSV" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/noah\/[^/]+\/csv$/,
+    description: { action: "baixou", item: "um CSV da conversão Noah" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/contabil\/responsibles\/client\/[^/]+$/,
     description: { action: "consultou", item: "o responsável contábil de um cliente" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/controls\/history$/,
+    description: { action: "consultou", item: "o histórico de um controle contábil" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/relationships\/client\/[^/]+\/history$/,
+    description: { action: "consultou", item: "o histórico do vínculo contábil de um cliente" },
   },
   {
     methods: ["GET"],
@@ -1116,6 +1373,56 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PATCH"],
     pattern: /^\/triagem\/urgent-requests\/[^/]+\/reopen\/?$/,
     description: { action: "reabriu", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/solicitations\/?$/,
+    description: { action: "consultou", item: "as solicitações da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/solicitations\/?$/,
+    description: { action: "cadastrou", item: "uma solicitação da Triagem" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/solicitations\/indicators\/?$/,
+    description: { action: "consultou", item: "os indicadores das solicitações da Triagem" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/solicitations\/[^/]+\/?$/,
+    description: { action: "consultou", item: "uma solicitação da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/solicitations\/[^/]+\/close\/?$/,
+    description: { action: "fechou", item: "uma solicitação da Triagem" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/solicitations\/[^/]+\/note-counts\/?$/,
+    description: { action: "consultou", item: "os contadores de notas da Triagem" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/solicitations\/[^/]+\/note-counts\/?$/,
+    description: { action: "atualizou", item: "os contadores de notas da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/contingency\/[^/]+\/review$/,
+    description: { action: "conferiu", item: "valores e parâmetros da Contingência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/contabil\/contingency\/[^/]+\/export$/,
+    description: { action: "exportou", item: "uma conclusão revisada da Contingência" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/contingency$/,
+    description: { action: "simulou", item: "uma contingência contábil" },
   },
   {
     methods: ["POST"],
@@ -1378,6 +1685,42 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um registro de alíquota fiscal",
     newSingular: "um novo registro de alíquota fiscal",
     plural: "registros de alíquotas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/anticipations\/batches(?:\/|$)/,
+    singular: "um lote de antecipações",
+    newSingular: "um novo lote de antecipações",
+    plural: "lotes de antecipações",
+  },
+  {
+    pattern: /^\/fiscal\/malhas(?:\/|$)/,
+    singular: "uma malha fiscal",
+    newSingular: "uma nova malha fiscal",
+    plural: "malhas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/obligations(?:\/|$)/,
+    singular: "uma obrigação fiscal mensal",
+    newSingular: "uma nova obrigação fiscal mensal",
+    plural: "obrigações fiscais mensais",
+  },
+  {
+    pattern: /^\/fiscal\/annual-controls\/[^/]+\/items(?:\/|$)/,
+    singular: "uma declaração fiscal anual",
+    newSingular: "uma nova declaração fiscal anual",
+    plural: "declarações fiscais anuais",
+  },
+  {
+    pattern: /^\/fiscal\/annual-controls(?:\/|$)/,
+    singular: "um controle fiscal anual",
+    newSingular: "um novo controle fiscal anual",
+    plural: "controles fiscais anuais",
+  },
+  {
+    pattern: /^\/fiscal\/monthly-controls(?:\/|$)/,
+    singular: "um controle fiscal mensal",
+    newSingular: "um novo controle fiscal mensal",
+    plural: "controles fiscais mensais",
   },
   {
     pattern: /^\/fiscal\/revenues(?:\/|$)/,

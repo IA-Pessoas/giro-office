@@ -40,6 +40,7 @@ import {
   isRegularizeCompanyClient,
   getRegularizeUnsupportedDateClearError,
   getRegularizeRegimeOptions,
+  licitacaoLabel,
   hasRegularizeChanges,
 } from "./utils/regularizeForm.ts";
 import { FISCAL_TAX_REGIME_OPTIONS } from "../fiscal/utils/fiscalTaxRegime.ts";
@@ -59,6 +60,9 @@ import {
   CLIENT_TAX_REGIME_OPTIONS,
   createClientFormInitialValues,
   getClientTaxRegime,
+  buildClientRegimeOptions,
+  buildClientSegmentOptions,
+  describeClientSegment,
 } from "./utils/clientForm.ts";
 import { getDocumentIssue } from "../../shared/utils/documentIssue.ts";
 import { toDatetimeLocalValue, toHistoryIsoDate } from "./utils/historyDate.ts";
@@ -124,6 +128,8 @@ runTest("client form sends the selected tax regime on creation and update", () =
   assert.equal(getClientTaxRegime("MEI"), "");
   assert.equal(getClientTaxRegime(null), "");
   assert.equal(createClientFormInitialValues({ regime: null }).regime, "");
+  // Valor gravado fora da lista continua selecionado na ficha, sem conversão (#1740).
+  assert.equal(createClientFormInitialValues({ regime: "MEI" }).regime, "MEI");
 
   const values = {
     ...createClientFormInitialValues(),
@@ -141,10 +147,61 @@ runTest("client form sends the selected tax regime on creation and update", () =
     "Lucro Presumido",
   );
   assert.equal(buildUpdateClientPayload({ ...values, regime: "" }).regime, null);
-  assert.equal(
-    "regime" in buildUpdateClientPayload({ ...values, regime: "" }, "MEI"),
-    false,
-  );
+  assert.equal(buildUpdateClientPayload({ ...values, regime: "MEI" }).regime, "MEI");
+});
+
+runTest("client segment options come only from the catalog and keep the stored value", () => {
+  const catalog = [
+    { id: "s1", name: "Varejo", type: "comercio" },
+    { id: "s2", name: "Usinagem", type: "industria" },
+  ];
+  assert.deepEqual(buildClientSegmentOptions([]), []);
+  assert.deepEqual(buildClientSegmentOptions(catalog, "Varejo"), [
+    { value: "Varejo", label: "Varejo (Comércio)" },
+    { value: "Usinagem", label: "Usinagem (Indústria)" },
+  ]);
+  assert.deepEqual(buildClientSegmentOptions(catalog, "Contabilidade").at(-1), {
+    value: "Contabilidade",
+    label: "Contabilidade (fora do catálogo)",
+  });
+  assert.equal(describeClientSegment("Usinagem", catalog), "Usinagem (Indústria)");
+  assert.equal(describeClientSegment("Contabilidade", catalog), "Contabilidade");
+  assert.equal(describeClientSegment(null, catalog), "A definir");
+  assert.equal(createClientFormInitialValues({ segment: "Contabilidade" }).segment, "Contabilidade");
+  const values = { ...createClientFormInitialValues(), name: "Acme", cpf_cnpj: "1", segment: " Varejo " };
+  assert.equal(buildUpdateClientPayload(values).segment, "Varejo");
+  assert.equal(buildUpdateClientPayload({ ...values, segment: "" }).segment, null);
+});
+
+runTest("segment is edited in the canonical form and Regularize without a parallel list", () => {
+  const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+  const regularize = readFileSync("src/modules/clients/components/ClientRegularizeForm.tsx", "utf8");
+  const detailPage = readFileSync("src/pages/clients/[id].tsx", "utf8");
+  for (const source of [form, regularize]) {
+    assert.match(source, /useClientSegments\(\)/);
+    assert.match(source, /name="segment"[\s\S]*?segmentOptions\.map/);
+  }
+  assert.doesNotMatch(regularize, /REGULARIZE_SEGMENT_OPTIONS|Contabilidade/);
+  assert.match(detailPage, /storedSegment=\{client\.segment\}/);
+  assert.match(detailPage, /label="Segmento"/);
+});
+
+runTest("client regime options join shared regimes, the catalog and the stored value", () => {
+  assert.deepEqual(buildClientRegimeOptions([]), [...CLIENT_TAX_REGIME_OPTIONS]);
+  assert.deepEqual(buildClientRegimeOptions(["Imune", "Lucro Real"], "Imune"), [
+    ...CLIENT_TAX_REGIME_OPTIONS,
+    "Imune",
+  ]);
+  assert.deepEqual(buildClientRegimeOptions(["Imune"], "Regime antigo"), [
+    ...CLIENT_TAX_REGIME_OPTIONS,
+    "Imune",
+    "Regime antigo",
+  ]);
+  assert.deepEqual(getRegularizeRegimeOptions("E-SOCIAL", ["Imune"]), [
+    ...CLIENT_TAX_REGIME_OPTIONS,
+    "Imune",
+    "E-SOCIAL",
+  ]);
 });
 
 runTest("new client form sends Ativo when status remains unchanged", () => {
@@ -382,14 +439,14 @@ runTest("client regime is constrained and bound in both shared client flows", ()
     types,
     /export type ClientTaxRegime = "Simples Nacional" \| "Lucro Presumido" \| "Lucro Real"/,
   );
-  assert.match(types, /regime: ClientTaxRegime \| "";/);
-  assert.match(form, /name="regime"[\s\S]*?CLIENT_TAX_REGIME_OPTIONS/);
-  assert.match(form, /legacyTaxRegime && values\.regime === ""/);
-  assert.match(form, /Regime atual:/);
+  assert.match(types, /export interface ClientFormValues[\s\S]*?regime: string;/);
+  assert.match(form, /useClientRegimes\(\)/);
+  assert.match(form, /buildClientRegimeOptions\([\s\S]*?storedRegime/);
+  assert.match(form, /name="regime"[\s\S]*?regimeOptions\.map/);
   assert.match(createModal, /buildCreateClientPayload\(formValues, organizationId\)/);
   assert.match(detailPage, /createClientFormInitialValues\(client\)/);
-  assert.match(detailPage, /buildUpdateClientPayload\(formValues, client\.regime\)/);
-  assert.match(detailPage, /legacyTaxRegime=\{client\.regime\}/);
+  assert.match(detailPage, /buildUpdateClientPayload\(formValues\)/);
+  assert.match(detailPage, /storedRegime=\{client\.regime\}/);
 });
 
 runTest("mapClientStatusToApi converts Prospect to API status", () => {
@@ -1247,6 +1304,25 @@ runTest("regularize keeps a legacy regime visible instead of dropping it", () =>
   }
 });
 
+runTest("licitação keeps Não informado, Sim and Não distinct and shows history and bidders", () => {
+  assert.equal(licitacaoLabel(null), "Não informado");
+  assert.equal(licitacaoLabel(undefined), "Não informado");
+  assert.equal(licitacaoLabel(true), "Sim");
+  assert.equal(licitacaoLabel(false), "Não");
+  const panels = readFileSync("src/modules/clients/components/ClientLicitacaoPanels.tsx", "utf8");
+  assert.match(panels, /row\.actor\.name/);
+  assert.match(panels, /formatDateTime\(row\.created_at\)/);
+  assert.match(panels, /licitacaoLabel\(row\.previous_value\)[\s\S]*?licitacaoLabel\(row\.new_value\)/);
+  const ficha = readFileSync("src/pages/clients/[id]/regularize.tsx", "utf8");
+  assert.match(ficha, /<ClientLicitacaoHistoryPanel clientId=\{clientId\} \/>/);
+  const regularize = readFileSync("src/modules/regularize/components/RegularizePage.tsx", "utf8");
+  assert.match(regularize, /\{ id: "bidders", label: "Licitantes"/);
+  assert.match(regularize, /activeTab === "bidders" \? <ClientLicitacaoBiddersPanel \/>/);
+  // Quem só tem Regularize também mantém regimes e segmentos usados na ficha.
+  assert.match(regularize, /\{ id: "catalogs", label: "Catálogos"/);
+  assert.match(regularize, /<ClientCatalogPanel kind="segment" canEdit=\{regularizeAccess\.canEdit\} \/>/);
+});
+
 runTest("client groups let users manage names and multiple client memberships", () => {
   const panel = readFileSync("src/modules/clients/components/ClientGroupsPanel.tsx", "utf8");
   const service = readFileSync("src/modules/clients/services/clientService.ts", "utf8");
@@ -1257,4 +1333,10 @@ runTest("client groups let users manage names and multiple client memberships", 
   assert.match(service, /async listGroups/);
   assert.match(service, /async createGroup/);
   assert.match(service, /async updateGroup/);
+  // Status ativo/inativo e a mesma origem canônica no Regularize (#1742).
+  assert.match(panel, /updateGroup\(selectedGroup\.id, \{ status: !selectedGroup\.status \}\)/);
+  assert.match(panel, /Filtrar grupos por status/);
+  const regularize = readFileSync("src/modules/regularize/components/RegularizePage.tsx", "utf8");
+  assert.match(regularize, /\{ id: "groups", label: "Grupos"/);
+  assert.match(regularize, /<ClientGroupsPanel canEdit=\{regularizeAccess\.canEdit\} \/>/);
 });

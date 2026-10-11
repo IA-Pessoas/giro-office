@@ -14,6 +14,7 @@ const CATALOG_KINDS: Array<{ value: TriageCatalogKind; label: string }> = [
   { value: "LINK_TYPE", label: "Tipos de link" },
   { value: "DELIVERY_METHOD", label: "Métodos de entrega" },
   { value: "STATE_SITE", label: "Sites estaduais" },
+  { value: "REQUEST_CATEGORY", label: "Categorias de solicitação" },
 ];
 
 type CatalogFormValues = {

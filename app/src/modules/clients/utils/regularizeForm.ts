@@ -1,4 +1,4 @@
-import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+import { buildClientRegimeOptions } from "./clientForm.ts";
 import {
   formatBrazilianPhoneInput,
   formatCpfCnpjInput,
@@ -105,19 +105,19 @@ const booleanFieldNames = [
   "consultoria",
 ] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
 
-// Valor antigo (MEI, E-SOCIAL, CNO, CAEPF) continua visível até alguém escolher um regime válido.
-export function getRegularizeRegimeOptions(current: string): string[] {
-  const options: string[] = [...TAX_REGIME_OPTIONS];
-  return current && !options.includes(current) ? [...options, current] : options;
+// Valor antigo (MEI, E-SOCIAL, CNO, CAEPF) continua visível; o catálogo da organização entra junto (#1740).
+export function getRegularizeRegimeOptions(current: string, catalog: readonly string[] = []): string[] {
+  return buildClientRegimeOptions(catalog, current);
+}
+
+// Não informado (null), Sim e Não são respostas distintas (#1743).
+export function licitacaoLabel(value: boolean | null | undefined): string {
+  if (value === true) return "Sim";
+  if (value === false) return "Não";
+  return "Não informado";
 }
 
 export const REGULARIZE_SIZE_OPTIONS = ["DEMAIS", "EPP", "ME"] as const;
-
-export const REGULARIZE_SEGMENT_OPTIONS = [
-  "Contabilidade",
-  "Mercado",
-  "Infoproduto",
-] as const;
 
 export function createRegularizeInitialValues(client: Client): ClientRegularizeFormValues {
   return {

@@ -34,7 +34,7 @@ function getIntegrationAuthorization(request: Request) {
 }
 
 export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
-  const { prisma, cnpjLookupProvider } = deps;
+  const { prisma, cnpjLookupProvider, audit } = deps;
   const router: ReturnType<typeof Router> = Router();
 
   router.get(
@@ -103,7 +103,11 @@ export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
           params.id,
           organizationId,
           body,
-          getIntegrationAuthorization(request),
+          {
+            ...getIntegrationAuthorization(request),
+            marketingLevel: normalizeModulePermission(request.modules?.marketing),
+          },
+          audit,
         );
         response.json(createSuccessResponse(updated));
       } catch (err) {

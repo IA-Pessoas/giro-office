@@ -4,6 +4,7 @@
 // AUDIT_SERVICE é stub: só o banco é real.
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import {
+  createZip,
   getFiscalIcmsReportingFields,
   getFiscalIpiReportingFields,
   getFiscalNcmReportingFields,
@@ -26,6 +27,29 @@ const REPORTS_SECRET = "crud-smoke-reports-secret";
 // Objetos rasos com arrays de string: JSON com chaves ordenadas é o canonicalJson do Worker.
 function canonical(value: Record<string, unknown>): string {
   return JSON.stringify(value, Object.keys(value).sort());
+}
+
+/** NF-e com chave de acesso válida (DV módulo 11), um item por valor. */
+function nfeWithKey(number: number, values: string[]): { key: string; xml: string } {
+  const issuer = "11222333000181";
+  const base = `352610${issuer}55001${String(number).padStart(9, "0")}100000001`;
+  let weight = 2;
+  let sum = 0;
+  for (let i = base.length - 1; i >= 0; i -= 1) {
+    sum += Number(base[i]) * weight;
+    weight = weight === 9 ? 2 : weight + 1;
+  }
+  const key = `${base}${sum % 11 < 2 ? 0 : 11 - (sum % 11)}`;
+  const det = values
+    .map(
+      (value, index) =>
+        `<det nItem="${index + 1}"><prod><cProd>P${index + 1}</cProd><xProd>Item</xProd><NCM>22030000</NCM><CFOP>6102</CFOP><qCom>1.5</qCom><vProd>${value}</vProd></prod></det>`,
+    )
+    .join("");
+  return {
+    key,
+    xml: `<NFe><infNFe Id="NFe${key}"><ide><mod>55</mod><serie>1</serie><nNF>${number}</nNF></ide><emit><CNPJ>${issuer}</CNPJ></emit>${det}</infNFe></NFe>`,
+  };
 }
 
 function reportingHeaders(
@@ -227,6 +251,508 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     expectOk(await call("GET", `/fiscal/ipi?ipi_id=${id}`), "GET após DELETE", [404]);
   });
 
+  it("controle mensal: geração única sob concorrência, elegibilidade, abertura excepcional e reabertura", async () => {
+    const eligible = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Controle ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+      // Meio do mês: o pg grava Date em hora local e 01/01 00:00Z viraria 31/12.
+      competence_entry: new Date("2026-08-15T12:00:00.000Z"),
+    });
+    const withoutFiscal = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Sem Fiscal ${suffix}`,
+      status: "Ativo",
+      fiscal: false,
+    });
+    const eligibleId = String(eligible.id);
+    const withoutFiscalId = String(withoutFiscal.id);
+
+    const before = expectOk(
+      await call("GET", "/fiscal/monthly-controls?competence=2026-07"),
+      "GET antes da entrada",
+    );
+    expect(before.data.items.map((item: { client_id: string }) => item.client_id)).not.toContain(
+      eligibleId,
+    );
+
+    const lists = await Promise.all(
+      Array.from({ length: 5 }, () => call("GET", "/fiscal/monthly-controls?competence=2026-09")),
+    );
+    for (const list of lists) expectOk(list, "GET concorrente");
+    const listed = expectOk(
+      await call("GET", "/fiscal/monthly-controls?competence=2026-09"),
+      "GET /fiscal/monthly-controls",
+    );
+    const mine = listed.data.items.filter(
+      (item: { client_id: string }) => item.client_id === eligibleId,
+    );
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({
+      competence: "2026-09",
+      status: "PENDING",
+      no_movement: false,
+      regime: "Simples Nacional",
+      client_name: `Smoke Controle ${suffix}`,
+    });
+    expect(listed.data.items.map((item: { client_id: string }) => item.client_id)).not.toContain(
+      withoutFiscalId,
+    );
+
+    expectOk(
+      await call("POST", "/fiscal/monthly-controls", {
+        client_id: withoutFiscalId,
+        competence: "2026-09",
+      }),
+      "POST excepcional sem motivo",
+      [400],
+    );
+    const opened = expectOk(
+      await call("POST", "/fiscal/monthly-controls", {
+        client_id: withoutFiscalId,
+        competence: "2026-09",
+        reason: "Apuração avulsa pedida pelo cliente",
+      }),
+      "POST excepcional",
+      [201],
+    );
+    expect(opened.data.control.opening_reason).toBe("Apuração avulsa pedida pelo cliente");
+    const again = expectOk(
+      await call("POST", "/fiscal/monthly-controls", {
+        client_id: withoutFiscalId,
+        competence: "2026-09",
+        reason: "De novo",
+      }),
+      "POST repetido",
+      [200],
+    );
+    expect(again.data).toMatchObject({ created: false, control: { id: opened.data.control.id } });
+
+    const id = mine[0].id as string;
+    const completed = expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${id}`, {
+        status: "COMPLETED",
+        no_movement: true,
+        // Sem registro na Triagem: conclusão excepcional (owner é nível 3).
+        reason: "Sem Triagem nesta competência",
+      }),
+      "PATCH concluir",
+    );
+    expect(completed.data).toMatchObject({ status: "COMPLETED", no_movement: true });
+    expectOk(
+      await call(
+        "PATCH",
+        `/fiscal/monthly-controls/${id}`,
+        { status: "IN_PROGRESS", reason: "Retificação" },
+        await smokeHeaders({ type: "user", permission: 2, modules: { fiscal: 2 } }),
+      ),
+      "PATCH reabrir nível 2",
+      [403],
+    );
+    const reopened = expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${id}`, {
+        status: "IN_PROGRESS",
+        reason: "Retificação",
+      }),
+      "PATCH reabrir nível 3",
+    );
+    expect(reopened.data.status).toBe("IN_PROGRESS");
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    expectOk(
+      await call(
+        "PATCH",
+        `/fiscal/monthly-controls/${id}`,
+        { status: "COMPLETED" },
+        otherOrganization,
+      ),
+      "PATCH de outra organização",
+      [403, 404],
+    );
+  });
+
+  it("obrigações mensais: sugestão por regime, pendências, cumprimento, dispensa e isolamento por competência", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Obrigações ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+    });
+    const clientId = String(client.id);
+    const mineIn = async (competence: string) => {
+      const list = expectOk(
+        await call("GET", `/fiscal/monthly-controls?competence=${competence}`),
+        `GET ${competence}`,
+      );
+      return list.data.items.find((item: { client_id: string }) => item.client_id === clientId);
+    };
+
+    const august = await mineIn("2026-08");
+    const september = await mineIn("2026-09");
+    expect(september.pending_obligations).toBe(1);
+    const base = `/fiscal/monthly-controls/${september.id}/obligations`;
+    const listed = expectOk(await call("GET", base), "GET obrigações");
+    expect(listed.data.items.map((item: { code: string }) => item.code)).toEqual(["PGDAS_D"]);
+    // Optante do Simples é dispensada da DIRBI.
+    expect(listed.data.addable.map((item: { code: string }) => item.code)).not.toContain("DIRBI");
+
+    expectOk(
+      await call("PATCH", `${base}/PGDAS_D`, { applicable: false }),
+      "não aplicável sem motivo",
+      [400],
+    );
+    const completed = expectOk(
+      await call("PATCH", `${base}/PGDAS_D`, { completed_on: "2026-09-10", protocol: "REC-1" }),
+      "cumprir PGDAS-D",
+    );
+    expect(completed.data).toMatchObject({
+      status: "COMPLETED",
+      completed_on: "2026-09-10",
+      protocol: "REC-1",
+    });
+    expectOk(
+      await call("POST", base, { code: "DIRBI", reason: "Benefício fiscal declarado" }),
+      "DIRBI no Simples",
+      [400],
+    );
+    expectOk(
+      await call("POST", base, { code: "DCTFWEB", reason: "Empresa com folha no mês" }),
+      "incluir DCTFWeb",
+      [201],
+    );
+    const dispensed = expectOk(
+      await call("PATCH", `${base}/DCTFWEB`, { applicable: false, reason: "Folha zerada" }),
+      "dispensar DCTFWeb",
+    );
+    expect(dispensed.data).toMatchObject({
+      status: "NOT_APPLICABLE",
+      not_applicable_reason: "Folha zerada",
+    });
+
+    const after = await mineIn("2026-09");
+    expect(after).toMatchObject({ pending_obligations: 0, status: "PENDING" });
+    expect((await mineIn("2026-08")).pending_obligations).toBe(august.pending_obligations);
+
+    expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${september.id}`, {
+        status: "COMPLETED",
+        reason: "Sem Triagem nesta competência",
+      }),
+      "concluir controle",
+    );
+    expectOk(
+      await call("PATCH", `${base}/PGDAS_D`, { completed_on: null }),
+      "obrigação com controle concluído",
+      [409],
+    );
+  });
+
+  it("conclusão: Triagem em dia conclui no nível 2; com pendência só nível 3 com justificativa, sem tocar na Triagem", async () => {
+    const insertClient = async (name: string) =>
+      String(
+        (
+          await smokeInsert("clients", {
+            id: randomUUID(),
+            name: `${name} ${suffix}`,
+            status: "Ativo",
+            fiscal: true,
+            regime: "Lucro Presumido",
+          })
+        ).id,
+      );
+    const upToDate = await insertClient("Smoke Triagem em dia");
+    const pending = await insertClient("Smoke Triagem pendente");
+    const checklist = { inbound_report: "PENDING", outbound_report: "COMPLETED" };
+    for (const [clientId, items] of [
+      [upToDate, { inbound_report: "COMPLETED", outbound_report: "NOT_PRESENT" }],
+      [pending, checklist],
+    ] as const) {
+      await smokeInsert("triagem.monthly", {
+        id: randomUUID(),
+        client_id: clientId,
+        competence: "2026-09",
+        type: "FISCAL",
+        checklist: items,
+      });
+    }
+
+    const list = expectOk(
+      await call("GET", "/fiscal/monthly-controls?competence=2026-09"),
+      "GET carteira",
+    );
+    const find = (clientId: string) =>
+      list.data.items.find((item: { client_id: string }) => item.client_id === clientId);
+    expect(find(upToDate).triage_pending).toBe(0);
+    expect(find(pending).triage_pending).toBe(1);
+
+    const editor = await smokeHeaders({ type: "user", permission: 2, modules: { fiscal: 2 } });
+    expectOk(
+      await call(
+        "PATCH",
+        `/fiscal/monthly-controls/${find(upToDate).id}`,
+        { status: "COMPLETED" },
+        editor,
+      ),
+      "nível 2 conclui em dia",
+    );
+    expectOk(
+      await call(
+        "PATCH",
+        `/fiscal/monthly-controls/${find(pending).id}`,
+        { status: "COMPLETED", reason: "Urgente" },
+        editor,
+      ),
+      "nível 2 com pendência",
+      [403],
+    );
+    expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${find(pending).id}`, { status: "COMPLETED" }),
+      "nível 3 sem justificativa",
+      [400],
+    );
+    const completed = expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${find(pending).id}`, {
+        status: "COMPLETED",
+        reason: "Relatório recebido por e-mail",
+      }),
+      "conclusão excepcional",
+    );
+    expect(completed.data.status).toBe("COMPLETED");
+
+    const triage = expectOk(
+      await call("GET", `/fiscal/monthly-controls/${find(pending).id}/triage`, undefined, editor),
+      "GET triagem do controle",
+    );
+    // A Triagem fica como estava.
+    expect(triage.data).toMatchObject({
+      source: "MONTHLY",
+      pending: 1,
+      items: [
+        { field: "inbound_report", status: "PENDING" },
+        { field: "outbound_report", status: "COMPLETED" },
+      ],
+    });
+  });
+
+  it("responsáveis: snapshot ao nascer, carteira atual separada e transferência auditada", async () => {
+    const { ownerId, userId, databaseUrl, organizationId } = requireSmokeState();
+    const clientId = String(
+      (
+        await smokeInsert("clients", {
+          id: randomUUID(),
+          name: `Smoke Responsável ${suffix}`,
+          status: "Ativo",
+          fiscal: true,
+          regime: "Lucro Real",
+        })
+      ).id,
+    );
+    await smokeInsert("triagem.responsibles", {
+      id: randomUUID(),
+      client_id: clientId,
+      user_id: ownerId,
+      type: "FISCAL",
+    });
+    const mineIn = async (competence: string) => {
+      const list = expectOk(
+        await call("GET", `/fiscal/monthly-controls?competence=${competence}`),
+        `GET ${competence}`,
+      );
+      return list.data.items.find((item: { client_id: string }) => item.client_id === clientId);
+    };
+
+    const august = await mineIn("2026-08");
+    expect(august).toMatchObject({ responsible_id: ownerId, default_responsible_id: ownerId });
+
+    // A carteira muda: vale para competências novas, sem reescrever agosto.
+    const { createRequire } = await import("node:module");
+    const require = createRequire(new URL("../../../infra/package.json", import.meta.url));
+    const { Client } = require("pg") as {
+      Client: new (
+        options: object,
+      ) => {
+        connect(): Promise<void>;
+        end(): Promise<void>;
+        query(text: string, values?: unknown[]): Promise<unknown>;
+      };
+    };
+    const pg = new Client({ connectionString: databaseUrl });
+    await pg.connect();
+    await pg.query(
+      `update "triagem.responsibles" set user_id = $1
+        where organization_id = $2 and client_id = $3 and type = 'FISCAL'`,
+      [userId, organizationId, clientId],
+    );
+    await pg.end();
+
+    const september = await mineIn("2026-09");
+    expect(september).toMatchObject({ responsible_id: userId, default_responsible_id: userId });
+    expect(await mineIn("2026-08")).toMatchObject({
+      responsible_id: ownerId,
+      default_responsible_id: userId,
+    });
+
+    const candidates = expectOk(
+      await call("GET", "/fiscal/monthly-controls/responsibles"),
+      "GET candidatos",
+    );
+    expect(candidates.data.map((user: { id: string }) => user.id)).toEqual(
+      expect.arrayContaining([ownerId, userId]),
+    );
+
+    const editor = await smokeHeaders({ type: "user", permission: 2, modules: { fiscal: 2 } });
+    expectOk(
+      await call(
+        "POST",
+        "/fiscal/monthly-controls/transfer",
+        { control_ids: [september.id], to_user_id: ownerId, reason: "Férias" },
+        editor,
+      ),
+      "transferência nível 2",
+      [403],
+    );
+    const single = expectOk(
+      await call("POST", "/fiscal/monthly-controls/transfer", {
+        control_ids: [september.id],
+        to_user_id: ownerId,
+        reason: "Férias do responsável",
+      }),
+      "transferência individual",
+    );
+    expect(single.data).toEqual({ transferred: [september.id], skipped: [] });
+
+    expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${august.id}`, {
+        status: "COMPLETED",
+        reason: "Sem Triagem nesta competência",
+      }),
+      "concluir agosto",
+    );
+    expectOk(
+      await call("POST", "/fiscal/monthly-controls/transfer", {
+        control_ids: [august.id],
+        to_user_id: userId,
+        reason: "Redistribuição",
+      }),
+      "transferência individual de concluído",
+      [409],
+    );
+    const batch = expectOk(
+      await call("POST", "/fiscal/monthly-controls/transfer", {
+        control_ids: [august.id, september.id],
+        to_user_id: userId,
+        reason: "Redistribuição",
+      }),
+      "transferência em lote",
+    );
+    expect(batch.data).toEqual({
+      transferred: [september.id],
+      skipped: [{ id: august.id, reason: "Controle concluído." }],
+    });
+    expect(await mineIn("2026-08")).toMatchObject({ responsible_id: ownerId });
+
+    // Responsáveis × Empresas: agosto mantém o responsável do controle; a visão atual segue a carteira.
+    const report = async (query: string) =>
+      expectOk(
+        await call("GET", `/fiscal/monthly-controls/responsibles-report?${query}`),
+        `relatório ${query}`,
+      ).data as { items: Array<{ client_id: string }>; csv: string };
+    const clientIds = (data: { items: Array<{ client_id: string }> }) =>
+      data.items.map((item) => item.client_id);
+    const augustOwner = await report(
+      `basis=competence&competence=2026-08&responsible_id=${ownerId}`,
+    );
+    expect(clientIds(augustOwner)).toContain(clientId);
+    expect(augustOwner.csv).toContain(`Smoke Responsável ${suffix}`);
+    expect(
+      clientIds(await report(`basis=competence&competence=2026-08&responsible_id=${userId}`)),
+    ).not.toContain(clientId);
+    expect(clientIds(await report(`basis=current&responsible_id=${userId}`))).toContain(clientId);
+    expect(clientIds(await report(`basis=current&responsible_id=${ownerId}`))).not.toContain(
+      clientId,
+    );
+  });
+
+  it("controle anual: um por cliente e ano sob concorrência, DEFIS no Simples, declarações e trilha", async () => {
+    const insertClient = async (name: string, regime: string) =>
+      String(
+        (
+          await smokeInsert("clients", {
+            id: randomUUID(),
+            name: `${name} ${suffix}`,
+            status: "Ativo",
+            fiscal: true,
+            regime,
+          })
+        ).id,
+      );
+    const simples = await insertClient("Smoke Anual Simples", "Simples Nacional");
+    const real = await insertClient("Smoke Anual Real", "Lucro Real");
+
+    const lists = await Promise.all(
+      Array.from({ length: 4 }, () => call("GET", "/fiscal/annual-controls?year=2025")),
+    );
+    for (const list of lists) expectOk(list, "GET anual concorrente");
+    const list = expectOk(await call("GET", "/fiscal/annual-controls?year=2025"), "GET anual");
+    const find = (clientId: string) =>
+      list.data.items.filter((item: { client_id: string }) => item.client_id === clientId);
+    expect(find(simples)).toHaveLength(1);
+    expect(find(simples)[0].declarations).toEqual([
+      { code: "DEFIS", status: "PENDING", completed_on: null },
+    ]);
+    expect(find(real)[0].declarations).toEqual([]);
+    expect(find(simples)[0]).not.toHaveProperty("status");
+
+    const realBase = `/fiscal/annual-controls/${find(real)[0].id}/items`;
+    const addable = expectOk(await call("GET", realBase), "GET declarações Real");
+    expect(addable.data.addable.map((item: { code: string }) => item.code)).toEqual([
+      "DMED",
+      "DIMOB",
+    ]);
+    expectOk(
+      await call("POST", realBase, { code: "DEFIS", reason: "x".repeat(3) }),
+      "DEFIS no Real",
+      [400],
+    );
+    expectOk(await call("POST", realBase, { code: "DIMOB" }), "DIMOB sem motivo", [400]);
+    expectOk(
+      await call("POST", realBase, { code: "DIMOB", reason: "Incorporadora" }),
+      "incluir DIMOB",
+      [201],
+    );
+
+    const simplesBase = `/fiscal/annual-controls/${find(simples)[0].id}/items`;
+    const done = expectOk(
+      await call("PATCH", `${simplesBase}/DEFIS`, {
+        completed_on: "2026-03-20",
+        protocol: "DEF-1",
+      }),
+      "cumprir DEFIS",
+    );
+    expect(done.data).toMatchObject({ status: "COMPLETED", completed_on: "2026-03-20" });
+    expectOk(
+      await call("PATCH", `${simplesBase}/DEFIS`, { applicable: false, reason: "MEI" }),
+      "dispensar cumprida",
+      [409],
+    );
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    expectOk(
+      await call("GET", simplesBase, undefined, otherOrganization),
+      "declarações de outra organização",
+      [403, 404],
+    );
+  });
+
   it("receitas mensais: cria, recusa duplicada, lista por período e corrige", async () => {
     const client = await smokeInsert("clients", {
       id: randomUUID(),
@@ -315,6 +841,262 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       "GET após tentativa de outra organização",
     );
     expect(after.data.data[0].amount).toBe("999.1");
+  });
+
+  it("malhas: cria, atualiza com histórico, filtra e isola por organização", async () => {
+    const state = requireSmokeState();
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Malha ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+    });
+    const clientId = String(client.id);
+    const created = expectOk(
+      await call("POST", "/fiscal/malhas", {
+        client_id: clientId,
+        period_start: "2025-01",
+        period_end: "2025-12",
+        reason: "Divergência DCTFWeb",
+        deadline: "2026-11-10",
+        responsible_id: state.ownerId,
+      }),
+      "POST /fiscal/malhas",
+    );
+    const id = created.data.id as string;
+    expect(created.data).toMatchObject({ status: "aberta", deadline: "2026-11-10" });
+    expectOk(
+      await call("POST", "/fiscal/malhas", {
+        client_id: clientId,
+        period_start: "2025-01",
+        period_end: "2025-12",
+        reason: "x",
+        task_id: randomUUID(),
+      }),
+      "POST com tarefa inexistente",
+      [404],
+    );
+
+    expectOk(
+      await call("PUT", `/fiscal/malhas/${id}`, { status: "respondida", deadline: null }),
+      "PUT /fiscal/malhas/:id",
+    );
+    const detail = expectOk(await call("GET", `/fiscal/malhas/${id}`), "GET /fiscal/malhas/:id");
+    const history = detail.data.history as { field: string; new_value: string | null }[];
+    expect(history.filter((row) => row.field === "status").map((row) => row.new_value)).toEqual([
+      "respondida",
+      "aberta",
+    ]);
+    expect(history.find((row) => row.field === "deadline")).toMatchObject({ new_value: null });
+
+    const list = expectOk(
+      await call("GET", `/fiscal/malhas/list?client_id=${clientId}&status=respondida`),
+      "GET /fiscal/malhas/list",
+    );
+    expect(list.data.data.map((row: { id: string }) => row.id)).toEqual([id]);
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreign = await call("GET", `/fiscal/malhas/${id}`, undefined, otherOrganization);
+    expect(foreign.status).not.toBe(200);
+    const foreignUpdate = await call(
+      "PUT",
+      `/fiscal/malhas/${id}`,
+      { status: "encerrada" },
+      otherOrganization,
+    );
+    expect(foreignUpdate.status).not.toBe(200);
+  });
+
+  it("antecipações: importa lote, recusa duplicata entre lotes e isola por organização", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Antecipação ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+    });
+    const clientId = String(client.id);
+    const number = Number(suffix);
+    const note = nfeWithKey(number, ["10.00", "5.50"]);
+    const zip = (files: Record<string, string>) =>
+      createZip(
+        Object.entries(files).map(([fileName, text]) => ({ fileName, body: Buffer.from(text) })),
+      ).toString("base64");
+    const body = (files: Record<string, string>) => ({
+      client_id: clientId,
+      competence: "2026-09",
+      file_name: "notas.zip",
+      zip_base64: zip(files),
+    });
+
+    const created = expectOk(
+      await call("POST", "/fiscal/anticipations/batches", body({ "a.xml": note.xml })),
+      "POST /fiscal/anticipations/batches",
+    );
+    const id = created.data.id as string;
+    expect(created.data).toMatchObject({
+      status: "pending_review",
+      competence: "2026-09",
+      item_count: 2,
+      issues: [],
+    });
+    expect(created.data.items[1]).toMatchObject({
+      access_key: note.key,
+      item_number: 2,
+      quantity: "1.5",
+      value: "5.5",
+    });
+
+    // A mesma nota de novo, mais uma nota nova: só a nova entra, a repetida vira issue.
+    const second = expectOk(
+      await call(
+        "POST",
+        "/fiscal/anticipations/batches",
+        body({ "a.xml": note.xml, "b.xml": nfeWithKey(number + 1, ["1.00"]).xml }),
+      ),
+      "POST com duplicata de outro lote",
+    );
+    expect(second.data.item_count).toBe(1);
+    expect(second.data.issues).toEqual([
+      expect.objectContaining({ entry: "a.xml", kind: "duplicate" }),
+      expect.objectContaining({ entry: "a.xml", kind: "duplicate" }),
+    ]);
+    expectOk(
+      await call("POST", "/fiscal/anticipations/batches", body({ "a.xml": note.xml })),
+      "POST só com duplicatas",
+      [400],
+    );
+
+    const list = expectOk(
+      await call("GET", `/fiscal/anticipations/batches/list?client_id=${clientId}`),
+      "GET /fiscal/anticipations/batches/list",
+    );
+    expect(list.data.total).toBe(2);
+    expectOk(
+      await call("GET", `/fiscal/anticipations/batches/${id}`),
+      "GET /fiscal/anticipations/batches/:id",
+    );
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreign = await call(
+      "GET",
+      `/fiscal/anticipations/batches/${id}`,
+      undefined,
+      otherOrganization,
+    );
+    expect(foreign.status).not.toBe(200);
+
+    // FIS-17: classifica e corrige com histórico, envia, devolve e aprova.
+    const [firstItem, secondItem] = created.data.items as { id: string }[];
+    const itemPath = (itemId: string | undefined) =>
+      `/fiscal/anticipations/batches/${id}/items/${itemId}`;
+    const reviewed = expectOk(
+      await call("PUT", itemPath(firstItem?.id), {
+        classification: "partial",
+        manual_value: "7.5",
+        corrections: { ncm: "22029900", quantity: "1.25" },
+        reason: "Conferido com o pedido",
+      }),
+      "PUT item",
+    );
+    expect(reviewed.data).toMatchObject({
+      classification: "partial",
+      manual_value: "7.50",
+      corrections: { ncm: "22029900", quantity: "1.25" },
+      ncm: "22030000",
+    });
+    const reviewer = requireSmokeState().ownerId;
+    expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/submit`, { reviewer_id: reviewer }),
+      "submit com item sem classificação",
+      [400],
+    );
+    expectOk(
+      await call("PUT", itemPath(secondItem?.id), { classification: "freight", reason: "Frete" }),
+      "PUT segundo item",
+    );
+    const submitted = expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/submit`, { reviewer_id: reviewer }),
+      "POST submit",
+    );
+    expect(submitted.data).toMatchObject({ status: "awaiting_check", reviewer_id: reviewer });
+    expectOk(
+      await call("PUT", itemPath(firstItem?.id), { classification: "total", reason: "x" }),
+      "PUT com lote em conferência",
+      [409],
+    );
+    expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/check`, {
+        decision: "return",
+        reason: "Rever o frete",
+      }),
+      "POST check return",
+    );
+    expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/submit`, { reviewer_id: reviewer }),
+      "POST resubmit",
+    );
+    const checked = expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/check`, { decision: "approve" }),
+      "POST check approve",
+    );
+    expect(checked.data.status).toBe("checked");
+
+    // FIS-18: demonstrativo do mesmo lote com a origem de cada valor.
+    const csv = await call("GET", `/fiscal/anticipations/batches/${id}/csv`);
+    expect(csv.status).toBe(200);
+    expect(csv.text).toContain("Estado da revisão;Conferido");
+    expect(csv.text).toContain("22029900;Corrigido;22030000");
+    expect(csv.text).toContain("7,50;Informado manualmente");
+    const pdf = await call("GET", `/fiscal/anticipations/batches/${id}/pdf`);
+    expect(pdf.status).toBe(200);
+    const detail = expectOk(await call("GET", `/fiscal/anticipations/batches/${id}`), "GET detail");
+    const fields = (detail.data.history as { field: string }[]).map((row) => row.field);
+    expect(fields.filter((field) => field === "status")).toHaveLength(4);
+    expect(fields).toEqual(
+      expect.arrayContaining(["classification", "manual_value", "correction.ncm", "reviewer_id"]),
+    );
+  });
+
+  it("atacadista: marca, desmarca com trilha e isola por organização", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Atacadista ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+    });
+    const clientId = String(client.id);
+    const path = `/fiscal/clients/${clientId}/wholesale`;
+    const initial = expectOk(await call("GET", path), "GET wholesale inicial");
+    expect(initial.data).toMatchObject({ is_wholesale: false, history: [] });
+
+    expectOk(await call("PUT", path, { is_wholesale: true }), "PUT wholesale true");
+    expectOk(await call("PUT", path, { is_wholesale: true }), "PUT wholesale repetido");
+    const final = expectOk(await call("PUT", path, { is_wholesale: false }), "PUT wholesale false");
+    expect(final.data.is_wholesale).toBe(false);
+    expect(
+      final.data.history.map((row: { previous_value: boolean; new_value: boolean }) => [
+        row.previous_value,
+        row.new_value,
+      ]),
+    ).toEqual([
+      [true, false],
+      [false, true],
+    ]);
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreign = await call("PUT", path, { is_wholesale: true }, otherOrganization);
+    expect(foreign.status).not.toBe(200);
+    const after = expectOk(await call("GET", path), "GET após outra organização");
+    expect(after.data.is_wholesale).toBe(false);
   });
 
   it("lote do Simples: CSV com elegíveis e motivo dos ignorados", async () => {

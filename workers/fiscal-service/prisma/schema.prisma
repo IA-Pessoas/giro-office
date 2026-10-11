@@ -33,6 +33,7 @@ model Client {
   organization_id   String
   type              String
   status            String
+  competence_entry  DateTime?
   competence_output DateTime?
   regime            String?
   fiscal            Boolean?
@@ -71,6 +72,122 @@ model FiscalMonthlyRevenue {
   @@map("fiscal.monthly_revenues")
 }
 
+model FiscalMonthlyControl {
+  id              String                      @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime                    @db.Date
+  status          String                      @default("PENDING")
+  no_movement     Boolean                     @default(false)
+  regime          String?
+  opening_reason  String?
+  responsible_id  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  events          FiscalMonthlyControlEvent[]
+  obligations     FiscalMonthlyControlObligation[]
+
+  @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_controls_org_client_competence")
+  @@index([organization_id, competence], map: "idx_fiscal_monthly_controls_org_competence")
+  @@index([organization_id, responsible_id], map: "idx_fiscal_monthly_controls_org_responsible")
+  @@map("fiscal.monthly_controls")
+}
+
+model FiscalMonthlyControlEvent {
+  id              String               @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  obligation_code String?
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime             @default(now())
+  control         FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_monthly_control_events_control_created")
+  @@map("fiscal.monthly_control_events")
+}
+
+model FiscalMonthlyControlObligation {
+  id                    String               @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean              @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?            @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  control               FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_monthly_control_obligations_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_monthly_control_obligations_org_control")
+  @@map("fiscal.monthly_control_obligations")
+}
+
+model FiscalAnnualControl {
+  id              String                     @id @default(uuid())
+  organization_id String
+  client_id       String
+  year            Int
+  regime          String?
+  responsible_id  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  items           FiscalAnnualControlItem[]
+  events          FiscalAnnualControlEvent[]
+
+  @@unique([organization_id, client_id, year], map: "uq_fiscal_annual_controls_org_client_year")
+  @@index([organization_id, year], map: "idx_fiscal_annual_controls_org_year")
+  @@map("fiscal.annual_controls")
+}
+
+model FiscalAnnualControlItem {
+  id                    String              @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean             @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?           @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  control               FiscalAnnualControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_annual_control_items_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_annual_control_items_org_control")
+  @@map("fiscal.annual_control_items")
+}
+
+model FiscalAnnualControlEvent {
+  id              String              @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  item_code       String?
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime            @default(now())
+  control         FiscalAnnualControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_annual_control_events_control_created")
+  @@map("fiscal.annual_control_events")
+}
+
 model Ncm {
   id                    String    @id @default(uuid())
   tax_regime            String
@@ -103,4 +220,199 @@ model Ipi {
   organization_id String
 
   @@map("fiscal.ipi")
+}
+
+model FiscalMalha {
+  id                       String    @id @default(uuid())
+  organization_id          String
+  client_id                String
+  period_start             DateTime  @db.Date
+  period_end               DateTime  @db.Date
+  reason                   String
+  deadline                 DateTime? @db.Date
+  status                   String
+  responsible_id           String?
+  task_id                  String?
+  attachment_path          String?
+  attachment_original_name String?
+  attachment_mime_type     String?
+  attachment_size_bytes    Int?
+  attachment_uploaded_at   DateTime?
+  attachment_uploaded_by   String?
+  created_by               String
+  updated_by               String
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@map("fiscal.malhas")
+}
+
+model FiscalMalhaHistory {
+  id              String   @id @default(uuid())
+  organization_id String
+  malha_id        String
+  field           String
+  previous_value  String?
+  new_value       String?
+  actor_user_id   String
+  created_at      DateTime @default(now())
+
+  @@map("fiscal.malha_history")
+}
+
+model FiscalClientWholesaleHistory {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  sequence        Int
+  previous_value  Boolean
+  new_value       Boolean
+  actor_user_id   String
+  created_at      DateTime @default(now())
+
+  @@unique([client_id, sequence], map: "uq_fiscal_client_wholesale_history_client_sequence")
+  @@map("fiscal.client_wholesale_history")
+}
+
+model Task {
+  id              String @id
+  organization_id String
+
+  @@map("integracao.tasks")
+}
+
+// Só leitura: o Fiscal consulta o checklist documental da Triagem, nunca edita.
+model TriageMonthly {
+  id              String    @id @default(uuid())
+  client_id       String
+  competence      String
+  type            String
+  checklist       Json
+  archived_at     DateTime?
+  organization_id String
+
+  @@unique([organization_id, client_id, competence, type])
+  @@map("triagem.monthly")
+}
+
+model TriageCompetence {
+  id                     String    @id @default(uuid())
+  organization_id        String
+  client_id              String
+  competence             String
+  configuration_snapshot Json
+  archived_at            DateTime?
+
+  @@unique([organization_id, client_id, competence])
+  @@map("triagem.competences")
+}
+
+// Lote de antecipações importado de ZIP de XML NF-e (E3); revisão manual, sem cálculo de imposto.
+model FiscalAnticipationBatch {
+  id              String                   @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime                 @db.Date
+  file_name       String
+  status          String                   @default("pending_review")
+  responsible_id  String
+  reviewer_id     String?
+  entry_count     Int
+  note_count      Int
+  item_count      Int
+  issues          Json                     @default("[]")
+  created_by      String
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  items           FiscalAnticipationItem[]
+  history         FiscalAnticipationHistory[]
+
+  @@index([organization_id, client_id, competence], map: "idx_fiscal_anticipation_batches_org_client_comp")
+  @@map("fiscal.anticipation_batches")
+}
+
+// Item de NF-e extraído do lote; chave de acesso + item é única na organização.
+model FiscalAnticipationItem {
+  id              String                  @id @default(uuid())
+  organization_id String
+  client_id       String
+  batch_id        String
+  entry           String
+  access_key      String
+  issuer          String
+  model           String
+  series          String
+  note_number     String
+  item_number     Int
+  code            String
+  description     String
+  ncm             String
+  cfop            String
+  quantity        Decimal?                @db.Decimal(15, 4)
+  value           Decimal?                @db.Decimal(15, 2)
+  ipi             Decimal?                @db.Decimal(15, 2)
+  icms_st         Decimal?                @db.Decimal(15, 2)
+  classification  String?
+  manual_value    Decimal?                @db.Decimal(15, 2)
+  corrections     Json                    @default("{}")
+  created_at      DateTime                @default(now())
+  batch           FiscalAnticipationBatch @relation(fields: [batch_id], references: [id], onDelete: Restrict)
+  history         FiscalAnticipationHistory[]
+
+  @@unique([organization_id, access_key, item_number], map: "uq_fiscal_anticipation_items_org_key_item")
+  @@index([organization_id, batch_id, access_key, item_number], map: "idx_fiscal_anticipation_items_org_batch")
+  @@map("fiscal.anticipation_items")
+}
+
+// Trilha da revisão de antecipações: classificação, correção, valor manual e estado do lote.
+model FiscalAnticipationHistory {
+  id              String                  @id @default(uuid())
+  organization_id String
+  batch_id        String
+  item_id         String?
+  field           String
+  previous_value  String?
+  new_value       String?
+  reason          String?
+  actor_user_id   String
+  created_at      DateTime                @default(now())
+  batch           FiscalAnticipationBatch @relation(fields: [batch_id], references: [id], onDelete: Restrict)
+  item            FiscalAnticipationItem? @relation(fields: [item_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, batch_id, created_at], map: "idx_fiscal_anticipation_history_org_batch_created")
+  @@map("fiscal.anticipation_history")
+}
+
+// Só leitura: responsável fiscal padrão do cliente, mantido pela Triagem.
+model TriageResponsible {
+  id              String @id @default(uuid())
+  client_id       String
+  user_id         String
+  type            String
+  organization_id String
+
+  @@unique([organization_id, client_id, type])
+  @@map("triagem.responsibles")
+}
+
+// Só leitura: nome do responsável e candidatos à transferência (acesso Fiscal na organização).
+model User {
+  id              String       @id @default(uuid())
+  name            String
+  status          String
+  organization_id String?
+  permissions     Permission[]
+
+  @@map("users")
+}
+
+model Permission {
+  id              String @id @default(uuid())
+  user_id         String
+  fiscal          Int    @default(0)
+  organization_id String
+  user            User   @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, organization_id], map: "uq_permissions_user_org")
+  @@map("permissions")
 }

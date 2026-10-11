@@ -11,6 +11,9 @@ import type {
   PessoalObligationCreatePayload,
   PessoalObligationCreateResult,
   PessoalObligationGenerationResult,
+  PessoalObligationHistoryPage,
+  PessoalObligationPortfolioFilters,
+  PessoalObligationPortfolioPage,
   PessoalObligationUpdatePayload,
 } from "../types/obligations";
 import type {
@@ -22,6 +25,10 @@ import type {
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import type {
   PessoalLdd,
+  PessoalLddImportPayload,
+  PessoalLddImportPreview,
+  PessoalLddImportPreviewPayload,
+  PessoalLddImportResult,
   PessoalLddListParams,
   PessoalLddPayload,
   PessoalLddUpdatePayload,
@@ -121,6 +128,24 @@ export function buildPessoalObligationParams(
     client_id: clientId,
     competence,
   };
+}
+
+/** Remove filtros vazios; estado sem item só vale para "pendente em qualquer item". */
+export function buildPessoalObligationPortfolioParams(
+  filters: PessoalObligationPortfolioFilters,
+): Record<string, string | number> {
+  const params: Record<string, string | number> = {
+    competence: filters.competence,
+    page: filters.page,
+    pageSize: filters.pageSize,
+  };
+  if (filters.responsavel_id) params.responsavel_id = filters.responsavel_id;
+  if (filters.group_id) params.group_id = filters.group_id;
+  if (filters.item) params.item = filters.item;
+  if (filters.state && (filters.item || filters.state === "pending")) {
+    params.state = filters.state;
+  }
+  return params;
 }
 
 export function buildPessoalLddListParams(clientId?: string): PessoalLddListParams {
@@ -356,6 +381,30 @@ export const pessoalService = {
     }
   },
 
+  async listObligationPortfolio(
+    filters: PessoalObligationPortfolioFilters,
+  ): Promise<PessoalObligationPortfolioPage> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.obligationPortfolio, {
+      params: buildPessoalObligationPortfolioParams(filters),
+    });
+
+    return unwrapPessoalEnvelope<PessoalObligationPortfolioPage>(response.data);
+  },
+
+  async listObligationHistory(
+    id: string,
+    page: number,
+    pageSize: number,
+  ): Promise<PessoalObligationHistoryPage> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.obligationHistory(id), {
+      params: { page, pageSize },
+    });
+
+    return unwrapPessoalEnvelope<PessoalObligationHistoryPage>(response.data);
+  },
+
   async createObligation(
     payload: PessoalObligationCreatePayload,
   ): Promise<PessoalObligationCreateResult> {
@@ -412,6 +461,22 @@ export const pessoalService = {
     const response = await api.delete(PESSOAL_ENDPOINTS.lddDetail(id));
 
     return unwrapPessoalEnvelope<PessoalLdd>(response.data);
+  },
+
+  async previewLddImport(
+    payload: PessoalLddImportPreviewPayload,
+  ): Promise<PessoalLddImportPreview> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.lddImportPreview, payload);
+
+    return unwrapPessoalEnvelope<PessoalLddImportPreview>(response.data);
+  },
+
+  async confirmLddImport(payload: PessoalLddImportPayload): Promise<PessoalLddImportResult> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.lddImport, payload);
+
+    return unwrapPessoalEnvelope<PessoalLddImportResult>(response.data);
   },
 
   async listSituations(clientId: string): Promise<PessoalSituation[]> {

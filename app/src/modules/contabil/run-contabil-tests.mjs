@@ -10,12 +10,23 @@ import {
   unwrapContabilEnvelope,
 } from "./services/contabilService.contract.ts";
 import {
+  contabilControlHistoryQueryKey,
+  contabilRelationshipHistoryQueryKey,
   contabilControlQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
 } from "./hooks/queryKeys.ts";
 import { getContabilErrorMessage } from "./services/contabilError.ts";
+import {
+  describeTriageHistoryEntry,
+  formatTriageHistoryField,
+  formatTriageHistoryValue,
+} from "./components/triageDocumentHistory.helpers.ts";
+import {
+  fiscalTriagePortfolioCsv,
+  fiscalTriagePortfolioExportTable,
+} from "./components/fiscalTriagePortfolioExport.ts";
 import { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess.ts";
 import {
   resolveDepartmentModuleKey,
@@ -25,8 +36,16 @@ import {
   CONTABIL_CONTROL_CHECKLIST_FIELDS,
   CONTABIL_CONTROL_FIELDS,
   CONTABIL_CONTROL_NOTES_FIELD,
+  getContabilControlFieldLabel,
 } from "./components/contabilControlFields.ts";
-import { CONTABIL_RELATIONSHIP_FIELDS } from "./components/contabilRelationshipFields.ts";
+import {
+  CONTABIL_RELATIONSHIP_FIELDS,
+  getContabilRelationshipFieldLabel,
+} from "./components/contabilRelationshipFields.ts";
+import {
+  formatContabilControlHistoryValue,
+  getContabilHistoryPageCount,
+} from "./components/contabilHistory.helpers.ts";
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
@@ -42,15 +61,32 @@ import {
 } from "./components/contabilControlSection.helpers.ts";
 import {
   buildContabilRelationshipFormValues,
+  buildContabilRelationshipPayload,
   buildContabilResponsibleFormValues,
+  formatContabilBidding,
+  formatContabilChartAccounts,
+  formatContabilRelationshipHistoryValue,
+  getContabilChartAccountsOptions,
+  pickChangedContabilRelationshipFields,
   getContabilSelectLabel,
   isContabilTextValueFilled,
   mapAssignableUsersToContabilOptions,
 } from "./components/contabilPartySection.helpers.ts";
 import {
+  AGENDA_REPORT_MAX_MONTHS,
+  agendaReportEvents,
+  agendaReportMonths,
+} from "./components/departmentAgendaReport.helpers.ts";
+import {
   getContabilCardState,
   shouldShowContabilNav,
 } from "./hooks/contabilAccessUi.ts";
+
+import {
+  agendaDateToIso,
+  agendaDay,
+  AGENDA_ENDPOINT,
+} from "../../shared/services/agendaService.contract.ts";
 
 async function runTest(name, fn) {
   try {
@@ -67,6 +103,9 @@ function readWorkspaceSource(relativePath) {
 }
 
 const contabilServiceSources = {
+  permissions: readWorkspaceSource(
+    "../../../../services/contabil-service/src/constants/permissions.ts",
+  ),
   authMiddleware: readWorkspaceSource(
     "../../../../services/contabil-service/src/middlewares/isAuthenticated.ts",
   ),
@@ -187,6 +226,16 @@ await (async () => {
     assert.doesNotMatch(pageSource, /canEdit\s*\/>/);
   });
 
+  await runTest("ficha Contábil mostra a mesma nuvem do cliente que a Triagem (#1728)", () => {
+    const relationship = readWorkspaceSource("./components/ContabilRelationshipSection.tsx");
+    const triage = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+    const usage = /<TriageClientCloudsSection clientId=\{clientId\} canEdit=\{canEdit\} \/>/;
+
+    assert.match(relationship, /from "@modules\/triagem\/components\/TriageClientCloudsSection"/);
+    assert.match(relationship, usage);
+    assert.match(triage, usage);
+  });
+
   await runTest("triagem apresenta competências com criação, listagem e arquivamento", () => {
     const pageSource = readFileSync(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
     const source = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
@@ -232,13 +281,14 @@ await (async () => {
 
   await runTest("triagem apresenta dez documentos com nota, justificativa e banco sem dados de conta", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
 
-    const contabilDocuments = source.slice(
-      source.indexOf("const CONTABIL_DOCUMENTS"),
-      source.indexOf("const FISCAL_DOCUMENTS"),
+    const contabilDocuments = labels.slice(
+      labels.indexOf("const CONTABIL_DOCUMENTS"),
+      labels.indexOf("const FISCAL_DOCUMENTS"),
     );
     assert.equal((contabilDocuments.match(/\["[a-z0-9_]+", "/g) ?? []).length, 10);
-    assert.match(source, /triaged_transactions/);
+    assert.match(labels, /triaged_transactions/);
     assert.match(source, /Nota/);
     assert.match(source, /Justificativa/);
     assert.match(source, /Salvar observações de \$\{label\}/);
@@ -258,12 +308,48 @@ await (async () => {
     assert.match(source, /NOT_RECEIVED/);
   });
 
+  await runTest("triagem contábil configura movimento padrão e atribui o movimento do mês (#1691)", () => {
+    const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    const panel = readWorkspaceSource("./components/TriageMovementPanel.tsx");
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+
+    assert.equal(CONTABIL_ENDPOINTS.triageConfig, "/triagem/config");
+    assert.equal(CONTABIL_ENDPOINTS.triageMonthlyById("m1"), "/triagem/monthly/m1");
+    assert.match(labels, /\["NOT_PRESENT", "Não possui"\]/);
+    assert.match(source, /<TriageMovementPanel/);
+    assert.match(source, /Desativado no movimento padrão/);
+    assert.match(source, /canEdit && !isDisabled\(field\)/);
+    for (const text of [
+      "Movimento padrão do cliente",
+      "Movimento enviado",
+      "Responsável",
+      "Justificativa",
+      "Data de download",
+      "Data de baixa",
+      "Observação",
+    ])
+      assert.ok(panel.includes(text), text);
+    assert.match(panel, /saveMovementConfig/);
+    assert.match(panel, /updateMonthly/);
+  });
+
+  await runTest("triagem fiscal configura documentos especiais e faturamento do shared (#1693)", () => {
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+    const section = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    assert.match(labels, /from "@workspace\/shared\/triagem\/documents"/);
+    assert.match(labels, /TRIAGE_FISCAL_CONFIGURABLE_FIELDS\.map/);
+    assert.match(section, /<FiscalSpecialDocumentsPanel/);
+    assert.match(section, /Faturamento não se aplica a este cliente/);
+    assert.equal(CONTABIL_ENDPOINTS.triageConfig, "/triagem/config");
+  });
+
   await runTest("triagem fiscal apresenta os 14 campos e controla revisão e entrega", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
     const pageSource = readWorkspaceSource("../../pages/triagem.tsx");
-    const fiscalDocuments = source.slice(
-      source.indexOf("const FISCAL_DOCUMENTS"),
-      source.indexOf("const STATUSES"),
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+    const fiscalDocuments = labels.slice(
+      labels.indexOf("const FISCAL_DOCUMENTS"),
+      labels.indexOf("const STATUSES"),
     );
 
     assert.equal((fiscalDocuments.match(/\["[a-z0-9_]+", "/g) ?? []).length, 13);
@@ -300,7 +386,8 @@ await (async () => {
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
-    assert.match(contabilServiceSources.authMiddleware, /const CONTABIL_WRITE_PERMISSION = 2;/);
+    assert.match(contabilServiceSources.permissions, /const CONTABIL_WRITE_PERMISSION = 2;/);
+    assert.match(contabilServiceSources.authMiddleware, /import \{ CONTABIL_WRITE_PERMISSION \} from "\.\.\/constants\/permissions\.js"/);
     assert.match(contabilServiceSources.authMiddleware, /requireContabilWritePermission/);
 
     assert.equal(
@@ -530,37 +617,74 @@ await (async () => {
     ]);
   });
 
+  await runTest("relationship history labels fields and legacy states (#1723)", () => {
+    assert.equal(getContabilRelationshipFieldLabel("bidding"), "Participa de licitação");
+    assert.equal(getContabilRelationshipFieldLabel("chart_accounts"), "Plano de contas");
+    assert.equal(formatContabilRelationshipHistoryValue("bidding", null), "Não selecionado");
+    assert.equal(formatContabilRelationshipHistoryValue("bidding", true), "Sim");
+    assert.equal(formatContabilRelationshipHistoryValue("chart_accounts", "Sim — Jonrick"), "Sim — Jonrick");
+    assert.equal(
+      formatContabilRelationshipHistoryValue("chart_accounts", "Plano próprio"),
+      "Plano próprio (texto legado)",
+    );
+    assert.equal(formatContabilRelationshipHistoryValue("chart_accounts", null), "Não selecionado");
+    assert.equal(formatContabilRelationshipHistoryValue("tool", ""), "(vazio)");
+    assert.deepEqual(contabilRelationshipHistoryQueryKey("client-1", 1), [
+      "contabil",
+      "relationship-history",
+      "client-1",
+      1,
+    ]);
+  });
+
+  await runTest("control history labels fields and values and paginates (#1722)", () => {
+    assert.equal(getContabilControlFieldLabel("depreciation"), "Depreciação");
+    assert.equal(getContabilControlFieldLabel("desconhecido"), "desconhecido");
+    assert.equal(formatContabilControlHistoryValue("depreciation", true), "Concluído");
+    assert.equal(formatContabilControlHistoryValue("depreciation", false), "Pendente");
+    assert.equal(formatContabilControlHistoryValue("depreciation", null), "—");
+    assert.equal(formatContabilControlHistoryValue("notes", ""), "(vazio)");
+    assert.equal(formatContabilControlHistoryValue("notes", "Conferir"), "Conferir");
+    assert.equal(getContabilHistoryPageCount(0, 20), 1);
+    assert.equal(getContabilHistoryPageCount(41, 20), 3);
+    assert.deepEqual(contabilControlHistoryQueryKey("client-1", "2026-09", 2), [
+      "contabil",
+      "control-history",
+      "client-1",
+      "2026-09",
+      2,
+    ]);
+  });
+
   await runTest("relationship field registry keeps bidding beside system in the UI order", () => {
     assert.deepEqual(
       CONTABIL_RELATIONSHIP_FIELDS.map((field) => field.field),
       ["chart_accounts", "tool", "system", "bidding", "note"],
     );
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.field, "bidding");
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.requiredOnCreate, true);
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.kind, "state");
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.requiredOnCreate, false);
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[0]?.requiredOnCreate, false);
   });
 
-  await runTest("relationship bidding checkbox uses compact form proportions", () => {
-    const source = readFileSync(
-      new URL("./components/ContabilRelationshipSection.tsx", import.meta.url),
-      "utf8",
-    );
-    const textFieldsStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXT_FIELDS.map");
-    const textareaStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS.map");
-    const checkboxStart = source.indexOf("{CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map");
-    const checkboxSource = source.slice(
-      checkboxStart,
-      source.indexOf("{submitError", checkboxStart),
-    );
-
-    assert.ok(textFieldsStart < textareaStart);
-    assert.ok(textFieldsStart < checkboxStart);
-    assert.ok(checkboxStart < textareaStart);
-    assert.match(checkboxSource, /className="flex h-11 items-center gap-3/);
-    assert.match(checkboxSource, /className="h-4 w-4/);
-    assert.doesNotMatch(
-      checkboxSource,
-      /rounded-xl border border-gray-200 bg-gray-50\/70 px-4 py-3/,
-    );
+  await runTest("relationship states render every legacy option, including no answer (#1721)", () => {
+    assert.equal(formatContabilBidding(null), "Não selecionado");
+    assert.equal(formatContabilBidding(true), "Sim");
+    assert.equal(formatContabilBidding(false), "Não");
+    assert.equal(formatContabilChartAccounts(null), "Não selecionado");
+    assert.equal(formatContabilChartAccounts(""), "Não selecionado");
+    assert.equal(formatContabilChartAccounts("Não — Jonrick"), "Não — Jonrick");
+    assert.equal(formatContabilChartAccounts("Plano próprio"), "Plano próprio (texto legado)");
+    assert.deepEqual(getContabilChartAccountsOptions(null), [
+      { value: "", label: "Não selecionado" },
+      { value: "Sim", label: "Sim" },
+      { value: "Não", label: "Não" },
+      { value: "Sim — Jonrick", label: "Sim — Jonrick" },
+      { value: "Não — Jonrick", label: "Não — Jonrick" },
+    ]);
+    assert.deepEqual(getContabilChartAccountsOptions("Plano próprio").at(-1), {
+      value: "Plano próprio",
+      label: "Plano próprio (texto legado)",
+    });
   });
 
   await runTest("responsible and relationship form helpers normalize nullable backend values", () => {
@@ -571,8 +695,51 @@ await (async () => {
     });
 
     assert.deepEqual(buildContabilRelationshipFormValues(null), {
-      bidding: false,
+      bidding: "",
       chart_accounts: "",
+      tool: "",
+      system: "",
+      note: "",
+    });
+    const legacy = buildContabilRelationshipFormValues({
+      id: "rel-1",
+      client_id: "client-1",
+      bidding: false,
+      chart_accounts: "Plano próprio",
+      tool: "ERP",
+      system: "Sistema",
+      note: "",
+    });
+    assert.equal(legacy.bidding, "false");
+    assert.deepEqual(buildContabilRelationshipPayload(legacy), {
+      bidding: false,
+      chart_accounts: "Plano próprio",
+      tool: "ERP",
+      system: "Sistema",
+      note: "",
+    });
+    const emptyLegacy = {
+      id: "rel-1",
+      client_id: "client-1",
+      bidding: null,
+      chart_accounts: "",
+      tool: "ERP",
+      system: "Sistema",
+      note: "",
+    };
+    assert.deepEqual(
+      pickChangedContabilRelationshipFields(
+        {
+          ...buildContabilRelationshipPayload(buildContabilRelationshipFormValues(emptyLegacy)),
+          note: "nova",
+        },
+        emptyLegacy,
+      ),
+      { note: "nova" },
+    );
+    assert.deepEqual(buildContabilRelationshipPayload(buildContabilRelationshipFormValues(null)), {
+      bidding: null,
+      chart_accounts: null,
       tool: "",
       system: "",
       note: "",
@@ -909,6 +1076,272 @@ await (async () => {
       buildTriageItemPayload("billing_amount", undefined, undefined, "FISCAL", "10,00"),
       { field: "billing_amount", type: "FISCAL", value: "10,00" },
     );
+  });
+
+  await runTest("carteira fiscal: CSV e impressão levam as linhas filtradas e o total delas (#1705)", () => {
+    const row = (overrides) => ({
+      client_id: "c1",
+      legal_name: "Alfa Ltda",
+      cpf_cnpj: "11222333000181",
+      regime: "Simples Nacional",
+      responsible_id: "u1",
+      responsible_name: "Ana Souza",
+      priority: true,
+      delivery_method: "EMAIL",
+      can_edit: true,
+      has_competence: true,
+      planned_checklist: null,
+      monthly: {
+        id: "m1",
+        checklist: { inbound_report: "COMPLETED", sped_fiscal: "NOT_PRESENT" },
+        item_notes: {},
+        billing_amount: "12500,00",
+        justification: "SEM_MOVIMENTO",
+        notes: "Aguardando XML de setembro",
+      },
+      ...overrides,
+    });
+    const deliveryLabel = {
+      delivery: (code) => (code === "EMAIL" ? "E-mail" : "Não informado"),
+      justification: (code) => (code === "SEM_MOVIMENTO" ? "Sem movimento no mês" : ""),
+    };
+    const rows = [
+      row({}),
+      // Rotina ainda não iniciada: sem faturamento, justificativa nem observação.
+      row({
+        client_id: "c2",
+        legal_name: '=Beta "SA"',
+        priority: false,
+        delivery_method: null,
+        monthly: null,
+      }),
+    ];
+
+    const table = fiscalTriagePortfolioExportTable(rows, deliveryLabel);
+    assert.deepEqual(table.columns.slice(0, 7), [
+      "Empresa",
+      "CNPJ",
+      "Regime",
+      "Responsável",
+      "Prioridade",
+      "Meio de envio",
+      "Relatório de entradas",
+    ]);
+    // Colunas do CSV/PDF do legado que a carteira não exportava.
+    assert.deepEqual(table.columns.slice(-3), ["Faturamento", "Justificativa", "Observação"]);
+    assert.deepEqual(table.body[0].slice(-3), [
+      "12500,00",
+      "Sem movimento no mês",
+      "Aguardando XML de setembro",
+    ]);
+    assert.deepEqual(table.body[1].slice(-3), ["", "", ""]);
+    assert.ok(table.body.every((line) => line.length === table.columns.length));
+    assert.deepEqual(table.body[0].slice(0, 7), [
+      "Alfa Ltda",
+      "11222333000181",
+      "Simples Nacional",
+      "Ana Souza",
+      "Sim",
+      "E-mail",
+      "Concluído",
+    ]);
+    assert.equal(table.body[0][table.columns.indexOf("SPED Fiscal")], "Não possui");
+    assert.equal(table.total, "2 empresas");
+
+    const lines = fiscalTriagePortfolioCsv(rows, deliveryLabel).split("\r\n");
+    assert.equal(lines.length, 4);
+    // Fórmula neutralizada e aspas escapadas.
+    assert.ok(lines[2].startsWith(`"'=Beta ""SA"""`));
+    assert.equal(lines[3], '"Total","2 empresas"');
+    // Seleção vazia segue com cabeçalho e total zerado.
+    assert.equal(
+      fiscalTriagePortfolioCsv([], deliveryLabel).split("\r\n").at(-1),
+      '"Total","0 empresas"',
+    );
+    assert.equal(fiscalTriagePortfolioExportTable([rows[0]], deliveryLabel).total, "1 empresa");
+  });
+
+  await runTest("histórico documental: campo, valor e objeto legíveis (#1706)", () => {
+    assert.equal(formatTriageHistoryField("checklist.sped_fiscal"), "SPED Fiscal");
+    assert.equal(
+      formatTriageHistoryField("item_notes.bank_reconciliation.justification"),
+      "Conciliação bancária · justificativa",
+    );
+    assert.equal(formatTriageHistoryField("triad_moviment"), "Movimento enviado");
+    assert.equal(formatTriageHistoryField("campo_novo"), "campo_novo");
+
+    assert.equal(formatTriageHistoryValue("checklist.sped_fiscal", "NOT_PRESENT"), "Não possui");
+    assert.equal(formatTriageHistoryValue("status", "COMPLETED"), "Concluído");
+    assert.equal(formatTriageHistoryValue("triad_moviment", true), "Sim");
+    assert.equal(formatTriageHistoryValue("notes", null), "(vazio)");
+    assert.equal(formatTriageHistoryValue("link", "https://drive.test/a"), "https://drive.test/a");
+    // Itens configurados chegam como JSON da auditoria e saem pelos rótulos.
+    assert.equal(
+      formatTriageHistoryValue(
+        "active_items",
+        '["sped_fiscal",{"field":"nfce_documents","required":true},{"field":"billing_amount","required":false}]',
+      ),
+      "SPED Fiscal, Documentos NFCe",
+    );
+    assert.equal(formatTriageHistoryValue("active_items", "[]"), "(vazio)");
+    assert.equal(formatTriageHistoryValue("active_items", "texto solto"), "texto solto");
+    assert.equal(formatTriageHistoryField("monthly"), "Rotinas");
+    // Datas em ISO saem no formato brasileiro; o arquivamento, na hora de Brasília.
+    assert.match(
+      formatTriageHistoryValue("archived_at", "2026-09-12T15:00:00.000Z"),
+      /^12\/09\/2026,? 12:00$/,
+    );
+    assert.equal(formatTriageHistoryValue("download_date", "2026-09-30T00:00:00.000Z"), "30/09/2026");
+    assert.equal(formatTriageHistoryValue("download_date", "sem data"), "sem data");
+
+    const entry = (object, action = "Atualizar pendência documental") => ({
+      id: "e1",
+      at: "2026-09-11T10:00:00.000Z",
+      actor: null,
+      action,
+      changes: [],
+      object: { client_id: "c1", client_name: "Alfa Ltda", ...object },
+    });
+    assert.equal(
+      describeTriageHistoryEntry(
+        entry({ kind: "triagem.monthly", competence: "2026-09", routine_type: "FISCAL" }),
+      ),
+      "Alfa Ltda · 2026-09 · Rotina Fiscal · Atualizar pendência documental",
+    );
+    assert.equal(
+      describeTriageHistoryEntry(
+        entry(
+          { kind: "clientes.clouds", competence: null, routine_type: null },
+          "Cadastrar nuvem do cliente",
+        ),
+      ),
+      "Alfa Ltda · Cloud do cliente · Cadastrar nuvem do cliente",
+    );
+    assert.equal(
+      describeTriageHistoryEntry(
+        entry(
+          { kind: "triagem.bank_statements", competence: "2026-09", routine_type: null },
+          "Arquivar marcador de extrato bancário",
+        ),
+      ),
+      "Alfa Ltda · 2026-09 · Extrato bancário · Arquivar marcador de extrato bancário",
+    );
+    assert.equal(
+      describeTriageHistoryEntry(
+        entry(
+          { kind: "triagem.configs", competence: null, routine_type: null },
+          "Configurar documentos fiscais especiais",
+        ),
+      ),
+      "Alfa Ltda · Configuração da Triagem · Configurar documentos fiscais especiais",
+    );
+  });
+
+  await runTest("histórico documental e da competência alcançam todas as páginas (#1706)", () => {
+    const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+    const section = read("./components/TriageDocumentHistorySection.tsx");
+    assert.match(section, /useTriageDocumentHistory\(\{/);
+    assert.match(section, /onPageChange=\{setPage\}/);
+    const page = read("../../pages/triagem.tsx");
+    // Com cliente, qualquer leitor da Triagem vê; sem cliente, só administrador.
+    assert.match(page, /<TriageDocumentHistorySection\s+key=\{client\.id\}/);
+    assert.match(
+      page,
+      /access\.isAdmin \|\| contabilAccess\.isAdmin \? <TriageDocumentHistorySection \/> : null/,
+    );
+    const timeline = read("../triagem/components/TriageAuditTimeline.tsx");
+    assert.match(timeline, /useTriageAudit\(competenceId, open, page\)/);
+    assert.match(timeline, /aria-label="Paginação do histórico da competência"/);
+    assert.match(read("../triagem/hooks/useTriageAudit.ts"), /listTimeline\(competenceId, page\)/);
+    // Resposta sem `items` vira erro visível, sem derrubar a tela que hospeda o painel.
+    const panel = read("./components/ContabilHistoryPanel.tsx");
+    assert.match(panel, /query\.data !== undefined && !Array\.isArray\(query\.data\?\.items\)/);
+    assert.match(panel, /O servidor devolveu uma resposta inesperada\./);
+  });
+
+  await runTest("agenda compartilhada: a data não muda de dia com o fuso (#1727)", () => {
+    assert.equal(AGENDA_ENDPOINT, "/task/agenda");
+    // Meio-dia UTC: o dia escolhido é o mesmo em qualquer fuso do Brasil.
+    assert.equal(agendaDateToIso("2026-12-31"), "2026-12-31T12:00:00.000Z");
+    assert.equal(agendaDay("2026-12-31T12:00:00.000Z"), "2026-12-31");
+  });
+
+  await runTest("agenda compartilhada: a aba do Contábil usa a agenda canônica (#1727)", () => {
+    const shell = readFileSync(new URL("./components/ContabilShell.tsx", import.meta.url), "utf8");
+    assert.match(shell, /<DepartmentAgendaSection module="contabil" canEdit=\{canEdit\} \/>/);
+    const section = readFileSync(
+      new URL("./components/DepartmentAgendaSection.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(section, /agendaService\.list\(module, month, mine\)/);
+  });
+
+  await runTest("relatório da agenda: o intervalo vira os meses que o serviço lista (#1734)", () => {
+    assert.deepEqual(agendaReportMonths("2026-11-15", "2027-01-10"), [
+      "2026-11",
+      "2026-12",
+      "2027-01",
+    ]);
+    assert.deepEqual(agendaReportMonths("2026-10-01", "2026-10-31"), ["2026-10"]);
+    // Intervalo invertido, vazio ou com data impossível não consulta nada.
+    assert.deepEqual(agendaReportMonths("2026-10-02", "2026-10-01"), []);
+    assert.deepEqual(agendaReportMonths("", "2026-10-01"), []);
+    assert.deepEqual(agendaReportMonths("2026-13-01", "2026-13-02"), []);
+    // Ano pela metade, como o campo de data emite ao digitar: mês sempre com ano de 4 dígitos.
+    assert.deepEqual(agendaReportMonths("0002-11-01", "0003-01-31"), [
+      "0002-11",
+      "0002-12",
+      "0003-01",
+    ]);
+    assert.ok(agendaReportMonths("0002-10-01", "2026-10-31").length > AGENDA_REPORT_MAX_MONTHS);
+    assert.equal(agendaReportMonths("2026-01-01", "2026-12-31").length, AGENDA_REPORT_MAX_MONTHS);
+  });
+
+  await runTest("relatório da agenda: só os dias do intervalo, em ordem, com estado e recorrência (#1734)", () => {
+    const event = (id, date, agenda, extra = {}) => ({
+      id,
+      agenda,
+      date,
+      status: "Pendente",
+      obs: null,
+      location: null,
+      client: null,
+      participant: null,
+      recurring_agenda_id: null,
+      ...extra,
+    });
+    const listed = [
+      event("4", "2026-11-20T12:00:00.000Z", "Fora do intervalo"),
+      event("3", "2026-11-10T12:00:00.000Z", "Fechamento", { recurring_agenda_id: "regra" }),
+      event("2", "2026-10-15T12:00:00.000Z", "Reunião", { status: "Realizado" }),
+      event("1", "2026-10-14T12:00:00.000Z", "Antes do intervalo"),
+      event("5", "2026-10-15T12:00:00.000Z", "Entrega", { status: null }),
+    ];
+
+    const rows = agendaReportEvents(listed, "2026-10-15", "2026-11-10");
+
+    assert.deepEqual(
+      rows.map((row) => row.agenda),
+      ["Entrega", "Reunião", "Fechamento"],
+    );
+    // O evento sai como veio do serviço: estado legado vazio e ocorrência de recorrência.
+    assert.equal(rows[0].status, null);
+    assert.equal(rows[2].recurring_agenda_id, "regra");
+  });
+
+  await runTest("relatório da agenda: usa a agenda compartilhada e a impressão do app (#1734)", () => {
+    const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+    const report = read("./components/DepartmentAgendaReport.tsx");
+    // Uma consulta por mês, pelo mesmo serviço e módulo da tela: o departamento é do servidor.
+    assert.match(report, /agendaService\.list\(module, month\)/);
+    // Mesmo cache mensal da tela: mudar só o dia não refaz consulta e a escrita invalida os dois.
+    assert.match(report, /queryKey: departmentAgendaQueryKey\(module, month, false\)/);
+    assert.match(report, /className="print-report/);
+    assert.match(report, /printReport\(reportId\)/);
+    // Sem exportação própria: o CSV quebrado do legado não volta.
+    assert.doesNotMatch(report, /csv/i);
+    const section = read("./components/DepartmentAgendaSection.tsx");
+    assert.match(section, /<DepartmentAgendaReport\s+module=\{module\}/);
   });
 })();
 

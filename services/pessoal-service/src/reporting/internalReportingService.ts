@@ -4,6 +4,8 @@ import {
   MAX_REPORTING_QUERY_BYTES,
   MAX_REPORTING_QUERY_ROWS,
   PESSOAL_LDD_REPORTING_SOURCES,
+  PESSOAL_OBLIGATION_ITEM_STATES,
+  PESSOAL_OBLIGATION_ITEMS,
   PESSOAL_PAYROLL_REPORTING_SOURCES,
   PESSOAL_SITUATIONS_REPORTING_SOURCES,
   REPORTING_QUERY_BYTE_LIMIT_CODE,
@@ -151,6 +153,9 @@ async function readReportingRows(
 }
 
 const PAYROLL_SCALAR_FIELDS = new Set([
+  "previous",
+  "info",
+  "contact",
   "advance",
   "advance_type",
   "advance_amount",
@@ -227,6 +232,31 @@ function projectReportingFields(
   );
 }
 
+const CLIENT_REPORTING_FIELDS = {
+  client_name: "name",
+  client_code: "dominio_code",
+  client_document: "cpf_cnpj",
+  client_status: "status",
+} as const;
+
+const CLIENT_REPORTING_SELECT = Object.fromEntries(
+  Object.values(CLIENT_REPORTING_FIELDS).map((column) => [column, true]),
+) as { name: true; dominio_code: true; cpf_cnpj: true; status: true };
+
+function needsClientFields(fields: readonly string[]): boolean {
+  return fields.some((field) => field in CLIENT_REPORTING_FIELDS);
+}
+
+function clientReportingValues(row: Record<string, unknown>): Record<string, unknown> {
+  const client = row.client as Record<string, unknown> | null | undefined;
+  return Object.fromEntries(
+    Object.entries(CLIENT_REPORTING_FIELDS).map(([field, column]) => [
+      field,
+      client?.[column] ?? null,
+    ]),
+  );
+}
+
 function projectPayrollReportingRow(
   row: Record<string, unknown>,
   fields: readonly string[],
@@ -234,6 +264,7 @@ function projectPayrollReportingRow(
   return projectReportingFields(
     {
       ...row,
+      ...clientReportingValues(row),
       client_name: reportName(row, "client", "client_name"),
       responsible_name: reportName(row, "responsible", "responsible_name"),
       union_name: reportName(row, "union", "union_name"),
@@ -244,6 +275,21 @@ function projectPayrollReportingRow(
   );
 }
 
+const OBLIGATION_ITEMS = PESSOAL_OBLIGATION_ITEMS.map(([item]) => item);
+
+function obligationItemState(value: unknown): string {
+  if (value === true) return PESSOAL_OBLIGATION_ITEM_STATES.completed;
+  if (value === false) return PESSOAL_OBLIGATION_ITEM_STATES.pending;
+  return PESSOAL_OBLIGATION_ITEM_STATES.notApplicable;
+}
+
+// Colunas que sustentam cada campo publicado (derivados leem as colunas de origem).
+function obligationFieldColumns(field: string): readonly string[] {
+  if (field === "group_snapshot_state") return ["group_snapshot_name", "group_snapshot_policy"];
+  const item = OBLIGATION_ITEMS.find((candidate) => field === `${candidate}_state`);
+  return [item ?? field];
+}
+
 function projectObligationReportingRow(
   row: Record<string, unknown>,
   fields: readonly string[],
@@ -251,6 +297,10 @@ function projectObligationReportingRow(
   return projectReportingFields(
     {
       ...row,
+      ...clientReportingValues(row),
+      ...Object.fromEntries(
+        OBLIGATION_ITEMS.map((item) => [`${item}_state`, obligationItemState(row[item])]),
+      ),
       client_name: reportName(row, "client", "client_name"),
       responsible_name: reportName(row, "responsible", "responsible_name"),
       group_snapshot_state: textValue(row.group_snapshot_state) ?? obligationSnapshotState(row),
@@ -277,10 +327,33 @@ export class InternalReportingService {
   constructor(
     private readonly prisma: Pick<
       PrismaClient,
-      "lddPessoal" | "payroll" | "situationsPessoal" | "obrigationsPessoal" | "unionPessoal"
+      | "lddPessoal"
+      | "payroll"
+      | "situationsPessoal"
+      | "obrigationsPessoal"
+      | "unionPessoal"
+      | "client"
     >,
     private readonly inSnapshot = false,
   ) {}
+
+  private async withClients(
+    rows: readonly Record<string, unknown>[],
+    organizationId: string,
+  ): Promise<readonly Record<string, unknown>[]> {
+    const ids = [
+      ...new Set(
+        rows.map((row) => row.client_id).filter((id): id is string => typeof id === "string"),
+      ),
+    ];
+    if (!ids.length) return rows;
+    const clients = await this.prisma.client.findMany({
+      where: { organization_id: organizationId, id: { in: ids } },
+      select: { id: true, ...CLIENT_REPORTING_SELECT },
+    });
+    const byId = new Map(clients.map((client) => [client.id, client]));
+    return rows.map((row) => ({ ...row, client: byId.get(String(row.client_id)) ?? null }));
+  }
 
   async extract(input: {
     query?: ReportingQuery;
@@ -328,18 +401,18 @@ export class InternalReportingService {
     if (input.source === PESSOAL_PAYROLL_REPORTING_SOURCES[0]) {
       const projectRow = (row: Record<string, unknown>) =>
         projectPayrollReportingRow(row, input.fields);
+      const needsClient = needsClientFields(input.fields);
       const rows = await readReportingRows(
         input.limit,
         { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
-        (page) =>
-          this.prisma.payroll.findMany({
+        async (page) => {
+          const payrolls = await this.prisma.payroll.findMany({
             where: { organization_id: input.organizationId },
             select: {
               ...selectScalars(input.fields, PAYROLL_SCALAR_FIELDS),
               ...(page.includeCursor ? { id: true } : {}),
-              ...(input.fields.includes("client_name")
-                ? { client: { select: { name: true } } }
-                : {}),
+              // Payroll não declara relação com Client no schema canônico (nem FK no banco).
+              ...(needsClient ? { client_id: true } : {}),
               ...(input.fields.includes("responsible_name")
                 ? { responsible: { select: { name: true } } }
                 : {}),
@@ -351,7 +424,9 @@ export class InternalReportingService {
                 : {}),
             },
             ...reportingPageOptions(page),
-          }),
+          });
+          return needsClient ? this.withClients(payrolls, input.organizationId) : payrolls;
+        },
         projectRow,
       );
       return projectRows(rows, input.limit, projectRow, input.cursorPage);
@@ -367,10 +442,13 @@ export class InternalReportingService {
           this.prisma.obrigationsPessoal.findMany({
             where: { organization_id: input.organizationId },
             select: {
-              ...selectScalars(input.fields, OBLIGATION_SCALAR_FIELDS),
+              ...selectScalars(
+                input.fields.flatMap(obligationFieldColumns),
+                OBLIGATION_SCALAR_FIELDS,
+              ),
               ...(page.includeCursor ? { id: true } : {}),
-              ...(input.fields.includes("client_name")
-                ? { client: { select: { name: true } } }
+              ...(needsClientFields(input.fields)
+                ? { client: { select: CLIENT_REPORTING_SELECT } }
                 : {}),
               ...(input.fields.includes("responsible_name")
                 ? { responsible: { select: { name: true } } }

@@ -17,9 +17,14 @@ import {
   userIdParamsSchema,
 } from "../schemas/user.schemas.js";
 import {
+  isMarketingOnlyUserListAccess,
+  isMarketingOnlyUserPhotoUpdate,
   isOwnerMutationPayload,
+  requireListUsersAuth,
   requireManageUsersAuth,
   requireOwnerUserAuth,
+  requireUpdateUserPhotoAuth,
+  requireViewUserPhotoAuth,
 } from "../security/userManagementAuth.js";
 import { StorageService } from "../services/storageService.js";
 import {
@@ -43,13 +48,13 @@ export function createUserRoutes(
     });
   }
 
-  function requireManageUsersAuthMiddleware(
+  function requireUpdateUserPhotoAuthMiddleware(
     request: Request,
     _response: Response,
     next: NextFunction,
   ): void {
     try {
-      requireManageUsersAuth(request);
+      requireUpdateUserPhotoAuth(request);
       next();
     } catch (err) {
       next(err);
@@ -69,8 +74,26 @@ export function createUserRoutes(
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const auth = requireManageUsersAuth(request);
+        const auth = requireListUsersAuth(request);
         const { skip, take } = parseWithZod(listUsersQuerySchema, request.query);
+        if (isMarketingOnlyUserListAccess(request)) {
+          const result = await userService.listMarketingProfiles({
+            skip,
+            take,
+            organizationId: auth.organization_id,
+          });
+          response.json(
+            createSuccessResponse({
+              ...result,
+              users: result.users.map((user) => ({
+                ...user,
+                photo_url: storageService.readUserPhoto(user.photo_url),
+              })),
+            }),
+          );
+          return;
+        }
+
         const result = await userManagement(auth).list({ skip, take });
 
         response.json(createSuccessResponse(result));
@@ -86,7 +109,7 @@ export function createUserRoutes(
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const auth = requireManageUsersAuth(request);
+        const auth = requireViewUserPhotoAuth(request);
         const { id } = parseWithZod(userIdParamsSchema, request.params);
         const user = await userManagement(auth).getById(id);
         const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
@@ -195,22 +218,29 @@ export function createUserRoutes(
   router.post(
     "/:id/photo",
     isAuthenticated,
-    requireManageUsersAuthMiddleware,
+    requireUpdateUserPhotoAuthMiddleware,
     upload.single("file"),
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const auth = requireManageUsersAuth(request);
+        const auth = requireUpdateUserPhotoAuth(request);
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
         if (!request.file) {
           throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
         }
 
+        const existing = await userManagement(auth).getById(id);
         validateUploadFileSignature(request.file);
         const photoUrl = await storageService.uploadUserPhoto(request.file, id);
         const user = await userManagement(auth).update(id, { photo_url: photoUrl }, "UPDATE_PHOTO");
 
-        response.json(createSuccessResponse(user));
+        response.json(
+          createSuccessResponse(
+            isMarketingOnlyUserPhotoUpdate(request)
+              ? { id: existing.id, photo_url: photoUrl }
+              : user,
+          ),
+        );
       } catch (err) {
         logError("Erro ao fazer upload de foto", { err });
         next(err);
@@ -223,13 +253,18 @@ export function createUserRoutes(
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const auth = requireManageUsersAuth(request);
+        const auth = requireUpdateUserPhotoAuth(request);
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
+        const existing = await userManagement(auth).getById(id);
         await storageService.deleteUserPhoto(id);
         const user = await userManagement(auth).update(id, { photo_url: null }, "UPDATE_PHOTO");
 
-        response.json(createSuccessResponse(user));
+        response.json(
+          createSuccessResponse(
+            isMarketingOnlyUserPhotoUpdate(request) ? { id: existing.id, photo_url: null } : user,
+          ),
+        );
       } catch (err) {
         logError("Erro ao excluir foto", { err });
         next(err);

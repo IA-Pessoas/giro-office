@@ -55,15 +55,19 @@ async function signJwt(claims: Record<string, unknown>): Promise<string> {
 async function signedReportingHeaders(
   body: Record<string, unknown>,
   operation: "extract" = "extract",
+  granted: { source: string; fields: readonly string[] } = {
+    source: "contabil.control",
+    fields: ["competence"],
+  },
 ): Promise<HeadersInit> {
   const requestId = "report-request";
   const grant = {
     version: 1,
     audience: "contabil-service",
     operation,
-    source: operation === "catalog" ? "contabil.catalog" : "contabil.control",
+    source: operation === "catalog" ? "contabil.catalog" : granted.source,
     organization_id: ORG,
-    fields: operation === "catalog" ? [] : ["competence"],
+    fields: operation === "catalog" ? [] : granted.fields,
     request_id: requestId,
     issued_at: Math.floor(Date.now() / 1000) - 1,
     expires_at: Math.floor(Date.now() / 1000) + 30,
@@ -124,7 +128,16 @@ function services() {
       getOrCreateMonthly: vi.fn(async () => ({ id: ID })),
       updateItem: vi.fn(async () => ({ id: ID })),
       updateAll: vi.fn(async () => ({ id: ID })),
+      updateMonthly: vi.fn(async () => ({ id: ID })),
+      getConfig: vi.fn(async () => ({ active_items: [] })),
+      saveConfig: vi.fn(async () => ({ active_items: [] })),
+      getFiscalSettings: vi.fn(async () => ({ priority: false, delivery_method: null })),
+      saveFiscalSettings: vi.fn(async () => ({ priority: true, delivery_method: null })),
       listStatements: vi.fn(async () => []),
+      listStatementHistory: vi.fn(async () => ({ client_id: CLIENT, competences: [] })),
+      listClouds: vi.fn(async () => []),
+      createCloud: vi.fn(async () => ({ id: ID })),
+      updateCloud: vi.fn(async () => ({ id: ID })),
       upsertStatement: vi.fn(async () => ({ id: ID })),
       archiveStatement: vi.fn(async () => ({ id: ID })),
     },
@@ -189,6 +202,116 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("relacionamento aceita estados não selecionados e exige permissão Contábil (#1721)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const put = (permission: string) =>
+      app.request(`https://contabil.test/contabil/relationships/${ID}`, {
+        method: "PUT",
+        headers: { ...headers(permission), "content-type": "application/json" },
+        body: JSON.stringify({ bidding: null, chart_accounts: null }),
+      });
+
+    expect((await put("2")).status).toBe(200);
+    expect(deps.relationshipService.update).toHaveBeenCalledWith(
+      ID,
+      { bidding: null, chart_accounts: null },
+      expect.objectContaining({ organizationId: ORG, userId: USER }),
+    );
+    expect((await put("1")).status).toBe(403);
+    const read = await app.request(
+      `https://contabil.test/contabil/relationships/client/${CLIENT}`,
+      { headers: headers("0") },
+    );
+    expect(read.status).toBe(403);
+    expect(deps.relationshipService.update).toHaveBeenCalledTimes(1);
+    expect(deps.relationshipService.getByClientId).not.toHaveBeenCalled();
+  });
+
+  it("histórico do controle lê a auditoria da organização e exige módulo Contábil (#1722)", async () => {
+    const prisma = {
+      controlContabil: { findFirst: vi.fn(async () => ({ id: ID })) },
+      auditRequest: {
+        findMany: vi.fn(async () => [
+          {
+            id: "audit-1",
+            user_id: USER,
+            created_at: new Date("2026-09-10T12:00:00.000Z"),
+            action: "Atualização",
+            changes_json: { depreciation: { from: false, to: true } },
+          },
+        ]),
+        count: vi.fn(async () => 1),
+      },
+      user: { findMany: vi.fn(async () => [{ id: USER, name: "Ana" }]) },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const url = `https://contabil.test/contabil/controls/history?client_id=${CLIENT}&competence=2026-09&organization_id=forged`;
+
+    const forged = await app.request(url, { headers: headers("1") });
+    const denied = await app.request(url, { headers: headers("0") });
+
+    expect(forged.status).toBe(400);
+    expect(denied.status).toBe(403);
+    const ok = await app.request(url.replace("&organization_id=forged", ""), {
+      headers: headers("1"),
+    });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({
+      data: {
+        total: 1,
+        items: [
+          {
+            actor: { id: USER, name: "Ana" },
+            changes: [{ field: "depreciation", from: false, to: true }],
+          },
+        ],
+      },
+    });
+    expect(prisma.controlContabil.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+    expect(prisma.auditRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
+  it("histórico do relacionamento lê a auditoria da organização e exige módulo Contábil (#1723)", async () => {
+    const prisma = {
+      relationshipContabil: { findFirst: vi.fn(async () => ({ id: ID })) },
+      auditRequest: {
+        findMany: vi.fn(async () => [
+          {
+            id: "audit-1",
+            user_id: USER,
+            created_at: new Date("2026-10-01T10:00:00.000Z"),
+            action: "Atualização",
+            changes_json: { bidding: { from: true, to: null } },
+          },
+        ]),
+        count: vi.fn(async () => 1),
+      },
+      user: { findMany: vi.fn(async () => [{ id: USER, name: "Ana" }]) },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const url = `https://contabil.test/contabil/relationships/client/${CLIENT}/history`;
+
+    const denied = await app.request(url, { headers: headers("0") });
+    const ok = await app.request(url, { headers: headers("1") });
+
+    expect(denied.status).toBe(403);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({
+      data: { total: 1, items: [{ changes: [{ field: "bidding", from: true, to: null }] }] },
+    });
+    expect(prisma.relationshipContabil.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, client_id: CLIENT } }),
+    );
+    expect(prisma.auditRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
   it("expõe triagem documental com validação de entrada", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });
@@ -220,6 +343,375 @@ describe("contabil Worker remainder routes", () => {
     );
     expect(deps.triageDocumentsService.getMonthly).toHaveBeenCalledWith(
       expect.objectContaining({ client_id: CLIENT, competence: "2026-09" }),
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("aplica na carteira fiscal os mesmos filtros da tela", async () => {
+    const deps = services();
+    const row = (legal_name: string, extra: Record<string, unknown>) => ({
+      legal_name,
+      cpf_cnpj: "",
+      regime: null,
+      responsible_id: null,
+      planned_checklist: null,
+      monthly: null,
+      ...extra,
+    });
+    deps.triageDocumentsService.listFiscalPortfolio.mockResolvedValue({
+      competence: "2026-09",
+      items: [
+        row("Alfa", {
+          regime: "Simples Nacional",
+          responsible_id: USER,
+          monthly: {
+            checklist: { inbound_report: "NOT_PRESENT" },
+            item_notes: { inbound_report: { note: null, justification: "Sem movimento" } },
+          },
+        }),
+        row("Beta", { regime: "Simples Nacional", responsible_id: USER }),
+        row("Gama", {}),
+      ],
+    });
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const get = (query: string) =>
+      app.request(`https://contabil.test/triagem/fiscal-portfolio?competence=2026-09&${query}`, {
+        headers: headers("2"),
+      });
+
+    const filtered = await get(
+      `responsible_id=${USER}&regime=Simples%20Nacional&document_field=inbound_report&justification=with`,
+    );
+    const byStatus = await get("document_field=inbound_report&document_status=NOT_STARTED");
+    const invalid = await get("justification=talvez");
+
+    expect(filtered.status).toBe(200);
+    expect(
+      (await filtered.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Alfa"]);
+    expect(
+      (await byStatus.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Beta", "Gama"]);
+    expect(invalid.status).toBe(400);
+  });
+
+  it("carteiras filtradas exigem sessão e consultam só a organização do token (#1690)", async () => {
+    const OTHER_ORG = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const urls = [
+      "https://contabil.test/triagem/fiscal-portfolio?competence=2025-03&justification=with",
+      "https://contabil.test/contabil/controls/list?competence=2025-03&status=CLOSED",
+    ];
+    const otherOrg = { ...headers("2"), "x-auth-organization-id": OTHER_ORG };
+
+    for (const url of urls) {
+      expect((await app.request(url)).status).toBe(401);
+      expect((await app.request(url, { headers: otherOrg })).status).toBe(200);
+    }
+
+    expect(deps.triageDocumentsService.listFiscalPortfolio).toHaveBeenCalledOnce();
+    expect(deps.triageDocumentsService.listFiscalPortfolio).toHaveBeenCalledWith(
+      "2025-03",
+      expect.objectContaining({ organizationId: OTHER_ORG }),
+    );
+    expect(deps.controlService.list).toHaveBeenCalledExactlyOnceWith("2025-03", OTHER_ORG);
+  });
+
+  it("filtra a carteira contábil por regime, responsável e estado do fechamento", async () => {
+    const deps = services();
+    deps.controlService.list.mockResolvedValue({
+      competence: "2026-09",
+      items: [
+        {
+          legal_name: "Alfa",
+          regime: "Simples Nacional",
+          person_responsible_id: USER,
+          closing: { status: "CLOSED" },
+        },
+        {
+          legal_name: "Beta",
+          regime: null,
+          person_responsible_id: null,
+          closing: { status: "NOT_RECEIVED" },
+        },
+      ],
+    });
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const get = (query: string) =>
+      app.request(`https://contabil.test/contabil/controls/list?competence=2026-09&${query}`, {
+        headers: headers("2"),
+      });
+
+    const byOwner = await get(`responsible_id=${USER}&regime=Simples%20Nacional&status=CLOSED`);
+    const unassigned = await get("responsible_id=none&regime=N%C3%A3o%20informado");
+    const invalid = await get("status=QUALQUER");
+
+    expect(
+      (await byOwner.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Alfa"]);
+    expect(
+      (await unassigned.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Beta"]);
+    expect(invalid.status).toBe(400);
+    expect(deps.controlService.list).toHaveBeenCalledWith("2026-09", ORG);
+  });
+
+  it("movimento mensal e movimento padrão validam corpo e usam a organização do token (#1691)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, path: string, body?: unknown, auth = true) =>
+      app.request(`https://contabil.test${path}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const monthly = await send("PATCH", `/triagem/monthly/${ID}`, {
+      type: "CONTABIL",
+      triad_moviment: true,
+      download_date: "2026-10-03",
+    });
+    const emptyMonthly = await send("PATCH", `/triagem/monthly/${ID}`, { type: "CONTABIL" });
+    const badDate = await send("PATCH", `/triagem/monthly/${ID}`, { download_date: "03/10/2026" });
+    const impossibleDate = await send("PATCH", `/triagem/monthly/${ID}`, {
+      settlement_date: "2026-02-31",
+    });
+    const config = await send("PUT", "/triagem/config", {
+      client_id: CLIENT,
+      active_items: ["bank_reconciliation"],
+    });
+    const fiscalField = await send("PUT", "/triagem/config", {
+      client_id: CLIENT,
+      active_items: ["inbound_report"],
+    });
+    const read = await send("GET", `/triagem/config?client_id=${CLIENT}`);
+    const anonymous = await send("GET", `/triagem/config?client_id=${CLIENT}`, undefined, false);
+
+    expect(monthly.status).toBe(200);
+    expect([
+      emptyMonthly.status,
+      badDate.status,
+      impossibleDate.status,
+      fiscalField.status,
+    ]).toEqual([400, 400, 400, 400]);
+    expect(config.status).toBe(200);
+    expect(read.status).toBe(200);
+    expect(anonymous.status).toBe(401);
+    expect(deps.triageDocumentsService.updateMonthly).toHaveBeenCalledExactlyOnceWith(
+      ID,
+      { type: "CONTABIL", triad_moviment: true, download_date: "2026-10-03" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.saveConfig).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "CONTABIL", active_items: ["bank_reconciliation"] },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.getConfig).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "CONTABIL" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("prioridade e meio de envio fiscal validam corpo e usam a organização do token (#1692)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, body?: unknown, query = "", auth = true) =>
+      app.request(`https://contabil.test/triagem/fiscal-settings${query}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const saved = await send("PUT", {
+      client_id: CLIENT,
+      priority: true,
+      delivery_method: "EMAIL",
+    });
+    const empty = await send("PUT", { client_id: CLIENT });
+    const textPriority = await send("PUT", { client_id: CLIENT, priority: "Sim" });
+    const read = await send("GET", undefined, `?client_id=${CLIENT}`);
+    const anonymous = await send("GET", undefined, `?client_id=${CLIENT}`, false);
+
+    expect([saved.status, read.status]).toEqual([200, 200]);
+    expect([empty.status, textPriority.status, anonymous.status]).toEqual([400, 400, 401]);
+    expect(deps.triageDocumentsService.saveFiscalSettings).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, priority: true, delivery_method: "EMAIL" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.getFiscalSettings).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("histórico bancário exige sessão e consulta a organização do token (#1694)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const url = `https://contabil.test/triagem/statements/history?client_id=${CLIENT}&from=2026-01&to=2026-09&pending=true`;
+
+    const anonymous = await app.request(url);
+    const ok = await app.request(url, { headers: headers("2") });
+    const inverted = await app.request(
+      `https://contabil.test/triagem/statements/history?client_id=${CLIENT}&from=2026-09&to=2026-01`,
+      { headers: headers("2") },
+    );
+
+    const denied = await app.request(url, {
+      headers: {
+        ...headers("0"),
+        "x-auth-modules": JSON.stringify({ contabil: 0, triagem: 0, fiscal: 0 }),
+      },
+    });
+
+    expect([anonymous.status, ok.status, inverted.status, denied.status]).toEqual([
+      401, 200, 400, 403,
+    ]);
+    expect(deps.triageDocumentsService.listStatementHistory).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, from: "2026-01", to: "2026-09", pending: true },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("histórico documental: leitura por cliente, organização do token e visão geral só do administrador (#1706)", async () => {
+    const events = [
+      {
+        id: "event-1",
+        user_id: USER,
+        created_at: new Date("2026-09-11T10:00:00.000Z"),
+        action: "Atualizar pendência documental",
+        referring: "triagem.monthly",
+        referring_id: "monthly-1",
+        changes_json: {
+          checklist: { from: { sped_fiscal: "PENDING" }, to: { sped_fiscal: "COMPLETED" } },
+        },
+      },
+    ];
+    const none = { findMany: vi.fn().mockResolvedValue([]) };
+    const prisma = {
+      auditRequest: {
+        findMany: vi.fn().mockResolvedValue(events),
+        count: vi.fn().mockResolvedValue(21),
+      },
+      client: {
+        findFirst: vi.fn().mockResolvedValue({ id: CLIENT }),
+        findMany: vi.fn().mockResolvedValue([{ id: CLIENT, name: "Alfa", company_name: null }]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: USER, name: "Ana Souza" }]) },
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { id: "monthly-1", client_id: CLIENT, competence: "2026-09", type: "FISCAL" },
+          ]),
+      },
+      triageBankStatement: none,
+      triageClosing: none,
+      clientCloud: none,
+      controlContabil: none,
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const get = (query: string, init?: RequestInit) =>
+      app.request(`https://contabil.test/triagem/documents/history${query}`, init);
+    const withModules = (modules: Record<string, number>) => ({
+      headers: { ...headers("0"), "x-auth-modules": JSON.stringify(modules) },
+    });
+
+    const anonymous = await get(`?client_id=${CLIENT}`);
+    const denied = await get(`?client_id=${CLIENT}`, withModules({ contabil: 0, triagem: 0 }));
+    const invalid = await get("?client_id=abc", { headers: headers("2") });
+    // Sem cliente é a organização inteira: quem só lê ou edita não vê.
+    const reader = await get("", withModules({ contabil: 0, triagem: 1 }));
+    const editor = await get("?competence=2026-09", { headers: headers("2") });
+    expect([anonymous.status, denied.status, invalid.status, reader.status, editor.status]).toEqual(
+      [401, 403, 400, 403, 403],
+    );
+    expect(prisma.auditRequest.findMany).not.toHaveBeenCalled();
+
+    const page = await get(
+      `?client_id=${CLIENT}&competence=2026-09&page=2&pageSize=20`,
+      withModules({ contabil: 0, triagem: 1 }),
+    );
+    expect(page.status).toBe(200);
+    await expect(page.json()).resolves.toMatchObject({
+      data: {
+        client_id: CLIENT,
+        competence: "2026-09",
+        page: 2,
+        total: 21,
+        items: [
+          {
+            actor: { id: USER, name: "Ana Souza" },
+            at: "2026-09-11T10:00:00.000Z",
+            object: { kind: "triagem.monthly", client_name: "Alfa", competence: "2026-09" },
+            changes: [{ field: "checklist.sped_fiscal", from: "PENDING", to: "COMPLETED" }],
+          },
+        ],
+      },
+    });
+    expect(prisma.auditRequest.findMany).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: ORG,
+          OR: [{ referring: "triagem.monthly", referring_id: { in: ["monthly-1"] } }],
+        }),
+        skip: 20,
+        take: 20,
+      }),
+    );
+
+    // Administrador da Triagem, administrador do Contábil e dono da organização.
+    const admins = await Promise.all([
+      get("", withModules({ contabil: 0, triagem: 3 })),
+      get("", withModules({ contabil: 3, triagem: 0 })),
+      get("", { headers: { ...headers("0"), "x-auth-type": "owner", "x-auth-modules": "{}" } }),
+    ]);
+    expect(admins.map((response) => response.status)).toEqual([200, 200, 200]);
+    const recentWhere = prisma.auditRequest.findMany.mock.calls.at(-1)?.[0].where;
+    expect(recentWhere).toMatchObject({ organization_id: ORG });
+    // Sem recorte por objeto: nenhum dos ramos filtra `referring_id`.
+    expect(recentWhere.OR).toHaveLength(6);
+    for (const branch of recentWhere.OR) expect(branch).not.toHaveProperty("referring_id");
+  });
+
+  it("nuvens do cliente validam link e usam a organização do token (#1695)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, path: string, body?: unknown, auth = true) =>
+      app.request(`https://contabil.test${path}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const created = await send("POST", "/triagem/clouds", {
+      client_id: CLIENT,
+      type: "Google Drive",
+      link: "https://drive.example/pasta",
+    });
+    const script = await send("POST", "/triagem/clouds", {
+      client_id: CLIENT,
+      type: "Drive",
+      link: "javascript:alert(1)",
+    });
+    const updated = await send("PATCH", `/triagem/clouds/${ID}`, { type: "OneDrive" });
+    const listed = await send("GET", `/triagem/clouds?client_id=${CLIENT}`);
+    const anonymous = await send("GET", `/triagem/clouds?client_id=${CLIENT}`, undefined, false);
+
+    expect([
+      created.status,
+      script.status,
+      updated.status,
+      listed.status,
+      anonymous.status,
+    ]).toEqual([201, 400, 200, 200, 401]);
+    expect(deps.triageDocumentsService.createCloud).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "Google Drive", link: "https://drive.example/pasta" },
+      expect.objectContaining({ organizationId: ORG, userId: USER }),
+    );
+    expect(deps.triageDocumentsService.updateCloud).toHaveBeenCalledExactlyOnceWith(
+      ID,
+      { type: "OneDrive" },
       expect.objectContaining({ organizationId: ORG }),
     );
   });
@@ -345,6 +837,83 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("extrai o Controle vigente com percentual sobre as 17 etapas e observação", async () => {
+    const controls = [
+      {
+        id: "1",
+        client_id: CLIENT,
+        competence: "2026-08",
+        notes: "Aguardando extratos",
+        monthly_closing: true,
+        depreciation: true,
+      },
+      {
+        id: "2",
+        client_id: "other-client",
+        competence: "2026-09",
+        notes: "",
+        monthly_closing: true,
+      },
+    ];
+    const prisma = {
+      controlContabil: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            controls.slice(skip, skip + take),
+          ),
+      },
+      client: { findMany: vi.fn().mockResolvedValue([{ id: CLIENT, cpf_cnpj: "11222333000181" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.control",
+      fields: ["competence", "completed_steps", "completion_percent", "notes"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: [...body.fields, "cpf_cnpj"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          {
+            competence: "2026-08",
+            completed_steps: 2,
+            completion_percent: 11.76,
+            notes: "Aguardando extratos",
+          },
+        ],
+        reachedLimit: false,
+      },
+    });
+    expect(prisma.controlContabil.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, archived_at: null } }),
+    );
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
   it("aplica filtro impossível no reporting em vez de devolver a página bruta", async () => {
     const delegate = { findMany: vi.fn().mockResolvedValue([{ competence: "2026-09" }]) };
     const prisma = {
@@ -377,6 +946,538 @@ describe("contabil Worker remainder routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { rows: [], reachedLimit: false },
     });
+  });
+
+  it("extrai o movimento Contábil da Triagem filtrado por competência e envio", async () => {
+    const monthly = [
+      { id: "1", client_id: CLIENT, competence: "2026-09", triad_moviment: true },
+      { id: "2", client_id: CLIENT, competence: "2026-10", triad_moviment: true },
+      { id: "3", client_id: "other-client", competence: "2026-09", triad_moviment: false },
+    ];
+    const prisma = {
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            monthly.slice(skip, skip + take),
+          ),
+      },
+      clientCloud: { findMany: vi.fn() },
+      client: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ id: CLIENT, name: "Alfa", company_name: "Alfa Ltda" }]),
+      },
+      responsibleContabil: { findMany: vi.fn() },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.triage_movement",
+      fields: ["company_name", "competence"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "competence", operator: "eq", parameter: "competencia", value: "2026-09" },
+          { field: "sends_movement", operator: "eq", parameter: "envia", value: true },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: ["company_name", "competence", "sends_movement"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { rows: [{ company_name: "Alfa Ltda", competence: "2026-09" }], reachedLimit: false },
+    });
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
+  });
+
+  it("extrai os clientes atribuídos a um responsável da Triagem na organização do grant", async () => {
+    const assignments = [
+      { id: "1", client_id: CLIENT, type: "FISCAL", user_id: USER },
+      { id: "2", client_id: CLIENT, type: "CONTABIL", user_id: "other-user" },
+    ];
+    const prisma = {
+      triageResponsible: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            assignments.slice(skip, skip + take),
+          ),
+      },
+      client: {
+        findMany: vi.fn().mockResolvedValue([{ id: CLIENT, name: "Alfa", regime: "Simples" }]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: USER, name: "Ana Souza" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.triage_responsibles",
+      fields: ["name", "regime", "type"],
+      limit: 10,
+      query: {
+        filters: [
+          {
+            field: "responsible_name",
+            operator: "eq",
+            parameter: "responsavel",
+            value: "Ana Souza",
+          },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: ["name", "regime", "type", "responsible_name"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { rows: [{ name: "Alfa", regime: "Simples", type: "Fiscal" }], reachedLimit: false },
+    });
+    for (const delegate of [prisma.triageResponsible, prisma.client, prisma.user]) {
+      expect(delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+      );
+    }
+  });
+
+  it("extrai as empresas de um responsável do Contábil na organização do grant", async () => {
+    const clients = [
+      { id: CLIENT, company_name: "Alfa Ltda" },
+      { id: "client-without-responsible", company_name: "Beta Ltda" },
+    ];
+    const prisma = {
+      client: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            clients.slice(skip, skip + take),
+          ),
+      },
+      responsibleContabil: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { client_id: CLIENT, person_responsible_id: USER, posted_by_id: "other-user" },
+          ]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: USER, name: "Ana Souza" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.responsibles",
+      fields: ["company_name", "posted_by_name"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "responsible_name", operator: "eq", parameter: "usuario", value: "Ana Souza" },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: ["company_name", "posted_by_name", "responsible_name"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    // O responsável pelo lançamento é de outra organização: o nome não sai.
+    await expect(response.json()).resolves.toMatchObject({
+      data: { rows: [{ company_name: "Alfa Ltda", posted_by_name: null }], reachedLimit: false },
+    });
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, contabil: true } }),
+    );
+    for (const delegate of [prisma.responsibleContabil, prisma.user]) {
+      expect(delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+      );
+    }
+  });
+
+  it("extrai as Relações Contábeis de um responsável com os estados gravados", async () => {
+    const relationships = [
+      { id: "1", client_id: CLIENT, bidding: null, chart_accounts: "Não — Jonrick", note: "Obs" },
+      { id: "2", client_id: "other-client", bidding: true, chart_accounts: null, note: "" },
+    ];
+    const prisma = {
+      relationshipContabil: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            relationships.slice(skip, skip + take),
+          ),
+      },
+      client: {
+        findMany: vi.fn().mockResolvedValue([{ id: CLIENT, name: "Alfa", segment: "Comércio" }]),
+      },
+      responsibleContabil: {
+        findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT, person_responsible_id: USER }]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: USER, name: "Ana Souza" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.relationship",
+      fields: ["name", "segment", "bidding", "bidding_status", "chart_accounts", "note"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "responsible_name", operator: "eq", parameter: "usuario", value: "Ana Souza" },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: [...body.fields, "responsible_name"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          {
+            name: "Alfa",
+            segment: "Comércio",
+            bidding: null,
+            bidding_status: "Não selecionado",
+            chart_accounts: "Não — Jonrick",
+            note: "Obs",
+          },
+        ],
+        reachedLimit: false,
+      },
+    });
+    for (const delegate of [
+      prisma.relationshipContabil,
+      prisma.client,
+      prisma.responsibleContabil,
+      prisma.user,
+    ]) {
+      expect(delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+      );
+    }
+  });
+
+  it("extrai os documentos do Contábil de um cliente no período com o estado do checklist", async () => {
+    const routines = [
+      {
+        id: "1",
+        client_id: CLIENT,
+        competence: "2026-08",
+        settlement_date: "2026-09-05T00:00:00.000Z",
+        checklist: { financial_transactions: "COMPLETED" },
+      },
+      { id: "2", client_id: CLIENT, competence: "2026-09", settlement_date: null, checklist: {} },
+      { id: "3", client_id: "other-client", competence: "2026-09", checklist: {} },
+    ];
+    const prisma = {
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(async ({ skip = 0, take }: { skip?: number; take: number }) =>
+            routines.slice(skip, skip + take),
+          ),
+      },
+      client: { findMany: vi.fn().mockResolvedValue([{ id: CLIENT, cpf_cnpj: "11222333000181" }]) },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.documents",
+      fields: ["competence", "financial_transactions", "settlement_date"],
+      limit: 10,
+      query: {
+        filters: [
+          { field: "cpf_cnpj", operator: "eq", parameter: "cliente", value: "11222333000181" },
+          { field: "competence", operator: "gte", parameter: "inicio", value: "2026-09" },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", {
+          source: body.source,
+          fields: [...body.fields, "cpf_cnpj"],
+        })),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          { competence: "2026-09", financial_transactions: "Não aplicável", settlement_date: null },
+        ],
+        reachedLimit: false,
+      },
+    });
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
+  it("extrai SGQ e métrica Contábil da Triagem na organização do grant", async () => {
+    // O SGQ vai até o mês corrente: fixa a data para o intervalo ser o das rotinas.
+    vi.useFakeTimers({ now: new Date("2026-01-20T12:00:00.000Z"), toFake: ["Date"] });
+    const routines = [
+      {
+        id: "1",
+        client_id: CLIENT,
+        competence: "2025-12",
+        checklist: { triaged_transactions: "COMPLETED", financial_transactions: "NOT_PRESENT" },
+      },
+      { id: "2", client_id: CLIENT, competence: "2026-01", checklist: {} },
+    ];
+    const prisma = {
+      triageMonthly: {
+        findMany: vi
+          .fn()
+          .mockImplementation(
+            async ({ skip = 0, take = routines.length }: { skip?: number; take?: number }) =>
+              routines.slice(skip, skip + take),
+          ),
+      },
+      client: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: CLIENT,
+            status: "Ativo",
+            competence_entry: null,
+            competence_output: null,
+            deletion_date: null,
+          },
+        ]),
+      },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const extract = async (body: { source: string; fields: string[]; limit: number }) => {
+      const response = await app.request("https://contabil.test/internal/reporting/extract", {
+        method: "POST",
+        headers: {
+          ...(await signedReportingHeaders(body, "extract", body)),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(200);
+      return ((await response.json()) as { data: { rows: unknown[] } }).data.rows;
+    };
+
+    await expect(
+      extract({
+        source: "contabil.triage_sgq",
+        fields: ["competence", "not_sent", "not_triaged", "triaged"],
+        limit: 10,
+      }),
+    ).resolves.toEqual([
+      { competence: "2025-12", not_sent: 0, not_triaged: 0, triaged: 1 },
+      { competence: "2026-01", not_sent: 0, not_triaged: 0, triaged: 1 },
+    ]);
+    await expect(
+      extract({
+        source: "contabil.triage_accounting_metric",
+        fields: ["competence", "completion_percent"],
+        limit: 1,
+      }),
+    ).resolves.toEqual([{ competence: "2025-12", completion_percent: 100 }]);
+    for (const delegate of [prisma.triageMonthly, prisma.client]) {
+      for (const [query] of delegate.findMany.mock.calls) {
+        expect(query.where).toMatchObject({ organization_id: ORG });
+      }
+    }
+    vi.useRealTimers();
+  });
+
+  it("extrai os documentos fiscais especiais da Triagem na organização do grant", async () => {
+    const prisma = {
+      triageMonthly: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "1",
+            client_id: CLIENT,
+            competence: "2026-09",
+            checklist: { sped_fiscal: "COMPLETED", nfce_documents: "nao possui" },
+          },
+        ]),
+      },
+      triageConfig: {
+        findMany: vi.fn().mockResolvedValue([{ client_id: CLIENT, delivery_method: "PORTAL" }]),
+      },
+      triageCatalogItem: {
+        findMany: vi.fn().mockResolvedValue([{ code: "PORTAL", label: "Portal" }]),
+      },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.triage_fiscal_special_documents",
+      fields: ["competence", "sped_fiscal", "nfce_documents", "cte_as_issuer", "delivery_method"],
+      limit: 10,
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", body)),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          {
+            competence: "2026-09",
+            sped_fiscal: "Concluído",
+            nfce_documents: "Não possui",
+            cte_as_issuer: "Não aplicável",
+            delivery_method: "Portal",
+          },
+        ],
+      },
+    });
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "FISCAL", archived_at: null },
+      }),
+    );
+    expect(prisma.triageConfig.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, client_id: { in: [CLIENT] }, type: "FISCAL" },
+      }),
+    );
+  });
+
+  it("extrai a grade Contábil da Triagem com justificativa do catálogo da organização", async () => {
+    const prisma = {
+      triageMonthly: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "1",
+            client_id: CLIENT,
+            competence: "2026-09",
+            justification: "SEM_MOVIMENTO",
+            checklist: { triaged_transactions: "PENDING", bank_reconciliation: "concluido" },
+          },
+        ]),
+      },
+      triageCatalogItem: {
+        findMany: vi.fn().mockResolvedValue([{ code: "SEM_MOVIMENTO", label: "Sem movimento" }]),
+      },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.triage_accounting_documents",
+      fields: ["competence", "triaged_transactions", "bank_reconciliation", "justification"],
+      limit: 10,
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...(await signedReportingHeaders(body, "extract", body)),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rows: [
+          {
+            competence: "2026-09",
+            triaged_transactions: "Pendente",
+            bank_reconciliation: "Concluído",
+            justification: "Sem movimento",
+          },
+        ],
+      },
+    });
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "CONTABIL", archived_at: null },
+      }),
+    );
+    expect(prisma.triageCatalogItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, kind: "JUSTIFICATION", code: { in: ["SEM_MOVIMENTO"] } },
+      }),
+    );
   });
 
   it("usa a permissão efetiva do módulo contábil como o gateway Node encaminha", async () => {

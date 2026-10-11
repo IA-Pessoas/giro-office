@@ -34,7 +34,7 @@ function createControlProvider() {
     createForActiveUsers: vi.fn(async () => ({ created: 2, alreadyExisted: 1 })),
     listControls: vi.fn(async () => []),
     updateAnswers: vi.fn(async () => ({ id: controlId })),
-    getReport: vi.fn(async () => ({ pending: [], withoutIntegration: [] })),
+    getReport: vi.fn(async () => ({ pending: [], unanswered: [], withoutIntegration: [] })),
     importLegacyRecords: vi.fn(async () => ({ imported: 1, alreadyExisted: 0, reconciliation: 1 })),
     listImportReconciliation: vi.fn(async () => []),
   };
@@ -78,6 +78,36 @@ describe("Marketing AI usage control routes", () => {
 
     expect(response.status).toBe(403);
     expect(service.createForUser).not.toHaveBeenCalled();
+
+    const answer = await request(createTestApp(service))
+      .patch(`/marketing/ai-usage-controls/${userId}`)
+      .set(gatewayHeaders(1))
+      .send({ knowledge: true });
+    // A negação acontece antes do serviço, que é quem grava a trilha.
+    expect(answer.status).toBe(403);
+    expect(service.updateAnswers).not.toHaveBeenCalled();
+  });
+
+  it("atribui criação e respostas ao usuário autenticado", async () => {
+    const service = createControlProvider();
+    const app = createTestApp(service);
+    const target = "30000000-0000-4000-8000-000000000001";
+    await request(app)
+      .post("/marketing/ai-usage-controls")
+      .set(gatewayHeaders(2))
+      .send({ userId: target, competence: "2026-04" });
+    await request(app)
+      .patch(`/marketing/ai-usage-controls/${target}`)
+      .set(gatewayHeaders(2))
+      .send({ knowledge: true });
+
+    expect(service.createForUser).toHaveBeenCalledWith(organizationId, target, "2026-04", userId);
+    expect(service.updateAnswers).toHaveBeenCalledWith(
+      organizationId,
+      target,
+      expect.objectContaining({ knowledge: true }),
+      userId,
+    );
   });
 
   it("lista controles apenas na organização autenticada", async () => {

@@ -17,6 +17,7 @@ import { PessoalUnionsAdapter } from "../integrations/pessoalUnionsAdapter.js";
 import { ProjectAdapter } from "../integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "../integrations/regularizeLicenseAdapter.js";
 import { RegularizeMunicipalTaxesAdapter } from "../integrations/regularizeMunicipalTaxesAdapter.js";
+import { RegularizePortfolioAdapter } from "../integrations/regularizePortfolioAdapter.js";
 import { RegularizeProcessAdapter } from "../integrations/regularizeProcessAdapter.js";
 import { RhAttendanceAdapter } from "../integrations/rhAttendanceAdapter.js";
 import { RhHolidayAdapter } from "../integrations/rhHolidayAdapter.js";
@@ -46,6 +47,7 @@ const adapters = [
   ProjectAdapter,
   RegularizeLicenseAdapter,
   RegularizeMunicipalTaxesAdapter,
+  RegularizePortfolioAdapter,
   RegularizeProcessAdapter,
   RhAttendanceAdapter,
   RhHolidayAdapter,

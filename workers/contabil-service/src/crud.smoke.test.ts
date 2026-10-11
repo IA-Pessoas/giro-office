@@ -3,7 +3,11 @@
 // schema do Worker ("Unknown argument"), tabela sem @@map, coluna NOT NULL não preenchida.
 // AUDIT_SERVICE e TRIAGEM_SERVICE são stubs: só o banco é real.
 import { randomUUID } from "node:crypto";
-import { getContabilReportingFields, TRIAGE_ACCOUNTING_STATUS_PRECEDENCE } from "@workspace/shared";
+import {
+  CONTABIL_REPORTING_SOURCES,
+  getContabilReportingFields,
+  TRIAGE_ACCOUNTING_STATUS_PRECEDENCE,
+} from "@workspace/shared";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   expectOk,
@@ -250,8 +254,8 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     const created = expectOk(
       await call("POST", "/contabil/relationships", {
         client_id: clientId,
-        bidding: false,
-        chart_accounts: "Plano padrão",
+        bidding: null,
+        chart_accounts: null,
         tool: "Domínio",
         system: "ERP Smoke",
         note: "Criado pelo smoke",
@@ -266,7 +270,7 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     expectOk(
       await call("PUT", `/contabil/relationships/${id}`, {
         bidding: true,
-        chart_accounts: "Plano próprio",
+        chart_accounts: "Sim — Jonrick",
         tool: "Questor",
         system: "ERP Novo",
         note: "Atualizado",
@@ -279,7 +283,7 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     );
     expect(after.data).toMatchObject({
       bidding: true,
-      chart_accounts: "Plano próprio",
+      chart_accounts: "Sim — Jonrick",
       tool: "Questor",
       system: "ERP Novo",
       note: "Atualizado",
@@ -534,8 +538,8 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
       ),
       "GET reporting/catalog",
     );
-    for (const source of ["contabil.control", "contabil.responsibles", "contabil.relationship"]) {
-      const fields = [...getContabilReportingFields(source as never)];
+    for (const source of CONTABIL_REPORTING_SOURCES) {
+      const fields = [...getContabilReportingFields(source)];
       const body = { source, fields, limit: 5 };
       expectOk(
         await call(

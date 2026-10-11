@@ -31,18 +31,21 @@ export interface MarketingEventEditionsProvider {
     organizationId: string,
     eventId: string,
     input: MarketingEventEditionInput,
+    actorUserId: string,
   ): Promise<MarketingEventEdition>;
   updateEdition(
     organizationId: string,
     eventId: string,
     editionId: string,
     input: MarketingEventEditionInput,
+    actorUserId: string,
   ): Promise<MarketingEventEdition | null>;
   createEditionFeedback(
     organizationId: string,
     eventId: string,
     editionId: string,
     input: MarketingEventEditionFeedbackInput,
+    actorUserId: string,
   ): Promise<MarketingEventEditionFeedback>;
   getEditionReport(
     organizationId: string,
@@ -80,10 +83,11 @@ export function createMarketingEventEditionsRoutes(
     requireMarketingPermission(MarketingPermissionLevel.Editor),
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { organization_id: organizationId, user_id: userId } =
+          requireAuthenticatedRequestContext(request);
         const { eventId } = parseWithZod(marketingEventEditionParamsSchema, request.params);
         const body = parseWithZod(marketingEventEditionBodySchema, request.body);
-        const edition = await editionsService.createEdition(organizationId, eventId, body);
+        const edition = await editionsService.createEdition(organizationId, eventId, body, userId);
         response.status(201).json(createSuccessResponse(edition));
       } catch (error: unknown) {
         logError("Falha ao cadastrar edição do evento.", { err: error });
@@ -98,7 +102,8 @@ export function createMarketingEventEditionsRoutes(
     requireMarketingPermission(MarketingPermissionLevel.Editor),
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { organization_id: organizationId, user_id: userId } =
+          requireAuthenticatedRequestContext(request);
         const { eventId, editionId } = parseWithZod(
           marketingEventEditionIdParamsSchema,
           request.params,
@@ -109,6 +114,7 @@ export function createMarketingEventEditionsRoutes(
           eventId,
           editionId,
           body,
+          userId,
         );
         if (!edition) throw new ServiceError(404, "Edição não encontrada.");
         response.json(createSuccessResponse(edition));
@@ -125,7 +131,8 @@ export function createMarketingEventEditionsRoutes(
     requireMarketingPermission(MarketingPermissionLevel.Editor),
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { organization_id: organizationId, user_id: userId } =
+          requireAuthenticatedRequestContext(request);
         const { eventId, editionId } = parseWithZod(
           marketingEventEditionIdParamsSchema,
           request.params,
@@ -136,6 +143,7 @@ export function createMarketingEventEditionsRoutes(
           eventId,
           editionId,
           body,
+          userId,
         );
         response.status(201).json(createSuccessResponse(feedback));
       } catch (error: unknown) {

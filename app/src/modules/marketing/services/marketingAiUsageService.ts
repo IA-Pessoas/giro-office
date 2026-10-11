@@ -16,6 +16,16 @@ export type AiUsageControl = AiUsageAnswers & {
   user: { id: string; name: string; full_name: string | null };
 };
 
+/**
+ * `pending`: qualquer resposta ausente. `unanswered`: sem resposta de conhecimento (legado
+ * `conhecimento=0`). `withoutIntegration`: respondeu "Não" à integração (legado `integracao=1`).
+ */
+export type AiUsageReport = {
+  pending: AiUsageControl[];
+  unanswered: AiUsageControl[];
+  withoutIntegration: AiUsageControl[];
+};
+
 export type EligibleMarketingUser = { id: string; name: string; full_name: string | null };
 export type MarketingAiUsageReconciliation = {
   id: string;
@@ -37,8 +47,8 @@ export const marketingAiUsageService = {
     unwrap<EligibleMarketingUser[]>(api.get<MarketingEnvelope<EligibleMarketingUser[]>>("/marketing/ai-usage-controls/users")),
   getControls: async (competence: string): Promise<AiUsageControl[]> =>
     unwrap<AiUsageControl[]>(api.get<MarketingEnvelope<AiUsageControl[]>>("/marketing/ai-usage-controls/list", { params: { competence } })),
-  getReport: async (competence: string): Promise<{ pending: AiUsageControl[]; withoutIntegration: AiUsageControl[] }> =>
-    unwrap<{ pending: AiUsageControl[]; withoutIntegration: AiUsageControl[] }>(api.get<MarketingEnvelope<{ pending: AiUsageControl[]; withoutIntegration: AiUsageControl[] }>>("/marketing/ai-usage-controls/report", { params: { competence } })),
+  getReport: async (competence: string): Promise<AiUsageReport> =>
+    unwrap<AiUsageReport>(api.get<MarketingEnvelope<AiUsageReport>>("/marketing/ai-usage-controls/report", { params: { competence } })),
   getReconciliation: async (): Promise<MarketingAiUsageReconciliation[]> =>
     unwrap<MarketingAiUsageReconciliation[]>(api.get<MarketingEnvelope<MarketingAiUsageReconciliation[]>>("/marketing/ai-usage-controls/reconciliation")),
   importLegacy: async (records: Array<Record<string, unknown>>): Promise<{ imported: number; alreadyExisted: number; reconciliation: number }> =>

@@ -13,6 +13,7 @@ import "express-async-errors";
 import { EncryptionService } from "@workspace/shared";
 import type { MarketingServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
+import { createMarketingAudit, type MarketingAudit } from "./integrations/audit.js";
 import { createIsAuthenticatedMiddleware } from "./middlewares/isAuthenticated.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildMarketingServiceOpenApiSpec } from "./openapi/spec.js";
@@ -51,6 +52,7 @@ interface CreateMarketingAppOptions {
   eventsService?: MarketingEventsProvider;
   editionsService?: MarketingEventEditionsProvider;
   prisma?: PrismaClient;
+  audit?: MarketingAudit;
 }
 
 function errorContext(request: Request): Record<string, unknown> {
@@ -72,19 +74,22 @@ export function createMarketingApp({
   eventsService,
   editionsService,
   prisma,
+  audit = createMarketingAudit(env, logger),
 }: CreateMarketingAppOptions): Express {
   const app = express();
   const auth = createIsAuthenticatedMiddleware(env);
   const service = dashboardService ?? (prisma ? new MarketingDashboardService(prisma) : null);
-  const controls = controlService ?? (prisma ? new MarketingAiUsageControlService(prisma) : null);
+  const controls =
+    controlService ?? (prisma ? new MarketingAiUsageControlService(prisma, audit) : null);
   const passwords =
     passwordService ??
     (prisma
-      ? new MarketingPasswordService(prisma, new EncryptionService(env.mtkEncryptionKey))
+      ? new MarketingPasswordService(prisma, new EncryptionService(env.mtkEncryptionKey), audit)
       : null);
-  const marketingEvents = eventsService ?? (prisma ? new MarketingEventsService(prisma) : null);
+  const marketingEvents =
+    eventsService ?? (prisma ? new MarketingEventsService(prisma, audit) : null);
   const marketingEventEditions =
-    editionsService ?? (prisma ? new MarketingEventEditionsService(prisma) : null);
+    editionsService ?? (prisma ? new MarketingEventEditionsService(prisma, audit) : null);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "marketing-service")));

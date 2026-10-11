@@ -37,6 +37,83 @@ describe("RegularizeMunicipalTaxesReportingService", () => {
     });
   });
 
+  it("traz cliente, município e inscrição municipal no relatório por ano", async () => {
+    const organization_id = "10000000-0000-4000-8000-000000000001";
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "t1",
+        year: 2026,
+        tff_notes: "Parcelado",
+        client: {
+          name: "Alfa",
+          company_name: "Alfa Ltda",
+          city: "Salvador",
+          municipal_registration: "123456",
+          organization_id,
+        },
+      },
+      {
+        id: "t2",
+        year: 2026,
+        tff_notes: null,
+        client: {
+          name: "Alheia",
+          city: "Recife",
+          municipal_registration: "999",
+          organization_id: "20000000-0000-4000-8000-000000000002",
+        },
+      },
+    ]);
+    const service = new RegularizeMunicipalTaxesReportingService({ municipalTaxes: { findMany } });
+
+    await expect(
+      service.extract({
+        organizationId: organization_id,
+        source: "regularize.municipal_taxes",
+        fields: [
+          "year",
+          "client_name",
+          "client_city",
+          "client_municipal_registration",
+          "tff_notes",
+        ],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          year: 2026,
+          client_name: "Alfa Ltda",
+          client_city: "Salvador",
+          client_municipal_registration: "123456",
+          tff_notes: "Parcelado",
+        },
+        {
+          year: 2026,
+          client_name: null,
+          client_city: null,
+          client_municipal_registration: null,
+          tff_notes: null,
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(findMany.mock.calls[0]?.[0].select).toEqual({
+      id: true,
+      year: true,
+      tff_notes: true,
+      client: {
+        select: {
+          name: true,
+          company_name: true,
+          city: true,
+          municipal_registration: true,
+          organization_id: true,
+        },
+      },
+    });
+  });
+
   it("rejeita chaves internas e campos não publicados", async () => {
     const findMany = vi.fn();
     const service = new RegularizeMunicipalTaxesReportingService({ municipalTaxes: { findMany } });

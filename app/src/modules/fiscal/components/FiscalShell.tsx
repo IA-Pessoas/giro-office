@@ -1,24 +1,44 @@
 import { useState } from "react";
 import {
   Banknote,
+  FileSearch,
+  FileStack,
+  FileCheck2,
+  CalendarRange,
+  ClipboardList,
   Percent,
   Landmark,
   Receipt,
   Search,
   ScrollText,
+  Users,
+  Warehouse,
   type LucideIcon,
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
 
 import type { FiscalTabId } from "../types";
+import { FiscalAnticipationsSection } from "./FiscalAnticipationsSection";
+import { FiscalConferencesSection } from "./FiscalConferencesSection";
+import { FiscalAnnualControlsSection } from "./FiscalAnnualControlsSection";
+import { FiscalControlsSection } from "./FiscalControlsSection";
 import { FiscalIcmsSection } from "./FiscalIcmsSection";
+import { FiscalInvoicePdfSection } from "./FiscalInvoicePdfSection";
 import { FiscalIpiSection } from "./FiscalIpiSection";
+import { FiscalMalhasSection } from "./FiscalMalhasSection";
+import { FiscalIpiSpreadsheetSection } from "./FiscalIpiSpreadsheetSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
 import { FiscalRatesSection } from "./FiscalRatesSection";
+import { FiscalResponsibleReportSection } from "./FiscalResponsibleReportSection";
 import { FiscalRevenuesSection } from "./FiscalRevenuesSection";
 import { FiscalSimplesBatchSection } from "./FiscalSimplesBatchSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
+import { FiscalWholesaleSection } from "./FiscalWholesaleSection";
+import { FiscalSefazXmlSection } from "./FiscalSefazXmlSection";
+import { FiscalSpedXmlSection } from "./FiscalSpedXmlSection";
+import { FiscalXmlSelectionSection } from "./FiscalXmlSelectionSection";
+import { FiscalXmlTaxesSection } from "./FiscalXmlTaxesSection";
 
 const fiscalTabs: Array<{
   icon: LucideIcon;
@@ -29,6 +49,16 @@ const fiscalTabs: Array<{
     id: "search",
     label: "Busca Fiscal",
     icon: Search,
+  },
+  {
+    id: "controls",
+    label: "Controle mensal",
+    icon: ClipboardList,
+  },
+  {
+    id: "annual",
+    label: "Controle anual",
+    icon: CalendarRange,
   },
   {
     id: "ncm",
@@ -55,6 +85,31 @@ const fiscalTabs: Array<{
     label: "Simples Nacional",
     icon: Banknote,
   },
+  {
+    id: "malhas",
+    label: "Malhas",
+    icon: FileSearch,
+  },
+  {
+    id: "anticipations",
+    label: "Antecipações",
+    icon: FileStack,
+  },
+  {
+    id: "wholesale",
+    label: "Atacadista",
+    icon: Warehouse,
+  },
+  {
+    id: "responsibles",
+    label: "Responsáveis × Empresas",
+    icon: Users,
+  },
+  {
+    id: "conferences",
+    label: "Conferências",
+    icon: FileCheck2,
+  },
 ];
 
 export function FiscalShell() {
@@ -72,7 +127,7 @@ export function FiscalShell() {
             Fiscal
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Consulta e cadastro de NCM, ICMS, IPI, alíquotas e receitas por empresa
+            Consulta e cadastro de NCM, ICMS, IPI, alíquotas, receitas e malhas por empresa, e conferência de arquivos
           </p>
         </div>
       </div>
@@ -133,6 +188,14 @@ function FiscalActiveTabPanel({
     return <FiscalSearchTab />;
   }
 
+  if (activeTab === "controls") {
+    return <div role="tabpanel" id="fiscal-panel-controls" aria-labelledby="fiscal-tab-controls"><FiscalControlsSection canEdit={canEdit} canAuthorize={canDelete} /></div>;
+  }
+
+  if (activeTab === "annual") {
+    return <div role="tabpanel" id="fiscal-panel-annual" aria-labelledby="fiscal-tab-annual"><FiscalAnnualControlsSection canEdit={canEdit} /></div>;
+  }
+
   if (activeTab === "ncm") {
     return <FiscalNcmTab canEdit={canEdit} canDelete={canDelete} />;
   }
@@ -147,6 +210,26 @@ function FiscalActiveTabPanel({
 
   if (activeTab === "revenues") {
     return <div role="tabpanel" id="fiscal-panel-revenues" aria-labelledby="fiscal-tab-revenues">{canEdit ? <FiscalSimplesBatchSection /> : null}<FiscalRevenuesSection canEdit={canEdit} /></div>;
+  }
+
+  if (activeTab === "responsibles") {
+    return <div role="tabpanel" id="fiscal-panel-responsibles" aria-labelledby="fiscal-tab-responsibles"><FiscalResponsibleReportSection /></div>;
+  }
+
+  if (activeTab === "wholesale") {
+    return <div role="tabpanel" id="fiscal-panel-wholesale" aria-labelledby="fiscal-tab-wholesale"><FiscalWholesaleSection canEdit={canEdit} /></div>;
+  }
+
+  if (activeTab === "malhas") {
+    return <div role="tabpanel" id="fiscal-panel-malhas" aria-labelledby="fiscal-tab-malhas"><FiscalMalhasSection canEdit={canEdit} canTransfer={canDelete} /></div>;
+  }
+
+  if (activeTab === "anticipations") {
+    return <div role="tabpanel" id="fiscal-panel-anticipations" aria-labelledby="fiscal-tab-anticipations"><FiscalAnticipationsSection canEdit={canEdit} canAuthorize={canDelete} /></div>;
+  }
+
+  if (activeTab === "conferences") {
+    return <div role="tabpanel" id="fiscal-panel-conferences" aria-labelledby="fiscal-tab-conferences"><div className="space-y-8"><FiscalConferencesSection canEdit={canEdit} /><FiscalIpiSpreadsheetSection canEdit={canEdit} /><FiscalSefazXmlSection canEdit={canEdit} /><FiscalSpedXmlSection canEdit={canEdit} /><FiscalXmlSelectionSection canEdit={canEdit} /><FiscalXmlTaxesSection canEdit={canEdit} /><FiscalInvoicePdfSection canEdit={canEdit} /></div></div>;
   }
 
   return <FiscalIpiTab canEdit={canEdit} canDelete={canDelete} />;

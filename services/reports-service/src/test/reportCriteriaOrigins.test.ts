@@ -9,6 +9,7 @@ import { InternalReportingService as Pessoal } from "../../../pessoal-service/sr
 import { InternalReportingService as Project } from "../../../project-service/src/services/internalReportingService.js";
 import {
   RegularizeMunicipalTaxesReportingService as Municipal,
+  RegularizePortfolioReportingService as Portfolio,
   RegularizeLicenseReportingService as Regularize,
 } from "../../../regularize-service/src/reporting/internalReportingService.js";
 import { InternalReportingService as Rh } from "../../../rh-service/src/reporting/internalReportingService.js";
@@ -18,6 +19,11 @@ import { InternalReportingService as Ti } from "../../../ti-service/src/reportin
 const organizationId = "00000000-0000-4000-8000-000000000001";
 const pessoalDerivedFields = new Set([
   "client_name",
+  "client_city",
+  "client_municipal_registration",
+  "client_code",
+  "client_document",
+  "client_status",
   "responsible_name",
   "union_name",
   "group_name",
@@ -65,15 +71,26 @@ it("rh.attendance: filters derived rows beyond 101 and counts the complete set",
   });
   expect(count.rows).toEqual([{ total: 150 }]);
 });
+// Áreas do Contábil cujos primeiros campos de texto são calculados ou vêm de outra tabela
+// (cobertos em contabil-service/triageReportingService.test.ts): aqui vale a coluna direta.
+const directColumns: Readonly<Record<string, string>> = {
+  "contabil.responsibles": "name",
+  "contabil.relationship": "tool",
+};
 for (const source of reportingSources.filter(
   (source) =>
     source.key !== "rh.attendance" &&
     source.key !== "marketing.budgets" &&
-    source.key !== "integracao.client_groups",
+    source.key !== "integracao.client_groups" &&
+    source.key !== "regularize.client_groups" &&
+    source.key !== "regularize.partners" &&
+    // Uma linha por mês, calculada: coberta em contabil-service/triageReportingService.test.ts.
+    source.key !== "contabil.triage_sgq",
 )) {
   describe(source.key, () => {
     it("orders the entire authorized set before the output cap", async () => {
       const field =
+        source.fields.find((field) => field.key === directColumns[source.key]) ??
         source.fields.find(
           (field) => field.value_type === "string" && !pessoalDerivedFields.has(field.key),
         ) ??
@@ -158,7 +175,10 @@ for (const source of reportingSources.filter(
                             ? Ti
                             : source.key === "regularize.municipal_taxes"
                               ? Municipal
-                              : Regularize;
+                              : source.key === "regularize.clients" ||
+                                  source.key === "regularize.clients_pf"
+                                ? Portfolio
+                                : Regularize;
       const service = new Service(prisma as never);
       const output = await service.extract({
         source: source.key,

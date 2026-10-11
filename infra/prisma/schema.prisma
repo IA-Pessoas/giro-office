@@ -160,12 +160,17 @@ model Organization {
   clientsGroups                 ClientsGroup[]
   documentsTermination          DocumentClientTermination[]
   groups                        Group[]
+  clientRegimes                 ClientRegime[]
+  clientSegments                ClientSegment[]
+  clientLicitacaoHistory        ClientLicitacaoHistory[]
   clientHistorys                ClientHistory[]
   clientHistorysPending         ClientHistoryPending[]
   pas                           PA[]
   clientsPF                     ClientPF[]
   clientTerminations            ClientTermination[]
   controlsContabil              ControlContabil[]
+  contingencyDrafts             ContingencyDraft[]
+  noahConversions               NoahConversion[]
   relationshipsContabil         RelationshipContabil[]
   responsiblesContabil          ResponsibleContabil[]
   departments                   Department[]
@@ -208,6 +213,7 @@ model Organization {
   permissionsProjects           PermissionProject[]
   permissionsSpecifics          PermissionSpecific[]
   lddPessoal                    LddPessoal[]
+  lddImportPessoal              LddImportPessoal[]
   obrigationsPessoal            ObrigationsPessoal[]
   passwordsPessoal              PasswordPessoal[]
   pessoalGroups                 PessoalGroup[]
@@ -221,12 +227,16 @@ model Organization {
   proposalConfigs               ProposalConfig[]
   commercialProspectings        CommercialProspecting[]
   commercialTaskBillings        CommercialTaskBilling[]
+  groupSavedMaps                RegularizeGroupSavedMap[]
   licenses                      License[]
   municipalTaxes                MunicipalTaxes[]
   partners                      Partners[]
   sitePasswordsRegularize       SitePasswordsRegularize[]
   passwordsRegularize           PasswordRegularize[]
   proceduralGuidances           ProceduralGuidance[]
+  dteImports                    RegularizeDteImport[]
+  dteNotices                    RegularizeDteNotice[]
+  dteQueries                    RegularizeDteQuery[]
   processes                     Process[]
   holidays                      Holidays[]
   pointsConfig                  PointsConfig[]
@@ -269,6 +279,8 @@ model Organization {
   triageOutboxEvents            TriageOutboxEvent[]
   triageExternalLinks           TriageExternalLink[]
   triageUrgentRequests           TriageUrgentRequest[]
+  triageSolicitations            TriageSolicitation[]
+  triageNoteCounts               TriageNoteCount[]
 
   @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
@@ -417,6 +429,9 @@ model User {
   triageExternalLinks         TriageExternalLink[]       @relation("TriageExternalLinkResponsible")
   triageUrgentRequestsCreated TriageUrgentRequest[]      @relation("TriageUrgentRequestRequester")
   triageUrgentRequestsAssigned TriageUrgentRequest[]     @relation("TriageUrgentRequestResponsible")
+  triageSolicitationsCreated  TriageSolicitation[]       @relation("TriageSolicitationRequester")
+  triageSolicitationsAssigned TriageSolicitation[]       @relation("TriageSolicitationResponsible")
+  triageNoteCountsUpdated     TriageNoteCount[]
   financeiroCollectorAssignments DepartmentCollector[]
   taskOperationalNotifications TaskOperationalNotification[]
   department                  Department             @relation(fields: [department_id], references: [id])
@@ -785,6 +800,7 @@ model Client {
   clouds                        ClientClouds[]
   organization                  Organization                @relation(fields: [organization_id], references: [id])
   groups                        ClientsGroup[]
+  licitacaoHistory              ClientLicitacaoHistory[]
   documentsTermination          DocumentClientTermination[]
   historys                      ClientHistory[]
   historysPe                    ClientHistoryPending[]
@@ -799,10 +815,12 @@ model Client {
   installments                  Installment[]
   panoramasParcelameto          PanoramaParcelameto[]
   lddPessoal                    LddPessoal[]
+  lddImportPessoal              LddImportPessoal[]
   obrigationsPessoal            ObrigationsPessoal[]
   passPessoal                   PasswordPessoal[]
   situationsPessoal             SituationsPessoal[]
   licenses                      License[]
+  dteQueries                    RegularizeDteQuery[]
   municipalTaxes                MunicipalTaxes[]
   partners                      Partners[]
   passRegularize                PasswordRegularize[]
@@ -816,6 +834,8 @@ model Client {
   triageCompetences             TriageCompetence[]
   triageExternalLinks           TriageExternalLink[]
   triageUrgentRequests           TriageUrgentRequest[]
+  triageSolicitations            TriageSolicitation[]
+  triageNoteCounts               TriageNoteCount[]
   commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
@@ -887,9 +907,57 @@ model Group {
   status          Boolean        @default(true)
   organization_id String
   clients         ClientsGroup[]
+  savedMaps       RegularizeGroupSavedMap[]
   organization    Organization   @relation(fields: [organization_id], references: [id])
 
   @@map("clients.group")
+}
+
+// Catálogo de regimes do cadastro de clientes por organização (tb_regularize.regimes no legado).
+// Client.regime guarda o nome; renomear aqui não reescreve clientes já gravados.
+model ClientRegime {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_regime_org_normalized_name")
+  @@map("clients.regimes")
+}
+
+// Segmentos do cliente por organização, com o tipo herdado de tb_integracao.segmentos (#1741).
+// Client.segment guarda o nome; renomear aqui não reescreve clientes já gravados.
+model ClientSegment {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  type            String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_segment_org_normalized_name")
+  @@map("clients.segments")
+}
+
+// Mudanças da resposta de licitação do cliente (#1743). NULL = não informado, distinto de Sim/Não.
+model ClientLicitacaoHistory {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  previous_value  Boolean?
+  new_value       Boolean?
+  actor_user_id   String
+  created_at      DateTime     @default(now())
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, client_id, created_at], map: "idx_client_licitacao_history_client")
+  @@map("clients.licitacao_history")
 }
 
 model ClientsGroup {
@@ -901,7 +969,26 @@ model ClientsGroup {
   group           Group        @relation(fields: [group_id], references: [id])
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  // Um cliente pode estar em vários grupos, mas o par cliente+grupo é único (#1742).
+  @@unique([group_id, client_id], map: "uq_clients_group_member")
   @@map("clients.clientsGroup")
+}
+
+// Versão salva do mapa de um grupo (#1749; tb_workspace.mapas_clientes no legado). Guarda a
+// árvore editada como foi salva: mudanças na carteira não mexem nela. Uma versão por grupo.
+model RegularizeGroupSavedMap {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  group_id           String
+  tree               Json
+  updated_by_user_id String
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+  organization       Organization @relation(fields: [organization_id], references: [id])
+  group              Group        @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, group_id], map: "uq_regularize_group_map_group")
+  @@map("regularize.group_maps")
 }
 
 model ClientTermination {
@@ -1375,14 +1462,19 @@ model Agenda {
   obs                   String?
   department_control_id String
   organization_id       String
+  // Ocorrência de uma recorrência mensal: uma por regra e competência (AAAA-MM).
+  recurring_agenda_id   String?
+  recurrence_month      String?
   client                Client?      @relation(fields: [client_id], references: [id])
   department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
   organization          Organization @relation(fields: [organization_id], references: [id])
   participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
   participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])
   participant           User?        @relation("participant", fields: [participant_id], references: [id])
+  recurring_agenda      RecurringAgenda? @relation(fields: [recurring_agenda_id], references: [id], onDelete: SetNull)
   task                  Task?        @relation(fields: [task_id], references: [id])
 
+  @@unique([recurring_agenda_id, recurrence_month], map: "uq_agenda_recurrence_occurrence")
   @@map("agenda")
 }
 
@@ -1399,8 +1491,11 @@ model RecurringAgenda {
   obs                   String?
   department_control_id String
   organization_id       String
+  // Última competência (AAAA-MM) já gerada; nulo = regra legada, fora do gerador.
+  generated_through     String?
   client                Client?      @relation(fields: [client_id], references: [id])
   department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
+  occurrences           Agenda[]
   organization          Organization @relation(fields: [organization_id], references: [id])
   participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
   participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])
@@ -1608,6 +1703,39 @@ model CertificatePF {
   @@map("certificate.pf")
 }
 
+model ContingencyDraft {
+  id              String   @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime @default(now())
+  snapshot        String
+  content_hash    String
+  reviewed_by     String?
+  reviewed_at     DateTime?
+  reviewed_hash   String?
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  @@index([organization_id, created_at])
+  @@map("contabil.contingency_drafts")
+}
+
+model NoahConversion {
+  id              String       @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime     @default(now())
+  source_name     String
+  source_sha256   String
+  result_sha256   String
+  csv             String
+  row_count       Int
+  file_count      Int
+  rejections      Json
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, created_at])
+  @@map("contabil.noah_conversions")
+}
+
 model ControlContabil {
   id                               String       @id @default(uuid())
   competence                       String
@@ -1658,8 +1786,8 @@ model ResponsibleContabil {
 model RelationshipContabil {
   id              String       @id @default(uuid())
   client_id       String
-  bidding         Boolean
-  chart_accounts  String
+  bidding         Boolean?
+  chart_accounts  String?
   tool            String
   system          String
   note            String
@@ -1739,6 +1867,260 @@ model FiscalMonthlyRevenue {
 
   @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_revenues_org_client_competence")
   @@map("fiscal.monthly_revenues")
+}
+
+model FiscalMalha {
+  id                       String               @id @default(uuid())
+  organization_id          String
+  client_id                String
+  period_start             DateTime             @db.Date
+  period_end               DateTime             @db.Date
+  reason                   String
+  deadline                 DateTime?            @db.Date
+  status                   String
+  responsible_id           String?
+  task_id                  String?
+  attachment_path          String?
+  attachment_original_name String?
+  attachment_mime_type     String?
+  attachment_size_bytes    Int?
+  attachment_uploaded_at   DateTime?
+  attachment_uploaded_by   String?
+  created_by               String
+  updated_by               String
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  history                  FiscalMalhaHistory[]
+
+  @@index([organization_id, client_id], map: "idx_fiscal_malhas_org_client")
+  @@index([organization_id, status], map: "idx_fiscal_malhas_org_status")
+  @@map("fiscal.malhas")
+}
+
+model FiscalMalhaHistory {
+  id              String      @id @default(uuid())
+  organization_id String
+  malha_id        String
+  field           String
+  previous_value  String?
+  new_value       String?
+  actor_user_id   String
+  created_at      DateTime    @default(now())
+  malha           FiscalMalha @relation(fields: [malha_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, malha_id, created_at], map: "idx_fiscal_malha_history_org_malha_created")
+  @@map("fiscal.malha_history")
+}
+
+model FiscalClientWholesaleHistory {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  sequence        Int
+  previous_value  Boolean
+  new_value       Boolean
+  actor_user_id   String
+  created_at      DateTime @default(now())
+
+  @@unique([client_id, sequence], map: "uq_fiscal_client_wholesale_history_client_sequence")
+  @@index([organization_id, client_id, sequence], map: "idx_fiscal_client_wholesale_history_org_client_seq")
+  @@map("fiscal.client_wholesale_history")
+}
+
+// Lote de antecipações importado de ZIP de XML NF-e (E3); revisão manual, sem cálculo de imposto.
+model FiscalAnticipationBatch {
+  id              String                   @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime                 @db.Date
+  file_name       String
+  status          String                   @default("pending_review")
+  responsible_id  String
+  reviewer_id     String?
+  entry_count     Int
+  note_count      Int
+  item_count      Int
+  issues          Json                     @default("[]")
+  created_by      String
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  items           FiscalAnticipationItem[]
+  history         FiscalAnticipationHistory[]
+
+  @@index([organization_id, client_id, competence], map: "idx_fiscal_anticipation_batches_org_client_comp")
+  @@map("fiscal.anticipation_batches")
+}
+
+// Item de NF-e extraído do lote; chave de acesso + item é única na organização.
+model FiscalAnticipationItem {
+  id              String                  @id @default(uuid())
+  organization_id String
+  client_id       String
+  batch_id        String
+  entry           String
+  access_key      String
+  issuer          String
+  model           String
+  series          String
+  note_number     String
+  item_number     Int
+  code            String
+  description     String
+  ncm             String
+  cfop            String
+  quantity        Decimal?                @db.Decimal(15, 4)
+  value           Decimal?                @db.Decimal(15, 2)
+  ipi             Decimal?                @db.Decimal(15, 2)
+  icms_st         Decimal?                @db.Decimal(15, 2)
+  classification  String?
+  manual_value    Decimal?                @db.Decimal(15, 2)
+  corrections     Json                    @default("{}")
+  created_at      DateTime                @default(now())
+  batch           FiscalAnticipationBatch @relation(fields: [batch_id], references: [id], onDelete: Restrict)
+  history         FiscalAnticipationHistory[]
+
+  @@unique([organization_id, access_key, item_number], map: "uq_fiscal_anticipation_items_org_key_item")
+  @@index([organization_id, batch_id, access_key, item_number], map: "idx_fiscal_anticipation_items_org_batch")
+  @@map("fiscal.anticipation_items")
+}
+
+// Trilha da revisão de antecipações: classificação, correção, valor manual e estado do lote.
+model FiscalAnticipationHistory {
+  id              String                  @id @default(uuid())
+  organization_id String
+  batch_id        String
+  item_id         String?
+  field           String
+  previous_value  String?
+  new_value       String?
+  reason          String?
+  actor_user_id   String
+  created_at      DateTime                @default(now())
+  batch           FiscalAnticipationBatch @relation(fields: [batch_id], references: [id], onDelete: Restrict)
+  item            FiscalAnticipationItem? @relation(fields: [item_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, batch_id, created_at], map: "idx_fiscal_anticipation_history_org_batch_created")
+  @@map("fiscal.anticipation_history")
+}
+
+// Controle fiscal mensal por cliente e competência; regime registrado ao nascer.
+model FiscalMonthlyControl {
+  id              String                      @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime                    @db.Date
+  status          String                      @default("PENDING")
+  no_movement     Boolean                     @default(false)
+  regime          String?
+  opening_reason  String?
+  responsible_id  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  events          FiscalMonthlyControlEvent[]
+  obligations     FiscalMonthlyControlObligation[]
+
+  @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_controls_org_client_competence")
+  @@index([organization_id, competence], map: "idx_fiscal_monthly_controls_org_competence")
+  @@index([organization_id, responsible_id], map: "idx_fiscal_monthly_controls_org_responsible")
+  @@map("fiscal.monthly_controls")
+}
+
+// Trilha do controle mensal, gravada na mesma transação da mudança.
+model FiscalMonthlyControlEvent {
+  id              String               @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  obligation_code String?
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime             @default(now())
+  control         FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_monthly_control_events_control_created")
+  @@map("fiscal.monthly_control_events")
+}
+
+// Obrigação mensal do controle: sugerida pelo catálogo ou incluída à mão.
+model FiscalMonthlyControlObligation {
+  id                    String               @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean              @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?            @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  control               FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_monthly_control_obligations_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_monthly_control_obligations_org_control")
+  @@map("fiscal.monthly_control_obligations")
+}
+
+// Controle fiscal anual por cliente e ano-calendário, com uma linha por declaração.
+model FiscalAnnualControl {
+  id              String                     @id @default(uuid())
+  organization_id String
+  client_id       String
+  year            Int
+  regime          String?
+  responsible_id  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  items           FiscalAnnualControlItem[]
+  events          FiscalAnnualControlEvent[]
+
+  @@unique([organization_id, client_id, year], map: "uq_fiscal_annual_controls_org_client_year")
+  @@index([organization_id, year], map: "idx_fiscal_annual_controls_org_year")
+  @@map("fiscal.annual_controls")
+}
+
+model FiscalAnnualControlItem {
+  id                    String              @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean             @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?           @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  control               FiscalAnnualControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_annual_control_items_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_annual_control_items_org_control")
+  @@map("fiscal.annual_control_items")
+}
+
+model FiscalAnnualControlEvent {
+  id              String              @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  item_code       String?
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime            @default(now())
+  control         FiscalAnnualControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_annual_control_events_control_created")
+  @@map("fiscal.annual_control_events")
 }
 
 model Ipi {
@@ -1990,6 +2372,24 @@ model LddPessoal {
   organization        Organization @relation(fields: [organization_id], references: [id])
 
   @@map("pessoal.ldd")
+}
+
+/// Arquivos LDD/INSS já importados: o hash impede somar o mesmo PDF duas vezes (#1769).
+model LddImportPessoal {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  file_hash       String
+  file_name       String
+  rows_count      Int
+  total_amount    Float
+  imported_by_id  String
+  created_at      DateTime     @default(now())
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id, file_hash], map: "uq_pessoal_ldd_imports_file")
+  @@map("pessoal.ldd_imports")
 }
 
 model PasswordPessoal {
@@ -2400,6 +2800,78 @@ model MunicipalTaxes {
   organization         Organization @relation(fields: [organization_id], references: [id])
 
   @@map("regularize.municipalTaxes")
+}
+
+// Importação manual de avisos DTE (#1744). Guarda o resumo e o que foi recusado ou
+// repetido, para conferência; o conteúdo colado não é armazenado.
+model RegularizeDteImport {
+  id              String                @id @default(uuid())
+  organization_id String
+  user_id         String
+  format          String
+  total_rows      Int
+  created_count   Int
+  duplicate_count Int
+  rejected_count  Int
+  duplicates      Json
+  rejections      Json
+  created_at      DateTime              @default(now())
+  organization    Organization          @relation(fields: [organization_id], references: [id])
+  notices         RegularizeDteNotice[]
+
+  @@index([organization_id, created_at], map: "idx_regularize_dte_import_org_created")
+  @@map("regularize.dte_imports")
+}
+
+// Aviso DTE (tb_regularize.dte do legado). Datas ficam como o texto da origem; a de emissão
+// também é lida como dd/mm/aaaa hh:mm em data_emissao_at, que a caixa de avisos usa no período
+// (dte/home.php). dedupe_key = SHA-256 dos nove campos de Fiscal::cadastrarDTE;
+// pending_reading = coluna `lido` do legado.
+model RegularizeDteNotice {
+  id              String              @id @default(uuid())
+  organization_id String
+  import_id       String
+  dedupe_key      String
+  tipo            String
+  aviso           String
+  cnpj_cpf        String
+  destinatario    String
+  remetente       String
+  data_emissao    String?
+  data_emissao_at DateTime?
+  assunto         String
+  data_leitura    String?
+  data_ciencia    String?
+  registro        String?
+  pending_reading Boolean
+  created_at      DateTime            @default(now())
+  organization    Organization        @relation(fields: [organization_id], references: [id])
+  import          RegularizeDteImport @relation(fields: [import_id], references: [id])
+
+  @@unique([organization_id, dedupe_key], map: "uq_regularize_dte_notice_dedupe")
+  @@index([organization_id, created_at], map: "idx_regularize_dte_notice_org_created")
+  @@index([organization_id, data_emissao_at], map: "idx_regularize_dte_notice_org_emissao")
+  @@map("regularize.dte_notices")
+}
+
+// Consulta diária ao DTE por cliente (#1746). O legado (tb_regularize.dte_status) guardava
+// duas listas de CPF/CNPJ por dia; aqui é uma linha por cliente e dia, então o cliente não
+// tem como estar em "feitas" e "não feitas" ao mesmo tempo. Sem linha = sem registro.
+model RegularizeDteQuery {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  client_id          String
+  date               DateTime     @db.Date
+  done               Boolean
+  updated_by_user_id String
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+  organization       Organization @relation(fields: [organization_id], references: [id])
+  client             Client       @relation(fields: [client_id], references: [id])
+
+  @@unique([organization_id, client_id, date], map: "uq_regularize_dte_query_client_date")
+  @@index([organization_id, date], map: "idx_regularize_dte_query_org_date")
+  @@map("regularize.dte_queries")
 }
 
 model TasksIntegrationRegularize {
@@ -2887,6 +3359,10 @@ model TriageConfig {
   client_id       String
   type            String
   active_items    Json
+  /// Prioridade Sim/Não do cliente na rotina (só FISCAL); não é urgência nem prioridade de item.
+  priority        Boolean      @default(false)
+  /// Meio de envio do cliente (código DELIVERY_METHOD do catálogo da triagem; só FISCAL).
+  delivery_method String?      @db.VarChar(100)
   updated_at      DateTime     @updatedAt
   organization_id String
   client          Client       @relation(fields: [client_id], references: [id])
@@ -3026,6 +3502,7 @@ model TriageCatalogItem {
   updated_at      DateTime     @updatedAt
   organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
   snapshots       TriageCompetenceCatalogSnapshot[]
+  solicitations   TriageSolicitation[]
 
   @@unique([organization_id, kind, code], map: "uq_triagem_catalog_items_org_kind_code")
   @@unique([id, organization_id], map: "uq_triagem_catalog_items_id_organization_id")
@@ -3097,6 +3574,50 @@ model TriageUrgentRequest {
   @@index([organization_id, client_id, competence, status, created_at], map: "idx_triagem_urgent_requests_scope")
   @@index([organization_id, responsible_id, status], map: "idx_triagem_urgent_requests_responsible")
   @@map("triagem.urgent_requests")
+}
+
+model TriageSolicitation {
+  id              String            @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      String
+  category_id     String
+  description     String
+  requester_id    String
+  responsible_id  String
+  status          String            @default("OPEN")
+  closed_at       DateTime?
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  organization    Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  client          Client            @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  category        TriageCatalogItem @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  requester       User              @relation("TriageSolicitationRequester", fields: [requester_id], references: [id], onDelete: Restrict)
+  responsible     User              @relation("TriageSolicitationResponsible", fields: [responsible_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, client_id, competence, status], map: "idx_triagem_solicitations_scope")
+  @@index([organization_id, responsible_id, status, created_at], map: "idx_triagem_solicitations_responsible")
+  @@map("triagem.solicitations")
+}
+
+model TriageNoteCount {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      String
+  xml_inbound     Int          @default(0)
+  xml_outbound    Int          @default(0)
+  nfse_issued     Int          @default(0)
+  nfse_received   Int          @default(0)
+  updated_by_id   String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  client          Client       @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  updated_by      User         @relation(fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, client_id, competence], map: "uq_triagem_note_counts_scope")
+  @@map("triagem.note_counts")
 }
 
 model TriageCompetenceHistory {

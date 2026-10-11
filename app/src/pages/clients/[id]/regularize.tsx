@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "@shared/services/toast";
 
 import { canSSRAuth } from "@modules/auth";
+import { ClientLicitacaoHistoryPanel } from "@modules/clients/components/ClientLicitacaoPanels";
 import { ClientRegularizeForm } from "@modules/clients/components/ClientRegularizeForm";
 import { useClient, useUpdateClientRegularizeMutation } from "@modules/clients/hooks/useClients";
 import type { ClientRegularizeFormValues } from "@modules/clients/types";
@@ -178,6 +179,7 @@ export default function ClientRegularizePage() {
             />
           </section>
         ) : null}
+        {client && clientId ? <ClientLicitacaoHistoryPanel clientId={clientId} /> : null}
       </div>
     </>
   );

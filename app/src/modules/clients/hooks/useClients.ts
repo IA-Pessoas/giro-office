@@ -16,6 +16,11 @@ import type {
   ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
+  ClientGroup,
+  ClientLicitacaoBidder,
+  ClientLicitacaoHistoryItem,
+  ClientRegime,
+  ClientSegment,
   ClientTerminationRecord,
   ClientListFilters,
   ClientListPage,
@@ -32,6 +37,35 @@ import type {
 } from "../types";
 
 export const CLIENTS_QUERY_KEY = ["clients"] as const;
+export const CLIENT_REGIMES_QUERY_KEY = ["client-regimes"] as const;
+
+export const CLIENT_SEGMENTS_QUERY_KEY = ["client-segments"] as const;
+export const CLIENT_GROUPS_QUERY_KEY = ["client-groups"] as const;
+
+export function useClientGroups(): UseQueryResult<ClientGroup[], Error> {
+  return useFetch(CLIENT_GROUPS_QUERY_KEY, clientService.listGroups);
+}
+
+export function useClientRegimes(): UseQueryResult<ClientRegime[], Error> {
+  return useFetch(CLIENT_REGIMES_QUERY_KEY, clientService.listRegimes, { staleTime: 60_000 });
+}
+
+// Sob CLIENTS_QUERY_KEY: salvar o Regularize invalida histórico e licitantes junto (#1743).
+export function useClientLicitacaoHistory(
+  clientId: string,
+): UseQueryResult<ClientLicitacaoHistoryItem[], Error> {
+  return useFetch([...CLIENTS_QUERY_KEY, "licitacao-history", clientId], () =>
+    clientService.listLicitacaoHistory(clientId),
+  );
+}
+
+export function useClientLicitacaoBidders(): UseQueryResult<ClientLicitacaoBidder[], Error> {
+  return useFetch([...CLIENTS_QUERY_KEY, "licitacao-bidders"], clientService.listLicitacaoBidders);
+}
+
+export function useClientSegments(): UseQueryResult<ClientSegment[], Error> {
+  return useFetch(CLIENT_SEGMENTS_QUERY_KEY, clientService.listSegments, { staleTime: 60_000 });
+}
 
 export function useCoringaClients(filters: ClientCoringaFilters): UseQueryResult<ClientCoringaPage, Error> {
   return useFetch([...CLIENTS_QUERY_KEY, "coringa", filters], () => clientService.listCoringa(filters), {

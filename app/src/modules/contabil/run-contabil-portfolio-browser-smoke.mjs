@@ -10,6 +10,8 @@ const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const screenshotPath =
   process.env.CONTABIL_BROWSER_SCREENSHOT_PATH ??
   "output/playwright/contabil-portfolio-dashboard.png";
+const agendaScreenshotPath = "output/playwright/contabil-agenda.png";
+const agendaReportScreenshotPath = "output/playwright/issue-1734/agenda-relatorio.png";
 const now = new Date();
 const competence = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 const checklistFields = [
@@ -65,6 +67,18 @@ const user = {
   modules: { contabil: 2 },
 };
 
+const agendaEvents = [
+  {
+    id: "e1000000-0000-4000-8000-000000000001",
+    agenda: "Fechamento mensal",
+    date: `${competence}-10T12:00:00.000Z`,
+    status: "Pendente",
+    obs: "Conferir balancete",
+    location: null,
+    recurring_agenda_id: "r1000000-0000-4000-8000-000000000001",
+  },
+];
+
 function json(route, data, status = 200) {
   return route.fulfill({
     status,
@@ -99,7 +113,38 @@ async function runBrowserProof() {
     if (!apiPath) return route.continue();
 
     const method = request.method();
-    requests.push({ method, path: apiPath, body: request.postDataJSON?.() });
+    requests.push({
+      method, path: apiPath, query: Object.fromEntries(url.searchParams),
+      body: request.headers()["content-type"]?.includes("application/json") ? request.postDataJSON() : null,
+    });
+    if (method === "POST" && apiPath === "/contabil/contingency") {
+      const parameters = Object.fromEntries(url.searchParams);
+      return json(route, {
+        id: "d1000000-0000-4000-8000-000000000001", content_hash: "a".repeat(64),
+        parameters: { ...parameters, rate: Number(parameters.rate) },
+        classification: "legacy_hypothesis", identity: "not_found", extraction: [],
+        differenceCents: 8000000, internalTransfersCents: 2200000,
+        minimum: { baseCents: 2000000, taxCents: 220000, penaltyCents: 165000, interestCents: 13200, totalCents: 398200 },
+        maximum: { baseCents: 4800000, taxCents: 528000, penaltyCents: 396000, interestCents: 31680, totalCents: 955680 },
+      });
+    }
+    if (method === "POST" && apiPath.endsWith("/review")) {
+      return json(route, { reviewed_by: user.id, reviewed_at: "2026-10-10T00:00:00Z", reviewed_hash: "a".repeat(64) });
+    }
+    if (method === "GET" && apiPath.endsWith("/export")) {
+      return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({
+        success: false, error: "A simulação mudou. Confira novamente.", code: "CONFLICT",
+      }) });
+    }
+    if (apiPath === "/task/agenda") {
+      if (method === "GET") return json(route, agendaEvents);
+      const body = request.postDataJSON();
+      if (method === "POST") agendaEvents.push({ id: "e2", location: null, ...body });
+      if (method === "DELETE") {
+        agendaEvents.splice(agendaEvents.findIndex((event) => event.id === body.agenda_id), 1);
+      }
+      return json(route, { id: body.agenda_id ?? "e2" });
+    }
     if (method === "GET" && apiPath === "/user/me") return json(route, user);
     if (method === "GET" && apiPath === "/contabil/controls/list") {
       return json(route, { competence, items: portfolioItems });
@@ -184,6 +229,105 @@ async function runBrowserProof() {
     await page.getByRole("tab", { name: "Documentos" }).click();
     await expect(page.getByLabel("Empresa")).toHaveValue(betaId);
     await expect(page.getByRole("heading", { name: "Pendências documentais" })).toBeVisible();
+
+    // Agenda: visão do departamento na agenda compartilhada, sem escolher empresa.
+    await page.getByRole("tab", { name: "Agenda", exact: true }).click();
+    await expect(page.getByText("Fechamento mensal", { exact: true })).toBeVisible();
+    const agendaList = requests.find((request) => request.path === "/task/agenda");
+    assert.equal(agendaList.method, "GET");
+    await page.getByRole("button", { name: "Novo evento", exact: true }).click();
+    await page.getByLabel("Título", { exact: true }).fill("Entrega da ECD");
+    await page.getByLabel("Data", { exact: true }).fill(`${competence}-20`);
+    await page.getByLabel("Estado", { exact: true }).selectOption("Realizado");
+    await page.getByRole("button", { name: "Salvar", exact: true }).click();
+    await expect(page.getByText("Entrega da ECD", { exact: true })).toBeVisible();
+    assert.deepEqual(requests.find((request) => request.method === "POST" && request.path === "/task/agenda").body, {
+      module: "contabil",
+      agenda: "Entrega da ECD",
+      date: `${competence}-20T12:00:00.000Z`,
+      status: "Realizado",
+      obs: null,
+    });
+    await page.screenshot({ path: agendaScreenshotPath, fullPage: true });
+
+    // Relatório por intervalo: os mesmos eventos da tela, com estado e repetição (#1734).
+    await page.getByRole("button", { name: "Imprimir agenda", exact: true }).click();
+    const agendaReport = page.getByRole("article", {
+      name: "Relatório da agenda do departamento Contábil",
+      exact: true,
+    });
+    await expect(agendaReport.getByRole("row")).toHaveCount(4);
+    await expect(
+      agendaReport.getByRole("row", { name: /Fechamento mensal Conferir balancete Pendente Mensal/ }),
+    ).toBeVisible();
+    await expect(
+      agendaReport.getByRole("row", { name: /Entrega da ECD - Realizado -/ }),
+    ).toBeVisible();
+    await expect(agendaReport.getByText("2 eventos", { exact: true })).toBeVisible();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    await expect(agendaReport.getByLabel("De", { exact: true })).toHaveValue(`${competence}-01`);
+    await expect(agendaReport.getByLabel("Até", { exact: true })).toHaveValue(
+      `${competence}-${lastDay}`,
+    );
+    // Intervalo que deixa o dia 20 de fora: o evento sai do relatório sem nova consulta.
+    const agendaListCount = () =>
+      requests.filter((request) => request.method === "GET" && request.path === "/task/agenda").length;
+    const listedBefore = agendaListCount();
+    await agendaReport.getByLabel("Até", { exact: true }).fill(`${competence}-15`);
+    await expect(agendaReport.getByText("1 evento", { exact: true })).toBeVisible();
+    await expect(agendaReport.getByText("Entrega da ECD", { exact: true })).toBeHidden();
+    assert.equal(agendaListCount(), listedBefore);
+    await expect(agendaReport.getByText(/meses futuros do período/)).toBeHidden();
+    await agendaReport.getByLabel("Até", { exact: true }).fill(`${competence}-01`);
+    await agendaReport.getByLabel("De", { exact: true }).fill(`${competence}-02`);
+    await expect(agendaReport.getByText("Intervalo inválido", { exact: true })).toBeVisible();
+    await expect(agendaReport.getByRole("button", { name: "Imprimir", exact: true })).toBeDisabled();
+    await agendaReport.getByLabel("De", { exact: true }).fill(`${competence}-01`);
+    await agendaReport.getByLabel("Até", { exact: true }).fill(`${competence}-${lastDay}`);
+    await expect(agendaReport.getByText("2 eventos", { exact: true })).toBeVisible();
+    // Na impressão só o relatório aparece; os controles de tela ficam de fora.
+    await page.emulateMedia({ media: "print" });
+    await expect(agendaReport.getByRole("heading", { name: "Agenda Contábil", exact: true })).toBeVisible();
+    await expect(agendaReport.getByRole("button", { name: "Imprimir", exact: true })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Novo evento", exact: true })).toBeHidden();
+    // O Dialog é centralizado por `translate`: na impressão o relatório começa no canto da página.
+    const printBox = await agendaReport.evaluate((element) => {
+      const { left, top, width } = element.getBoundingClientRect();
+      return { left, top, width, viewport: window.innerWidth };
+    });
+    assert.deepEqual(printBox, { left: 0, top: 0, width: printBox.viewport, viewport: printBox.viewport });
+    await page.screenshot({ path: agendaReportScreenshotPath, fullPage: true });
+    await page.emulateMedia({ media: "screen" });
+    await page.keyboard.press("Escape");
+    await expect(agendaReport).toBeHidden();
+    assert.ok(
+      requests
+        .filter((request) => request.method === "GET" && request.path === "/task/agenda")
+        .every((request) => request.query?.module === "contabil"),
+    );
+    console.log("PASS relatório da agenda do Contábil filtra por intervalo e imprime só o relatório");
+
+    await page.getByRole("button", { name: "Remover Fechamento mensal", exact: true }).click();
+    await page.getByRole("button", { name: "Remover", exact: true }).click();
+    await expect(page.getByText("Fechamento mensal", { exact: true })).toBeHidden();
+    console.log("PASS agenda do Contábil lista, cria e remove na agenda compartilhada");
+
+    // Outra sessão recalculou o rascunho: o 409 binário precisa invalidar a confirmação local.
+    await page.getByRole("tab", { name: "Contingência", exact: true }).click();
+    await page.getByLabel("Arquivo XLS", { exact: true }).setInputFiles(
+      fileURLToPath(new URL("../../../../scripts/fixtures/contingency/synthetic.xls", import.meta.url)),
+    );
+    await page.getByRole("button", { name: "Simular contingência", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Resultado da simulação", exact: true })).toBeVisible();
+    const exportButton = page.getByRole("button", { name: "Exportar conclusão imprimível", exact: true });
+    await expect(exportButton).toBeDisabled();
+    await page.getByRole("button", { name: "Confirmar valores e parâmetros", exact: true }).click();
+    await expect(exportButton).toBeEnabled();
+    await exportButton.click();
+    await expect(page.getByText("A simulação mudou. Confira novamente.", { exact: true })).toBeVisible();
+    await expect(exportButton).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Confirmar valores e parâmetros", exact: true })).toBeDisabled();
+    console.log("PASS exportação de Contingência invalida confirmação local após conflito 409");
 
     console.log(JSON.stringify({ url: page.url(), requestCount: requests.length, screenshotPath }));
   } finally {

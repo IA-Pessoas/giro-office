@@ -3,6 +3,7 @@ import type {
   RegularizeGuidanceListFilters,
   RegularizeId,
   RegularizeLicenseListFilters,
+  RegularizeDteNoticeListFilters,
   RegularizeMunicipalTaxesListFilters,
   RegularizePartnerListFilters,
   RegularizePasswordListFilters,
@@ -67,8 +68,19 @@ export const regularizeQueryKeys = {
     ] as const,
   partnerDetail: (id: RegularizeId | undefined | null, scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.people(scope), "partners", "detail", id ?? ""] as const,
+  // Sob "people": mudar sócio ou PF refaz o mapa.
+  groupMap: (groupId: RegularizeId, scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.people(scope), "group-map", groupId] as const,
+  groupMapSaved: (groupId: RegularizeId, scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.people(scope), "group-map-saved", groupId] as const,
   operations: (scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.scopedRoot(scope), "operations"] as const,
+  dteImports: (scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.operations(scope), "dte-imports"] as const,
+  dteQueryGrid: (date: string, scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.operations(scope), "dte-queries", date] as const,
+  dteNotices: (filters: RegularizeDteNoticeListFilters, scope: RegularizeQueryScope) =>
+    [...regularizeQueryKeys.operations(scope), "dte-notices", filters] as const,
   municipalTaxes: (filters: RegularizeMunicipalTaxesListFilters, scope: RegularizeQueryScope) =>
     [
       ...regularizeQueryKeys.operations(scope),

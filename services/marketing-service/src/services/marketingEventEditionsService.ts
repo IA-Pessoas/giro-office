@@ -1,5 +1,6 @@
 import { INTERNAL_ERROR_MESSAGE, error as logError, ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { AUDITED_TRANSACTION, changedFields, type MarketingAudit } from "../integrations/audit.js";
 import type { MarketingEvent } from "../routes/marketingEvents.routes.js";
 import {
   MARKETING_EVENT_PRIORITIES,
@@ -148,8 +149,24 @@ function budgetCreateData(items: MarketingEventEditionInput["budgetItems"]) {
   }));
 }
 
+const EDITION_REFERRING = "marketing.eventEditions";
+const FEEDBACK_REFERRING = "marketing.eventEditionFeedback";
+
+/** Campos da edição que entram na trilha: planejamento, orçamento e período de avaliação. */
+function auditedEdition(edition: MarketingEventEdition): Record<string, unknown> {
+  const { id: _id, eventId, budgetTotal: _total, feedback: _feedback, ...fields } = edition;
+  return {
+    eventId,
+    ...fields,
+    budgetItems: edition.budgetItems.map(({ name, amount }) => ({ name, amount })),
+  };
+}
+
 export class MarketingEventEditionsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly audit: MarketingAudit,
+  ) {}
 
   async listEditions(organizationId: string, eventId: string): Promise<MarketingEventEdition[]> {
     const records = await this.prisma.marketingEventEdition.findMany({
@@ -164,19 +181,32 @@ export class MarketingEventEditionsService {
     organizationId: string,
     eventId: string,
     input: MarketingEventEditionInput,
+    actorUserId: string,
   ): Promise<MarketingEventEdition> {
     try {
-      const record = await this.prisma.marketingEventEdition.create({
-        data: {
-          ...editionData(input),
-          event: {
-            connect: { id_organization_id: { id: eventId, organization_id: organizationId } },
-          },
-          budgetItems: { create: budgetCreateData(input.budgetItems) },
-        },
-        include: editionInclude,
-      });
-      return mapEdition(record);
+      return await this.prisma.$transaction(async (tx) => {
+        const edition = mapEdition(
+          await tx.marketingEventEdition.create({
+            data: {
+              ...editionData(input),
+              event: {
+                connect: { id_organization_id: { id: eventId, organization_id: organizationId } },
+              },
+              budgetItems: { create: budgetCreateData(input.budgetItems) },
+            },
+            include: editionInclude,
+          }),
+        );
+        await this.audit({
+          organizationId,
+          userId: actorUserId,
+          action: "Cadastro",
+          referring: EDITION_REFERRING,
+          referringId: edition.id,
+          changes: changedFields({}, auditedEdition(edition)),
+        });
+        return edition;
+      }, AUDITED_TRANSACTION);
     } catch (error) {
       logError("Falha ao criar edição do evento.", { err: error });
       if (
@@ -197,26 +227,52 @@ export class MarketingEventEditionsService {
     eventId: string,
     editionId: string,
     input: MarketingEventEditionInput,
+    actorUserId: string,
   ): Promise<MarketingEventEdition | null> {
-    return this.prisma.$transaction(async (tx) => {
-      const current = await tx.marketingEventEdition.findFirst({
-        where: { id: editionId, organization_id: organizationId, event_id: eventId },
-        select: { id: true },
-      });
-      if (!current) return null;
-      const record = await tx.marketingEventEdition.update({
-        where: { id_organization_id: { id: editionId, organization_id: organizationId } },
-        data: {
-          ...editionData(input),
-          budgetItems: {
-            deleteMany: {},
-            create: budgetCreateData(input.budgetItems),
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const current = await tx.marketingEventEdition.findFirst({
+          where: { id: editionId, organization_id: organizationId, event_id: eventId },
+          include: editionInclude,
+        });
+        if (!current) return null;
+        const record = await tx.marketingEventEdition.update({
+          where: { id_organization_id: { id: editionId, organization_id: organizationId } },
+          data: {
+            ...editionData(input),
+            budgetItems: {
+              deleteMany: {},
+              create: budgetCreateData(input.budgetItems),
+            },
           },
-        },
-        include: editionInclude,
-      });
-      return mapEdition(record);
-    });
+          include: editionInclude,
+        });
+        const edition = mapEdition(record);
+        const changes = changedFields(auditedEdition(mapEdition(current)), auditedEdition(edition));
+        if (Object.keys(changes).length > 0) {
+          await this.audit({
+            organizationId,
+            userId: actorUserId,
+            action: "Edição",
+            referring: EDITION_REFERRING,
+            referringId: editionId,
+            changes,
+          });
+        }
+        return edition;
+      }, AUDITED_TRANSACTION);
+    } catch (error) {
+      // Apagada entre a leitura e a escrita: mesmo 404 da edição inexistente.
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "P2025"
+      ) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   async createEditionFeedback(
@@ -224,28 +280,40 @@ export class MarketingEventEditionsService {
     eventId: string,
     editionId: string,
     input: MarketingEventEditionFeedbackInput,
+    actorUserId: string,
   ): Promise<MarketingEventEditionFeedback> {
     try {
-      const edition = await this.prisma.marketingEventEdition.findFirst({
-        where: { id: editionId, organization_id: organizationId, event_id: eventId },
-        select: { id: true },
-      });
-      if (!edition) throw new ServiceError(404, "Edição não encontrada.");
+      return await this.prisma.$transaction(async (tx) => {
+        const edition = await tx.marketingEventEdition.findFirst({
+          where: { id: editionId, organization_id: organizationId, event_id: eventId },
+          select: { id: true },
+        });
+        if (!edition) throw new ServiceError(404, "Edição não encontrada.");
 
-      const feedback = await this.prisma.marketingEventEditionFeedback.create({
-        data: {
-          organization_id: organizationId,
-          edition_id: edition.id,
-          rating: input.rating,
-          observation: input.observation?.trim() || null,
-          evaluated_at: new Date(),
-        },
-      });
-      return {
-        rating: feedback.rating,
-        observation: feedback.observation,
-        evaluatedAt: feedback.evaluated_at.toISOString(),
-      };
+        const feedback = await tx.marketingEventEditionFeedback.create({
+          data: {
+            organization_id: organizationId,
+            edition_id: edition.id,
+            rating: input.rating,
+            observation: input.observation?.trim() || null,
+            evaluated_at: new Date(),
+          },
+        });
+        const result = {
+          rating: feedback.rating,
+          observation: feedback.observation,
+          evaluatedAt: feedback.evaluated_at.toISOString(),
+        };
+        await this.audit({
+          organizationId,
+          userId: actorUserId,
+          action: "Avaliação",
+          referring: FEEDBACK_REFERRING,
+          referringId: edition.id,
+          changes: changedFields({}, { rating: result.rating, observation: result.observation }),
+        });
+        return result;
+      }, AUDITED_TRANSACTION);
     } catch (error) {
       logError("Falha ao registrar avaliação da edição.", { err: error });
       if (error instanceof ServiceError) throw error;

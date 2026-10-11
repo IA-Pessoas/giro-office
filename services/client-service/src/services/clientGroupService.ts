@@ -103,34 +103,38 @@ export class ClientGroupService {
   async update(
     groupId: string,
     organizationId: string,
-    name: string,
+    input: { name?: string; status?: boolean },
     authorization: ClientGroupAuthorization,
   ): Promise<ClientGroupResult> {
     requireIntegracaoRouteAccess("PATCH", "/client/groups/:id", {
       ...authorization,
       organizationId,
       resourceOrganizationId: organizationId,
-      requestedFields: ["name"],
+      requestedFields: Object.keys(input),
     });
-    const normalizedName = name.trim();
-    if (!normalizedName) throw new ServiceError(400, "Informe o nome do grupo.");
+    const normalizedName = input.name?.trim();
+    if (normalizedName === "") throw new ServiceError(400, "Informe o nome do grupo.");
     const group = await this.prisma.group.findFirst({
       where: { id: groupId, organization_id: organizationId },
       select: { id: true },
     });
     if (!group) throw new ServiceError(404, "Grupo não encontrado.");
     if (
-      await this.prisma.group.findFirst({
+      normalizedName &&
+      (await this.prisma.group.findFirst({
         where: { organization_id: organizationId, name: normalizedName, id: { not: groupId } },
         select: { id: true },
-      })
+      }))
     ) {
       throw new ServiceError(409, "Já existe um grupo com este nome.");
     }
     return presentGroup(
       await this.prisma.group.update({
         where: { id: groupId },
-        data: { name: normalizedName },
+        data: {
+          ...(normalizedName ? { name: normalizedName } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+        },
         select: groupSelect(organizationId),
       }),
     );

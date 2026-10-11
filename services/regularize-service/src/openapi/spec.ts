@@ -6,6 +6,7 @@ import {
   reportingQueryOpenApiSchema,
 } from "@workspace/shared";
 
+import { GROUP_MAP_TREE_LIMITS } from "../schemas/groupMap.schemas.js";
 import {
   CANONICAL_GUIDANCE_STATUSES,
   CANONICAL_LICENSE_STATUSES,
@@ -602,6 +603,10 @@ export function buildRegularizeServiceOpenApiSpec(
       { name: "PF", description: "Clientes PF do regularize" },
       { name: "Partners", description: "Quadro societario" },
       { name: "MunicipalTaxes", description: "Tributos municipais" },
+      {
+        name: "DTE",
+        description: "Importação manual de avisos, caixa de avisos e consultas diárias ao DTE",
+      },
       { name: "Processes", description: "Processos de regularize" },
       { name: "Guidance", description: "Orientacoes procedurais" },
       { name: "Licenses", description: "Alvaras e licencas" },
@@ -849,6 +854,73 @@ export function buildRegularizeServiceOpenApiSpec(
           responses: { "200": { description: "Vinculo removido", ...successEnvelopeContent() } },
         },
       },
+      "/regularize/groups/{id}/map": {
+        get: {
+          tags: ["Partners"],
+          summary: "Gerar o mapa de um grupo de clientes",
+          description:
+            "Árvore grupo, cidade, sócio e empresas com vínculo societário vigente, com situação, sede e regime de cada empresa. Não traz capital social nem RBT12.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: { "200": { description: "Mapa do grupo", ...successEnvelopeContent() } },
+        },
+      },
+      "/regularize/groups/{id}/map/saved": {
+        get: {
+          tags: ["Partners"],
+          summary: "Ler a versão salva do mapa de um grupo",
+          description: "Devolve a árvore como foi salva, ou null quando o grupo não tem versão.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: { "200": { description: "Versão salva", ...successEnvelopeContent() } },
+        },
+        put: {
+          tags: ["Partners"],
+          summary: "Salvar a versão editada do mapa de um grupo",
+          description: `Substitui a versão do grupo pela árvore enviada (até ${GROUP_MAP_TREE_LIMITS.maxNodes} itens e ${GROUP_MAP_TREE_LIMITS.maxDepth} níveis). Gerar o mapa de novo não altera a versão salva.`,
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["tree"],
+                  properties: {
+                    tree: {
+                      type: "object",
+                      description:
+                        "Item raiz do mapa; cada item em `children` tem o mesmo formato.",
+                      additionalProperties: false,
+                      required: ["id", "lines", "children"],
+                      properties: {
+                        id: { type: "string", maxLength: GROUP_MAP_TREE_LIMITS.maxIdLength },
+                        lines: {
+                          type: "array",
+                          minItems: 1,
+                          maxItems: GROUP_MAP_TREE_LIMITS.maxLines,
+                          items: { type: "string", maxLength: GROUP_MAP_TREE_LIMITS.maxLineLength },
+                        },
+                        color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" },
+                        children: { type: "array", items: { type: "object" } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Versão salva", ...successEnvelopeContent() } },
+        },
+      },
       "/regularize/partner": {
         get: {
           tags: ["Partners"],
@@ -858,6 +930,145 @@ export function buildRegularizeServiceOpenApiSpec(
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
           responses: { "200": { description: "Detalhe do socio", ...successEnvelopeContent() } },
+        },
+      },
+      "/regularize/dte/import": {
+        post: {
+          tags: ["DTE"],
+          summary: "Importar avisos DTE colados em HTML ou JSON",
+          description:
+            "Extrai a primeira tabela conforme o legado e ignora avisos repetidos. Leitor verificado apenas com casos sintéticos.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "201": { description: "Resumo da importação", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/imports": {
+        get: {
+          tags: ["DTE"],
+          summary: "Listar importações de DTE com recusas e duplicatas",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Página de importações", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/notices": {
+        get: {
+          tags: ["DTE"],
+          summary: "Listar avisos DTE importados",
+          description:
+            "Sem `from`, lista os avisos emitidos nos últimos 45 dias. O período usa a data de emissão do aviso; quando ela não pôde ser lida, a data da importação.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "from", in: "query", schema: { type: "string", format: "date" } },
+            { name: "to", in: "query", schema: { type: "string", format: "date" } },
+            {
+              name: "tipo",
+              in: "query",
+              description: "Trecho da classe do selo (ex.: badge-warning); vazio lista os sem cor.",
+              schema: { type: "string" },
+            },
+            { name: "search", in: "query", schema: { type: "string", default: "" } },
+            {
+              name: "reading",
+              in: "query",
+              schema: { type: "string", enum: ["Todos", "Pendente", "Lido"], default: "Todos" },
+            },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Página de avisos DTE", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/notices/reading": {
+        put: {
+          tags: ["DTE"],
+          summary: "Alterar o estado de leitura de um aviso DTE",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Aviso atualizado", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/queries": {
+        get: {
+          tags: ["DTE"],
+          summary: "Grade de consultas diárias ao DTE por cliente",
+          description:
+            "Clientes de comércio ou indústria da BA com inscrição estadual, na carteira da competência do dia, mais os que já têm registro na data.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "date",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "date" },
+            },
+          ],
+          responses: {
+            "200": { description: "Situação por cliente no dia", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/queries/status": {
+        put: {
+          tags: ["DTE"],
+          summary: "Marcar a consulta de um cliente como feita, não feita ou sem registro",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Situação atualizada", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/dte/queries/import": {
+        post: {
+          tags: ["DTE"],
+          summary: "Registrar consultas do dia por listas de CPF/CNPJ",
+          description:
+            "Recebe as listas de feitas e não feitas; documento nas duas listas não é aplicado.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "201": { description: "Resumo do registro", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/regularize/veri/compare": {
+        post: {
+          tags: ["Veri"],
+          summary: "Comparar um XLSX do Veri com a carteira pelo CPF/CNPJ",
+          description:
+            "Lê da linha 3 em diante, razão social na coluna A e CNPJ na coluna C, e compara com os clientes ativos ou em processo de inativação da organização. Nada é gravado, por isso basta a permissão Regularize 1. Limites: 2 MiB no envio, 8 MiB descompactados, 5.000 linhas de dados e 64 colunas. Leitor verificado só com casos sintéticos.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                schema: { type: "string", format: "binary" },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Correspondências, ausências dos dois lados e entradas inválidas",
+              ...successEnvelopeContent(),
+            },
+          },
         },
       },
       "/regularize/municipal-taxes": {
@@ -1376,7 +1587,8 @@ export function buildRegularizeServiceOpenApiSpec(
       "/internal/reporting/extract": {
         post: {
           tags: ["Internal"],
-          summary: "Extrair licenças, processos e tributos municipais para o reports-service",
+          summary:
+            "Extrair licenças, processos, tributos municipais, carteira, grupos, PF e sócios para o reports-service",
           security: [{ internalToken: [] }],
           parameters: [
             {
@@ -1408,6 +1620,10 @@ export function buildRegularizeServiceOpenApiSpec(
                         "regularize.licenses",
                         "regularize.processes",
                         "regularize.municipal_taxes",
+                        "regularize.clients",
+                        "regularize.client_groups",
+                        "regularize.clients_pf",
+                        "regularize.partners",
                       ],
                     },
                     fields: {

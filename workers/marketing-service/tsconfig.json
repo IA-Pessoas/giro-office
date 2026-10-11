@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "../..",
+    "types": ["node"]
+  },
+  // O tipo MarketingEvent vem do arquivo de rotas Express do Node, que depende do
+  // `Request` aumentado em types.d.ts.
+  "include": ["src", "../../services/marketing-service/src/types.d.ts"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+}

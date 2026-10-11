@@ -15,6 +15,7 @@ export {
   triageMonthlyQueryKey,
   triageStatementsQueryKey,
   CONTABIL_QUERY_KEY,
+  TRIAGE_DOCUMENT_HISTORY_QUERY_KEY,
 } from "./queryKeys";
 export {
   useContabilControlBootstrapMutation,
@@ -22,12 +23,14 @@ export {
   useCreateYearContabilControlsMutation,
   useArchiveContabilCompetenceMutation,
   useContabilControlDetail,
+  useContabilControlHistory,
   useContabilControlPortfolio,
   usePatchContabilControlFieldMutation,
   useRestoreContabilCompetenceMutation,
 } from "./useContabilControl";
 export {
   useContabilRelationship,
+  useContabilRelationshipHistory,
   useCreateContabilRelationshipMutation,
   useDeleteContabilRelationshipMutation,
   useUpdateContabilRelationshipMutation,
@@ -46,6 +49,7 @@ export {
   useTriageEditability,
   useTriageMonthly,
   useTriageMutations,
+  useTriageDocumentHistory,
   useTriageStatements,
 } from "./useTriageDocuments";
 export {

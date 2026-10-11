@@ -239,9 +239,7 @@ describe("pessoal Worker /internal/reporting", () => {
     const relations = (name: string) =>
       [...model(name).matchAll(/^ {2}(\w+)\s+\w+\??\s+@relation/gmu)].map(([, field]) => field);
 
-    expect(relations("Payroll")).toEqual(
-      expect.arrayContaining(["client", "responsible", "union", "group"]),
-    );
+    expect(relations("Payroll")).toEqual(expect.arrayContaining(["responsible", "union", "group"]));
     expect(relations("ObrigationsPessoal")).toEqual(
       expect.arrayContaining(["client", "responsible"]),
     );

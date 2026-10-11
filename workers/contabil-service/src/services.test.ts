@@ -41,6 +41,48 @@ function prisma() {
 const auth = { userId: USER, organizationId: ORG, modules: { contabil: 2 } };
 
 describe("contabil services tenant and catalog seams", () => {
+  it("restaurar a competência audita no controle, com as contagens, como o arquivamento (#1689)", async () => {
+    const CONTROL = "99999999-9999-4999-8999-999999999999";
+    const updateMany = (count: number) => ({ updateMany: vi.fn().mockReturnValue({ count }) });
+    const database = {
+      controlContabil: {
+        ...updateMany(1),
+        findFirst: vi.fn().mockResolvedValue({ id: CONTROL }),
+      },
+      triageMonthly: updateMany(1),
+      triageBankStatement: updateMany(2),
+      triageClosing: updateMany(0),
+      $transaction: vi.fn(async (operations: unknown[]) => operations),
+    };
+    const auditLog = audit();
+
+    await expect(
+      createControlService(database as never, auditLog).restoreCompetence({
+        userId: USER,
+        organizationId: ORG,
+        permission: 2,
+        clientId: CLIENT,
+        competence: "2026-09",
+      }),
+    ).resolves.toEqual({ controls: 1, monthly: 1, statements: 2, closings: 0 });
+
+    expect(database.controlContabil.findFirst).toHaveBeenCalledWith({
+      where: { client_id: CLIENT, competence: "2026-09", organization_id: ORG },
+      select: { id: true },
+    });
+    // O histórico documental lê este evento pelo id do controle; sem contagens ele sumia.
+    expect(auditLog.logUpdateIfChanged).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        action: "Restaurar competência contábil",
+        referring: "contabil.control",
+        referringId: CONTROL,
+        organizationId: ORG,
+        updatedData: { controls: 1, monthly: 1, statements: 2, closings: 0 },
+      }),
+    );
+    expect(auditLog.createLog).not.toHaveBeenCalled();
+  });
+
   it("lista carteira com CNPJ, regime e responsáveis do tenant", async () => {
     const database = {
       client: {
@@ -96,6 +138,62 @@ describe("contabil services tenant and catalog seams", () => {
       regime: null,
       person_responsible_id: null,
       posted_by_id: null,
+    });
+  });
+
+  it("carteiras de competência passada respeitam entrada, saída e inativação (#1690)", async () => {
+    const start = new Date("2025-03-01T00:00:00.000Z");
+    const end = new Date("2025-03-31T23:59:59.999Z");
+    const window = [
+      { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
+      { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+      {
+        OR: [
+          { deletion_date: { gte: start } },
+          { deletion_date: null, NOT: { status: "Inativo" } },
+        ],
+      },
+    ];
+    const database = {
+      client: { findMany: vi.fn().mockResolvedValue([]) },
+      responsibleContabil: { findMany: vi.fn().mockResolvedValue([]) },
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+
+    await createControlService(database as never, audit()).list("2025-03", ORG);
+    await createDocumentsService(database as never, audit()).listFiscalPortfolio("2025-03", {
+      userId: USER,
+      organizationId: ORG,
+      modules: { fiscal: 1 },
+    });
+
+    const [contabil, fiscal] = database.client.findMany.mock.calls.map(([args]) => args.where);
+    expect(contabil).toEqual({
+      organization_id: ORG,
+      OR: [
+        { AND: [{ OR: [{ contabil: true }, { contabil: null }] }, ...window] },
+        {
+          controlContabil: {
+            some: { competence: "2025-03", organization_id: ORG, archived_at: null },
+          },
+        },
+      ],
+    });
+    expect(fiscal).toEqual({
+      organization_id: ORG,
+      OR: [
+        { fiscal: true, AND: window },
+        {
+          triageMonthlys: {
+            some: {
+              organization_id: ORG,
+              competence: "2025-03",
+              archived_at: null,
+              type: "FISCAL",
+            },
+          },
+        },
+      ],
     });
   });
 
@@ -161,6 +259,55 @@ describe("contabil services tenant and catalog seams", () => {
     await expect(
       createRelationshipService(database as never, audit()).getByClientId(CLIENT, ORG),
     ).resolves.toBeNull();
+  });
+
+  it("relacionamento aceita estados não selecionados e só mantém texto livre legado (#1721)", async () => {
+    const legacy = {
+      id: "rel-1",
+      client_id: CLIENT,
+      bidding: true,
+      chart_accounts: "Plano próprio",
+    };
+    const database = {
+      relationshipContabil: {
+        findFirst: vi.fn(),
+        create: vi.fn(async ({ data }) => ({ id: "rel-1", ...data })),
+        update: vi.fn(async ({ data }) => ({ ...legacy, ...data })),
+      },
+    };
+    const trail = audit();
+    const service = createRelationshipService(database as never, trail);
+    const base = { client_id: CLIENT, tool: "t", system: "s", note: "" };
+
+    database.relationshipContabil.findFirst.mockResolvedValue(null);
+    await service.create({ ...base, bidding: null, chart_accounts: "Não — Jonrick" }, auth);
+    expect(trail.logUpdateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Cadastro",
+        referring: "contabil.relationship",
+        oldData: {},
+        updatedData: expect.objectContaining({ chart_accounts: "Não — Jonrick" }),
+      }),
+    );
+    expect(database.relationshipContabil.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ bidding: null, chart_accounts: "Não — Jonrick" }),
+    });
+    await expect(
+      service.create({ ...base, bidding: false, chart_accounts: "Plano próprio" }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    database.relationshipContabil.findFirst.mockResolvedValue(legacy);
+    await service.update("rel-1", { chart_accounts: "Plano próprio", bidding: null }, auth);
+    expect(trail.logUpdateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oldData: legacy,
+        updatedData: { ...legacy, bidding: null },
+      }),
+    );
+    await expect(
+      service.update("rel-1", { chart_accounts: "Outro plano" }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(database.relationshipContabil.update).toHaveBeenCalledTimes(1);
   });
 
   it("grava responsáveis ausentes como null em vez do default '' que viola a FK", async () => {
@@ -249,6 +396,11 @@ describe("contabil services tenant and catalog seams", () => {
         ]),
       },
       user: { findMany: vi.fn().mockResolvedValue([{ id: "u-snap", name: "Snap" }]) },
+      triageConfig: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ client_id: CLIENT, priority: true, delivery_method: "EMAIL" }]),
+      },
     };
     const service = createDocumentsService(database as never, audit());
 
@@ -261,8 +413,15 @@ describe("contabil services tenant and catalog seams", () => {
     expect(database.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { organization_id: ORG, id: { in: ["u-snap"] } } }),
     );
+    expect(database.triageConfig.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "FISCAL", client_id: { in: [CLIENT, MONTHLY] } },
+      }),
+    );
     expect(result.items[0]).toMatchObject({
       legal_name: "Art",
+      priority: true,
+      delivery_method: "EMAIL",
       responsible_id: "u-snap",
       responsible_name: "Snap",
       can_edit: true,
@@ -274,6 +433,8 @@ describe("contabil services tenant and catalog seams", () => {
       monthly: null,
     });
     expect(result.items[1]).toMatchObject({
+      priority: false,
+      delivery_method: null,
       responsible_id: null,
       can_edit: false,
       has_competence: false,
