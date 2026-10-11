@@ -9,6 +9,7 @@ export type RegularizeTabId =
   | "taxes"
   | "dte"
   | "groups"
+  | "agenda"
   | "bidders"
   | "catalogs";
 

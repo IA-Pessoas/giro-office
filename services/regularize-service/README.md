@@ -47,6 +47,8 @@ Exemplos de paths publicos:
 - `/regularize/pfs`
   - aceita `status`, `search`, `page` e `limit`; retorna uma página com `data`, `total` e `hasMore`.
 - `/regularize/partners`
+- `/regularize/groups/:id/map` - mapa gerado do grupo: cidade, sócio e empresas com vínculo societário vigente
+- `/regularize/groups/:id/map/saved` - lê (GET) ou substitui (PUT) a versão editada do mapa do grupo; gerar de novo não a altera
 - `/regularize/municipal-taxes`
 - `/regularize/dte/import` - importa avisos DTE colados em HTML ou JSON; leitor verificado só com casos sintéticos
 - `/regularize/dte/imports` - importações da organização, com recusas e duplicatas
