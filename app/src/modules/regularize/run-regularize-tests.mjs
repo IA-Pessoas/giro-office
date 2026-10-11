@@ -1904,3 +1904,10 @@ await runTest("Veri comparison shows the same rows on screen and in the CSV (#17
   const service = await readModuleSource("services/regularizeService.ts");
   assert.match(service, /REGULARIZE_ENDPOINTS\.veriCompare, file/);
 });
+
+await runTest("regularize tabs wrap instead of scrolling sideways (#1739)", async () => {
+  const page = await readModuleSource("components/RegularizePage.tsx");
+  const nav = page.match(/<nav\s+aria-label="Abas do Regularize"[\s\S]*?<\/nav>/)?.[0] ?? "";
+  assert.match(nav, /<div role="tablist" className="[^"]*\bflex-wrap\b[^"]*">/);
+  assert.doesNotMatch(nav, /min-w-max|overflow-x/);
+});
