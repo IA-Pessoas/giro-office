@@ -171,6 +171,49 @@ describe("matriz de regressão das políticas modulares", () => {
     );
   });
 
+  // #1774: o Pessoal escolhe o responsável do evento e da carteira no catálogo operacional.
+  it("libera o catálogo de responsáveis para quem só tem Pessoal", () => {
+    const policy = requiredRoutePolicy("GET", "/rh/operational-users");
+
+    expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), policy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { pessoal: 0, fiscal: 3 } }), policy)).toBe(false);
+  });
+
+  // #1699: a agenda é de departamento, não da Integração; o task-service confere o módulo pedido.
+  it("libera a agenda compartilhada para Contábil ou Triagem, sem exigir Integração", () => {
+    const read = requiredRoutePolicy("GET", "/task/agenda");
+
+    expect(canAccessRoute(authContext({ modules: { triagem: 1 } }), read)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { contabil: 1 } }), read)).toBe(true);
+    // #1773: o Pessoal consulta o próprio recorte da agenda.
+    expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), read)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), read)).toBe(false);
+
+    for (const method of ["POST", "PUT", "DELETE"]) {
+      const write = requiredRoutePolicy(method, "/task/agenda");
+
+      expect(canAccessRoute(authContext({ modules: { triagem: 2 } }), write)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { contabil: 2 } }), write)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { triagem: 1 } }), write)).toBe(false);
+      expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), write)).toBe(false);
+    }
+  });
+
+  // #1747: o Regularize entra na agenda compartilhada com os níveis do próprio módulo.
+  it("libera a agenda compartilhada para o Regularize: leitura no nível 1, escrita no 2", () => {
+    const read = requiredRoutePolicy("GET", "/task/agenda");
+
+    expect(canAccessRoute(authContext({ modules: { regularize: 1 } }), read)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { regularize: 0 } }), read)).toBe(false);
+
+    for (const method of ["POST", "PUT", "DELETE"]) {
+      const write = requiredRoutePolicy(method, "/task/agenda");
+
+      expect(canAccessRoute(authContext({ modules: { regularize: 2 } }), write)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { regularize: 1 } }), write)).toBe(false);
+    }
+  });
+
   it("deixa a atribuição de Triagem decidir a escrita no serviço", () => {
     const policy = requiredRoutePolicy("PATCH", "/triagem/monthly/monthly-1/item");
 
@@ -243,6 +286,27 @@ describe("matriz de regressão das políticas modulares", () => {
       const policy = requiredRoutePolicy("GET", path);
       expect(canAccessRoute(regularizeReader, policy), `Regularize 1: ${path}`).toBe(true);
       expect(canAccessRoute(noModule, policy), `sem módulo: ${path}`).toBe(false);
+    }
+  });
+
+  // O comparador Veri só lê a carteira e não grava nada: basta o acesso de leitura (#1739).
+  it("libera o comparador Veri para quem lê o Regularize e mantém as demais escritas no nível 2", () => {
+    const regularizeReader = authContext({ modules: { regularize: 1 } });
+    const noAccess = authContext({ modules: { regularize: 0 } });
+    const veri = requiredRoutePolicy("POST", "/regularize/veri/compare");
+
+    expect(canAccessRoute(regularizeReader, veri)).toBe(true);
+    expect(canAccessRoute(noAccess, veri)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), veri)).toBe(false);
+    for (const [method, path] of [
+      ["POST", "/regularize/dte/import"],
+      ["PUT", "/regularize/veri/compare"],
+      ["POST", "/regularize/veri/compare/other"],
+    ] as const) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(regularizeReader, policy), `Regularize 1: ${method} ${path}`).toBe(
+        false,
+      );
     }
   });
 

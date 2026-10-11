@@ -110,6 +110,12 @@ describe("regularize internal reporting routes", () => {
       "entry_date",
       "date_last_consultation",
       "due_date",
+      "client_name",
+      "observation",
+      "responsible_name",
+      "entry_month",
+      "locking_type",
+      "locked",
     ]);
     expect(source.fields.map((field: { key: string }) => field.key)).not.toContain("id");
   });

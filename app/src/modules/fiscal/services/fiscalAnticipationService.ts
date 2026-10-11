@@ -1,7 +1,7 @@
 import { setupAPIClient } from "@shared/services/api";
 import type { PaginatedResult } from "@shared/pagination/pagination";
 
-import { fileToBase64 } from "../utils/xmlSelection";
+import { fileToBase64 } from "@shared/utils/fileToBase64";
 import type {
   FiscalAnticipationClassification,
   FiscalAnticipationCorrectableField,

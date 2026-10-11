@@ -1,3 +1,5 @@
+import type { AgendaModule } from "@shared/services/agendaService.contract";
+
 export const CONTABIL_QUERY_KEY = ["contabil"] as const;
 
 export function contabilControlQueryKey(clientId: string, competence: string) {
@@ -27,9 +29,9 @@ export function contabilRelationshipHistoryQueryKey(clientId: string, page?: num
 }
 
 /** Sem `month`, é o prefixo de todos os meses (invalidação após escrita). */
-export function contabilAgendaQueryKey(month?: string) {
-  const key = [...CONTABIL_QUERY_KEY, "agenda"] as const;
-  return month === undefined ? key : ([...key, month] as const);
+export function departmentAgendaQueryKey(module: AgendaModule, month?: string, mine = false) {
+  const key = [...CONTABIL_QUERY_KEY, "agenda", module] as const;
+  return month === undefined ? key : ([...key, month, mine] as const);
 }
 
 export function triageMonthlyQueryKey(
@@ -67,6 +69,26 @@ export function triageFiscalPortfolioQueryKey(competence: string) {
 export function triageStatementHistoryQueryKey(clientId: string, pendingOnly?: boolean) {
   const base = [...CONTABIL_QUERY_KEY, "triage", "statement-history", clientId] as const;
   return pendingOnly === undefined ? base : ([...base, pendingOnly] as const);
+}
+
+/** Prefixo de todo histórico documental: quem altera documento, extrato ou Cloud o invalida. */
+export const TRIAGE_DOCUMENT_HISTORY_QUERY_KEY = [
+  ...CONTABIL_QUERY_KEY,
+  "triage",
+  "document-history",
+] as const;
+
+export function triageDocumentHistoryQueryKey(filters: {
+  clientId?: string;
+  competence?: string;
+  page: number;
+}) {
+  return [
+    ...TRIAGE_DOCUMENT_HISTORY_QUERY_KEY,
+    filters.clientId ?? "all",
+    filters.competence ?? "all",
+    filters.page,
+  ] as const;
 }
 
 export function triageStatementsQueryKey(clientId: string, competence: string) {

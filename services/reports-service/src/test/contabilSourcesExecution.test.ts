@@ -1,4 +1,8 @@
-import { CONTABIL_REPORTING_SOURCES, REPORTING_QUERY_ROW_LIMIT_CODE } from "@workspace/shared";
+import {
+  CONTABIL_REPORTING_SOURCES,
+  CONTABIL_TRIAGE_REPORTING_SOURCES,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
+} from "@workspace/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { reportingSources } from "../../../../shared/src/reporting/reportingSources.js";
 
@@ -27,8 +31,13 @@ afterEach(() => {
 // Literais de propósito: iterar a constante do shared esconderia uma fonte removida dela.
 const announced = ["contabil.control", "contabil.responsibles", "contabil.relationship"] as const;
 
+// As áreas da Triagem saem do mesmo serviço, mas são liberadas pelo módulo Triagem e
+// cobertas em workerCatalog.test.ts.
 it("o Contábil anuncia exatamente as três fontes executadas aqui", () => {
-  expect([...CONTABIL_REPORTING_SOURCES].sort()).toEqual([...announced].sort());
+  const triage: readonly string[] = CONTABIL_TRIAGE_REPORTING_SOURCES;
+  expect(CONTABIL_REPORTING_SOURCES.filter((source) => !triage.includes(source)).sort()).toEqual(
+    [...announced].sort(),
+  );
 });
 
 describe.each(announced)("execução da fonte %s", (key) => {

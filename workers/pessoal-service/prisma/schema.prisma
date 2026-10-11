@@ -108,6 +108,21 @@ model LddPessoal {
   @@map("pessoal.ldd")
 }
 
+model LddImportPessoal {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  file_hash       String
+  file_name       String
+  rows_count      Int
+  total_amount    Float
+  imported_by_id  String
+  created_at      DateTime @default(now())
+
+  @@unique([organization_id, client_id, file_hash], map: "uq_pessoal_ldd_imports_file")
+  @@map("pessoal.ldd_imports")
+}
+
 model User {
   id              String  @id @default(uuid())
   name            String

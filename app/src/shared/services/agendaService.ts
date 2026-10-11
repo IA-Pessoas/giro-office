@@ -8,8 +8,11 @@ import {
 } from "./agendaService.contract";
 
 export const agendaService = {
-  async list(module: AgendaModule, month: string): Promise<AgendaEvent[]> {
-    const response = await setupAPIClient().get(AGENDA_ENDPOINT, { params: { module, month } });
+  /** Com `mine`, só os eventos do usuário da sessão e os sem responsável. */
+  async list(module: AgendaModule, month: string, mine = false): Promise<AgendaEvent[]> {
+    const response = await setupAPIClient().get(AGENDA_ENDPOINT, {
+      params: { module, month, ...(mine ? { mine: true } : {}) },
+    });
     return (response.data as { data: AgendaEvent[] }).data;
   },
   async create(module: AgendaModule, payload: AgendaEventPayload): Promise<void> {

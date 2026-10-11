@@ -47,6 +47,13 @@ export const regularizeLicenseReportingCatalog = {
         field("entry_date", "Data de entrada", "date", dateOperators),
         field("date_last_consultation", "Data da última consulta", "date", dateOperators),
         field("due_date", "Data de vencimento", "date", dateOperators),
+        field("client_name", "Cliente", "string", stringOperators),
+        field("observation", "Observação", "string", stringOperators),
+        field("responsible_name", "Responsável", "string", stringOperators),
+        // Mês no formato AAAA-MM, para agrupar e filtrar por mês como no legado.
+        field("entry_month", "Mês de entrada", "string", stringOperators),
+        field("locking_type", "Travamento", "string", stringOperators),
+        field("locked", "Travado", "boolean", booleanOperators),
       ],
     },
   ],

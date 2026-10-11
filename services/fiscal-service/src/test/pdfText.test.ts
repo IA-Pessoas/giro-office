@@ -1,6 +1,5 @@
+import { extractPdfText } from "@workspace/shared/pdf";
 import { describe, expect, it } from "vitest";
-
-import { extractPdfText } from "../services/pdfText.js";
 import { renderPdf, type0Pdf } from "./pdfFixtures.js";
 
 describe("extractPdfText", () => {

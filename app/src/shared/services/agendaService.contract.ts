@@ -4,7 +4,7 @@ export const AGENDA_STATUSES = ["Pendente", "Realizado", "Cancelado"] as const;
 export type AgendaStatus = (typeof AGENDA_STATUSES)[number];
 
 /** Módulo cujo departamento filtra a agenda compartilhada. */
-export type AgendaModule = "contabil" | "triagem";
+export type AgendaModule = "contabil" | "pessoal" | "triagem" | "regularize";
 
 export interface AgendaEvent {
   id: string;
@@ -14,6 +14,11 @@ export interface AgendaEvent {
   status: string | null;
   obs: string | null;
   location: string | null;
+  client: { id: string; name: string } | null;
+  /** Responsável pelo evento; sem ele, o evento entra na "minha agenda" de todos. */
+  participant: { id: string; name: string } | null;
+  /** Preenchido quando o evento é ocorrência de uma recorrência mensal. */
+  recurring_agenda_id: string | null;
 }
 
 export interface AgendaEventPayload {
@@ -21,6 +26,11 @@ export interface AgendaEventPayload {
   date: string;
   status: AgendaStatus;
   obs: string | null;
+  /** Repete todo mês; desligar encerra a série e mantém os eventos já criados. */
+  recurrent?: boolean;
+  /** Nulo limpa o vínculo; ausente não mexe nele. */
+  client_id?: string | null;
+  participant_id?: string | null;
 }
 
 /** Evento de dia inteiro: meio-dia UTC mantém o dia escolhido em qualquer fuso do Brasil. */

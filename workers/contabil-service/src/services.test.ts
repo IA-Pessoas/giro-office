@@ -41,6 +41,48 @@ function prisma() {
 const auth = { userId: USER, organizationId: ORG, modules: { contabil: 2 } };
 
 describe("contabil services tenant and catalog seams", () => {
+  it("restaurar a competência audita no controle, com as contagens, como o arquivamento (#1689)", async () => {
+    const CONTROL = "99999999-9999-4999-8999-999999999999";
+    const updateMany = (count: number) => ({ updateMany: vi.fn().mockReturnValue({ count }) });
+    const database = {
+      controlContabil: {
+        ...updateMany(1),
+        findFirst: vi.fn().mockResolvedValue({ id: CONTROL }),
+      },
+      triageMonthly: updateMany(1),
+      triageBankStatement: updateMany(2),
+      triageClosing: updateMany(0),
+      $transaction: vi.fn(async (operations: unknown[]) => operations),
+    };
+    const auditLog = audit();
+
+    await expect(
+      createControlService(database as never, auditLog).restoreCompetence({
+        userId: USER,
+        organizationId: ORG,
+        permission: 2,
+        clientId: CLIENT,
+        competence: "2026-09",
+      }),
+    ).resolves.toEqual({ controls: 1, monthly: 1, statements: 2, closings: 0 });
+
+    expect(database.controlContabil.findFirst).toHaveBeenCalledWith({
+      where: { client_id: CLIENT, competence: "2026-09", organization_id: ORG },
+      select: { id: true },
+    });
+    // O histórico documental lê este evento pelo id do controle; sem contagens ele sumia.
+    expect(auditLog.logUpdateIfChanged).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        action: "Restaurar competência contábil",
+        referring: "contabil.control",
+        referringId: CONTROL,
+        organizationId: ORG,
+        updatedData: { controls: 1, monthly: 1, statements: 2, closings: 0 },
+      }),
+    );
+    expect(auditLog.createLog).not.toHaveBeenCalled();
+  });
+
   it("lista carteira com CNPJ, regime e responsáveis do tenant", async () => {
     const database = {
       client: {

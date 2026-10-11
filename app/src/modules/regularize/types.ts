@@ -191,6 +191,42 @@ export type UpdateRegularizeClientPfPayload = CreateRegularizeClientPfPayload & 
   id: RegularizeId;
 };
 
+// Mapa gerado de grupo (#1748). Sem capital social nem RBT12: o cadastro não tem esses dados.
+export type RegularizeGroupMapCompany = {
+  client_id: RegularizeId;
+  name: string;
+  cpf_cnpj: string | null;
+  status: string;
+  address: string | null;
+  regime: string | null;
+};
+
+export type RegularizeGroupMap = {
+  group: { id: RegularizeId; name: string };
+  cities: Array<{
+    name: string;
+    partners: Array<{
+      pf_id: RegularizeId;
+      name: string;
+      companies: RegularizeGroupMapCompany[];
+    }>;
+  }>;
+};
+
+// Item do mapa como é desenhado e salvo (#1749). color é a cor de fundo em #rrggbb.
+export type RegularizeGroupMapTreeNode = {
+  id: string;
+  lines: string[];
+  color?: string;
+  children: RegularizeGroupMapTreeNode[];
+};
+
+export type RegularizeSavedGroupMap = {
+  tree: RegularizeGroupMapTreeNode;
+  updated_at: string;
+  updated_by_user_id: RegularizeId;
+};
+
 export type RegularizePartner = {
   id: RegularizeId;
   pj_id: RegularizeId;
@@ -661,3 +697,142 @@ export interface RegularizeDashboard {
     Pick<RegularizeLicenseListItem, "id" | "type_license" | "protocol" | "due_date">
   >;
 }
+
+export type RegularizeDteImportFormat = "html" | "json";
+
+export type RegularizeDteImportPayload = {
+  format: RegularizeDteImportFormat;
+  content: string;
+};
+
+export type RegularizeDteRejectionReason =
+  | "LINHA_INCOMPLETA"
+  | "ITEM_INVALIDO"
+  | "CAMPO_INVALIDO"
+  | "CAMPO_LONGO"
+  | "SEM_DADOS";
+
+export type RegularizeDteImport = {
+  id: RegularizeId;
+  format: RegularizeDteImportFormat;
+  total_rows: number;
+  created_count: number;
+  duplicate_count: number;
+  rejected_count: number;
+  duplicates: Array<{ row: number; aviso: string; cnpj_cpf: string }>;
+  rejections: Array<{ row: number; reason: RegularizeDteRejectionReason }>;
+  created_at: string;
+};
+
+export const REGULARIZE_DTE_NOTICE_READING_FILTERS = ["Todos", "Pendente", "Lido"] as const;
+export type RegularizeDteNoticeReadingFilter =
+  (typeof REGULARIZE_DTE_NOTICE_READING_FILTERS)[number];
+
+// Datas no formato do <input type="date"> (aaaa-mm-dd); vazio = sem limite.
+export type RegularizeDteNoticeListFilters = {
+  from: string;
+  to: string;
+  tipo: string;
+  search: string;
+  reading: RegularizeDteNoticeReadingFilter;
+  page: number;
+  limit: number;
+};
+
+export type RegularizeDteNotice = {
+  id: RegularizeId;
+  tipo: string;
+  aviso: string;
+  cnpj_cpf: string;
+  destinatario: string;
+  remetente: string;
+  data_emissao: string | null;
+  assunto: string;
+  data_leitura: string | null;
+  data_ciencia: string | null;
+  // Data da consulta na SEFAZ, quando a colagem trouxe.
+  registro: string | null;
+  pending_reading: boolean;
+  created_at: string;
+};
+
+export type RegularizeDteNoticesPage = {
+  data: RegularizeDteNotice[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};
+
+export type RegularizeDteNoticeReadingPayload = {
+  id: RegularizeId;
+  pending_reading: boolean;
+};
+
+export const REGULARIZE_DTE_QUERY_STATUSES = ["feita", "nao_feita", "sem_registro"] as const;
+export type RegularizeDteQueryStatus = (typeof REGULARIZE_DTE_QUERY_STATUSES)[number];
+
+export type RegularizeDteQueryGridRow = {
+  client_id: RegularizeId;
+  name: string;
+  fantasy_name: string | null;
+  cpf_cnpj: string | null;
+  status: RegularizeDteQueryStatus;
+};
+
+export type RegularizeDteQueryGrid = {
+  date: string;
+  rows: RegularizeDteQueryGridRow[];
+  totals: Record<RegularizeDteQueryStatus, number>;
+};
+
+// date no formato do <input type="date"> (aaaa-mm-dd).
+export type RegularizeDteQueryStatusPayload = {
+  client_id: RegularizeId;
+  date: string;
+  status: RegularizeDteQueryStatus;
+};
+
+export type RegularizeDteQueryListsPayload = {
+  date: string;
+  done: string;
+  not_done: string;
+};
+
+export type RegularizeDteQueryListsResult = {
+  date: string;
+  done_count: number;
+  not_done_count: number;
+  conflicts: string[];
+  unknown: string[];
+};
+
+// Comparador Veri (#1755): resultado da comparação da planilha com a carteira, por CPF/CNPJ.
+export type RegularizeVeriComparison = {
+  rows: Array<{
+    name: string;
+    document: string;
+    in_veri: boolean;
+    in_workspace: boolean;
+    status: "Ambos" | "Veri" | "Workspace";
+  }>;
+  invalid: Array<{ row: number; name: string; value: string; reason: string }>;
+  totals: {
+    veri: number;
+    workspace: number;
+    both: number;
+    veri_only: number;
+    workspace_only: number;
+    invalid: number;
+    workspace_without_document: number;
+    workspace_duplicate_documents: number;
+  };
+};
+
+export type RegularizeDteImportsPage = {
+  data: RegularizeDteImport[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};

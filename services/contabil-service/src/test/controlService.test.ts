@@ -261,6 +261,8 @@ describe("ControlService", () => {
     const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
     vi.mocked(prisma.controlContabil.findFirst)
       .mockResolvedValueOnce({ ...baseRow, archived_at: new Date("2024-02-01") } as never)
+      // A restauração lê o controle para auditar no mesmo objeto do arquivamento.
+      .mockResolvedValueOnce(baseRow as never)
       .mockResolvedValueOnce(baseRow as never);
     vi.mocked(prisma.controlContabil.updateMany).mockResolvedValue({ count: 1 } as never);
     vi.mocked(prisma.triageMonthly.updateMany).mockResolvedValue({ count: 0 } as never);
@@ -285,6 +287,14 @@ describe("ControlService", () => {
     expect(prisma.controlContabil.create).not.toHaveBeenCalled();
     expect(prisma.controlContabil.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { archived_at: null } }),
+    );
+    // O histórico documental da Triagem acha a restauração pelo id do controle.
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Restaurar competência contábil",
+        referring: "contabil.control",
+        referringId: baseRow.id,
+      }),
     );
   });
 

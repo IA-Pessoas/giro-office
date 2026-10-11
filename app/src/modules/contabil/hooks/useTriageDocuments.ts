@@ -12,17 +12,31 @@ import type {
   TriageClosingStatus,
   TriageDocumentItemNotes,
   TriageDocumentField,
+  TriageDocumentHistoryPage,
   TriageDocumentsMonthly,
   TriageFiscalField,
   TriageRoutineType,
 } from "../types";
 import {
+  TRIAGE_DOCUMENT_HISTORY_QUERY_KEY,
   triageClosingQueryKey,
+  triageDocumentHistoryQueryKey,
   triageFiscalPortfolioQueryKey,
   triageMonthlyQueryKey,
   triageStatementHistoryQueryKey,
   triageStatementsQueryKey,
 } from "./queryKeys";
+
+export function useTriageDocumentHistory(filters: {
+  clientId?: string;
+  competence?: ContabilCompetence;
+  page: number;
+  pageSize: number;
+}): UseQueryResult<TriageDocumentHistoryPage, Error> {
+  return useFetch(triageDocumentHistoryQueryKey(filters), () =>
+    triageDocumentsService.getDocumentHistory(filters),
+  );
+}
 
 export function useTriageClosing(
   clientId: string,
@@ -77,8 +91,12 @@ export function useTriageMutations(
   type: TriageRoutineType = "CONTABIL",
 ) {
   const queryClient = useQueryClient();
+  // Toda alteração daqui vira evento de auditoria: o histórico documental da página recarrega.
+  const refreshHistory = () =>
+    queryClient.invalidateQueries({ queryKey: TRIAGE_DOCUMENT_HISTORY_QUERY_KEY });
   const refresh = async () => {
     await Promise.all([
+      refreshHistory(),
       queryClient.invalidateQueries({
         queryKey: triageMonthlyQueryKey(clientId, competence, type),
       }),
@@ -157,6 +175,7 @@ export function useTriageMutations(
       mutationFn: triageDocumentsService.archiveStatement,
       onSuccess: async () => {
         await Promise.all([
+          refreshHistory(),
           queryClient.invalidateQueries({
             queryKey: triageStatementsQueryKey(clientId, competence),
           }),
@@ -168,6 +187,7 @@ export function useTriageMutations(
       mutationFn: ({ status }: { status: TriageClosingStatus }) =>
         triageDocumentsService.updateClosing({ clientId, competence, status }),
       onSuccess: async () => {
+        await refreshHistory();
         await queryClient.invalidateQueries({
           queryKey: triageClosingQueryKey(clientId, competence),
         });

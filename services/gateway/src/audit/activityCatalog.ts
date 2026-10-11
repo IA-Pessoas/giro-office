@@ -253,6 +253,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/pessoal\/ldd\/import$/,
+    description: { action: "importou", item: "débitos de LDD de um PDF" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/ldd\/import\/preview$/,
+    description: { action: "gerou", item: "uma prévia de importação de LDD em PDF" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/pessoal\/group-assignments\/previews$/,
     description: { action: "gerou", item: "uma prévia de atribuição de grupo" },
   },
@@ -933,6 +943,46 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/regularize\/dte\/import$/,
+    description: { action: "importou", item: "avisos DTE no Regularize" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/imports$/,
+    description: { action: "consultou", item: "a lista de importações de avisos DTE" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/notices$/,
+    description: { action: "consultou", item: "a caixa de avisos DTE" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/dte\/notices\/reading$/,
+    description: { action: "alterou", item: "a leitura de um aviso DTE" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/dte\/queries$/,
+    description: { action: "consultou", item: "a grade de consultas diárias ao DTE" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/dte\/queries\/status$/,
+    description: { action: "alterou", item: "a situação de uma consulta diária ao DTE" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/dte\/queries\/import$/,
+    description: { action: "registrou", item: "consultas diárias ao DTE por lista" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/veri\/compare$/,
+    description: { action: "comparou", item: "uma planilha do Veri com a carteira do Regularize" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/regularize\/process\/send-to-fiscal$/,
     description: { action: "enviou", item: "um processo de regularização ao Fiscal" },
   },
@@ -1103,6 +1153,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/task\/deps\/options$/,
     description: { action: "consultou", item: "as opções de modelos de tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/groups\/[^/]+\/map$/,
+    description: { action: "consultou", item: "o mapa de um grupo de clientes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/groups\/[^/]+\/map\/saved$/,
+    description: { action: "consultou", item: "a versão salva do mapa de um grupo" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/groups\/[^/]+\/map\/saved$/,
+    description: { action: "salvou", item: "o mapa de um grupo de clientes" },
   },
   {
     methods: ["GET"],

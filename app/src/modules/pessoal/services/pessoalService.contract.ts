@@ -4,6 +4,8 @@ import type { PaginatedResult } from "@shared/pagination/pagination";
 export const PESSOAL_ENDPOINTS = {
   ldd: "/pessoal/ldd",
   lddDetail: (id: string) => `/pessoal/ldd/${id}`,
+  lddImport: "/pessoal/ldd/import",
+  lddImportPreview: "/pessoal/ldd/import/preview",
   overview: "/pessoal/overview",
   groups: "/pessoal/groups",
   groupDetail: (id: string) => `/pessoal/groups/${id}`,
@@ -37,6 +39,7 @@ export const PESSOAL_TABS: PessoalTab[] = [
   { id: "obligations", label: "Obrigações" },
   { id: "tracking", label: "Acompanhamentos" },
   { id: "passwords", label: "Senhas" },
+  { id: "agenda", label: "Agenda" },
 ];
 
 export function unwrapPessoalEnvelope<T>(body: unknown): T {

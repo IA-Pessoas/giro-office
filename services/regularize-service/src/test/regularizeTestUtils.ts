@@ -12,6 +12,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
   RegularizeLicenseReportingService,
   RegularizeMunicipalTaxesReportingService,
+  RegularizePortfolioReportingService,
 } from "../reporting/internalReportingService.js";
 import type { LicenseProtocolStorage } from "../services/licenseProtocolStorage.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
@@ -71,6 +72,7 @@ export function createTestApp(
   internalReportingService?: RegularizeLicenseReportingService,
   municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService,
   protocolStorage?: LicenseProtocolStorage,
+  portfolioReportingService?: RegularizePortfolioReportingService,
 ) {
   return createApp({
     env: regularizeTestEnv,
@@ -83,6 +85,7 @@ export function createTestApp(
     runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     internalReportingService,
     municipalTaxesReportingService,
+    portfolioReportingService,
     protocolStorage,
   });
 }
