@@ -1,6 +1,8 @@
 import {
   CLIENT_INACTIVE_STATUS,
+  CONTABIL_RESPONSIBLES_REPORTING_SOURCES,
   CONTABIL_TRIAGE_REPORTING_SOURCES,
+  type ContabilResponsiblesReportingSource,
   type ContabilTriageReportingSource,
   normalizeTriageDocumentStatus,
   TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
@@ -50,13 +52,26 @@ type RowSource = {
   columns: Readonly<Record<string, string>>;
   /** Colunas lidas a mais para descobrir o responsável da linha. */
   responsibleColumns?: readonly string[];
+  /** Campo publicado -> coluna do cadastro de responsáveis do Contábil com o id do usuário. */
+  userColumns?: Readonly<Record<string, string>>;
   /** Campos calculados a partir de uma coluna da linha. */
   derived?: { columns: readonly string[]; fields: readonly string[]; values(row: Row): Row };
 };
-type RowSourceKey = Exclude<ContabilTriageReportingSource, "contabil.triage_sgq">;
+type RowSourceKey =
+  | Exclude<ContabilTriageReportingSource, "contabil.triage_sgq">
+  | ContabilResponsiblesReportingSource;
 // Nenhuma área esconde cliente inativado (`deletion_date` é a data da inativação): status e
 // data de inativação são campos, e o filtro é de quem monta o relatório.
 const rowSources: Readonly<Record<RowSourceKey, RowSource>> = {
+  // Uma linha por cliente do Contábil, como o relatório legado: quem não tem responsável
+  // cadastrado sai com os nomes em branco. O cadastro é o mesmo de onde as áreas da Triagem
+  // leem "cliente com movimento".
+  "contabil.responsibles": {
+    delegate: "clients",
+    where: { contabil: true },
+    columns: {},
+    userColumns: { responsible_name: "person_responsible_id", posted_by_name: "posted_by_id" },
+  },
   "contabil.triage_clouds": { delegate: "clients", where: {}, columns: {} },
   // "Movimento enviado" é da rotina Contábil; a Fiscal não usa o marcador.
   "contabil.triage_movement": {
@@ -285,8 +300,13 @@ async function extractSgqPage(
   };
 }
 
-export function isTriageReportingSource(source: string): source is ContabilTriageReportingSource {
-  return (CONTABIL_TRIAGE_REPORTING_SOURCES as readonly string[]).includes(source);
+type ClientReportingSource = ContabilTriageReportingSource | ContabilResponsiblesReportingSource;
+
+/** Áreas que este extrator monta: as da Triagem e os responsáveis do Contábil. */
+export function isClientReportingSource(source: string): source is ClientReportingSource {
+  return [...CONTABIL_TRIAGE_REPORTING_SOURCES, ...CONTABIL_RESPONSIBLES_REPORTING_SOURCES].some(
+    (candidate) => candidate === source,
+  );
 }
 
 function byClient(rows: readonly Row[]): Map<string, Row[]> {
@@ -321,14 +341,15 @@ function inheritedResponsible(
 
 /**
  * Página das áreas da Triagem na Central de Relatórios. A linha é o cliente em
- * `contabil.triage_clouds`, a atribuição atual em `contabil.triage_responsibles`, o mês em
- * `contabil.triage_sgq` e a rotina mensal nas demais. Quem chama já validou os campos
- * contra o catálogo; a organização vem do grant e limita todas as consultas.
+ * `contabil.triage_clouds` e em `contabil.responsibles` (só os do Contábil), a atribuição
+ * atual em `contabil.triage_responsibles`, o mês em `contabil.triage_sgq` e a rotina mensal
+ * nas demais. Quem chama já validou os campos contra o catálogo; a organização vem do grant
+ * e limita todas as consultas.
  */
 export async function extractTriageReportingPage(
   prisma: TriageReportingPrisma,
   input: {
-    source: ContabilTriageReportingSource;
+    source: ClientReportingSource;
     organizationId: string;
     fields: readonly string[];
     limit: number;
@@ -346,6 +367,10 @@ export async function extractTriageReportingPage(
   const wanted = (field: string) => input.fields.includes(field);
   const clientIsRow = base.delegate === "clients";
   const wantsResponsible = Boolean(base.responsibleColumns) && wanted("responsible_name");
+  const userColumns = base.userColumns ?? {};
+  const namedUserColumns = Object.keys(userColumns)
+    .filter(wanted)
+    .map((field) => userColumns[field]);
   const clientSelect = {
     id: true,
     ...Object.fromEntries(clientColumns.filter(wanted).map((column) => [column, true])),
@@ -398,8 +423,14 @@ export async function extractTriageReportingPage(
       select: { client_id: true, type: true, link: true },
       orderBy: [{ type: "asc" }, { id: "asc" }],
     }),
-    related(prisma.responsibles, wanted("customer_with_movement"), {
-      select: { client_id: true, customer_with_movement: true },
+    related(prisma.responsibles, wanted("customer_with_movement") || namedUserColumns.length > 0, {
+      select: {
+        client_id: true,
+        ...(wanted("customer_with_movement") ? { customer_with_movement: true } : {}),
+        ...Object.fromEntries(namedUserColumns.map((column) => [column, true])),
+      },
+      // O banco não impede dois cadastros do mesmo cliente: o nome sai sempre do mesmo.
+      orderBy: { id: "asc" },
     }),
     related(
       prisma.competences,
@@ -420,9 +451,14 @@ export async function extractTriageReportingPage(
   ]);
   const responsibleIdOf = (row: Row) =>
     row.user_id || row.responsible_id || inheritedResponsible(snapshots, assignments, row);
-  const userIds = wantsResponsible
-    ? [...new Set(rows.map(responsibleIdOf).filter((id) => typeof id === "string"))]
-    : [];
+  const userIds = [
+    ...new Set(
+      [
+        ...(wantsResponsible ? rows.map(responsibleIdOf) : []),
+        ...responsibles.flatMap((record) => namedUserColumns.map((column) => record[column])),
+      ].filter((id) => typeof id === "string" && id !== ""),
+    ),
+  ];
   const users = userIds.length
     ? await prisma.users.findMany({
         where: { ...organization, id: { in: userIds } },
@@ -468,6 +504,10 @@ export async function extractTriageReportingPage(
       const derivedValues = derived?.values(row) ?? {};
       const value = (field: string): unknown => {
         if (field in derivedValues) return derivedValues[field];
+        if (field in userColumns) {
+          const record = responsiblesByClient.get(clientId)?.[0];
+          return userNames.get(record?.[userColumns[field]]) ?? null;
+        }
         if (field in base.columns) {
           const column = row[base.columns[field]];
           if (field === "justification") return justificationLabels.get(column) ?? column;

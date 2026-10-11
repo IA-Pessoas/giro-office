@@ -7,7 +7,7 @@ import {
   withReportingSnapshot,
 } from "@workspace/shared";
 
-import { extractTriageReportingPage, isTriageReportingSource } from "./triageReportingService.js";
+import { extractTriageReportingPage, isClientReportingSource } from "./triageReportingService.js";
 
 type ReportingDelegate = {
   findMany(input: {
@@ -59,7 +59,7 @@ export class InternalReportingService {
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
-    if (isTriageReportingSource(input.source)) {
+    if (isClientReportingSource(input.source)) {
       return extractTriageReportingPage(
         {
           clients: this.prisma.client,
@@ -79,9 +79,7 @@ export class InternalReportingService {
     const delegate =
       input.source === "contabil.control"
         ? this.prisma.controlContabil
-        : input.source === "contabil.responsibles"
-          ? this.prisma.responsibleContabil
-          : this.prisma.relationshipContabil;
+        : this.prisma.relationshipContabil;
     const rows = await delegate.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
