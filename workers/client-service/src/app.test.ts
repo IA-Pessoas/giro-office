@@ -54,6 +54,13 @@ function client() {
 
 function service(): ClientWorkerService {
   return {
+    listInstagramProfiles: vi.fn(async () => ({
+      items: [{ id: CLIENT_ID, name: "Acme", status: "Ativo", instagram: "@acme" }],
+      total: 1,
+      page: 1,
+      pageSize: 100,
+      hasMore: false,
+    })),
     listByOrganization: vi.fn(async () => ({
       items: [client()],
       total: 1,
@@ -163,6 +170,34 @@ describe("client Worker", () => {
     );
     expect(create.status).toBe(403);
     expect(clientService.create).not.toHaveBeenCalled();
+  });
+
+  it("serves the Instagram report to Marketing readers and scopes it to the session", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const url =
+      "https://client.test/client/instagram-profiles/report?profile=without&status=Ativo&limit=100";
+
+    const as = (modules: Record<string, number>) =>
+      headers({ "x-auth-type": "user", "x-auth-modules": JSON.stringify(modules) });
+
+    const marketing = await app.request(url, { headers: as({ marketing: 1 }) });
+    const denied = await app.request(url, { headers: as({ fiscal: 3 }) });
+    const foreign = await app.request(`${url}&organization_id=${OTHER_ORGANIZATION_ID}`, {
+      headers: as({ marketing: 1 }),
+    });
+
+    expect(marketing.status).toBe(200);
+    expect(clientService.listInstagramProfiles).toHaveBeenCalledTimes(1);
+    expect(clientService.listInstagramProfiles).toHaveBeenCalledWith(ORGANIZATION_ID, {
+      page: 1,
+      pageSize: 100,
+      profile: "without",
+      search: undefined,
+      status: "Ativo",
+    });
+    expect(denied.status).toBe(403);
+    expect(foreign.status).toBe(400);
   });
 
   it("serves the regime catalog of the authenticated organization before /client/:id", async () => {

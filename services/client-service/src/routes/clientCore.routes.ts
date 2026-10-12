@@ -79,6 +79,7 @@ export function createClientCoreRouter(deps: ClientRouterDeps): Router {
           pageSize: query.limit,
           profile: query.profile,
           search: query.search,
+          status: query.status,
         });
         response.json(createSuccessResponse(report));
       } catch (err) {
