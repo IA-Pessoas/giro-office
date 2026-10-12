@@ -122,6 +122,7 @@ export const listInstagramProfilesQuerySchema = z
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     search: z.string().max(200).optional(),
+    status: z.string().trim().min(1).max(40).optional(),
   })
   .strict();
 

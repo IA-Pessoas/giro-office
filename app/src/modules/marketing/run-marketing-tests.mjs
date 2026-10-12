@@ -6,6 +6,7 @@ import {
   createMonthlyClientBirthdayCsv,
   createMonthlyEmployeeBirthdayCsv,
   createAiUsageReportCsv,
+  createInstagramReportCsv,
   createMarketingStockCsv,
 } from "./utils/marketingCsv.ts";
 
@@ -191,6 +192,24 @@ assert.match(stockReport, /marketingStockRows\(stock\.items\)/);
 assert.match(stockReport, /printMarketingReport\("marketing-stock-report"\)/);
 assert.match(stockReport, /marketing-print-report/);
 assert.match(page, /MarketingStockReport/);
+const instagramReport = await readFile(new URL("./components/MarketingInstagramReport.tsx", import.meta.url), "utf8");
+assert.equal(
+  createInstagramReportCsv([
+    { name: "Acme", instagram: " @acme " },
+    { name: "Beta", instagram: "   " },
+  ]),
+  '"Cliente","Perfil Instagram"\r\n"Acme","\'@acme"\r\n"Beta","Sem perfil"\r\n"Total: 2 clientes ativos",""',
+);
+assert.equal(createInstagramReportCsv([{ name: "Acme", instagram: null }]).endsWith('"Total: 1 cliente ativo",""'), true);
+assert.match(instagramReport, /status: "Ativo"/);
+assert.match(instagramReport, /while \(page\.hasMore\)/);
+assert.match(instagramReport, /instagramReportRows\(items\)/);
+assert.match(instagramReport, /createInstagramReportCsv\(items\)/);
+assert.match(instagramReport, /<QRCodeSVG/);
+assert.match(instagramReport, /printMarketingReport\("marketing-instagram-report"\)/);
+assert.match(instagramReport, /marketing-print-report/);
+assert.match(instagramReport, /access\.canView/);
+assert.match(page, /MarketingInstagramReport/);
 assert.equal(
   createAiUsageReportCsv(
     [

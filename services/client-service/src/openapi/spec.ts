@@ -606,6 +606,12 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
               schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
             },
             { name: "search", in: "query", schema: { type: "string", maxLength: 200 } },
+            {
+              name: "status",
+              in: "query",
+              description: "Situação exata do cliente, por exemplo Ativo.",
+              schema: { type: "string", maxLength: 40 },
+            },
           ],
           responses: {
             "200": {
