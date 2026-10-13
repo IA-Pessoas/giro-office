@@ -225,6 +225,55 @@ describe("Marketing access to departments", () => {
   });
 });
 
+describe("Integração agenda catalogs", () => {
+  it("libera departamentos e participantes ao nível 1 da Integração", () => {
+    expect(authorizeClientRequest("GET", "/department/list", { integracao: 1 })).toBeUndefined();
+    expect(
+      authorizeClientRequest("GET", "/rh/operational-users", { integracao: 1 }),
+    ).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/department/list", { integracao: 0 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it("não libera exclusão de compromisso só com Integração nível 2", () => {
+    expect(
+      authorizeClientRequest(
+        "DELETE",
+        "/task/agenda",
+        { integracao: 2 },
+        {
+          module: "integracao",
+          agenda_id: "evt-1",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+    expect(
+      authorizeClientRequest(
+        "DELETE",
+        "/task/agenda",
+        { contabil: 2 },
+        {
+          module: "contabil",
+          agenda_id: "evt-1",
+        },
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("cronograma de Integração", () => {
+  it("exige nível 1 no gateway e não usa a exceção de tarefas próprias", () => {
+    expect(authorizeClientRequest("GET", "/task/cronograma", { integracao: 0 })).toMatchObject({
+      statusCode: 403,
+    });
+    expect(authorizeClientRequest("GET", "/task/cronograma", { integracao: 1 })).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/task/cronograma", { contabil: 3 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+});
+
 describe("platform default deny", () => {
   it("deixa público somente o login e exige platformOnly nas demais rotas", () => {
     expect(isPublicRoute("POST", "/platform/session")).toBe(true);

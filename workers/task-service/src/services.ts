@@ -12,6 +12,7 @@ import { ProjectPlanService } from "@workspace/task-service/src/services/project
 import { ProjectWizardExtractionService } from "@workspace/task-service/src/services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "@workspace/task-service/src/services/projectWizardService.js";
 import { TaskAttachmentService } from "@workspace/task-service/src/services/taskAttachmentService.js";
+import { TaskCronogramaService } from "@workspace/task-service/src/services/taskCronogramaService.js";
 import { TaskCrudService } from "@workspace/task-service/src/services/taskCrudService.js";
 import { TaskDependentService } from "@workspace/task-service/src/services/taskDependentService.js";
 import { TaskFinanceiroService } from "@workspace/task-service/src/services/taskFinanceiroService.js";
@@ -77,6 +78,7 @@ export function createTaskServices(prisma: unknown, env: TaskWorkerEnv) {
   const crud = () => new TaskCrudService(db, audit, projectProgress);
   return {
     crud,
+    cronograma: () => new TaskCronogramaService(db),
     model: () => new TaskModelService(db, audit),
     dependent: () => new TaskDependentService(db, audit),
     integration: () => new TaskIntegrationRegularizeService(db, audit),

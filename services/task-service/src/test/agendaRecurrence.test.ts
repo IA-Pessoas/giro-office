@@ -13,7 +13,8 @@ type Where = Record<string, unknown>;
 /** Filtros que o serviço usa: igualdade, `in`, `lt`, `gt` e `gte` (nulo nunca é menor). */
 function matches(row: Row, where: Where): boolean {
   return Object.entries(where).every(([key, condition]) => {
-    const value = row[key] as never;
+    // Colunas opcionais não informadas no fake representam NULL no Postgres.
+    const value = (row[key] ?? null) as never;
     if (condition === null || typeof condition !== "object" || condition instanceof Date) {
       return value === condition;
     }
