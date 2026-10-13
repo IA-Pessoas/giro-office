@@ -77,6 +77,8 @@ function serializeMinute(minute: MinuteWithRevisions) {
   };
 }
 
+type EmployeeMeetingMinuteResponse = ReturnType<typeof serializeMinute>;
+
 class EmployeeMeetingMinuteService {
   constructor(private readonly db: PrismaClient = prismaClient) {}
 
@@ -104,7 +106,7 @@ class EmployeeMeetingMinuteService {
     return target;
   }
 
-  async list(context: EmployeeMeetingMinuteContext) {
+  async list(context: EmployeeMeetingMinuteContext): Promise<EmployeeMeetingMinuteResponse[]> {
     const target = await this.resolveTarget(context, context.targetUserId);
     const minutes = await this.db.rhEmployeeMeetingMinute.findMany({
       where: { organization_id: context.organizationId, user_id: target.id },
@@ -114,7 +116,10 @@ class EmployeeMeetingMinuteService {
     return minutes.map(serializeMinute);
   }
 
-  async create(context: EmployeeMeetingMinuteContext, input: CreateEmployeeMeetingMinuteInput) {
+  async create(
+    context: EmployeeMeetingMinuteContext,
+    input: CreateEmployeeMeetingMinuteInput,
+  ): Promise<EmployeeMeetingMinuteResponse> {
     const target = await this.resolveTarget(context, input.target_user_id ?? context.targetUserId);
     try {
       const created = await this.db.$transaction(async (tx) => {
@@ -164,7 +169,7 @@ class EmployeeMeetingMinuteService {
     context: EmployeeMeetingMinuteContext,
     minuteId: string,
     input: UpdateEmployeeMeetingMinuteInput,
-  ) {
+  ): Promise<EmployeeMeetingMinuteResponse> {
     const current = await this.db.rhEmployeeMeetingMinute.findFirst({
       where: { id: minuteId, organization_id: context.organizationId },
     });

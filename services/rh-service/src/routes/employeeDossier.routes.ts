@@ -60,6 +60,7 @@ router.get(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao listar atas de reunião do colaborador", { err });
       next(err);
     }
   },
@@ -75,6 +76,7 @@ router.post(
       const data = await employeeMeetingMinuteService.create(getContext(request), body);
       response.status(201).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao criar ata de reunião do colaborador", { err });
       next(err);
     }
   },
@@ -91,6 +93,7 @@ router.patch(
       const data = await employeeMeetingMinuteService.update(getContext(request), id, body);
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao atualizar ata de reunião do colaborador", { err });
       next(err);
     }
   },
