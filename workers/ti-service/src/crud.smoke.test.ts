@@ -144,6 +144,15 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
       user_id: userId,
       delivery_date: "2026-09-11",
     });
+    // #1932: pessoa→local e local→pessoa; o histórico traz o cadastro já atribuído, a
+    // devolução, a nova atribuição e as duas transferências.
+    await call("PATCH", `/ti/inventory/${assetId}/transfer`, { location_id: locationId });
+    await call("PATCH", `/ti/inventory/${assetId}/transfer`, { user_id: userId });
+    const history = await smokeCall(app(), env(), "GET", `/ti/inventory/${assetId}/history`);
+    expect(history.status).toBe(200);
+    expect(
+      (history.json?.data as Array<{ action: string }>).map((event) => event.action).sort(),
+    ).toEqual(["assign", "assign", "return", "transfer", "transfer"]);
     await call("PATCH", `/ti/inventory-categories/${categoryId}`, { active: false });
     await call("PATCH", `/ti/inventory-locations/${locationId}`, { active: false });
   });

@@ -257,10 +257,22 @@ function inventoryServices(database: TiDatabase): TiServices {
             database,
             auth.organizationId,
             { category_id: input.category_id, user_id: input.user_id },
-            (writer) =>
-              delegate(writer, "inventoryTecnologia").create({
+            async (writer) => {
+              const created = await delegate(writer, "inventoryTecnologia").create({
                 data: { ...input, organization_id: auth.organizationId },
-              }),
+              });
+              // Cadastro já atribuído entra no histórico patrimonial como atribuição.
+              if (typeof input.user_id === "string") {
+                await delegate(writer, "inventoryEventTecnologia").create({
+                  data: inventoryEventData(auth, String(row(created).id), "assign", null, {
+                    user_id: input.user_id,
+                    location_id: input.location_id ?? null,
+                  }),
+                });
+              }
+              return created;
+            },
+            typeof input.user_id === "string",
           );
         } catch (error) {
           if (error instanceof ServiceError) throw error;
@@ -285,7 +297,12 @@ function inventoryServices(database: TiDatabase): TiServices {
           (input.category_id !== undefined && input.category_id !== current.category_id) ||
           (input.user_id !== undefined && current.return_date != null);
         // Edição que não troca pessoa nem categoria não reavalia a regra (dado legado).
-        if (!changesHolder) return inventory.update({ where: { id }, data });
+        // Trocar a pessoa ou o local pela edição é uma movimentação: entra no histórico.
+        const toUserId = input.user_id ?? activeHolderId(current);
+        const toLocationId = input.location_id ?? current.location_id ?? null;
+        const movesAsset =
+          toUserId !== activeHolderId(current) || toLocationId !== (current.location_id ?? null);
+        if (!changesHolder && !movesAsset) return inventory.update({ where: { id }, data });
         return writeWithComputerRule(
           database,
           auth.organizationId,
@@ -295,7 +312,22 @@ function inventoryServices(database: TiDatabase): TiServices {
             user_id: input.user_id ?? current.user_id,
             return_date: input.user_id === undefined ? current.return_date : null,
           },
-          (writer) => delegate(writer, "inventoryTecnologia").update({ where: { id }, data }),
+          async (writer) => {
+            const updated = await delegate(writer, "inventoryTecnologia").update({
+              where: { id },
+              data,
+            });
+            if (movesAsset) {
+              await delegate(writer, "inventoryEventTecnologia").create({
+                data: inventoryEventData(auth, String(id), "transfer", current, {
+                  user_id: toUserId,
+                  location_id: toLocationId,
+                }),
+              });
+            }
+            return updated;
+          },
+          movesAsset,
         );
       },
       assignUser: async (value, id, body) => {
@@ -305,46 +337,208 @@ function inventoryServices(database: TiDatabase): TiServices {
         });
         if (!existing) throw new ServiceError(404, "Ativo de TI não encontrado.");
         const input = row(body);
+        if (input.user_id === activeHolderId(existing)) {
+          throw new ServiceError(409, "O item já está com esta pessoa.");
+        }
         await activeUserInOrganization(database, auth.organizationId, String(input.user_id));
-        return writeWithComputerRule(
-          database,
-          auth.organizationId,
-          {
-            id: String(id),
-            category_id: row(existing).category_id,
-            user_id: input.user_id,
-            return_date: null,
-          },
-          (writer) =>
-            delegate(writer, "inventoryTecnologia").update({
-              where: { id },
-              data: {
-                user_id: input.user_id,
-                delivery_date: input.delivery_date ?? new Date(),
-                return_date: null,
-              },
-            }),
-        );
+        return moveInventory(database, auth, String(id), existing, "assign", inventoryInclude, {
+          user_id: String(input.user_id),
+          delivery_date: input.delivery_date ?? new Date(),
+          return_date: null,
+        });
       },
       returnAsset: async (value, id, body) => {
         const auth = context(value);
-        await inventory
-          .findFirst({ where: { id, organization_id: auth.organizationId } })
-          .then((found) => {
-            if (!found) throw new ServiceError(404, "Ativo de TI não encontrado.");
-          });
-        const input = row(body);
-        return inventory.update({
-          where: { id },
-          data: {
-            user_id: null,
-            return_date: input.return_date ?? new Date(),
-            ...(input.notes === undefined ? {} : { notes: input.notes }),
-          },
+        const existing = await inventory.findFirst({
+          where: { id, organization_id: auth.organizationId },
         });
+        if (!existing) throw new ServiceError(404, "Ativo de TI não encontrado.");
+        const input = row(body);
+        return moveInventory(database, auth, String(id), existing, "return", inventoryInclude, {
+          user_id: null,
+          return_date: input.return_date ?? new Date(),
+          ...(input.notes === undefined ? {} : { notes: input.notes }),
+        });
+      },
+      // Quatro direções do legado: pessoa→pessoa, pessoa→local, local→pessoa e local→local
+      // (#1932). A origem é quem está com o item agora; o destino vem no corpo.
+      transfer: async (value, id, body) => {
+        const auth = context(value);
+        const existing = await inventory.findFirst({
+          where: { id, organization_id: auth.organizationId },
+        });
+        if (!existing) throw new ServiceError(404, "Ativo de TI não encontrado.");
+        const input = row(body);
+        const holderId = activeHolderId(existing);
+        if (typeof input.user_id === "string") {
+          if (input.user_id === holderId) {
+            throw new ServiceError(409, "O item já está com esta pessoa.");
+          }
+          await activeUserInOrganization(database, auth.organizationId, input.user_id);
+          return moveInventory(database, auth, String(id), existing, "transfer", inventoryInclude, {
+            user_id: input.user_id,
+            location_id: null,
+            delivery_date: new Date(),
+            return_date: null,
+          });
+        }
+        if (!holderId && existing.location_id === input.location_id) {
+          throw new ServiceError(409, "O item já está neste local.");
+        }
+        const location = await locations.findFirst({
+          where: { id: input.location_id, organization_id: auth.organizationId, active: true },
+        });
+        if (!location) {
+          throw new ServiceError(404, "Departamento/local de inventário não encontrado.");
+        }
+        return moveInventory(database, auth, String(id), existing, "transfer", inventoryInclude, {
+          user_id: null,
+          location_id: String(input.location_id),
+          delivery_date: new Date(),
+          return_date: null,
+        });
+      },
+      // Histórico patrimonial do item, do mais recente para o mais antigo.
+      listHistory: async (value, id, query) => {
+        const auth = context(value);
+        const found = await inventory.findFirst({
+          where: { id, organization_id: auth.organizationId },
+        });
+        if (!found) throw new ServiceError(404, "Ativo de TI não encontrado.");
+        const { skip, take } = pageQuery(query);
+        const events = (
+          await delegate(database, "inventoryEventTecnologia").findMany({
+            where: { organization_id: auth.organizationId, inventory_id: id },
+            orderBy: { created_at: "desc" },
+            skip,
+            take,
+          })
+        ).map(row);
+        const userIds = uniqueIds(
+          events.flatMap((event) => [event.actor_user_id, event.from_user_id, event.to_user_id]),
+        );
+        const locationIds = uniqueIds(
+          events.flatMap((event) => [event.from_location_id, event.to_location_id]),
+        );
+        const [users, eventLocations] = await Promise.all([
+          userIds.length === 0
+            ? []
+            : delegate(database, "user").findMany({
+                where: { id: { in: userIds }, organization_id: auth.organizationId },
+                select: { id: true, name: true, full_name: true },
+              }),
+          locationIds.length === 0
+            ? []
+            : locations.findMany({
+                where: { id: { in: locationIds }, organization_id: auth.organizationId },
+                select: { id: true, name: true },
+              }),
+        ]);
+        const byId = new Map([...users, ...eventLocations].map((item) => [row(item).id, item]));
+        const named = (itemId: unknown) => (itemId ? (byId.get(itemId) ?? null) : null);
+        return events.map((event) => ({
+          id: event.id,
+          inventory_id: event.inventory_id,
+          action: event.action,
+          created_at: event.created_at,
+          actor: named(event.actor_user_id),
+          from_user: named(event.from_user_id),
+          to_user: named(event.to_user_id),
+          from_location: named(event.from_location_id),
+          to_location: named(event.to_location_id),
+        }));
       },
     },
   };
+}
+
+/** Pessoa que está com o item agora; item devolvido não está com ninguém. */
+function activeHolderId(asset: Row): string | null {
+  return typeof asset.user_id === "string" &&
+    (asset.return_date === null || asset.return_date === undefined)
+    ? asset.user_id
+    : null;
+}
+
+/** Evento patrimonial: autor, item, origem, destino e tipo de ação. */
+function inventoryEventData(
+  auth: TiAuthContext,
+  inventoryId: string,
+  action: "assign" | "return" | "transfer",
+  from: Row | null,
+  to: { user_id: unknown; location_id: unknown },
+): Row {
+  return {
+    inventory_id: inventoryId,
+    action,
+    from_user_id: from ? activeHolderId(from) : null,
+    from_location_id: from?.location_id ?? null,
+    to_user_id: to.user_id,
+    to_location_id: to.location_id,
+    actor_user_id: auth.userId,
+    organization_id: auth.organizationId,
+  };
+}
+
+function uniqueIds(ids: unknown[]): string[] {
+  return [...new Set(ids.filter((id): id is string => typeof id === "string"))];
+}
+
+/**
+ * Muda quem está com o item e registra o evento patrimonial na mesma transação: autor,
+ * momento, item, origem, destino e tipo de ação (#1932). O estado lido antes vira condição
+ * da escrita, então duas movimentações simultâneas do mesmo item não se sobrepõem.
+ */
+async function moveInventory(
+  database: TiDatabase,
+  auth: TiAuthContext,
+  id: string,
+  existing: Row,
+  action: "assign" | "return" | "transfer",
+  include: Row,
+  data: Row & { user_id: string | null; location_id?: string | null },
+): Promise<unknown> {
+  const organizationId = auth.organizationId;
+  const toLocationId = data.location_id === undefined ? existing.location_id : data.location_id;
+
+  return database.$transaction(async (transaction) => {
+    if (data.user_id) {
+      const computerCategoryIds = await computerCategoryIdsOf(transaction, organizationId);
+      if (computerCategoryIds.includes(existing.category_id)) {
+        await lockAndCheckActiveComputer(
+          transaction,
+          organizationId,
+          data.user_id,
+          computerCategoryIds,
+          id,
+        );
+      }
+    }
+    const inventory = delegate(transaction, "inventoryTecnologia");
+    const moved = await inventory.updateMany({
+      where: {
+        id,
+        organization_id: organizationId,
+        user_id: existing.user_id ?? null,
+        location_id: existing.location_id ?? null,
+        return_date: existing.return_date ?? null,
+      },
+      data,
+    });
+    if (moved.count !== 1) {
+      throw new ServiceError(
+        409,
+        "O item foi movimentado por outra operação. Atualize a tela e tente novamente.",
+      );
+    }
+    await delegate(transaction, "inventoryEventTecnologia").create({
+      data: inventoryEventData(auth, id, action, existing, {
+        user_id: data.user_id,
+        location_id: toLocationId ?? null,
+      }),
+    });
+    return inventory.findFirst({ where: { id, organization_id: organizationId }, include });
+  });
 }
 
 /** A categoria canônica Computador é única na organização, ativa ou não (#1931). */
@@ -389,42 +583,70 @@ async function writeWithComputerRule<T>(
   organizationId: string,
   target: { id?: string; category_id: unknown; user_id: unknown; return_date?: unknown },
   write: (writer: TiDatabase) => Promise<T>,
+  // A escrita grava mais de uma linha (item e evento) e precisa de transação mesmo sem a regra.
+  transactional = false,
 ): Promise<T> {
+  const writeWithoutRule = () =>
+    transactional ? database.$transaction((transaction) => write(transaction)) : write(database);
   const userId = target.user_id;
   if (
     typeof userId !== "string" ||
     (target.return_date !== null && target.return_date !== undefined)
   ) {
-    return write(database);
+    return writeWithoutRule();
   }
+  const computerCategoryIds = await computerCategoryIdsOf(database, organizationId);
+  if (!computerCategoryIds.includes(target.category_id)) return writeWithoutRule();
+
+  return database.$transaction(async (transaction) => {
+    await lockAndCheckActiveComputer(
+      transaction,
+      organizationId,
+      userId,
+      computerCategoryIds,
+      target.id,
+    );
+    return write(transaction);
+  });
+}
+
+async function computerCategoryIdsOf(
+  database: TiDatabase,
+  organizationId: string,
+): Promise<unknown[]> {
   const categories = await delegate(database, "inventoryCategoryTecnologia").findMany({
     where: { organization_id: organizationId },
     select: { id: true, name: true },
   });
-  const computerCategoryIds = categories
+  return categories
     .filter((category) => isComputerCategoryName(row(category).name))
     .map((category) => row(category).id);
-  if (!computerCategoryIds.includes(target.category_id)) return write(database);
+}
 
-  return database.$transaction(async (transaction) => {
-    const lock = transaction.$executeRaw as (
-      query: TemplateStringsArray,
-      ...values: unknown[]
-    ) => Promise<unknown>;
-    await lock`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
-    const activeComputer = await delegate(transaction, "inventoryTecnologia").findFirst({
-      where: {
-        organization_id: organizationId,
-        user_id: userId,
-        return_date: null,
-        category_id: { in: computerCategoryIds },
-        ...(target.id ? { NOT: { id: target.id } } : {}),
-      },
-      select: { id: true },
-    });
-    if (activeComputer) throw new ServiceError(409, ACTIVE_COMPUTER_CONFLICT_MESSAGE);
-    return write(transaction);
+/** Toma o bloqueio da pessoa e recusa se ela já tem outro computador ativo. */
+async function lockAndCheckActiveComputer(
+  transaction: TiDatabase,
+  organizationId: string,
+  userId: string,
+  computerCategoryIds: unknown[],
+  assetId?: string,
+): Promise<void> {
+  const lock = transaction.$executeRaw as (
+    query: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<unknown>;
+  await lock`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+  const activeComputer = await delegate(transaction, "inventoryTecnologia").findFirst({
+    where: {
+      organization_id: organizationId,
+      user_id: userId,
+      return_date: null,
+      category_id: { in: computerCategoryIds },
+      ...(assetId ? { NOT: { id: assetId } } : {}),
+    },
+    select: { id: true },
   });
+  if (activeComputer) throw new ServiceError(409, ACTIVE_COMPUTER_CONFLICT_MESSAGE);
 }
 
 async function ensureInventoryReferences(

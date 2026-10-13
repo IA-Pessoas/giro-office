@@ -137,6 +137,46 @@ describe("ti Worker", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  // #1932: transferência e histórico patrimonial.
+  it("routes inventory transfer and history with their permission levels", async () => {
+    const inventory = {
+      transfer: vi.fn(async () => ({ id: CATEGORY_ID, user_id: USER_ID })),
+      listHistory: vi.fn(async () => []),
+    };
+    const app = createTiWorkerApp({ env: env(), services: { inventory } } as never);
+    const transfer = (permission: string, body: unknown) =>
+      app.request(`https://ti.test/ti/inventory/${CATEGORY_ID}/transfer`, {
+        method: "PATCH",
+        headers: { ...headers(permission), "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const self = {
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      permission: 3,
+      isOrganizationOwner: false,
+    };
+
+    expect((await transfer("2", { user_id: USER_ID })).status).toBe(403);
+    expect((await transfer("3", {})).status).toBe(400);
+    expect((await transfer("3", { user_id: USER_ID, location_id: CATEGORY_ID })).status).toBe(400);
+    expect(inventory.transfer).not.toHaveBeenCalled();
+
+    expect((await transfer("3", { user_id: USER_ID })).status).toBe(200);
+    expect(inventory.transfer).toHaveBeenCalledWith(self, CATEGORY_ID, { user_id: USER_ID });
+
+    const history = (permission: string) =>
+      app.request(`https://ti.test/ti/inventory/${CATEGORY_ID}/history?page=1&page_size=20`, {
+        headers: headers(permission),
+      });
+    expect((await history("1")).status).toBe(403);
+    expect((await history("2")).status).toBe(200);
+    expect(inventory.listHistory).toHaveBeenCalledWith({ ...self, permission: 2 }, CATEGORY_ID, {
+      page: 1,
+      page_size: 20,
+    });
+  });
+
   it("requires the TI module claim even when the legacy permission is high", async () => {
     const categoryService = service();
     const app = createTiWorkerApp({ env: env(), categoryService });
