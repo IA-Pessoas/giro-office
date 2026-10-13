@@ -14,10 +14,12 @@ import type {
   TiInventoryAssignUserPayload,
   TiInventoryCategory,
   TiInventoryCategoryPayload,
+  TiInventoryEvent,
   TiInventoryLocation,
   TiInventoryLocationPayload,
   TiInventoryPayload,
   TiInventoryReturnPayload,
+  TiInventoryTransferPayload,
   TiListFilters,
   TiReadQueryOptions,
 } from "../types";
@@ -36,6 +38,11 @@ type TiInventoryAssignUserVariables = {
 type TiInventoryReturnVariables = {
   id: TiId;
   payload?: TiInventoryReturnPayload;
+};
+
+type TiInventoryTransferVariables = {
+  id: TiId;
+  payload: TiInventoryTransferPayload;
 };
 
 type TiInventoryCategoryUpdateVariables = {
@@ -152,6 +159,33 @@ export function useReturnTiInventoryAssetMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => tiInventoryService.returnInventoryAsset(id, payload),
     onSuccess: () => invalidateTiInventoryQueries(queryClient),
   });
+}
+
+export function useTransferTiInventoryAssetMutation(): UseMutationResult<
+  TiInventoryAsset,
+  Error,
+  TiInventoryTransferVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => tiInventoryService.transferInventoryAsset(id, payload),
+    onSuccess: () => invalidateTiInventoryQueries(queryClient),
+  });
+}
+
+export function useTiInventoryAssetHistory(
+  id?: TiId,
+  options?: TiReadQueryOptions,
+): UseQueryResult<TiInventoryEvent[], Error> {
+  return useFetch(
+    tiQueryKeys.inventory.history(id),
+    () => tiInventoryService.listInventoryAssetHistory(id as TiId),
+    {
+      ...options,
+      enabled: Boolean(id) && options?.enabled !== false,
+    },
+  );
 }
 
 export function useCreateTiInventoryCategoryMutation(): UseMutationResult<

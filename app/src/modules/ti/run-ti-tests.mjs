@@ -1863,6 +1863,29 @@ await runTest("ti inventory copy uses backend inventory labels", async () => {
   assert.doesNotMatch(source, /Criar departamento|Atualizar departamento|Adicionar departamento|Editar departamento/);
 });
 
+await runTest("ti inventory offers transfer to a user or department and shows asset history", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const service = await readModuleSource("services/tiInventoryService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /transfer: "\/ti\/inventory\/\{id\}\/transfer"/);
+  assert.match(contract, /history: "\/ti\/inventory\/\{id\}\/history"/);
+  assert.match(service, /transferInventoryAsset/);
+  assert.match(service, /listInventoryAssetHistory/);
+  assert.match(source, /label="Transferir"/);
+  assert.match(source, /title="Transferir ativo"/);
+  assert.match(source, /\{ value: "user", label: "Usuário" \}/);
+  assert.match(source, /\{ value: "location", label: "Departamento" \}/);
+  // O destino é um ou outro: o payload nunca leva os dois.
+  assert.match(
+    source,
+    /transferTarget === "user" \? \{ user_id: destinationId \} : \{ location_id: destinationId \}/,
+  );
+  assert.match(source, /Histórico patrimonial/);
+  assert.match(source, /useTiInventoryAssetHistory\(selectedAssetId/);
+  assert.match(source, /getTiInventoryMutationErrorMessage\(error\)/);
+});
+
 await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");
