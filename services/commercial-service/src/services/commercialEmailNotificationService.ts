@@ -76,6 +76,7 @@ export class CommercialEmailNotificationService {
   ): Promise<void> {
     if (
       event.to_status !== "Fechado" ||
+      event.suppress_notice ||
       client.service_unique !== false ||
       client.type_registration === "Existente"
     ) {

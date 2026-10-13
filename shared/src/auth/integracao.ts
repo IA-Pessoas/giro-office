@@ -172,6 +172,7 @@ const TASK_MODEL_FIELDS = [
   "billing",
   "prevision",
   "type",
+  "unique_charge",
 ] as const;
 const TASK_MODEL_DEPENDENCY_FIELDS = [
   "task_model_id",

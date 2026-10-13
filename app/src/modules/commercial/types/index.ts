@@ -69,6 +69,7 @@ export interface CommercialProspecting {
   client_id: string;
   status: CommercialProspectingStatus;
   status_date: string | null;
+  closed_at?: string | null;
   solution: "CASTELO" | "KALANGO" | "META" | "NIT" | null;
   reference_month: string | null;
   service: string | null;
@@ -117,8 +118,8 @@ export interface CreateCommercialProspectingPayload {
 }
 
 export type UpdateCommercialProspectingPayload = Partial<
-  Omit<CreateCommercialProspectingPayload, "client_id">
->;
+  Omit<CreateCommercialProspectingPayload, "client_id" | "status">
+> & { status?: CommercialProspectingStatus | "Fechado SE" };
 
 export const COMMERCIAL_TASK_HIRING_STATUSES = [
   "A Realizar",

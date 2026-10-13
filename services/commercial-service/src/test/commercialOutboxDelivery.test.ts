@@ -80,4 +80,24 @@ describe("CommercialOutboxHttpDelivery", () => {
     expect(notifications.notify).toHaveBeenCalledWith(event, { id: EVENT.client_id }, "2026-10");
     expect(taskTransition.deliver).not.toHaveBeenCalled();
   });
+
+  it("aplica os efeitos de Fechado SE sem enviar aviso", async () => {
+    const event = { ...EVENT, to_status: "Fechado" as const, suppress_notice: true };
+    const client = { deliver: vi.fn().mockResolvedValue({ client: { id: EVENT.client_id } }) };
+    const taskProjection = { deliver: vi.fn() };
+    const taskClose = { deliver: vi.fn().mockResolvedValue({ competence: "2026-10" }) };
+    const taskTransition = { deliver: vi.fn() };
+    const delivery = new CommercialOutboxHttpDelivery(
+      client as never,
+      taskProjection as never,
+      taskClose,
+      undefined,
+      taskTransition,
+    );
+
+    await delivery.deliver(event);
+
+    expect(client.deliver).toHaveBeenCalledWith(event);
+    expect(taskClose.deliver).toHaveBeenCalledWith(event);
+  });
 });

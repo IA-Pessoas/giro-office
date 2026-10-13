@@ -36,6 +36,7 @@ model CommercialProspecting {
   organization_id String
   status          String
   status_date     DateTime?
+  closed_at       DateTime?
   solution        String?
   reference_month String?
   service         String?

@@ -77,4 +77,17 @@ describe("internal commercial prospecting close route", () => {
     });
     expect(service.apply).toHaveBeenCalledWith(EVENT);
   });
+
+  it("encaminha o sinal de supressão de aviso ao service", async () => {
+    const service = { apply: vi.fn().mockResolvedValue({}) };
+    const event = { ...EVENT, suppress_notice: true };
+
+    const response = await request(createApp(service))
+      .post("/internal/commercial/prospecting-close")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "commercial-token")
+      .send(event);
+
+    expect(response.status).toBe(200);
+    expect(service.apply).toHaveBeenCalledWith(event);
+  });
 });

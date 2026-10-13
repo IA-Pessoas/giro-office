@@ -114,6 +114,7 @@ const createTaskModelRequestBody = createObjectRequestBody({
     billing: "mensal",
     prevision: 3,
     type: "regularize",
+    unique_charge: false,
   },
   required: ["name", "department_id", "responsible_id", "billing", "prevision"],
   properties: {
@@ -126,6 +127,7 @@ const createTaskModelRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     prevision: { type: "number" },
     type: { type: ["string", "null"] },
+    unique_charge: { type: "boolean" },
   },
 });
 
@@ -141,6 +143,7 @@ const updateTaskModelRequestBody = createObjectRequestBody({
     billing: "mensal",
     prevision: 5,
     type: "regularize",
+    unique_charge: false,
   },
   required: ["task_id", "name", "department_id", "responsible_id", "billing", "prevision"],
   properties: {
@@ -154,6 +157,7 @@ const updateTaskModelRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     prevision: { type: "number" },
     type: { type: ["string", "null"] },
+    unique_charge: { type: "boolean" },
   },
 });
 

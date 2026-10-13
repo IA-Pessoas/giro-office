@@ -13,6 +13,11 @@ export const prospectingStatuses = [
 
 export const prospectingStatusSchema = z.enum(prospectingStatuses);
 export type ProspectingStatus = z.infer<typeof prospectingStatusSchema>;
+export const prospectingUpdateStatusSchema = z.union([
+  prospectingStatusSchema,
+  z.literal("Fechado SE"),
+]);
+export type ProspectingUpdateStatus = z.infer<typeof prospectingUpdateStatusSchema>;
 
 export const prospectingListQuerySchema = z
   .object({
@@ -82,7 +87,7 @@ export const createProspectingBodySchema = z
 
 export const updateProspectingBodySchema = z
   .object({
-    status: prospectingStatusSchema.optional(),
+    status: prospectingUpdateStatusSchema.optional(),
     status_date: statusDateSchema.optional(),
     solution: prospectingSolutionSchema.optional(),
     reference_month: referenceMonthSchema.optional(),

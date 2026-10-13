@@ -62,6 +62,7 @@ export function buildCreateTaskModelPayload(payload: CreateTaskModelData) {
     billing: payload.billing,
     prevision: payload.prevision,
     type: payload.type ?? null,
+    unique_charge: payload.unique_charge,
   };
 }
 
@@ -79,6 +80,7 @@ export function buildUpdateTaskModelPayload(payload: UpdateTaskModelData) {
     billing: payload.billing,
     prevision: payload.prevision,
     type: payload.type ?? null,
+    unique_charge: payload.unique_charge,
   };
 }
 

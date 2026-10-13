@@ -230,6 +230,24 @@ describe("commercial prospecting routes", () => {
     });
   });
 
+  it("aceita Fechado SE somente como ação de atualização", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service))
+      .patch(`/commercial/prospecting/${PROSPECTING_ID}`)
+      .set(gatewayHeaders())
+      .send({ status: "Fechado SE" });
+
+    expect(response.status).toBe(200);
+    expect(service.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "Fechado SE", prospecting_id: PROSPECTING_ID }),
+    );
+    await request(createTestApp(service))
+      .post("/commercial/prospecting")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, status: "Fechado SE" })
+      .expect(400);
+  });
+
   it("propaga conflito ao tentar reabrir prospecção fechada", async () => {
     const service = createServiceMock();
     service.update = vi.fn(async () => {

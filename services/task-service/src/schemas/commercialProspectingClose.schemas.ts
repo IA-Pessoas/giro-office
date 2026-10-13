@@ -27,6 +27,7 @@ export const commercialProspectingCloseEventSchema = z
     to_status: z.literal("Fechado"),
     status_date: z.string().datetime({ offset: true }).nullable(),
     description: z.string().nullable(),
+    suppress_notice: z.boolean().optional(),
     audit_correlation_id: z.string().trim().min(1),
     occurred_at: z.string().datetime({ offset: true }),
   })
