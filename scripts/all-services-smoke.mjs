@@ -2681,7 +2681,7 @@ const handlers = {
     });
   },
 
-  // #1933: o lote leva o item para um local; a troca usa um segundo item do administrador.
+  // #1933: o lote leva o item para um local; a troca usa um segundo item de outro usuário.
   async tiInventoryTransferBatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -2700,6 +2700,8 @@ const handlers = {
       return;
     }
     const headers = getTiAdminHeaders();
+    // O segundo item fica com outro usuário criado pelo smoke, não com a sessão do admin.
+    await ensureRhManagerSessionCookies();
     const created = await helperCall("ti-inventory-swap-asset-create", {
       method: "POST",
       path: "/ti/inventory",
@@ -2710,7 +2712,7 @@ const handlers = {
       json: {
         asset_code: uniqueText("SMOKE-SWAP"),
         category_id: requireState("tiInventoryCategoryId"),
-        user_id: requireState("session").id,
+        user_id: requireState("rhManagerUserId"),
       },
       expectedStatus: [201],
     });
