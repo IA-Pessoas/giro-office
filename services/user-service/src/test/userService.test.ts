@@ -467,6 +467,21 @@ describe("UserService", () => {
         "none",
       ),
     ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      new UserService().create(
+        {
+          name: "Usuario Elevado",
+          login: "usuario.elevado",
+          password: "secret",
+          department_id: "dep-ti",
+          permission: 2,
+          organization_id: "org-1",
+          type: "user",
+        },
+        "actor-1",
+        "none",
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
     expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
 

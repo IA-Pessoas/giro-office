@@ -1814,6 +1814,7 @@ describe("admin de TI gerencia usuários sem conceder permissões gerais", () =>
       name: "Tecnologia",
     });
     expect((await request(app, "POST", "/user", newUser({ type: "admin" }))).status).toBe(403);
+    expect((await request(app, "POST", "/user", newUser({ permission: 2 }))).status).toBe(403);
 
     // Admin do Fiscal recebe fiscal=3 na normalização do servidor.
     db.department.findFirst.mockResolvedValue({
