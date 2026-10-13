@@ -40,6 +40,25 @@ describe("CommercialOutboxHttpDelivery", () => {
     expect(notifications.notify).not.toHaveBeenCalled();
   });
 
+  it("não aplica efeitos de tarefa ao cadastrar uma prospecção já em uma situação", async () => {
+    const event = { ...EVENT, from_status: null };
+    const client = { deliver: vi.fn().mockResolvedValue({ client: { id: EVENT.client_id } }) };
+    const taskProjection = { deliver: vi.fn() };
+    const taskTransition = { deliver: vi.fn() };
+    const delivery = new CommercialOutboxHttpDelivery(
+      client as never,
+      taskProjection as never,
+      undefined,
+      undefined,
+      taskTransition,
+    );
+
+    await delivery.deliver(event);
+
+    expect(client.deliver).toHaveBeenCalledWith(event);
+    expect(taskTransition.deliver).not.toHaveBeenCalled();
+  });
+
   it("mantém Fechado no fluxo existente de fechamento e aviso", async () => {
     const event = { ...EVENT, to_status: "Fechado" as const };
     const client = { deliver: vi.fn().mockResolvedValue({ client: { id: EVENT.client_id } }) };

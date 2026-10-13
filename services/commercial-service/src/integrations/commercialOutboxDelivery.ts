@@ -34,6 +34,7 @@ export class CommercialOutboxHttpDelivery implements CommercialOutboxDelivery {
         const taskResult = await this.taskClose.deliver(prospectingEvent);
         await this.notifications.notify(prospectingEvent, projection.client, taskResult.competence);
       } else {
+        if (prospectingEvent.from_status === null) return;
         if (!this.taskTransition) {
           throw new Error("Dependência de transição comercial nas tarefas não configurada.");
         }

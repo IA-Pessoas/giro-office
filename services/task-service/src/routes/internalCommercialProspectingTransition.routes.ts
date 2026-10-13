@@ -1,4 +1,4 @@
-import { createSuccessResponse, parseWithZod } from "@workspace/shared";
+import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { RequestHandler } from "express";
 import { Router } from "express";
 
@@ -24,6 +24,7 @@ export function createInternalCommercialProspectingTransitionRouter(
         const event = parseWithZod(commercialProspectingTransitionEventSchema, request.body);
         response.json(createSuccessResponse(await deps.apply(event)));
       } catch (error) {
+        logError("Erro ao aplicar situação comercial nas tarefas", { error });
         next(error);
       }
     },
