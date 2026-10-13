@@ -72,4 +72,6 @@ export function createRhExamRouter(service = new RhExamService()): ReturnType<ty
   return router;
 }
 
-export default createRhExamRouter();
+const rhExamRouter: ReturnType<typeof Router> = createRhExamRouter();
+
+export default rhExamRouter;
