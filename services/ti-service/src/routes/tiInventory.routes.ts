@@ -16,6 +16,7 @@ import {
   returnTiInventoryBodySchema,
   swapTiInventoryBodySchema,
   tiInventoryIdParamsSchema,
+  tiInventoryUserIdParamsSchema,
   transferTiInventoryBatchBodySchema,
   transferTiInventoryBodySchema,
   updateTiInventoryBodySchema,
@@ -51,6 +52,23 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
         logError("Erro ao listar inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/equipment-map/:userId",
+    requireTiPermission(TiPermissionLevel.Technician),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiInventoryUserIdParamsSchema, request.params);
+        const result = await service.getUserEquipmentMap(context, params.userId);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao montar mapa de equipamentos de TI", { err });
         next(err);
       }
     },

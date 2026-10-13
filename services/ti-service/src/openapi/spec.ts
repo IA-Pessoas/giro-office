@@ -1096,6 +1096,25 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           errors: [400, 401, 403, 404, 409],
         }),
       },
+      "/ti/inventory/equipment-map/{userId}": {
+        get: publicTiOperation({
+          operationId: "getTiInventoryEquipmentMap",
+          tags: ["TI Inventory"],
+          summary:
+            "Mapa somente leitura dos equipamentos ativos de um usuario e suas conexoes, derivado do inventario de TI",
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              description: "Usuario dono dos equipamentos",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          successDescription: "Mapa de equipamentos do usuario",
+          errors: [400, 401, 403, 404],
+        }),
+      },
       "/ti/inventory/transfer-batch": {
         post: publicTiOperation({
           operationId: "transferTiInventoryBatch",

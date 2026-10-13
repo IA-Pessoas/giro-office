@@ -148,6 +148,19 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     // devolução, a nova atribuição e as duas transferências.
     await call("PATCH", `/ti/inventory/${assetId}/transfer`, { location_id: locationId });
     await call("PATCH", `/ti/inventory/${assetId}/transfer`, { user_id: userId });
+    // #1934: o mapa do usuário traz o item que está com ele, lido do inventário.
+    const equipmentMap = await smokeCall(
+      app(),
+      env(),
+      "GET",
+      `/ti/inventory/equipment-map/${userId}`,
+    );
+    expect(equipmentMap.status).toBe(200);
+    expect(
+      (equipmentMap.json?.data as { equipment: Array<{ id: string }> }).equipment.map(
+        (item) => item.id,
+      ),
+    ).toContain(assetId);
     // #1933: lote para o local e troca com um segundo item que está com outra pessoa.
     const other = await call("POST", "/ti/inventory", {
       asset_code: `PAT-TROCA-${suffix()}`,

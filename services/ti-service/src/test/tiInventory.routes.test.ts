@@ -391,6 +391,32 @@ describe("ti inventory routes", () => {
     expect(prisma.inventoryTecnologia.findMany).not.toHaveBeenCalled();
   });
 
+  // #1934: mapa de equipamentos por usuário.
+  it("GET /ti/inventory/equipment-map/:userId returns the map for technicians only", async () => {
+    const prisma = createPrismaMock();
+    const app = createTestApp(prisma);
+    const path = `/ti/inventory/equipment-map/${userId}`;
+
+    const viewer = await request(app).get(path).set(gatewayHeaders(TI_VIEWER_PERMISSION));
+    const technician = await request(app).get(path).set(gatewayHeaders(2));
+    const invalid = await request(app)
+      .get("/ti/inventory/equipment-map/nao-e-uuid")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(viewer.status).toBe(403);
+    expect(invalid.status).toBe(400);
+    expect(technician.status).toBe(200);
+    expect(technician.body).toMatchObject({
+      success: true,
+      data: { equipment: [], connections: [] },
+    });
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: organizationId, user_id: userId, return_date: null },
+      }),
+    );
+  });
+
   it("POST /ti/inventory-categories creates a category", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-categories")

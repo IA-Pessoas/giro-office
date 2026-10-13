@@ -1,6 +1,7 @@
 import {
   ACTIVE_COMPUTER_CONFLICT_MESSAGE,
   activeComputerLockKey,
+  buildEquipmentMap,
   isComputerCategoryName,
   error as logError,
   ServiceError,
@@ -487,6 +488,27 @@ export class TiInventoryService {
         orderBy: { asset_code: "asc" },
       });
     }, BATCH_TRANSACTION_OPTIONS);
+  }
+
+  /**
+   * Mapa de equipamentos de um usuário (#1934): os itens ativos da pessoa e as conexões entre
+   * o computador e os periféricos, derivados só do inventário. Somente leitura.
+   */
+  async getUserEquipmentMap(context: TiAuthContext, userId: string): Promise<unknown> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organization_id: context.organizationId },
+      select: SAFE_USER_SELECT,
+    });
+    if (!user) {
+      throw new ServiceError(404, "Usuário não encontrado na organização.");
+    }
+    const assets = await this.prisma.inventoryTecnologia.findMany({
+      where: { organization_id: context.organizationId, user_id: userId, return_date: null },
+      select: { id: true, asset_code: true, notes: true, category: { select: { name: true } } },
+      orderBy: { asset_code: "asc" },
+    });
+
+    return { user, ...buildEquipmentMap(assets) };
   }
 
   /** Histórico patrimonial do item, do mais recente para o mais antigo. */

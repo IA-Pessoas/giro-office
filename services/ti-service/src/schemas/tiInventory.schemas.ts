@@ -9,6 +9,12 @@ export const tiInventoryIdParamsSchema = z
   })
   .strict();
 
+export const tiInventoryUserIdParamsSchema = z
+  .object({
+    userId: z.string().uuid({ message: "Usuário inválido." }),
+  })
+  .strict();
+
 export const createTiInventoryBodySchema = z
   .object({
     asset_code: zNonEmptyText("asset_code"),
