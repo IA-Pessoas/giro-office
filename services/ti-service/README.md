@@ -52,6 +52,10 @@ servico/VPS, junto com `SUPABASE_URL`.
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
 - Exemplo: `GET /ti/stock`
+- Exemplo: `GET /ti/change-history/list?item_type=inventory&page=1` (TI nível 3): alterações de
+  itens de TI (`tecnologia.changeHistory`), uma linha por campo, com antes e depois. Hoje a
+  edição de item de inventário grava aqui; movimentação patrimonial fica em
+  `/ti/inventory/{id}/history`. Valor de credencial nunca é devolvido (`masked`).
 - Exemplo: `GET /ti/access-logs/{userId}?page=1&page_size=20` (TI nível 3): logins e acessos do
   usuário migrados de `tb_admin.logs` (`logs.action` 0/1), do mais recente para o mais antigo.
   `origin` vem nulo porque o `local` legado não foi migrado. Login atual não entra

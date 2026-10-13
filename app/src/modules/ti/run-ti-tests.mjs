@@ -1949,6 +1949,31 @@ await runTest("ti inventory write actions follow the level the service requires"
   assert.match(source, /event\.from_user\?\.id === event\.to_user\?\.id/);
 });
 
+await runTest("ti change history tab lists field changes with masked credentials", async () => {
+  const source = await readModuleSource("components/TiChangeHistoryTab.tsx");
+  const page = await readModuleSource("components/TiPage.tsx");
+  const service = await readModuleSource("services/tiChangeHistoryService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /list: "\/ti\/change-history\/list"/);
+  assert.match(service, /page_size: TI_CHANGE_HISTORY_PAGE_SIZE/);
+  // Item, ação, campo, antes, depois, autor e momento.
+  assert.match(
+    source,
+    /headers=\{\["Data", "Item", "Ação", "Campo", "Antes", "Depois", "Autor"\]\}/,
+  );
+  // Valor de credencial não aparece, mesmo que viesse na resposta.
+  assert.match(source, /if \(item\.masked\) \{\s+return "Oculto";/);
+  assert.match(source, /disabled=\{!changeHistory\.has_more \|\| changeHistoryQuery\.isFetching\}/);
+  // Não mistura estoque nem log de acesso: os tipos são só os de alteração de item.
+  assert.match(source, /inventory: "Inventário"/);
+  assert.doesNotMatch(source, /\bstock\b|Estoque|Acesso/);
+  // Só TI nível 3 vê a aba; o autoatendimento não.
+  const selfService = page.slice(page.indexOf("const SELF_SERVICE_TI_TABS"));
+  assert.match(page, /panel: TiChangeHistoryTab/);
+  assert.doesNotMatch(selfService.slice(0, selfService.indexOf("];")), /TiChangeHistoryTab/);
+});
+
 await runTest("ti access logs tab lists logins and accesses per user for TI admins", async () => {
   const source = await readModuleSource("components/TiAccessLogsTab.tsx");
   const page = await readModuleSource("components/TiPage.tsx");

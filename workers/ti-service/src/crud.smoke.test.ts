@@ -161,6 +161,22 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
         (item) => item.id,
       ),
     ).toContain(assetId);
+    // #1936: a edição acima gravou os campos alterados em `tecnologia.changeHistory`.
+    const changeHistory = await smokeCall(
+      app(),
+      env(),
+      "GET",
+      `/ti/change-history/list?item_type=inventory&item_id=${assetId}`,
+    );
+    expect(changeHistory.status).toBe(200);
+    expect(
+      (changeHistory.json?.data as { items: Array<{ field: string; after: string }> }).items,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: "notes", after: "Editado pelo smoke" }),
+        expect.objectContaining({ field: "delivery_date", after: "2026-09-02" }),
+      ]),
+    );
     // #1935: o SQL cru sobre `logs` só é exercitado de verdade no Postgres.
     const accessLogs = await smokeCall(app(), env(), "GET", `/ti/access-logs/${userId}`);
     expect(accessLogs.status).toBe(200);

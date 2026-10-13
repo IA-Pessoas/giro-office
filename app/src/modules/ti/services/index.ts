@@ -8,3 +8,4 @@ export * from "./tiStockService";
 export * from "./tiPasswordsService";
 export * from "./tiExtensionsService";
 export * from "./tiAccessLogsService";
+export * from "./tiChangeHistoryService";
