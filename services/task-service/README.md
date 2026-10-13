@@ -41,6 +41,10 @@ Exemplos de paths publicos:
 
 - `/task`
 - `/task/list`
+- `/task/agenda` — `GET` consulta mês e módulo (Integração nível 1+); `POST`, `PUT` e `DELETE`
+  exigem nível 2+ ou owner. Em Integração, criar exige cliente, pauta e primeiro par
+  departamento/participante, aceita até quatro pares, inicia em `Pendente` e mantém
+  o histórico de alterações na auditoria. O serviço Node e o Worker usam o mesmo contrato.
 - `/task/model`
 - `/task/model/list`
 - `/task/project-plan`

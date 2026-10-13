@@ -634,6 +634,18 @@ describe("activityCatalog", () => {
     });
   });
 
+  it.each([
+    ["GET", "consultou", "a agenda de compromissos"],
+    ["POST", "cadastrou", "um compromisso na agenda"],
+    ["PUT", "atualizou", "um compromisso na agenda"],
+    ["DELETE", "excluiu", "um compromisso da agenda"],
+  ])("classifica %s /task/agenda como atividade visível", (method, action, item) => {
+    expect(classifyActivity(method, "/task/agenda")).toEqual({
+      kind: "visible",
+      description: { action, item },
+    });
+  });
+
   it("classifica a extração de tarefas por IA como atividade visível sem expor a Ata", () => {
     expect(classifyActivity("POST", "/task/project-wizard/extract-tasks")).toEqual({
       kind: "visible",

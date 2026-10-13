@@ -225,6 +225,18 @@ describe("Marketing access to departments", () => {
   });
 });
 
+describe("Integração agenda catalogs", () => {
+  it("libera departamentos e participantes ao nível 1 da Integração", () => {
+    expect(authorizeClientRequest("GET", "/department/list", { integracao: 1 })).toBeUndefined();
+    expect(
+      authorizeClientRequest("GET", "/rh/operational-users", { integracao: 1 }),
+    ).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/department/list", { integracao: 0 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+});
+
 describe("platform default deny", () => {
   it("deixa público somente o login e exige platformOnly nas demais rotas", () => {
     expect(isPublicRoute("POST", "/platform/session")).toBe(true);

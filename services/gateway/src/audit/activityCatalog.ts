@@ -202,6 +202,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "registrou", item: "uma avaliação de edição de evento" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/task\/agenda$/,
+    description: { action: "consultou", item: "a agenda de compromissos" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/agenda$/,
+    description: { action: "cadastrou", item: "um compromisso na agenda" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/agenda$/,
+    description: { action: "atualizou", item: "um compromisso na agenda" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/task\/agenda$/,
+    description: { action: "excluiu", item: "um compromisso da agenda" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/task\/project-wizard$/,
     description: { action: "criou", item: "um projeto com tarefas" },

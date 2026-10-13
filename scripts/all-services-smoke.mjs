@@ -6605,6 +6605,42 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async taskAgendaCreate(op) {
+    const session = requireState("session");
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        module: "integracao",
+        agenda: uniqueText("Smoke agenda Integração"),
+        date: new Date().toISOString(),
+        client_id: requireState("primaryClientId"),
+        participants: [{ department_id: session.department_id, participant_id: session.id }],
+      },
+    });
+    state.taskAgendaId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async taskAgendaList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { module: "integracao", month: new Date().toISOString().slice(0, 7) },
+    });
+  },
+
+  async taskAgendaUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { module: "integracao", agenda_id: requireState("taskAgendaId"), status: "Agendada" },
+    });
+  },
+
+  async taskAgendaDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { module: "integracao", agenda_id: requireState("taskAgendaId") },
+    });
+  },
+
   async taskModelCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

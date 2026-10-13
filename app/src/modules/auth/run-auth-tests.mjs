@@ -75,14 +75,15 @@ await runTest("integration routes preserve the level 0 own-tasks exception", () 
     "/tasks/123?status=Todos",
     "/clients/123/",
     "/projects/123?tab=tasks",
+    "/integracao/agenda",
     "/configs/integracao/tasks/",
   ];
   const expectedByProfile = {
-    level0: [true, false, false, false],
-    level1: [true, true, true, true],
-    level2: [true, true, true, true],
-    level3: [true, true, true, true],
-    owner: [true, true, true, true],
+    level0: [true, false, false, false, false],
+    level1: [true, true, true, true, true],
+    level2: [true, true, true, true, true],
+    level3: [true, true, true, true, true],
+    owner: [true, true, true, true, true],
   };
 
   for (const [profile, expected] of Object.entries(expectedByProfile)) {

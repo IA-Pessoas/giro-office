@@ -110,6 +110,7 @@ model User {
   emergency_contacts          Json?
   agenda2                     Agenda[]               @relation("participant2")
   agenda3                     Agenda[]               @relation("participant3")
+  agenda4                     Agenda[]               @relation("participant4")
   agenda                      Agenda[]               @relation("participant")
   sponso                      Project[]              @relation("sponsor")
   tasks2                      Task[]                 @relation("responsible2")
@@ -620,6 +621,7 @@ model CommercialTaskBillingProjectionEvent {
 
 model Agenda {
   id                    String       @id @default(uuid())
+  module                String?
   agenda                String
   date                  DateTime
   client_id             String?
@@ -627,6 +629,10 @@ model Agenda {
   participant_id        String?
   participant_id_2      String?
   participant_id_3      String?
+  participant_id_4      String?
+  department_id_2       String?
+  department_id_3       String?
+  department_id_4       String?
   task_id               String?
   status                String?
   obs                   String?
@@ -639,11 +645,13 @@ model Agenda {
   organization          Organization @relation(fields: [organization_id], references: [id])
   participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
   participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])
+  participant4          User?        @relation("participant4", fields: [participant_id_4], references: [id])
   participant           User?        @relation("participant", fields: [participant_id], references: [id])
   recurring_agenda      RecurringAgenda? @relation(fields: [recurring_agenda_id], references: [id], onDelete: SetNull)
   task                  Task?        @relation(fields: [task_id], references: [id])
 
   @@unique([recurring_agenda_id, recurrence_month], map: "uq_agenda_recurrence_occurrence")
+  @@index([organization_id, module, date], map: "idx_agenda_org_module_date")
   @@map("agenda")
 }
 
