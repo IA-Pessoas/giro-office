@@ -48,8 +48,8 @@ const marketingEditPolicy = createModulePolicy("marketing", moduleEditPermission
 const departmentAdminPolicy: AuthPolicy = {
   anyOf: [createModulePolicy("rh", 3), createModulePolicy("ti", 3)],
 };
-const departmentMarketingReadPolicy: AuthPolicy = {
-  anyOf: [tiModulePolicy, marketingModulePolicy],
+const departmentCatalogReadPolicy: AuthPolicy = {
+  anyOf: [tiModulePolicy, marketingModulePolicy, createModulePolicy("integracao", 1)],
 };
 const departmentMarketingColorEditPolicy: AuthPolicy = {
   anyOf: [departmentAdminPolicy, createModulePolicy("marketing", 3)],
@@ -63,7 +63,7 @@ const userPhotoEditPolicy: AuthPolicy = {
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
-    modules: ["rh", "contabil", "financeiro", "pessoal", "triagem"],
+    modules: ["rh", "contabil", "financeiro", "pessoal", "triagem", "integracao"],
     minPermission: moduleAccessPermission,
   },
 };
@@ -141,12 +141,18 @@ const financeiroTaskAdminPolicy: AuthPolicy = {
 };
 const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 // Agenda compartilhada: módulos com tela de agenda; o task-service confere o nível do módulo pedido.
-const agendaModules = ["contabil", "pessoal", "triagem", "regularize"];
+const agendaModules = ["contabil", "pessoal", "triagem", "regularize", "integracao"];
 const agendaViewPolicy: AuthPolicy = {
   anyModulePermission: { modules: agendaModules, minPermission: moduleAccessPermission },
 };
 const agendaEditPolicy: AuthPolicy = {
   anyModulePermission: { modules: agendaModules, minPermission: moduleEditPermission },
+};
+const agendaDeletePolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: agendaModules.filter((module) => module !== "integracao"),
+    minPermission: moduleEditPermission,
+  },
 };
 /**
  * Rotas cuja matriz do task-service admite o responsável em nível 0/1; o escopo de
@@ -198,7 +204,7 @@ const integracaoClientPath =
   /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
-  ["GET /department/list", departmentMarketingReadPolicy],
+  ["GET /department/list", departmentCatalogReadPolicy],
   ["PUT /department", departmentMarketingColorEditPolicy],
   ["GET /dashboard/stats", authenticatedPolicy],
   ["GET /client/list", clientListPolicy],
@@ -374,6 +380,7 @@ const routePolicyMatchers: Array<{
     policy: integracaoResponsibleTaskPolicy,
   },
   { method: "GET", path: /^\/task\/agenda$/, policy: agendaViewPolicy },
+  { method: "DELETE", path: /^\/task\/agenda$/, policy: agendaDeletePolicy },
   { method: "ANY", path: /^\/task\/agenda$/, policy: agendaEditPolicy },
   { method: "GET", path: /^\/task(?:\/list)?$/, policy: integracaoResponsibleTaskPolicy },
   { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },

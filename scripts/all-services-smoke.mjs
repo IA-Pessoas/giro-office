@@ -6759,6 +6759,97 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async taskAgendaCreate(op) {
+    const session = requireState("session");
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        module: "integracao",
+        agenda: uniqueText("Smoke agenda Integração"),
+        date: new Date().toISOString(),
+        client_id: requireState("primaryClientId"),
+        participants: [{ department_id: session.department_id, participant_id: session.id }],
+      },
+    });
+    state.taskAgendaId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async taskAgendaList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { module: "integracao", month: new Date().toISOString().slice(0, 7) },
+    });
+  },
+
+  async taskAgendaUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { module: "integracao", agenda_id: requireState("taskAgendaId"), status: "Agendada" },
+    });
+  },
+
+  async taskAgendaDelete(op) {
+    const departments = await helperCall("agenda-delete-departments", {
+      method: "GET",
+      path: "/department/list",
+      target: "gateway",
+      service: "department-service",
+      auth: "bearer",
+      expectedStatus: [200],
+    });
+    const accountingNames = new Set([
+      "contabil",
+      "contabilidade",
+      "contabil_fiscal",
+      "contabil_societario",
+      "contabil_tributario",
+    ]);
+    const accounting = departments.body?.data?.find((department) =>
+      accountingNames.has(
+        department.name
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, ""),
+      ),
+    );
+    const departmentId =
+      accounting?.id ??
+      pickFirst(
+        (
+          await helperCall("agenda-delete-department-create", {
+            method: "POST",
+            path: "/department",
+            target: "gateway",
+            service: "department-service",
+            auth: "bearer",
+            json: { name: "Contábil", color: "#0F766E", solution: true },
+            expectedStatus: [201],
+          })
+        ).body,
+        "data.dep.id",
+      );
+    const created = await helperCall("agenda-delete-create", {
+      method: "POST",
+      path: "/task/agenda",
+      target: "gateway",
+      service: "task-service",
+      auth: "admin-bearer",
+      json: {
+        module: "contabil",
+        agenda: uniqueText("Smoke agenda exclusão"),
+        date: new Date().toISOString(),
+        department_id: departmentId,
+      },
+      expectedStatus: [201],
+    });
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { module: "contabil", agenda_id: pickFirst(created.body, "data.id") },
+    });
+  },
+
   async taskModelCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

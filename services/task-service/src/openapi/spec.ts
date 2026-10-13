@@ -673,6 +673,118 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/task/agenda": {
+        get: {
+          tags: ["Agenda"],
+          summary: "Listar compromissos da agenda no mês e módulo informados",
+          security: bearer,
+          parameters: [
+            { name: "module", in: "query", required: true, schema: { type: "string" } },
+            {
+              name: "month",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-[0-9]{2}$" },
+            },
+            { name: "mine", in: "query", schema: { type: "boolean" } },
+            {
+              name: "timezone_offset_start",
+              in: "query",
+              description:
+                "Minutos de UTC para o horário local no início do mês; enviar com timezone_offset_end.",
+              schema: { type: "integer", minimum: -840, maximum: 840 },
+            },
+            {
+              name: "timezone_offset_end",
+              in: "query",
+              description: "Minutos de UTC para o horário local no início do mês seguinte.",
+              schema: { type: "integer", minimum: -840, maximum: 840 },
+            },
+          ],
+          responses: {
+            "200": { description: "Compromissos", ...successJson },
+            "403": { description: "Sem permissão" },
+          },
+        },
+        post: {
+          tags: ["Agenda"],
+          summary:
+            "Criar compromisso; Integração exige cliente e primeiro par departamento/participante",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: {
+              module: "integracao",
+              agenda: "Reunião de implantação",
+              date: "2026-12-31T12:00:00.000Z",
+              client_id: "client-uuid",
+              participants: [{ department_id: "department-uuid", participant_id: "user-uuid" }],
+            },
+            required: ["module", "agenda", "date"],
+            properties: {
+              module: { type: "string" },
+              agenda: { type: "string" },
+              date: { type: "string", format: "date-time" },
+              client_id: { type: "string" },
+              location: { type: ["string", "null"] },
+              obs: { type: ["string", "null"] },
+              participants: {
+                type: "array",
+                minItems: 1,
+                maxItems: 4,
+                items: {
+                  type: "object",
+                  required: ["department_id", "participant_id"],
+                  properties: {
+                    department_id: { type: "string" },
+                    participant_id: { type: "string" },
+                  },
+                },
+              },
+            },
+          }),
+          responses: {
+            "201": { description: "Criado", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+        put: {
+          tags: ["Agenda"],
+          summary: "Editar compromisso e transitar entre os estados de Integração",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { module: "integracao", agenda_id: "agenda-uuid", status: "Agendada" },
+            required: ["module", "agenda_id"],
+            properties: {
+              module: { type: "string" },
+              agenda_id: { type: "string" },
+              status: { type: "string" },
+              participants: { type: "array", minItems: 1, maxItems: 4, items: { type: "object" } },
+            },
+          }),
+          responses: {
+            "200": { description: "Atualizado", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Não encontrado" },
+          },
+        },
+        delete: {
+          tags: ["Agenda"],
+          summary: "Remover compromisso no próprio escopo, exceto Integração",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { module: "contabil", agenda_id: "agenda-uuid" },
+            required: ["module", "agenda_id"],
+            properties: { module: { type: "string" }, agenda_id: { type: "string" } },
+          }),
+          responses: {
+            "200": { description: "Removido", ...successJson },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Não encontrado" },
+          },
+        },
+      },
       "/task": {
         post: {
           tags: ["IntegracaoTasks"],

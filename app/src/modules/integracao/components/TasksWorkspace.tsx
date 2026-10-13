@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import {
   CheckSquare,
+  CalendarDays,
   Edit3,
   Filter,
   LoaderCircle,
@@ -300,6 +301,12 @@ export function TasksWorkspace() {
             allowClearSelection
           />
           <div className="flex flex-col gap-2 sm:flex-row">
+            {integracaoAccess.canView && (
+              <Link href="/integracao/agenda" className={PROJECT_COMPACT_BUTTON_CLASSNAME}>
+                <CalendarDays className="h-3.5 w-3.5" />
+                Agenda
+              </Link>
+            )}
             {canManageTaskModels ? (
               <Link
                 href={TASK_MODEL_CONFIG_ENTRY.href}

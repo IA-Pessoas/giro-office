@@ -11,6 +11,7 @@ import { recordingBinding, TOKENS, workerEnv } from "./test/env.js";
 
 const ORG = "org-1";
 const CONTABIL = "dep-contabil";
+const INTEGRACAO = "dep-integracao";
 
 function setup() {
   const prisma = {
@@ -18,6 +19,7 @@ function setup() {
       findMany: vi.fn().mockResolvedValue([
         { id: CONTABIL, name: "Contábil" },
         { id: "dep-fiscal", name: "Fiscal" },
+        { id: INTEGRACAO, name: "Integração" },
       ]),
     },
     agenda: {
@@ -125,7 +127,12 @@ describe("agenda compartilhada por departamento (#1727)", () => {
 
     expect(updated.status).toBe(200);
     expect(prisma.agenda.updateMany).toHaveBeenCalledWith({
-      where: { id: "evt-1", organization_id: ORG, department_control_id: { in: [CONTABIL] } },
+      where: {
+        id: "evt-1",
+        organization_id: ORG,
+        module: null,
+        department_control_id: { in: [CONTABIL] },
+      },
       data: { status: "Realizado" },
     });
     expect(removed.status).toBe(404);
@@ -193,6 +200,126 @@ describe("agenda compartilhada por departamento (#1727)", () => {
       (
         await send("PUT", "/task/agenda", {
           body: { module: "contabil", agenda_id: "evt-1", status: "Qualquer" },
+        })
+      ).status,
+    ).toBe(400);
+  });
+});
+
+describe("agenda de Integração (#1952)", () => {
+  const participants = [
+    { department_id: INTEGRACAO, participant_id: "user-1" },
+    { department_id: "dep-fiscal", participant_id: "user-2" },
+    { department_id: "dep-fiscal", participant_id: "user-3" },
+    { department_id: CONTABIL, participant_id: "user-4" },
+  ];
+  const body = {
+    module: "integracao",
+    agenda: "Reunião de implantação",
+    date: "2026-12-31T12:00:00.000Z",
+    client_id: "client-1",
+    participants,
+  };
+
+  it("aplica o mês civil e nega exclusão direta", async () => {
+    const { prisma, send } = setup();
+    const modules = { integracao: 2 };
+    const path =
+      "/task/agenda?module=integracao&month=2026-12&timezone_offset_start=180&timezone_offset_end=120";
+    expect((await send("GET", path, { modules })).status).toBe(200);
+    expect(prisma.agenda.findMany.mock.calls[0][0].where.date).toEqual({
+      gte: new Date("2026-12-01T03:00:00Z"),
+      lt: new Date("2027-01-01T02:00:00Z"),
+    });
+    expect(
+      (
+        await send("DELETE", "/task/agenda", {
+          modules,
+          body: { module: "integracao", agenda_id: "evt-1" },
+        })
+      ).status,
+    ).toBe(403);
+    expect(prisma.agenda.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("permite leitura ao nível 1 e recusa nível 0 mesmo com permissão em outro módulo", async () => {
+    const { prisma, send } = setup();
+    const path = "/task/agenda?module=integracao&month=2026-12";
+
+    expect((await send("GET", path, { modules: { integracao: 1 } })).status).toBe(200);
+    expect(prisma.agenda.findMany.mock.calls[0][0].where).toMatchObject({
+      organization_id: ORG,
+      module: "integracao",
+    });
+    expect((await send("GET", path, { modules: { integracao: 0, contabil: 3 } })).status).toBe(403);
+  });
+
+  it("exige cliente, pauta e primeiro par, e valida os quatro participantes", async () => {
+    const { prisma, send } = setup();
+    const modules = { integracao: 2 };
+
+    expect((await send("POST", "/task/agenda", { body, modules })).status).toBe(201);
+    expect(prisma.agenda.create.mock.calls[0][0].data).toMatchObject({
+      module: "integracao",
+      client_id: "client-1",
+      status: "Pendente",
+      department_control_id: INTEGRACAO,
+      participant_id: "user-1",
+      participant_id_2: "user-2",
+      participant_id_3: "user-3",
+      participant_id_4: "user-4",
+    });
+    expect(
+      (await send("POST", "/task/agenda", { body: { ...body, client_id: null }, modules })).status,
+    ).toBe(400);
+    expect(
+      (await send("POST", "/task/agenda", { body: { ...body, participants: [] }, modules })).status,
+    ).toBe(400);
+    expect(
+      (
+        await send("POST", "/task/agenda", {
+          body: { ...body, department_id: INTEGRACAO },
+          modules,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await send("PUT", "/task/agenda", {
+          body: { module: "integracao", agenda_id: "evt-1", participant_id: "user-2" },
+          modules,
+        })
+      ).status,
+    ).toBe(400);
+    expect((await send("POST", "/task/agenda", { body, modules: { integracao: 1 } })).status).toBe(
+      403,
+    );
+  });
+
+  it("aceita os seis estados legados em edição e recusa estado alheio", async () => {
+    const { send } = setup();
+    for (const status of [
+      "Realizado",
+      "Agendada",
+      "Atrasada",
+      "Desmarcada pelo cliente",
+      "Pendente",
+      "Previsão",
+    ]) {
+      expect(
+        (
+          await send("PUT", "/task/agenda", {
+            body: { module: "integracao", agenda_id: "evt-1", status },
+            modules: { integracao: 2 },
+          })
+        ).status,
+      ).toBe(200);
+    }
+    expect(
+      (
+        await send("PUT", "/task/agenda", {
+          body: { module: "integracao", agenda_id: "evt-1", status: "Cancelado" },
+          modules: { integracao: 2 },
         })
       ).status,
     ).toBe(400);
