@@ -232,6 +232,24 @@ describe("commercial prospecting routes", () => {
 
   it("aceita Fechado SE somente como ação de atualização", async () => {
     const service = createServiceMock();
+    service.update = vi.fn(async () => ({
+      id: PROSPECTING_ID,
+      client_id: CLIENT_ID,
+      status: "Fechado",
+      status_date: null,
+      solution: "CASTELO",
+      reference_month: "2026-10",
+      service: null,
+      description: null,
+      participants: null,
+      meeting_mode: null,
+      branch: null,
+      pause_reason: null,
+      attachment_name: null,
+      attachment_mime_type: null,
+      attachment_size_bytes: null,
+      client: { id: CLIENT_ID, name: "Cliente", company_name: null, fantasy_name: null },
+    }));
     const response = await request(createTestApp(service))
       .patch(`/commercial/prospecting/${PROSPECTING_ID}`)
       .set(gatewayHeaders())

@@ -86,6 +86,14 @@ it("persiste Fechado SE como Fechado e suprime o aviso no evento", async () => {
   };
   const closed = { ...current, status: "Fechado" };
   const prisma = {
+    client: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: CLIENT,
+        name: "Cliente",
+        company_name: null,
+        fantasy_name: null,
+      }),
+    },
     commercialProspecting: {
       findFirst: vi.fn().mockResolvedValueOnce(current).mockResolvedValueOnce(closed),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),

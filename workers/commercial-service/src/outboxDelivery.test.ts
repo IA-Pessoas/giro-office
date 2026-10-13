@@ -111,6 +111,51 @@ it("preserva o envelope de prospecção fechada e aciona a notificação canôni
   }
 });
 
+it("aplica os efeitos de Fechado SE sem exigir ou disparar notificação", async () => {
+  const clientFetch = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ success: true, data: { applied: true } }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  const taskFetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({ success: true, data: { competence: "2026-09" } }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    ),
+  );
+  const event = {
+    event_id: "10000000-0000-4000-8000-000000000002",
+    event_type: "commercial.prospecting.transition" as const,
+    event_version: 1 as const,
+    organization_id: "a0000000-0000-4000-8000-000000000001",
+    client_id: "c0000000-0000-4000-8000-000000000001",
+    prospecting_id: "d0000000-0000-4000-8000-000000000001",
+    from_status: "Envio de Proposta" as const,
+    to_status: "Fechado" as const,
+    status_date: "2026-09-22T00:00:00.000Z",
+    description: null,
+    suppress_notice: true,
+    audit_correlation_id: "request-closed-se-1",
+    occurred_at: "2026-09-22T00:00:00.000Z",
+  };
+  const delivery = new CommercialOutboxBindingDelivery({
+    INTERNAL_REQUEST_ORIGIN: "https://commercial.test",
+    CLIENT_SERVICE_INTERNAL_TOKEN: "client-token",
+    CLIENT_SERVICE: { fetch: clientFetch },
+    TASK_SERVICE_INTERNAL_TOKEN: "task-token",
+    TASK_SERVICE: { fetch: taskFetch },
+  });
+
+  await delivery.deliver(event);
+
+  expect(clientFetch).toHaveBeenCalledOnce();
+  expect(taskFetch).toHaveBeenCalledOnce();
+  expect(new URL((taskFetch.mock.calls[0] as [Request])[0].url).pathname).toBe(
+    "/internal/commercial/prospecting-close",
+  );
+});
+
 it("entrega efeitos de transição às tarefas pela binding com token interno", async () => {
   const clientFetch = vi.fn().mockResolvedValue(
     new Response(
