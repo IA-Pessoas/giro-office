@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Award, BarChart3, BookOpenCheck, Calendar, Clock, FileText, Star, UserRound, Users } from "lucide-react";
+import { Award, BarChart3, BookOpenCheck, Calendar, Clock, FileText, Star, Target, UserRound, Users } from "lucide-react";
 import { useRouter } from "next/router";
 
 import {
   RhDashboardSection,
   RhCceSection,
   RhExamsSection,
+  RhLifeProjectSection,
   RhDossierSection,
   RhHolidaysSection,
   RhPointSection,
@@ -17,7 +18,7 @@ import {
 import { useRhPermissions } from "@modules/rh/hooks/useRhPermissions";
 import { Dialog } from "@shared/components";
 
-type RhMainTab = "dashboard" | "dossier" | "requests" | "evaluations" | "cce" | "exams" | "point";
+type RhMainTab = "dashboard" | "dossier" | "life-project" | "requests" | "evaluations" | "cce" | "exams" | "point";
 
 export function RH() {
   const router = useRouter();
@@ -124,6 +125,12 @@ export function RH() {
               onClick={() => setActiveTab("dossier")}
             />
             <RhTabButton
+              active={activeTab === "life-project"}
+              icon={Target}
+              label="Projeto de Vida"
+              onClick={() => setActiveTab("life-project")}
+            />
+            <RhTabButton
               active={activeTab === "requests"}
               icon={FileText}
               label="Solicitações"
@@ -168,6 +175,7 @@ export function RH() {
       ) : null}
 
       {activeTab === "dossier" ? <RhDossierSection /> : null}
+      {activeTab === "life-project" ? <RhLifeProjectSection /> : null}
       {activeTab === "requests" ? (
         <RhRequestsSection
           initialRequestId={

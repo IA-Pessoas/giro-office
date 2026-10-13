@@ -857,4 +857,20 @@ describe("matriz de regressão das políticas modulares", () => {
       expect(canAccessRoute(authContext({ modules: { rh: 3 } }), policy)).toBe(true);
     }
   });
+
+  it("permite o fluxo de autoatendimento do Projeto de Vida com RH nível 1", () => {
+    const routes = [
+      ["GET", "/rh/life-projects"],
+      ["POST", "/rh/life-projects"],
+      ["PATCH", "/rh/life-projects/project-1"],
+      ["POST", "/rh/life-projects/project-1/objectives"],
+      ["PATCH", "/rh/life-projects/project-1/objectives/objective-1"],
+    ] as const;
+
+    for (const [method, path] of routes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(authContext({ modules: { rh: 1 } }), policy)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { rh: 0 } }), policy)).toBe(false);
+    }
+  });
 });

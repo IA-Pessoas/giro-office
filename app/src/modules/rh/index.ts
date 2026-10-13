@@ -7,6 +7,7 @@ export { RhPointSection } from "./components/RhPointSection";
 export { RhScoreSection } from "./components/score/RhScoreSection";
 export { RhCceSection } from "./components/RhCceSection";
 export { RhExamsSection } from "./components/RhExamsSection";
+export { RhLifeProjectSection } from "./components/RhLifeProjectSection";
 export { useAssignableUsers } from "./hooks/useAssignableUsers";
 export {
   RH_PENDING_REQUEST_STATUSES,
