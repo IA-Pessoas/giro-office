@@ -53,6 +53,8 @@ const tiPublicOpenApiOperations = {
   "/ti/inventory/{id}": ["get", "patch"],
   "/ti/inventory/{id}/assign-user": ["patch"],
   "/ti/inventory/{id}/return": ["patch"],
+  "/ti/inventory/{id}/transfer": ["patch"],
+  "/ti/inventory/{id}/history": ["get"],
   "/ti/inventory-categories/list": ["get"],
   "/ti/inventory-categories": ["post"],
   "/ti/inventory-categories/{id}": ["patch"],

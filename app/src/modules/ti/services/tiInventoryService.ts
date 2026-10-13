@@ -7,10 +7,12 @@ import type {
   TiInventoryAssignUserPayload,
   TiInventoryCategory,
   TiInventoryCategoryPayload,
+  TiInventoryEvent,
   TiInventoryLocation,
   TiInventoryLocationPayload,
   TiInventoryPayload,
   TiInventoryReturnPayload,
+  TiInventoryTransferPayload,
   TiListFilters,
 } from "../types";
 import {
@@ -78,6 +80,24 @@ export const tiInventoryService = {
     );
 
     return unwrapTiEnvelope<TiInventoryAsset>(response.data);
+  },
+
+  async transferInventoryAsset(
+    id: TiId,
+    payload: TiInventoryTransferPayload,
+  ): Promise<TiInventoryAsset> {
+    const response = await api.patch<TiEnvelope<TiInventoryAsset>>(
+      buildTiPath(TI_ENDPOINTS.inventory.transfer, id),
+      payload,
+    );
+
+    return unwrapTiEnvelope<TiInventoryAsset>(response.data);
+  },
+
+  async listInventoryAssetHistory(id: TiId): Promise<TiInventoryEvent[]> {
+    const response = await api.get(buildTiPath(TI_ENDPOINTS.inventory.history, id));
+
+    return unwrapTiList<TiInventoryEvent>(response.data);
   },
 
   async listInventoryCategories(filters?: TiListFilters): Promise<TiInventoryCategory[]> {

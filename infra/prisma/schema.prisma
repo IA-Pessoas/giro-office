@@ -258,6 +258,7 @@ model Organization {
   locationsStock                LocationStock[]
   extensionsTecnologia          ExtensionsTecnologia[]
   inventoryTecnologia           InventoryTecnologia[]
+  inventoryEventsTecnologia     InventoryEventTecnologia[]
   inventoryCategoriesTecnologia InventoryCategoryTecnologia[]
   inventoryLocationsTecnologia  InventoryLocationTecnologia[]
   passwordsTecnologia           PasswordTecnologia[]
@@ -3238,10 +3239,31 @@ model InventoryTecnologia {
   organization            Organization                 @relation(fields: [organization_id], references: [id])
   responsible_it_staff    User?                        @relation("staff", fields: [responsible_it_staff_id], references: [id])
   user                    User?                        @relation("user", fields: [user_id], references: [id])
+  events                  InventoryEventTecnologia[]
 
   @@index([organization_id, user_id], map: "idx_tecnologia_inventory_org_user")
   @@unique([organization_id, asset_code], map: "uq_tecnologia_inventory_org_asset_code")
   @@map("tecnologia.inventory")
+}
+
+/// Evento patrimonial de um item do inventário de TI (#1932): atribuição, devolução e
+/// transferência entre pessoas e locais. Separado dos movimentos de estoque.
+model InventoryEventTecnologia {
+  id               String              @id @default(uuid())
+  inventory_id     String
+  action           String
+  from_user_id     String?
+  from_location_id String?
+  to_user_id       String?
+  to_location_id   String?
+  actor_user_id    String
+  created_at       DateTime            @default(now())
+  organization_id  String
+  inventory        InventoryTecnologia @relation(fields: [inventory_id], references: [id], onDelete: Cascade)
+  organization     Organization        @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, inventory_id, created_at], map: "idx_tecnologia_inventory_events_org_item")
+  @@map("tecnologia.inventoryEvents")
 }
 
 model TermTecnologia {

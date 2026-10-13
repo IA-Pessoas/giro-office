@@ -41,6 +41,19 @@ export const returnTiInventoryBodySchema = z
   })
   .strict();
 
+// Destino da transferência: uma pessoa ou um local, nunca os dois.
+export const transferTiInventoryBodySchema = z
+  .object({
+    user_id: z.string().uuid({ message: "Usuário inválido." }).optional(),
+    location_id: z.string().uuid({ message: "Local de inventário inválido." }).optional(),
+  })
+  .strict()
+  .refine((value) => (value.user_id === undefined) !== (value.location_id === undefined), {
+    message: "Informe a pessoa ou o local de destino.",
+  });
+
+export const listTiInventoryHistoryQuerySchema = paginationQuerySchema;
+
 export const listTiInventoryQuerySchema = paginationQuerySchema
   .merge(
     z.object({
@@ -58,3 +71,5 @@ export type UpdateTiInventoryBody = z.infer<typeof updateTiInventoryBodySchema>;
 export type AssignTiInventoryUserBody = z.infer<typeof assignTiInventoryUserBodySchema>;
 export type ReturnTiInventoryBody = z.infer<typeof returnTiInventoryBodySchema>;
 export type ListTiInventoryQuery = z.infer<typeof listTiInventoryQuerySchema>;
+export type TransferTiInventoryBody = z.infer<typeof transferTiInventoryBodySchema>;
+export type ListTiInventoryHistoryQuery = z.infer<typeof listTiInventoryHistoryQuerySchema>;

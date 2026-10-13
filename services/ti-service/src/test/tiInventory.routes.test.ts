@@ -213,6 +213,82 @@ describe("ti inventory routes", () => {
     });
   });
 
+  // #1932: transferência e histórico patrimonial.
+  it("PATCH /ti/inventory/:id/transfer moves an asset and records the event", async () => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/inventory/${assetId}/transfer`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ user_id: userId });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: { id: assetId, user_id: userId, location_id: null, return_date: null },
+    });
+    expect(prisma.inventoryEvents).toEqual([
+      {
+        inventory_id: assetId,
+        action: "transfer",
+        from_user_id: null,
+        from_location_id: locationId,
+        to_user_id: userId,
+        to_location_id: null,
+        actor_user_id: userId,
+        organization_id: organizationId,
+      },
+    ]);
+  });
+
+  it.each([
+    ["sem destino", {}],
+    ["pessoa e local ao mesmo tempo", { user_id: userId, location_id: locationId }],
+    ["campo desconhecido", { user_id: userId, notes: "x" }],
+  ])("PATCH /ti/inventory/:id/transfer rejects %s", async (_label, body) => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/inventory/${assetId}/transfer`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send(body);
+
+    expect(response.status).toBe(400);
+    expect(prisma.inventoryEvents).toEqual([]);
+  });
+
+  it("PATCH /ti/inventory/:id/transfer requires admin permission", async () => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/inventory/${assetId}/transfer`)
+      .set(gatewayHeaders(2))
+      .send({ user_id: userId });
+
+    expect(response.status).toBe(403);
+    expect(prisma.inventoryEvents).toEqual([]);
+  });
+
+  it("GET /ti/inventory/:id/history lists events for technicians and rejects viewers", async () => {
+    const prisma = createPrismaMock();
+    const app = createTestApp(prisma);
+
+    const viewer = await request(app)
+      .get(`/ti/inventory/${assetId}/history`)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
+    const technician = await request(app)
+      .get(`/ti/inventory/${assetId}/history`)
+      .query({ page: "1", page_size: "20" })
+      .set(gatewayHeaders(2));
+
+    expect(viewer.status).toBe(403);
+    expect(technician.status).toBe(200);
+    expect(technician.body).toMatchObject({ success: true, data: [] });
+    expect(prisma.inventoryEventTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: organizationId, inventory_id: assetId },
+        take: 20,
+      }),
+    );
+  });
+
   it("POST /ti/inventory-categories creates a category", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-categories")

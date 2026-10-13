@@ -333,6 +333,17 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiInventoryTransferInput: {
+    type: "object",
+    description: "Destino da transferencia: informe a pessoa ou o local, nunca os dois.",
+    properties: {
+      user_id: { type: "string", format: "uuid" },
+      location_id: { type: "string", format: "uuid" },
+    },
+    minProperties: 1,
+    maxProperties: 1,
+    additionalProperties: false,
+  },
   TiInventoryCategoryInput: {
     type: "object",
     required: ["name"],
@@ -1041,7 +1052,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Ativo de inventario de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiInventoryAssignInput"),
           successDescription: "Ativo atribuido",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/inventory/{id}/return": {
@@ -1052,6 +1063,27 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Ativo de inventario de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiInventoryReturnInput"),
           successDescription: "Devolucao registrada",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/inventory/{id}/transfer": {
+        patch: publicTiOperation({
+          operationId: "transferTiInventory",
+          tags: ["TI Inventory"],
+          summary: "Transfere ativo de inventario de TI para uma pessoa ou um local",
+          parameters: [pathIdParameter("Ativo de inventario de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryTransferInput"),
+          successDescription: "Ativo transferido",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/inventory/{id}/history": {
+        get: publicTiOperation({
+          operationId: "listTiInventoryHistory",
+          tags: ["TI Inventory"],
+          summary: "Lista o historico patrimonial do ativo de inventario de TI",
+          parameters: [pathIdParameter("Ativo de inventario de TI"), ...paginationParameters()],
+          successDescription: "Historico patrimonial listado",
           errors: [400, 401, 403, 404],
         }),
       },

@@ -2668,6 +2668,33 @@ const handlers = {
     });
   },
 
+  // #1932: depois da devolução o item vai para a pessoa; o histórico lista os eventos.
+  async tiInventoryTransfer(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/${requireState("tiInventoryId")}/transfer`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        user_id: await ensureRhTargetUser(),
+      },
+    });
+  },
+
+  async tiInventoryHistory(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/${requireState("tiInventoryId")}/history`,
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const actions = (response.body?.data ?? []).map((event) => event.action);
+    if (!actions.includes("transfer")) {
+      throw new Error(`${op.id} did not list the transfer event.`);
+    }
+  },
+
   async tiStockCategoryList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

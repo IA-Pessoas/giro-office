@@ -1,5 +1,17 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Boxes, Eye, Pencil, Plus, RotateCcw, Save, Tags, Trash2, UserPlus, X } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Boxes,
+  Eye,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Save,
+  Tags,
+  Trash2,
+  UserPlus,
+  X,
+} from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
 import { useAssignableUsers } from "@modules/rh";
@@ -15,8 +27,10 @@ import {
   useReturnTiInventoryAssetMutation,
   useTiInventory,
   useTiInventoryAsset,
+  useTiInventoryAssetHistory,
   useTiInventoryCategories,
   useTiInventoryLocations,
+  useTransferTiInventoryAssetMutation,
   useUpdateTiInventoryAssetMutation,
   useUpdateTiInventoryCategoryMutation,
 } from "../hooks";
@@ -25,6 +39,7 @@ import type {
   TiInventoryAsset,
   TiInventoryAssignUserPayload,
   TiInventoryCategory,
+  TiInventoryEvent,
   TiInventoryReturnPayload,
 } from "../types";
 import { getTiInventoryMutationErrorMessage } from "../utils/inventoryMutationError";
@@ -55,7 +70,39 @@ type InventoryDialogState =
   | { type: "asset"; mode: "edit"; asset: TiInventoryAsset }
   | { type: "assign"; asset: TiInventoryAsset }
   | { type: "return"; asset: TiInventoryAsset }
+  | { type: "transfer"; asset: TiInventoryAsset }
   | { type: "categories" };
+
+type TransferTarget = "user" | "location";
+
+const TRANSFER_TARGET_OPTIONS = [
+  { value: "user", label: "Usuário" },
+  { value: "location", label: "Departamento" },
+];
+
+const INVENTORY_EVENT_LABELS: Record<string, string> = {
+  assign: "Atribuição",
+  return: "Devolução",
+  transfer: "Transferência",
+};
+
+function getEventPartyName(party?: { name?: string | null; full_name?: string | null } | null) {
+  return party?.full_name || party?.name || null;
+}
+
+/** Origem ou destino do evento: o usuário, senão o departamento, senão o item disponível. */
+function getEventHolder(event: TiInventoryEvent, side: "from" | "to"): string {
+  const user = side === "from" ? event.from_user : event.to_user;
+  const location = side === "from" ? event.from_location : event.to_location;
+
+  return getEventPartyName(user) ?? getEventPartyName(location) ?? "Disponível";
+}
+
+function formatEventDate(value: string): string {
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString("pt-BR");
+}
 
 type PendingInventoryAction =
   | { type: "assign"; asset: TiInventoryAsset; payload: TiInventoryAssignUserPayload }
@@ -246,8 +293,12 @@ export function TiInventoryTab() {
   const [editingCategory, setEditingCategory] = useState<TiInventoryCategory | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<TiInventoryCategory | null>(null);
   const [categoryDeleteError, setCategoryDeleteError] = useState<string | null>(null);
+  const [transferTarget, setTransferTarget] = useState<TransferTarget>("user");
   const isUserSelectorEnabled =
-    canManage && (dialogState?.type === "asset" || dialogState?.type === "assign");
+    canManage &&
+    (dialogState?.type === "asset" ||
+      dialogState?.type === "assign" ||
+      dialogState?.type === "transfer");
   const assetUsersQuery = useAssignableUsers({ enabled: isUserSelectorEnabled });
   const technologyResponsibleUsersQuery = useAssignableUsers({
     enabled: isUserSelectorEnabled && dialogState?.type === "asset",
@@ -269,11 +320,15 @@ export function TiInventoryTab() {
   // "Departamento" do ativo é um local de inventário: é a FK e o que o backend valida.
   const departmentsQuery = useTiInventoryLocations();
   const selectedAssetQuery = useTiInventoryAsset(selectedAssetId, { enabled: Boolean(selectedAssetId) });
+  const assetHistoryQuery = useTiInventoryAssetHistory(selectedAssetId, {
+    enabled: Boolean(selectedAssetId) && isDetailDialogOpen,
+  });
 
   const createAssetMutation = useCreateTiInventoryAssetMutation();
   const updateAssetMutation = useUpdateTiInventoryAssetMutation();
   const assignUserMutation = useAssignTiInventoryAssetUserMutation();
   const returnAssetMutation = useReturnTiInventoryAssetMutation();
+  const transferAssetMutation = useTransferTiInventoryAssetMutation();
   const createCategoryMutation = useCreateTiInventoryCategoryMutation();
   const updateCategoryMutation = useUpdateTiInventoryCategoryMutation();
 
@@ -326,6 +381,12 @@ export function TiInventoryTab() {
       })),
     ],
     [assetUsersQuery.data],
+  );
+
+  // Na transferência o destino é obrigatório: sem a opção "Não atribuir".
+  const transferUserOptions = useMemo(
+    () => [{ value: "", label: "Selecione" }, ...assetUserOptions.slice(1)],
+    [assetUserOptions],
   );
 
   const technologyResponsibleOptions = useMemo(
@@ -457,6 +518,38 @@ export function TiInventoryTab() {
       asset: dialogState.asset,
       payload: compactPayload({ notes: getFormText(formData, "notes") }),
     });
+  }
+
+  async function handleSubmitTransfer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canManage || dialogState?.type !== "transfer") {
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    const destinationId = getFormText(
+      formData,
+      transferTarget === "user" ? "user_id" : "location_id",
+    );
+
+    if (!destinationId) {
+      setDialogError("Selecione o destino da transferência.");
+      return;
+    }
+
+    try {
+      setDialogError(null);
+      await transferAssetMutation.mutateAsync({
+        id: dialogState.asset.id,
+        payload:
+          transferTarget === "user" ? { user_id: destinationId } : { location_id: destinationId },
+      });
+      setSelectedAssetId(dialogState.asset.id);
+      closeDialog();
+    } catch (error) {
+      setDialogError(getTiInventoryMutationErrorMessage(error));
+    }
   }
 
   async function handleConfirmPendingAction() {
@@ -676,6 +769,14 @@ export function TiInventoryTab() {
                                 label="Devolver"
                                 onClick={() => openDialog({ type: "return", asset })}
                               />
+                              <TiTableAction
+                                icon={ArrowRightLeft}
+                                label="Transferir"
+                                onClick={() => {
+                                  setTransferTarget("user");
+                                  openDialog({ type: "transfer", asset });
+                                }}
+                              />
                             </>
                           ) : null}
                         </div>
@@ -728,6 +829,34 @@ export function TiInventoryTab() {
                 }
               />
               <TiFieldLine label="Notas" value={getText(selectedAsset.notes)} />
+              <div className={tiDialogSubsectionClassName}>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Histórico patrimonial
+                </p>
+                {assetHistoryQuery.isLoading ? (
+                  <p className="mt-2 text-sm">Carregando histórico...</p>
+                ) : assetHistoryQuery.isError ? (
+                  <TiInlineNotice tone="danger">
+                    Não foi possível carregar o histórico patrimonial.
+                  </TiInlineNotice>
+                ) : (assetHistoryQuery.data ?? []).length === 0 ? (
+                  <p className="mt-2 text-sm">Nenhuma movimentação registrada para este ativo.</p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {(assetHistoryQuery.data ?? []).map((historyEvent) => (
+                      <li key={historyEvent.id} className="text-sm">
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {INVENTORY_EVENT_LABELS[historyEvent.action] ?? historyEvent.action}
+                        </span>
+                        {`: ${getEventHolder(historyEvent, "from")} → ${getEventHolder(historyEvent, "to")}`}
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">
+                          {`${formatEventDate(historyEvent.created_at)} · por ${getEventPartyName(historyEvent.actor) ?? "usuário removido"}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex min-h-32 items-center justify-center text-center text-sm font-medium text-slate-500 dark:text-slate-400">
@@ -959,6 +1088,60 @@ export function TiInventoryTab() {
               label={returnAssetMutation.isPending ? "Registrando..." : "Registrar devolução"}
               variant="primary"
               disabled={returnAssetMutation.isPending || !canManage}
+            />
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={dialogState?.type === "transfer"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDialog();
+          }
+        }}
+        title="Transferir ativo"
+        description="Transferência do ativo para outro usuário ou departamento."
+      >
+        <form className="space-y-4" onSubmit={handleSubmitTransfer}>
+          {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
+          <TiInlineNotice tone="warning">
+            A transferência fica registrada no histórico patrimonial do ativo.
+          </TiInlineNotice>
+          <TiNativeSelect
+            label="Destino"
+            name="transfer_target"
+            options={TRANSFER_TARGET_OPTIONS}
+            value={transferTarget}
+            onChange={(event) => setTransferTarget(event.target.value as TransferTarget)}
+          />
+          {transferTarget === "user" ? (
+            <TiNativeSelect
+              label="Usuário"
+              name="user_id"
+              required
+              options={transferUserOptions}
+              disabled={assetUsersQuery.isLoading || assetUsersQuery.isError}
+            />
+          ) : (
+            <TiNativeSelect
+              label="Departamento"
+              name="location_id"
+              required
+              options={departmentFormOptions}
+              disabled={departmentsQuery.isLoading || departmentsQuery.isError}
+            />
+          )}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
+              Cancelar
+            </button>
+            <TiIconAction
+              icon={ArrowRightLeft}
+              type="submit"
+              label={transferAssetMutation.isPending ? "Transferindo..." : "Transferir ativo"}
+              variant="primary"
+              disabled={transferAssetMutation.isPending || !canManage}
             />
           </div>
         </form>

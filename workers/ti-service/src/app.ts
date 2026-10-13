@@ -26,9 +26,11 @@ import {
 import {
   assignTiInventoryUserBodySchema,
   createTiInventoryBodySchema,
+  listTiInventoryHistoryQuerySchema,
   listTiInventoryQuerySchema,
   returnTiInventoryBodySchema,
   tiInventoryIdParamsSchema,
+  transferTiInventoryBodySchema,
   updateTiInventoryBodySchema,
 } from "@workspace/ti-service/src/schemas/tiInventory.schemas.js";
 import {
@@ -512,6 +514,18 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     const params = parseWithZod(tiInventoryIdParamsSchema, { id: c.req.param("id") });
     const body = parseWithZod(returnTiInventoryBodySchema, await c.req.json());
     return respond(c, "inventory", "returnAsset", [requestContext(c), params.id, body]);
+  });
+  app.patch("/ti/inventory/:id/transfer", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const params = parseWithZod(tiInventoryIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(transferTiInventoryBodySchema, await c.req.json());
+    return respond(c, "inventory", "transfer", [requestContext(c), params.id, body]);
+  });
+  app.get("/ti/inventory/:id/history", async (c) => {
+    requireTiPermission(c.get("auth"), 2);
+    const params = parseWithZod(tiInventoryIdParamsSchema, { id: c.req.param("id") });
+    const query = parseWithZod(listTiInventoryHistoryQuerySchema, c.req.query());
+    return respond(c, "inventory", "listHistory", [requestContext(c), params.id, query]);
   });
 
   app.get("/ti/inventory-locations/list", async (c) => {

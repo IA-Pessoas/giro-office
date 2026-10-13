@@ -897,6 +897,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "registrou", item: "a devolução de um item de inventário" },
   },
   {
+    methods: ["POST", "PATCH"],
+    pattern: /^\/ti\/inventory\/[^/]+\/transfer$/,
+    description: { action: "transferiu", item: "um item de inventário" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/ti\/inventory\/[^/]+\/history$/,
+    description: { action: "consultou", item: "o histórico de um item de inventário" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/ti\/stock$/,
     description: { action: "consultou", item: "o estoque de TI" },
