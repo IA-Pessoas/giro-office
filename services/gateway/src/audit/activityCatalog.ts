@@ -823,6 +823,31 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/rh\/life-projects$/,
+    description: { action: "consultou", item: "um Projeto de Vida anual" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/life-projects$/,
+    description: { action: "criou", item: "um Projeto de Vida anual" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/rh\/life-projects\/[^/]+$/,
+    description: { action: "atualizou", item: "as histórias de um Projeto de Vida" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/life-projects\/[^/]+\/objectives$/,
+    description: { action: "criou", item: "um objetivo de Projeto de Vida" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/rh\/life-projects\/[^/]+\/objectives\/[^/]+$/,
+    description: { action: "atualizou", item: "um objetivo de Projeto de Vida" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/rh\/profile\/colaborator$/,
     description: { action: "consultou", item: "o dossiê de um colaborador" },
   },

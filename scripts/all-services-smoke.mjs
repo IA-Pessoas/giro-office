@@ -301,6 +301,9 @@ const state = {
   rhScoreId: "",
   rhScoreEvaluationId: "",
   rhCceWeeklyEvaluationId: "",
+  rhLifeProjectId: "",
+  rhLifeProjectYear: "",
+  rhLifeObjectiveId: "",
   rhHolidayId: "",
   rhTimeBankReleaseId: "",
   rhTimeSheetId: "",
@@ -403,6 +406,16 @@ const actionExecutionRank = {
   rhExamCreateInvalid: 8318,
   rhExamGetNotFound: 8319,
   rhExamOpenConflict: 8320,
+  rhLifeProjectGet: 8330,
+  rhLifeProjectCreate: 8331,
+  rhLifeProjectUpdate: 8333,
+  rhLifeObjectiveCreate: 8334,
+  rhLifeObjectiveUpdate: 8335,
+  rhLifeProjectGetInvalid: 8321,
+  rhLifeProjectCreateDuplicate: 8332,
+  rhLifeProjectUpdateMissing: 8323,
+  rhLifeObjectiveCreateMissingProject: 8324,
+  rhLifeObjectiveUpdateMissing: 8325,
   platformSessionLogout: 9900,
   userSessionLogout: 10000,
 };
@@ -8018,6 +8031,107 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [409],
       path: `/rh/exams/${requireState("rhExamId")}/open`,
+    });
+  },
+
+  async rhLifeProjectGet(op) {
+    const year = new Date().getFullYear();
+    await httpRequest(op, { expectedStatus: [200], path: `/rh/life-projects?year=${year}` });
+  },
+
+  async rhLifeProjectGetInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      path: "/rh/life-projects?year=not-a-year",
+    });
+  },
+
+  async rhLifeProjectCreate(op) {
+    const year = new Date().getFullYear();
+    const response = await httpRequest(op, {
+      expectedStatus: [201, 409],
+      path: "/rh/life-projects",
+      json: { year },
+    });
+    state.rhLifeProjectYear = String(year);
+    state.rhLifeProjectId = response.body?.data?.id ?? "";
+    if (!state.rhLifeProjectId) {
+      const existing = await httpRequest(op, {
+        expectedStatus: [200],
+        path: `/rh/life-projects?year=${year}`,
+      });
+      state.rhLifeProjectId = existing.body?.data?.id ?? "";
+    }
+    if (!state.rhLifeProjectId)
+      throw new Error("O Projeto de Vida anual não foi encontrado após a criação.");
+  },
+
+  async rhLifeProjectCreateDuplicate(op) {
+    await httpRequest(op, {
+      expectedStatus: [409],
+      path: "/rh/life-projects",
+      json: { year: Number(requireState("rhLifeProjectYear")) },
+    });
+  },
+
+  async rhLifeProjectUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/life-projects/${requireState("rhLifeProjectId")}`,
+      json: {
+        life_story: "História atualizada pelo smoke.",
+        company_story: "História na empresa.",
+      },
+    });
+  },
+
+  async rhLifeProjectUpdateMissing(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/rh/life-projects/00000000-0000-0000-0000-000000000000",
+      json: { life_story: "Não deve gravar." },
+    });
+  },
+
+  async rhLifeObjectiveCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/rh/life-projects/${requireState("rhLifeProjectId")}/objectives`,
+      json: {
+        title: uniqueText("Objetivo smoke"),
+        forecast_date: `${new Date().getFullYear()}-12-31`,
+        employee_observations: "Meta criada no smoke.",
+      },
+    });
+    state.rhLifeObjectiveId = response.body?.data?.objectives?.at(-1)?.id ?? "";
+    if (!state.rhLifeObjectiveId) throw new Error("A criação do objetivo não retornou o id.");
+  },
+
+  async rhLifeObjectiveCreateMissingProject(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/rh/life-projects/00000000-0000-0000-0000-000000000000/objectives",
+      json: { title: "Projeto inexistente" },
+    });
+  },
+
+  async rhLifeObjectiveUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/life-projects/${requireState("rhLifeProjectId")}/objectives/${requireState("rhLifeObjectiveId")}`,
+      json: {
+        status: "Realized",
+        completed_at: new Date().toISOString().slice(0, 10),
+        rh_observations: "Validado pelo smoke.",
+      },
+    });
+  },
+
+  async rhLifeObjectiveUpdateMissing(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/rh/life-projects/00000000-0000-0000-0000-000000000000/objectives/00000000-0000-0000-0000-000000000000",
+      json: { status: "Realized" },
     });
   },
 

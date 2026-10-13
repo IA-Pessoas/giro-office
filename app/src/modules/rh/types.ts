@@ -4,6 +4,68 @@ export type RhRequestStatus = "New" | "In_Progress" | "Resolved" | "Closed";
 
 export type RhMessageType = "Message" | "Solution" | "Rejection" | "Acceptance";
 
+export type RhLifeObjectiveStatus = "ToDo" | "Realized" | "Discontinued";
+
+export interface RhLifeProjectObjective {
+  id: string;
+  title: string;
+  forecast_date: string | null;
+  completed_at: string | null;
+  status: RhLifeObjectiveStatus;
+  rh_observations: string;
+  employee_observations: string;
+  created_by_id: string;
+  updated_by_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RhLifeProject {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  year: number;
+  life_story: string;
+  company_story: string;
+  created_by_id: string;
+  updated_by_id: string;
+  created_at: string;
+  updated_at: string;
+  objectives: RhLifeProjectObjective[];
+  objective_count: number;
+  completed_objective_count: number;
+  progress: number;
+}
+
+export interface CreateRhLifeProjectPayload {
+  year: number;
+  target_user_id?: string;
+}
+
+export interface UpdateRhLifeProjectPayload {
+  id: string;
+  life_story?: string;
+  company_story?: string;
+}
+
+export interface CreateRhLifeObjectivePayload {
+  projectId: string;
+  title: string;
+  forecast_date?: string | null;
+  employee_observations?: string;
+}
+
+export interface UpdateRhLifeObjectivePayload {
+  projectId: string;
+  objectiveId: string;
+  title?: string;
+  forecast_date?: string | null;
+  completed_at?: string | null;
+  status?: RhLifeObjectiveStatus;
+  rh_observations?: string;
+  employee_observations?: string;
+}
+
 export type RhScoreQuestionType = "behavioral" | "technical" | "tech" | "leadership";
 
 export type RhNitroMetricType = "projects" | "hours" | "errors" | "folders";
