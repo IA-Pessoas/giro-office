@@ -98,6 +98,41 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { rh: 0 } }), profilePolicy)).toBe(false);
   });
 
+  // #1929: o autoatendimento de TI é do nível 1; a posse do recurso é conferida no serviço.
+  it("permite TI nível 1 no autoatendimento, sem liberar a gestão de TI", () => {
+    const viewer = authContext({ modules: { ti: 1 } });
+    const technician = authContext({ modules: { ti: 2 } });
+    const selfServiceRoutes = [
+      ["POST", "/ti/requests"],
+      ["POST", "/ti/requests/request-1/messages"],
+      ["PATCH", "/ti/terms/term-1/sign"],
+    ] as const;
+    const managementRoutes = [
+      ["PATCH", "/ti/requests/request-1"],
+      ["PATCH", "/ti/requests/request-1/assign"],
+      ["PATCH", "/ti/requests/request-1/status"],
+      ["POST", "/ti/request-categories"],
+      ["POST", "/ti/terms"],
+      ["PATCH", "/ti/terms/term-1"],
+      ["POST", "/ti/terms/term-1/sign"],
+      ["POST", "/ti/inventory"],
+    ] as const;
+
+    for (const [method, path] of selfServiceRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(viewer, policy), `ti 1: ${method} ${path}`).toBe(true);
+      expect(
+        canAccessRoute(authContext({ modules: { ti: 0, rh: 3 } }), policy),
+        `ti 0: ${method} ${path}`,
+      ).toBe(false);
+    }
+    for (const [method, path] of managementRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(viewer, policy), `ti 1: ${method} ${path}`).toBe(false);
+      expect(canAccessRoute(technician, policy), `ti 2: ${method} ${path}`).toBe(true);
+    }
+  });
+
   it("mantém notificações de RH no mesmo nível de acesso do módulo", () => {
     const listPolicy = requiredRoutePolicy("GET", "/rh/notifications");
     const readPolicy = requiredRoutePolicy("PUT", "/rh/notifications/read");
