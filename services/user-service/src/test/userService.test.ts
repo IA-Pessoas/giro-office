@@ -447,6 +447,141 @@ describe("UserService", () => {
     );
   });
 
+  // #1930: quem gerencia usuários sem ser owner não concede nem revoga acessos.
+  it("create por não-owner rejeita admin, que receberia o módulo do departamento", async () => {
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-ti", name: "Tecnologia" });
+
+    await expect(
+      new UserService().create(
+        {
+          name: "Admin TI",
+          login: "admin.ti",
+          password: "secret",
+          department_id: "dep-ti",
+          permission: 1,
+          organization_id: "org-1",
+          type: "admin",
+        },
+        "actor-1",
+        "none",
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      new UserService().create(
+        {
+          name: "Usuario Elevado",
+          login: "usuario.elevado",
+          password: "secret",
+          department_id: "dep-ti",
+          permission: 2,
+          organization_id: "org-1",
+          type: "user",
+        },
+        "actor-1",
+        "none",
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
+  });
+
+  it("create por não-owner aceita usuário comum só com o autoatendimento", async () => {
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-contabil", name: "Contabil" });
+    prismaMock.user.create.mockResolvedValue({ id: "user-2", organization_id: "org-1" });
+    permissionServiceMock.create.mockResolvedValue({ id: "permission-2" });
+    prismaMock.user.update.mockResolvedValue({});
+
+    await new UserService().create(
+      {
+        name: "Usuario",
+        login: "usuario.comum",
+        password: "secret",
+        department_id: "dep-contabil",
+        permission: 1,
+        organization_id: "org-1",
+        type: "user",
+      },
+      "actor-1",
+      "none",
+    );
+
+    expect(prismaMock.permission.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { rh: 1, ti: 1 } }),
+    );
+  });
+
+  it("update e delete por não-owner não alcançam um owner", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "owner-1",
+      status: "active",
+      type: "owner",
+      version: 1,
+      permission_id: "permission-1",
+    });
+    const service = new UserService();
+
+    await expect(
+      service.update("owner-1", { name: "Outro" }, "org-1", "actor-1", "UPDATE", "none"),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(service.delete("owner-1", "org-1", "actor-1", "none")).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("update por não-owner rejeita mudar tipo, nível ou departamento de admin", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      status: "active",
+      type: "admin",
+      permission: 1,
+      version: 1,
+      department_id: "dep-contabil",
+      permission_id: "permission-1",
+    });
+    const service = new UserService();
+
+    for (const change of [
+      { type: "user" as const },
+      { permission: 0 },
+      { department_id: "dep-ti" },
+    ]) {
+      await expect(
+        service.update("user-1", change, "org-1", "actor-1", "UPDATE", "none"),
+      ).rejects.toMatchObject({ statusCode: 403 });
+    }
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.permission.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Payload do painel de Administração: reenvia permissão e departamento sem mudar.
+  it("update por não-owner com acesso inalterado não rederiva módulos", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      status: "active",
+      type: "user",
+      permission: 1,
+      version: 1,
+      department_id: "dep-contabil",
+      permission_id: "permission-1",
+    });
+
+    await new UserService().update(
+      "user-1",
+      { name: "Outro", permission: 1, department_id: "dep-contabil", status: "active" },
+      "org-1",
+      "actor-1",
+      "UPDATE",
+      "none",
+    );
+
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ name: "Outro" }) }),
+    );
+    expect(prismaMock.permission.updateMany).not.toHaveBeenCalled();
+  });
+
   it("create de owner concede permissao maxima para o modulo TI", async () => {
     passwordHashMock.hashPassword.mockResolvedValue("hashed");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });

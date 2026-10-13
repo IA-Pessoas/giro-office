@@ -36,8 +36,14 @@ export const useUserForm = (initialUser: UserItem) => {
       const updateData: UpdateUserData = {
         name: formData.name,
         // O papel do owner não é um nível de permissão (ADR 0002): não sobrescrever.
-        ...(isOrganizationOwner(initialUser) ? {} : { permission: formData.permission }),
-        department_id: formData.department_id,
+        // Permissão e departamento só seguem quando mudam: reenviá-los faz o servidor
+        // rederivar os módulos do usuário (#1930).
+        ...(isOrganizationOwner(initialUser) || formData.permission === initialUser.permission
+          ? {}
+          : { permission: formData.permission }),
+        ...(formData.department_id === initialUser.department_id
+          ? {}
+          : { department_id: formData.department_id }),
         status: formData.status,
         file: file || undefined,
       };

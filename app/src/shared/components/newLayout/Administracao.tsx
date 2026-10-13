@@ -520,6 +520,7 @@ export function Administracao() {
               departmentsError={Boolean(departmentsError)}
               onUserUpdated={() => invalidateAdminUserLists()}
               canManageUsers={hasAdminAccess}
+              canChangeAccess={canManageOrganizationOwners}
               dataSource={administrationUserContracts.details}
             />
           </section>
@@ -529,6 +530,7 @@ export function Administracao() {
           dataSource={administrationUserContracts.permissions}
           departments={departments}
           currentUserId={user?.id}
+          canEditPermissions={canManageOrganizationOwners}
           onAccessDenied={() => void router.replace("/dashboard")}
           onPermissionsUpdated={async () => {
             try {
@@ -555,6 +557,7 @@ export function Administracao() {
         organizationId={organizationId}
         invitedBy={user?.id}
         canCreateOrganizationOwner={canManageOrganizationOwners}
+        canGrantModules={canManageOrganizationOwners}
       />
 
     </div>

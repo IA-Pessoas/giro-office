@@ -147,6 +147,20 @@ describe("permission routes", () => {
     expect(permissionServiceMock.update).not.toHaveBeenCalled();
   });
 
+  // #1930: TI nível 3 consulta, mas só o owner concede ou revoga permissões gerais.
+  it("TI nível 3 consulta permissões e não as altera", async () => {
+    permissionServiceMock.getByUserId.mockResolvedValue({ ti: 1 });
+    const app = createTestApp();
+    const headers = gatewayAuthHeaders({ permission: 1, type: "admin", modules: { ti: 3 } });
+
+    const read = await request(app).get("/user/permission/user-1").set(headers);
+    const grant = await request(app).put("/user/permission/user-1").set(headers).send({ ti: 1 });
+    const revoke = await request(app).put("/user/permission/user-1").set(headers).send({ ti: 0 });
+
+    expect([read.status, grant.status, revoke.status]).toEqual([200, 403, 403]);
+    expect(permissionServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("bloqueia consulta e atualizacao de permissoes para nao-admin", async () => {
     const app = createTestApp();
     const headers = gatewayAuthHeaders({ permission: 1 });

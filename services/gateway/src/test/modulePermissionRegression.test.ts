@@ -133,6 +133,42 @@ describe("matriz de regressão das políticas modulares", () => {
     }
   });
 
+  // #1930: TI nível 3 gerencia usuários como o RH nível 3; permissões gerais são do owner.
+  it("libera a gestão de usuários a owner, RH 3 e TI 3, e as permissões gerais só ao owner", () => {
+    const owner = authContext({ type: "owner", permission: 2, modules: {} });
+    const managers = [
+      authContext({ type: "admin", modules: { ti: 3, rh: 1 } }),
+      authContext({ type: "admin", modules: { rh: 3, ti: 1 } }),
+    ];
+    const others = [
+      authContext({ modules: { ti: 1, rh: 1 } }),
+      authContext({ type: "admin", modules: { ti: 2, rh: 2, fiscal: 3 } }),
+    ];
+    const managementRoutes = [
+      ["GET", "/user"],
+      ["POST", "/user"],
+      ["GET", "/user/user-1"],
+      ["PUT", "/user/user-1"],
+      ["DELETE", "/user/user-1"],
+      ["GET", "/user/permission/user-1"],
+    ] as const;
+    const grantPolicy = requiredRoutePolicy("PUT", "/user/permission/user-1");
+
+    for (const [method, path] of managementRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      for (const context of [owner, ...managers]) {
+        expect(canAccessRoute(context, policy), `gestor: ${method} ${path}`).toBe(true);
+      }
+      for (const context of others) {
+        expect(canAccessRoute(context, policy), `sem gestão: ${method} ${path}`).toBe(false);
+      }
+    }
+    expect(canAccessRoute(owner, grantPolicy)).toBe(true);
+    for (const context of [...managers, ...others]) {
+      expect(canAccessRoute(context, grantPolicy)).toBe(false);
+    }
+  });
+
   it("mantém notificações de RH no mesmo nível de acesso do módulo", () => {
     const listPolicy = requiredRoutePolicy("GET", "/rh/notifications");
     const readPolicy = requiredRoutePolicy("PUT", "/rh/notifications/read");
