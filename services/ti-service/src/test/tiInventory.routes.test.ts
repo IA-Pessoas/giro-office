@@ -289,6 +289,108 @@ describe("ti inventory routes", () => {
     );
   });
 
+  // #1933: troca entre pessoas e transferência em lote.
+  const otherAssetId = "40000000-0000-4000-8000-000000000002";
+  const otherUserId = "00000000-0000-4000-8000-000000000009";
+  const movable = (id: string, holderId: string | null) => ({
+    id,
+    asset_code: id,
+    category_id: categoryId,
+    user_id: holderId,
+    location_id: null,
+    return_date: null,
+  });
+
+  it("POST /ti/inventory/transfer-batch moves every asset and records one event each", async () => {
+    const prisma = createPrismaMock();
+    prisma.inventoryTecnologia.findMany.mockResolvedValueOnce([
+      movable(assetId, null),
+      movable(otherAssetId, otherUserId),
+    ]);
+    const response = await request(createTestApp(prisma))
+      .post("/ti/inventory/transfer-batch")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ asset_ids: [assetId, otherAssetId], user_id: userId });
+
+    expect(response.status).toBe(200);
+    expect(prisma.inventoryEvents.map((event) => [event.inventory_id, event.to_user_id])).toEqual([
+      [assetId, userId],
+      [otherAssetId, userId],
+    ]);
+  });
+
+  it("POST /ti/inventory/swap swaps the holders of two assets", async () => {
+    const prisma = createPrismaMock();
+    prisma.inventoryTecnologia.findMany.mockResolvedValueOnce([
+      movable(assetId, userId),
+      movable(otherAssetId, otherUserId),
+    ]);
+    const response = await request(createTestApp(prisma))
+      .post("/ti/inventory/swap")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ asset_id: assetId, other_asset_id: otherAssetId });
+
+    expect(response.status).toBe(200);
+    expect(
+      prisma.inventoryEvents.map((event) => [event.action, event.from_user_id, event.to_user_id]),
+    ).toEqual([
+      ["swap", userId, otherUserId],
+      ["swap", otherUserId, userId],
+    ]);
+  });
+
+  it("POST /ti/inventory/transfer-batch reports blocking items with 409 and writes nothing", async () => {
+    const prisma = createPrismaMock();
+    prisma.inventoryTecnologia.findMany.mockResolvedValueOnce([movable(assetId, userId)]);
+    const response = await request(createTestApp(prisma))
+      .post("/ti/inventory/transfer-batch")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ asset_ids: [assetId], user_id: userId });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "TI_INVENTORY_ITEMS_BLOCKED",
+      error: `Nenhum item foi movimentado. Itens impeditivos: ${assetId} (já está no destino).`,
+    });
+    expect(prisma.inventoryEvents).toEqual([]);
+  });
+
+  it.each([
+    ["/ti/inventory/transfer-batch", { asset_ids: [], user_id: userId }],
+    ["/ti/inventory/transfer-batch", { asset_ids: [assetId, assetId], user_id: userId }],
+    ["/ti/inventory/transfer-batch", { asset_ids: [assetId] }],
+    [
+      "/ti/inventory/transfer-batch",
+      { asset_ids: [assetId], user_id: userId, location_id: locationId },
+    ],
+    ["/ti/inventory/swap", { asset_id: assetId, other_asset_id: assetId }],
+    ["/ti/inventory/swap", { asset_id: assetId }],
+  ])("POST %s rejects an invalid body %#", async (path, body) => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .post(path)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send(body);
+
+    expect(response.status).toBe(400);
+    expect(prisma.inventoryEvents).toEqual([]);
+  });
+
+  it.each([
+    ["/ti/inventory/transfer-batch", { asset_ids: [assetId], user_id: userId }],
+    ["/ti/inventory/swap", { asset_id: assetId, other_asset_id: otherAssetId }],
+  ])("POST %s requires admin permission", async (path, body) => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .post(path)
+      .set(gatewayHeaders(2))
+      .send(body);
+
+    expect(response.status).toBe(403);
+    expect(prisma.inventoryTecnologia.findMany).not.toHaveBeenCalled();
+  });
+
   it("POST /ti/inventory-categories creates a category", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory-categories")

@@ -351,10 +351,13 @@ describe("TiInventoryService: regra do computador ativo", () => {
     const matches = (item: Asset, where: Record<string, unknown>): boolean =>
       Object.entries(where).every(([key, expected]) => {
         if (key === "NOT") return item.id !== (expected as { id: string }).id;
-        if (key === "category_id" && expected && typeof expected === "object") {
-          return (expected as { in: string[] }).in.includes(item.category_id);
+        const value = item[key as keyof Asset];
+        if (expected && typeof expected === "object" && !(expected instanceof Date)) {
+          const filter = expected as { in?: unknown[]; notIn?: unknown[] };
+          if (filter.in) return filter.in.includes(value);
+          if (filter.notIn) return !filter.notIn.includes(value);
         }
-        return item[key as keyof Asset] === expected;
+        return value === expected;
       });
     const client = {
       inventoryTecnologia: {
@@ -364,6 +367,11 @@ describe("TiInventoryService: regra do computador ativo", () => {
           const snapshot = found ? { ...found } : null;
           await new Promise((resolve) => setTimeout(resolve, 5));
           return snapshot;
+        }),
+        findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+          const found = assets.filter((item) => matches(item, where)).map((item) => ({ ...item }));
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return found;
         }),
         create: vi.fn(async ({ data }: { data: Partial<Asset> }) => {
           const created = asset(`created-${assets.length}`, data);
@@ -388,6 +396,10 @@ describe("TiInventoryService: regra do computador ativo", () => {
           events.push(data);
           return data;
         }),
+        createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+          events.push(...data);
+          return { count: data.length };
+        }),
       },
       inventoryLocationTecnologia: {
         findFirst: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id })),
@@ -407,8 +419,30 @@ describe("TiInventoryService: regra do computador ativo", () => {
       ...client,
       $transaction: vi.fn(async (callback: (transaction: unknown) => Promise<unknown>) => {
         const releases: Array<() => void> = [];
+        // Desfaz as escritas desta transação se ela falhar, como o rollback do banco.
+        const undo: Array<() => void> = [];
         const transaction = {
           ...client,
+          inventoryTecnologia: {
+            ...client.inventoryTecnologia,
+            updateMany: async (args: { where: Record<string, unknown>; data: Partial<Asset> }) => {
+              for (const item of assets.filter((candidate) => matches(candidate, args.where))) {
+                const before = { ...item };
+                undo.push(() => Object.assign(item, before));
+              }
+              return client.inventoryTecnologia.updateMany(args);
+            },
+          },
+          inventoryEventTecnologia: {
+            create: async (args: { data: Record<string, unknown> }) => {
+              undo.push(() => events.splice(events.indexOf(args.data), 1));
+              return client.inventoryEventTecnologia.create(args);
+            },
+            createMany: async (args: { data: Array<Record<string, unknown>> }) => {
+              undo.push(() => events.splice(events.indexOf(args.data[0] ?? {}), args.data.length));
+              return client.inventoryEventTecnologia.createMany(args);
+            },
+          },
           $executeRaw: vi.fn(async (_query: TemplateStringsArray, key: string) => {
             lockedKeys.push(key);
             const previous = queues.get(key) ?? Promise.resolve();
@@ -426,6 +460,9 @@ describe("TiInventoryService: regra do computador ativo", () => {
         };
         try {
           return await callback(transaction);
+        } catch (error) {
+          for (const revert of undo.reverse()) revert();
+          throw error;
         } finally {
           for (const release of releases) release();
         }
@@ -742,6 +779,260 @@ describe("TiInventoryService: regra do computador ativo", () => {
         statusCode: 404,
       });
       expect(events).toEqual([]);
+    });
+
+    // #1933: troca entre pessoas e lote, numa operação que vale para todos ou nenhum.
+    describe("troca e lote", () => {
+      const thirdUserId = "00000000-0000-4000-8000-0000000000a3";
+      const holders = (assets: Asset[]) =>
+        Object.fromEntries(assets.map((item) => [item.id, item.user_id ?? item.location_id]));
+
+      it("transfere vários itens para uma pessoa e registra um evento por item", async () => {
+        const { prisma, assets, events } = inMemoryPrisma([
+          asset("monitor-1", { user_id: userId, category_id: monitorCategoryId }),
+          asset("monitor-2", { location_id: roomA, category_id: monitorCategoryId }),
+          asset("pc-1", { user_id: userId }),
+        ]);
+        const service = new TiInventoryService(prisma as never);
+
+        await service.transferBatch(context, {
+          asset_ids: ["monitor-1", "monitor-2", "pc-1"],
+          user_id: otherUserId,
+        });
+
+        expect(holders(assets)).toEqual({
+          "monitor-1": otherUserId,
+          "monitor-2": otherUserId,
+          "pc-1": otherUserId,
+        });
+        expect(events).toEqual([
+          event({ from_user_id: userId, to_user_id: otherUserId }),
+          event({ inventory_id: "monitor-2", from_location_id: roomA, to_user_id: otherUserId }),
+          event({ inventory_id: "pc-1", from_user_id: userId, to_user_id: otherUserId }),
+        ]);
+      });
+
+      it("transfere vários itens para um local", async () => {
+        const { prisma, assets, events } = inMemoryPrisma([
+          asset("pc-1", { user_id: userId }),
+          asset("pc-2", { user_id: otherUserId }),
+        ]);
+        const service = new TiInventoryService(prisma as never);
+
+        await service.transferBatch(context, { asset_ids: ["pc-1", "pc-2"], location_id: roomA });
+
+        expect(assets.map((item) => [item.user_id, item.location_id])).toEqual([
+          [null, roomA],
+          [null, roomA],
+        ]);
+        expect(events).toHaveLength(2);
+      });
+
+      it("um item impeditivo desfaz o lote e a mensagem diz quais são", async () => {
+        const seed = [
+          asset("monitor-1", { user_id: userId, category_id: monitorCategoryId }),
+          asset("pc-1", { user_id: userId }),
+          asset("pc-2", { location_id: roomA }),
+          asset("ja-la", { user_id: otherUserId, category_id: monitorCategoryId }),
+        ];
+        const { prisma, assets, events } = inMemoryPrisma(seed);
+        const service = new TiInventoryService(prisma as never);
+
+        await expect(
+          service.transferBatch(context, {
+            asset_ids: ["monitor-1", "pc-1", "pc-2", "ja-la"],
+            user_id: otherUserId,
+          }),
+        ).rejects.toMatchObject({
+          statusCode: 409,
+          code: "TI_INVENTORY_ITEMS_BLOCKED",
+          message:
+            "Nenhum item foi movimentado. Itens impeditivos: pc-1 (o usuário ficaria com mais de um computador ativo); pc-2 (o usuário ficaria com mais de um computador ativo); ja-la (já está no destino).",
+        });
+        expect(holders(assets)).toEqual(holders(seed));
+        expect(events).toEqual([]);
+      });
+
+      it("recusa o lote que daria um segundo computador a quem já tem um", async () => {
+        const { prisma, events } = inMemoryPrisma([
+          asset("pc-1", { user_id: userId }),
+          asset("pc-2", { user_id: otherUserId }),
+        ]);
+        const service = new TiInventoryService(prisma as never);
+
+        await expect(
+          service.transferBatch(context, { asset_ids: ["pc-1"], user_id: otherUserId }),
+        ).rejects.toMatchObject({
+          statusCode: 409,
+          message:
+            "Nenhum item foi movimentado. Itens impeditivos: pc-1 (o usuário ficaria com mais de um computador ativo).",
+        });
+        expect(events).toEqual([]);
+      });
+
+      it("troca os computadores de duas pessoas sem ferir a regra do computador ativo", async () => {
+        const { prisma, assets, events, activeComputers } = inMemoryPrisma([
+          asset("pc-1", { user_id: userId, location_id: roomA }),
+          asset("pc-2", { user_id: otherUserId }),
+        ]);
+        const service = new TiInventoryService(prisma as never);
+
+        await service.swap(context, { asset_id: "pc-1", other_asset_id: "pc-2" });
+
+        expect(holders(assets)).toEqual({ "pc-1": otherUserId, "pc-2": userId });
+        expect(activeComputers(userId).map((item) => item.id)).toEqual(["pc-2"]);
+        expect(events).toEqual([
+          event({
+            inventory_id: "pc-1",
+            action: "swap",
+            from_user_id: userId,
+            from_location_id: roomA,
+            to_user_id: otherUserId,
+          }),
+          event({
+            inventory_id: "pc-2",
+            action: "swap",
+            from_user_id: otherUserId,
+            to_user_id: userId,
+          }),
+        ]);
+      });
+
+      it("recusa a troca que deixaria alguém com dois computadores ou sem duas pessoas", async () => {
+        const { prisma, assets, events } = inMemoryPrisma([
+          asset("pc-1", { user_id: userId }),
+          asset("monitor-2", { user_id: otherUserId, category_id: monitorCategoryId }),
+          asset("pc-2", { user_id: otherUserId }),
+          asset("sem-dono", { location_id: roomA }),
+          asset("monitor-1", { user_id: userId, category_id: monitorCategoryId }),
+        ]);
+        const service = new TiInventoryService(prisma as never);
+        const before = holders(assets);
+
+        // Quem recebe o pc-1 já tem o pc-2, que não entra na troca.
+        await expect(
+          service.swap(context, { asset_id: "pc-1", other_asset_id: "monitor-2" }),
+        ).rejects.toMatchObject({ statusCode: 409, code: "TI_INVENTORY_ITEMS_BLOCKED" });
+        await expect(
+          service.swap(context, { asset_id: "pc-1", other_asset_id: "sem-dono" }),
+        ).rejects.toMatchObject({
+          statusCode: 409,
+          message: "A troca exige dois itens que estejam com pessoas.",
+        });
+        await expect(
+          service.swap(context, { asset_id: "pc-1", other_asset_id: "monitor-1" }),
+        ).rejects.toMatchObject({
+          statusCode: 409,
+          message: "Os dois itens já estão com a mesma pessoa.",
+        });
+        expect(holders(assets)).toEqual(before);
+        expect(events).toEqual([]);
+      });
+
+      it("recusa a troca com uma pessoa inativa", async () => {
+        const { prisma, assets, events } = inMemoryPrisma([
+          asset("pc-1", { user_id: userId }),
+          asset("pc-2", { user_id: otherUserId }),
+        ]);
+        // O ex-colaborador ainda aparece no item, mas não está ativo na organização.
+        prisma.user.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) =>
+          where.id === otherUserId ? null : { id: where.id },
+        );
+        const service = new TiInventoryService(prisma as never);
+
+        await expect(
+          service.swap(context, { asset_id: "pc-1", other_asset_id: "pc-2" }),
+        ).rejects.toMatchObject({
+          statusCode: 404,
+          message: "Usuário não encontrado na organização.",
+        });
+        expect(holders(assets)).toEqual({ "pc-1": userId, "pc-2": otherUserId });
+        expect(events).toEqual([]);
+      });
+
+      it("não movimenta item de outra organização nem lote com item inexistente", async () => {
+        const { prisma, assets, events } = inMemoryPrisma([
+          asset("monitor-1", { user_id: userId, category_id: monitorCategoryId }),
+          asset("alheio", { user_id: otherUserId, organization_id: "outra-organizacao" }),
+        ]);
+        const service = new TiInventoryService(prisma as never);
+
+        await expect(
+          service.transferBatch(context, {
+            asset_ids: ["monitor-1", "alheio"],
+            user_id: thirdUserId,
+          }),
+        ).rejects.toMatchObject({ statusCode: 404 });
+        await expect(
+          service.swap(context, { asset_id: "monitor-1", other_asset_id: "alheio" }),
+        ).rejects.toMatchObject({ statusCode: 404 });
+        expect(assets[0]).toMatchObject({ user_id: userId });
+        expect(events).toEqual([]);
+      });
+
+      it("falha no meio do lote desfaz as escritas já feitas", async () => {
+        const { prisma, assets, events } = inMemoryPrisma([
+          asset("monitor-1", { user_id: userId, category_id: monitorCategoryId }),
+          asset("monitor-2", { user_id: userId, category_id: monitorCategoryId }),
+        ]);
+        // Outra operação move o segundo item depois que o lote já gravou o primeiro.
+        const writeAsset = prisma.inventoryTecnologia.updateMany.getMockImplementation();
+        prisma.inventoryTecnologia.updateMany.mockImplementationOnce(async (args) => {
+          const written = await writeAsset?.(args);
+          const second = assets.find((item) => item.id === "monitor-2");
+          if (second) second.user_id = thirdUserId;
+          return written ?? { count: 0 };
+        });
+        const service = new TiInventoryService(prisma as never);
+
+        await expect(
+          service.transferBatch(context, {
+            asset_ids: ["monitor-1", "monitor-2"],
+            user_id: otherUserId,
+          }),
+        ).rejects.toMatchObject({
+          statusCode: 409,
+          message:
+            "Nenhum item foi movimentado. Itens impeditivos: monitor-2 (movimentado por outra operação).",
+        });
+        expect(assets.find((item) => item.id === "monitor-1")).toMatchObject({ user_id: userId });
+        expect(events).toEqual([]);
+      });
+
+      it("lotes simultâneos para a mesma pessoa deixam um só computador ativo", async () => {
+        const { prisma, activeComputers, lockedKeys } = inMemoryPrisma([
+          asset("pc-1", { location_id: roomA }),
+          asset("pc-2", { location_id: roomA }),
+        ]);
+        const service = new TiInventoryService(prisma as never);
+
+        const results = await Promise.allSettled([
+          service.transferBatch(context, { asset_ids: ["pc-1"], user_id: userId }),
+          service.transferBatch(context, { asset_ids: ["pc-2"], user_id: userId }),
+        ]);
+
+        expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+        expect(activeComputers(userId)).toHaveLength(1);
+        expect(new Set(lockedKeys)).toEqual(
+          new Set([`ti.inventory.active-computer:${context.organizationId}:${userId}`]),
+        );
+      });
+
+      it("trocas cruzadas tomam os bloqueios das pessoas na mesma ordem", async () => {
+        const { prisma, lockedKeys } = inMemoryPrisma([
+          asset("pc-1", { user_id: userId }),
+          asset("pc-2", { user_id: otherUserId }),
+        ]);
+        const service = new TiInventoryService(prisma as never);
+
+        await service.swap(context, { asset_id: "pc-1", other_asset_id: "pc-2" });
+        const firstOrder = [...lockedKeys];
+        lockedKeys.length = 0;
+        await service.swap(context, { asset_id: "pc-1", other_asset_id: "pc-2" });
+
+        expect(firstOrder).toEqual([...firstOrder].sort());
+        expect(lockedKeys).toEqual(firstOrder);
+      });
     });
 
     it("lista o histórico do item com nomes, só da organização", async () => {

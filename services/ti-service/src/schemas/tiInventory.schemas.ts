@@ -52,6 +52,35 @@ export const transferTiInventoryBodySchema = z
     message: "Informe a pessoa ou o local de destino.",
   });
 
+// Lote: vários itens para um mesmo destino, numa operação que vale para todos ou nenhum.
+export const transferTiInventoryBatchBodySchema = z
+  .object({
+    asset_ids: z
+      .array(z.string().uuid({ message: "Ativo de TI inválido." }))
+      .min(1, { message: "Informe ao menos um ativo." })
+      .max(100, { message: "Informe no máximo 100 ativos por lote." }),
+    user_id: z.string().uuid({ message: "Usuário inválido." }).optional(),
+    location_id: z.string().uuid({ message: "Local de inventário inválido." }).optional(),
+  })
+  .strict()
+  .refine((value) => (value.user_id === undefined) !== (value.location_id === undefined), {
+    message: "Informe a pessoa ou o local de destino.",
+  })
+  .refine((value) => new Set(value.asset_ids).size === value.asset_ids.length, {
+    message: "Cada ativo só pode aparecer uma vez no lote.",
+  });
+
+// Troca: os dois itens trocam de pessoa entre si.
+export const swapTiInventoryBodySchema = z
+  .object({
+    asset_id: z.string().uuid({ message: "Ativo de TI inválido." }),
+    other_asset_id: z.string().uuid({ message: "Ativo de TI inválido." }),
+  })
+  .strict()
+  .refine((value) => value.asset_id !== value.other_asset_id, {
+    message: "Informe dois ativos diferentes para a troca.",
+  });
+
 export const listTiInventoryHistoryQuerySchema = paginationQuerySchema;
 
 export const listTiInventoryQuerySchema = paginationQuerySchema
@@ -73,3 +102,5 @@ export type ReturnTiInventoryBody = z.infer<typeof returnTiInventoryBodySchema>;
 export type ListTiInventoryQuery = z.infer<typeof listTiInventoryQuerySchema>;
 export type TransferTiInventoryBody = z.infer<typeof transferTiInventoryBodySchema>;
 export type ListTiInventoryHistoryQuery = z.infer<typeof listTiInventoryHistoryQuerySchema>;
+export type TransferTiInventoryBatchBody = z.infer<typeof transferTiInventoryBatchBodySchema>;
+export type SwapTiInventoryBody = z.infer<typeof swapTiInventoryBodySchema>;
