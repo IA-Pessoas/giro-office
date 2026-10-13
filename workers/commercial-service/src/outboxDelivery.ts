@@ -101,6 +101,15 @@ export class CommercialOutboxBindingDelivery implements CommercialOutboxDelivery
         throw new Error("Envelope de fechamento comercial inválido.");
       }
       await this.notifications.notify(event, projection.client, close.competence);
+    } else if (event.from_status !== null) {
+      await postBinding(
+        this.env.TASK_SERVICE,
+        this.env.TASK_SERVICE_INTERNAL_TOKEN,
+        this.env.INTERNAL_REQUEST_ORIGIN,
+        "/internal/commercial/prospecting-transition",
+        event,
+        event.audit_correlation_id,
+      );
     }
   }
 }
