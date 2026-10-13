@@ -18,8 +18,10 @@ export function createPrismaMock(): PrismaClient {
   let movedInventory: Record<string, unknown> = {};
   const inventoryEvents: Array<Record<string, unknown>> = [];
   const stockTransaction = {
+    $executeRaw: vi.fn(async () => 0),
     inventoryCategoryTecnologia: { findMany: vi.fn(async () => []) },
     inventoryTecnologia: {
+      findMany: vi.fn(async () => []),
       updateMany: vi.fn(async ({ data }) => {
         movedInventory = data;
         return { count: 1 };
@@ -35,6 +37,10 @@ export function createPrismaMock(): PrismaClient {
       create: vi.fn(async ({ data }) => {
         inventoryEvents.push(data);
         return data;
+      }),
+      createMany: vi.fn(async ({ data }) => {
+        inventoryEvents.push(...data);
+        return { count: data.length };
       }),
     },
     stock: {

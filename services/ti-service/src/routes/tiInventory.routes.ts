@@ -14,7 +14,9 @@ import {
   listTiInventoryHistoryQuerySchema,
   listTiInventoryQuerySchema,
   returnTiInventoryBodySchema,
+  swapTiInventoryBodySchema,
   tiInventoryIdParamsSchema,
+  transferTiInventoryBatchBodySchema,
   transferTiInventoryBodySchema,
   updateTiInventoryBodySchema,
 } from "../schemas/tiInventory.schemas.js";
@@ -137,6 +139,40 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
         logError("Erro ao devolver ativo de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/transfer-batch",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const body = parseWithZod(transferTiInventoryBatchBodySchema, request.body);
+        const result = await service.transferBatch(context, body);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao transferir ativos de inventario de TI em lote", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/swap",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const body = parseWithZod(swapTiInventoryBodySchema, request.body);
+        const result = await service.swap(context, body);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao trocar ativos de inventario de TI", { err });
         next(err);
       }
     },

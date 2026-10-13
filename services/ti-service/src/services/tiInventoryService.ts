@@ -14,6 +14,8 @@ import type {
   ListTiInventoryHistoryQuery,
   ListTiInventoryQuery,
   ReturnTiInventoryBody,
+  SwapTiInventoryBody,
+  TransferTiInventoryBatchBody,
   TransferTiInventoryBody,
   UpdateTiInventoryBody,
 } from "../schemas/tiInventory.schemas.js";
@@ -43,7 +45,30 @@ type AssetAssignment = {
 };
 
 /** Tipo de ação do evento patrimonial (#1932). */
-type InventoryEventAction = "assign" | "return" | "transfer";
+type InventoryEventAction = "assign" | "return" | "transfer" | "swap";
+
+type MovableAsset = AssetAssignment & { id: string; asset_code: string };
+
+/** Movimentação planejada de um item dentro de uma troca ou de um lote (#1933). */
+type PlannedMove = {
+  asset: MovableAsset;
+  to: { user_id: string | null; location_id: string | null };
+};
+
+const ITEMS_BLOCKED_CODE = "TI_INVENTORY_ITEMS_BLOCKED";
+
+// Um lote de 100 itens faz uma escrita por item: o padrão de 5 s do Prisma não basta.
+const BATCH_TRANSACTION_OPTIONS = { maxWait: 5_000, timeout: 30_000 };
+
+/** A operação vale para todos os itens ou para nenhum; a mensagem diz quais impediram. */
+function itemsBlockedError(blocked: string[]): ServiceError {
+  return new ServiceError(
+    409,
+    `Nenhum item foi movimentado. Itens impeditivos: ${blocked.join("; ")}.`,
+    undefined,
+    ITEMS_BLOCKED_CODE,
+  );
+}
 
 const ASSET_MOVED_MESSAGE =
   "O item foi movimentado por outra operação. Atualize a tela e tente novamente.";
@@ -305,6 +330,165 @@ export class TiInventoryService {
     });
   }
 
+  /** Vários itens para a mesma pessoa ou o mesmo local, todos ou nenhum (#1933). */
+  async transferBatch(
+    context: TiAuthContext,
+    body: TransferTiInventoryBatchBody,
+  ): Promise<unknown[]> {
+    const assets = await this.loadMovableAssets(context, body.asset_ids);
+    if (body.user_id !== undefined) {
+      await this.ensureActiveOrganizationUser(context.organizationId, body.user_id);
+    } else {
+      await this.ensureLocation(context.organizationId, body.location_id as string);
+    }
+    const to =
+      body.user_id !== undefined
+        ? { user_id: body.user_id, location_id: null }
+        : { user_id: null, location_id: body.location_id as string };
+
+    return this.moveMany(
+      context,
+      "transfer",
+      assets.map((asset) => ({ asset, to })),
+    );
+  }
+
+  /** Troca entre duas pessoas: cada item passa para quem está com o outro (#1933). */
+  async swap(context: TiAuthContext, body: SwapTiInventoryBody): Promise<unknown[]> {
+    const [first, second] = await this.loadMovableAssets(context, [
+      body.asset_id,
+      body.other_asset_id,
+    ]);
+    const firstHolder = first ? activeHolderId(first) : null;
+    const secondHolder = second ? activeHolderId(second) : null;
+    if (!first || !second || !firstHolder || !secondHolder) {
+      throw new ServiceError(409, "A troca exige dois itens que estejam com pessoas.");
+    }
+    if (firstHolder === secondHolder) {
+      throw new ServiceError(409, "Os dois itens já estão com a mesma pessoa.");
+    }
+    // Cada pessoa passa a ser destino de um item: precisa estar ativa, como na transferência.
+    await this.ensureActiveOrganizationUser(context.organizationId, firstHolder);
+    await this.ensureActiveOrganizationUser(context.organizationId, secondHolder);
+
+    return this.moveMany(context, "swap", [
+      { asset: first, to: { user_id: secondHolder, location_id: null } },
+      { asset: second, to: { user_id: firstHolder, location_id: null } },
+    ]);
+  }
+
+  private async loadMovableAssets(context: TiAuthContext, ids: string[]): Promise<MovableAsset[]> {
+    const found = await this.prisma.inventoryTecnologia.findMany({
+      where: { id: { in: ids }, organization_id: context.organizationId },
+      select: {
+        id: true,
+        asset_code: true,
+        category_id: true,
+        user_id: true,
+        location_id: true,
+        return_date: true,
+      },
+    });
+    const byId = new Map(found.map((asset) => [asset.id, asset]));
+    const assets = ids.flatMap((id) => byId.get(id) ?? []);
+    if (assets.length !== ids.length) {
+      throw new ServiceError(404, "Ativo de TI não encontrado.");
+    }
+    return assets;
+  }
+
+  /**
+   * Aplica várias movimentações numa só transação. Tudo é conferido antes da primeira
+   * escrita — destino igual à origem e regra do computador ativo sobre o estado final —, e a
+   * resposta lista os itens que impediram. Os bloqueios das pessoas de destino são tomados
+   * em ordem, para duas operações cruzadas não se travarem.
+   */
+  private async moveMany(
+    context: TiAuthContext,
+    action: InventoryEventAction,
+    moves: PlannedMove[],
+  ): Promise<unknown[]> {
+    const organizationId = context.organizationId;
+    const ids = moves.map((move) => move.asset.id);
+
+    return this.prisma.$transaction(async (transaction) => {
+      const destinationUserIds = uniqueIds(moves.map((move) => move.to.user_id)).sort();
+      for (const userId of destinationUserIds) {
+        await this.lockActiveComputer(transaction, organizationId, userId);
+      }
+
+      const computerCategoryIds = await this.computerCategoryIds(transaction, organizationId);
+      const isComputer = (move: PlannedMove) =>
+        computerCategoryIds.includes(move.asset.category_id);
+      // Computadores que cada pessoa de destino terá no fim: os que ficam mais os que chegam.
+      const staying =
+        destinationUserIds.length === 0
+          ? []
+          : await transaction.inventoryTecnologia.findMany({
+              where: {
+                organization_id: organizationId,
+                user_id: { in: destinationUserIds },
+                return_date: null,
+                category_id: { in: computerCategoryIds },
+                id: { notIn: ids },
+              },
+              select: { user_id: true },
+            });
+      const computersByUser = new Map<string, number>();
+      const count = (userId: string | null) => {
+        if (userId) computersByUser.set(userId, (computersByUser.get(userId) ?? 0) + 1);
+      };
+      for (const asset of staying) count(asset.user_id);
+      for (const move of moves) if (isComputer(move)) count(move.to.user_id);
+
+      const blocked = moves.flatMap((move) => {
+        const holderId = activeHolderId(move.asset);
+        const alreadyThere = move.to.user_id
+          ? move.to.user_id === holderId
+          : !holderId && move.asset.location_id === move.to.location_id;
+        if (alreadyThere) return [`${move.asset.asset_code} (já está no destino)`];
+        if (
+          move.to.user_id &&
+          isComputer(move) &&
+          (computersByUser.get(move.to.user_id) ?? 0) > 1
+        ) {
+          return [`${move.asset.asset_code} (o usuário ficaria com mais de um computador ativo)`];
+        }
+        return [];
+      });
+      if (blocked.length > 0) throw itemsBlockedError(blocked);
+
+      const deliveryDate = new Date();
+      for (const move of moves) {
+        const moved = await transaction.inventoryTecnologia.updateMany({
+          where: {
+            id: move.asset.id,
+            organization_id: organizationId,
+            category_id: move.asset.category_id,
+            user_id: move.asset.user_id ?? null,
+            location_id: move.asset.location_id ?? null,
+            return_date: move.asset.return_date ?? null,
+          },
+          data: { ...move.to, delivery_date: deliveryDate, return_date: null },
+        });
+        if (moved.count !== 1) {
+          throw itemsBlockedError([`${move.asset.asset_code} (movimentado por outra operação)`]);
+        }
+      }
+      await transaction.inventoryEventTecnologia.createMany({
+        data: moves.map((move) =>
+          this.eventData(context, move.asset.id, action, move.asset, move.to),
+        ),
+      });
+
+      return transaction.inventoryTecnologia.findMany({
+        where: { id: { in: ids }, organization_id: organizationId },
+        include: INVENTORY_INCLUDE,
+        orderBy: { asset_code: "asc" },
+      });
+    }, BATCH_TRANSACTION_OPTIONS);
+  }
+
   /** Histórico patrimonial do item, do mais recente para o mais antigo. */
   async listHistory(
     context: TiAuthContext,
@@ -411,6 +595,7 @@ export class TiInventoryService {
         where: {
           id,
           organization_id: organizationId,
+          category_id: existing.category_id,
           user_id: existing.user_id ?? null,
           location_id: existing.location_id ?? null,
           return_date: existing.return_date ?? null,
@@ -517,7 +702,7 @@ export class TiInventoryService {
     computerCategoryIds: string[],
     assetId?: string,
   ): Promise<void> {
-    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+    await this.lockActiveComputer(transaction, organizationId, userId);
     const activeComputer = await transaction.inventoryTecnologia.findFirst({
       where: {
         organization_id: organizationId,
@@ -531,6 +716,15 @@ export class TiInventoryService {
     if (activeComputer) {
       throw new ServiceError(409, ACTIVE_COMPUTER_CONFLICT_MESSAGE);
     }
+  }
+
+  /** Bloqueio transacional que serializa as escritas de computador de uma pessoa. */
+  private async lockActiveComputer(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
   }
 
   private async ensureCategory(organizationId: string, categoryId: string): Promise<void> {

@@ -1886,6 +1886,33 @@ await runTest("ti inventory offers transfer to a user or department and shows as
   assert.match(source, /getTiInventoryMutationErrorMessage\(error\)/);
 });
 
+await runTest("ti inventory offers batch transfer and swap, showing the blocking items", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const service = await readModuleSource("services/tiInventoryService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /transferBatch: "\/ti\/inventory\/transfer-batch"/);
+  assert.match(contract, /swap: "\/ti\/inventory\/swap"/);
+  assert.match(service, /transferInventoryAssetsBatch/);
+  assert.match(service, /swapInventoryAssets/);
+  assert.match(source, /label="Transferir em lote"/);
+  assert.match(source, /title="Transferir em lote"/);
+  assert.match(source, /A transferência vale para todos os ativos selecionados ou para nenhum\./);
+  assert.match(source, /asset_ids: assetIds/);
+  assert.match(source, /\.filter\(\(id\) => batchAssetIds\.includes\(id\)\)/);
+  assert.match(source, /label="Trocar"/);
+  assert.match(source, /title="Trocar ativo"/);
+  assert.match(source, /other_asset_id: otherAssetId/);
+  // A troca só oferece ativos que estão com outro usuário.
+  assert.match(source, /asset\.user_id !== swapAsset\.user_id/);
+  // A mensagem do servidor, com os itens impeditivos, aparece no diálogo.
+  assert.match(
+    source,
+    /diz quais impediram o lote\.\s*setDialogError\(getTiInventoryMutationErrorMessage\(error\)\);/,
+  );
+  assert.match(source, /swap: "Troca"/);
+});
+
 await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");

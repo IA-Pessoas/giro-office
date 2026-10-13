@@ -635,11 +635,15 @@ describe("TI domain: transferências e histórico patrimonial", () => {
   function store(seed: Asset[]) {
     const assets = seed.map((item) => ({ ...item }));
     const events: Array<Record<string, unknown>> = [];
+    const lockedKeys: unknown[] = [];
+    const queues = new Map<string, Promise<void>>();
     const matches = (item: Asset, where: Record<string, unknown>): boolean =>
       Object.entries(where).every(([key, expected]) => {
         if (key === "NOT") return item.id !== (expected as { id: string }).id;
-        if (key === "category_id" && expected && typeof expected === "object") {
-          return (expected as { in: unknown[] }).in.includes(item.category_id);
+        if (expected && typeof expected === "object" && !(expected instanceof Date)) {
+          const filter = expected as { in?: unknown[]; notIn?: unknown[] };
+          if (filter.in) return filter.in.includes(item[key]);
+          if (filter.notIn) return !filter.notIn.includes(item[key]);
         }
         return item[key] === expected;
       });
@@ -650,6 +654,11 @@ describe("TI domain: transferências e histórico patrimonial", () => {
           const snapshot = found ? { ...found } : null;
           await new Promise((resolve) => setTimeout(resolve, 5));
           return snapshot;
+        }),
+        findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+          const found = assets.filter((item) => matches(item, where)).map((item) => ({ ...item }));
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return found;
         }),
         updateMany: vi.fn(
           async ({ where, data }: { where: Record<string, unknown>; data: object }) => {
@@ -674,6 +683,10 @@ describe("TI domain: transferências e histórico patrimonial", () => {
           events.push(data);
           return data;
         }),
+        createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+          events.push(...data);
+          return { count: data.length };
+        }),
         findMany: vi.fn(async () => [] as unknown[]),
       },
       user: {
@@ -689,14 +702,50 @@ describe("TI domain: transferências e histórico patrimonial", () => {
     };
     const db = {
       ...models,
-      $transaction: vi.fn(async (callback: (database: TiDatabase) => Promise<unknown>) =>
-        callback({
-          ...models,
-          $executeRaw: vi.fn(async () => undefined),
-        } as unknown as TiDatabase),
-      ),
+      // O bloqueio consultivo enfileira as transações da mesma chave, e a transação que
+      // falha tem as escritas desfeitas, como o rollback do banco.
+      $transaction: vi.fn(async (callback: (database: TiDatabase) => Promise<unknown>) => {
+        const releases: Array<() => void> = [];
+        const undo: Array<() => void> = [];
+        const eventsBefore = events.length;
+        try {
+          return await callback({
+            ...models,
+            inventoryTecnologia: {
+              ...models.inventoryTecnologia,
+              updateMany: async (args: { where: Record<string, unknown>; data: object }) => {
+                for (const item of assets.filter((candidate) => matches(candidate, args.where))) {
+                  const before = { ...item };
+                  undo.push(() => Object.assign(item, before));
+                }
+                return models.inventoryTecnologia.updateMany(args);
+              },
+            },
+            $executeRaw: vi.fn(async (_query: TemplateStringsArray, key: string) => {
+              lockedKeys.push(key);
+              const previous = queues.get(key) ?? Promise.resolve();
+              let release = () => {};
+              const held = new Promise<void>((resolve) => {
+                release = resolve;
+              });
+              queues.set(
+                key,
+                previous.then(() => held),
+              );
+              await previous;
+              releases.push(release);
+            }),
+          } as unknown as TiDatabase);
+        } catch (error) {
+          for (const revert of undo.reverse()) revert();
+          events.length = eventsBefore;
+          throw error;
+        } finally {
+          for (const release of releases) release();
+        }
+      }),
     } as unknown as TiDatabase;
-    return { db, models, assets, events };
+    return { db, models, assets, events, lockedKeys };
   }
 
   it("move entre pessoas e locais e registra origem, destino, autor e ação", async () => {
@@ -808,6 +857,208 @@ describe("TI domain: transferências e histórico patrimonial", () => {
       results.flatMap((result) => (result.status === "rejected" ? [result.reason.statusCode] : [])),
     ).toEqual([409]);
     expect(events).toHaveLength(1);
+  });
+
+  // #1933: troca entre pessoas e lote, numa operação que vale para todos ou nenhum.
+  describe("troca e lote", () => {
+    const THIRD_USER_ID = "b0000000-0000-4000-8000-000000000003";
+    const computer = (id: string, overrides: Record<string, unknown> = {}) =>
+      asset(id, { asset_code: id, category_id: COMPUTER_CATEGORY_ID, ...overrides });
+    const monitor = (id: string, overrides: Record<string, unknown> = {}) =>
+      asset(id, { asset_code: id, ...overrides });
+    const holders = (assets: Asset[]) =>
+      Object.fromEntries(assets.map((item) => [item.id, item.user_id ?? item.location_id]));
+
+    it("transfere vários itens para uma pessoa ou um local, com um evento por item", async () => {
+      const { db, assets, events } = store([
+        monitor("monitor-1", { user_id: USER_ID }),
+        monitor("monitor-2", { location_id: ROOM_A }),
+        computer("pc-1", { user_id: USER_ID }),
+      ]);
+      const service = createTiDomainServices(db).inventory;
+
+      await service?.transferBatch?.(auth(), {
+        asset_ids: ["monitor-1", "monitor-2", "pc-1"],
+        user_id: OTHER_USER_ID,
+      });
+      expect(holders(assets)).toEqual({
+        "monitor-1": OTHER_USER_ID,
+        "monitor-2": OTHER_USER_ID,
+        "pc-1": OTHER_USER_ID,
+      });
+      expect(events).toEqual([
+        event({ from_user_id: USER_ID, to_user_id: OTHER_USER_ID }),
+        event({ inventory_id: "monitor-2", from_location_id: ROOM_A, to_user_id: OTHER_USER_ID }),
+        event({ inventory_id: "pc-1", from_user_id: USER_ID, to_user_id: OTHER_USER_ID }),
+      ]);
+
+      await service?.transferBatch?.(auth(), {
+        asset_ids: ["monitor-1", "pc-1"],
+        location_id: ROOM_B,
+      });
+      expect(assets.filter((item) => item.location_id === ROOM_B).map((item) => item.id)).toEqual([
+        "monitor-1",
+        "pc-1",
+      ]);
+      expect(events).toHaveLength(5);
+    });
+
+    it("um item impeditivo desfaz o lote e a mensagem diz quais são", async () => {
+      const seed = [
+        monitor("monitor-1", { user_id: USER_ID }),
+        computer("pc-1", { user_id: USER_ID }),
+        computer("pc-2", { location_id: ROOM_A }),
+        monitor("ja-la", { user_id: OTHER_USER_ID }),
+      ];
+      const { db, assets, events } = store(seed);
+      const service = createTiDomainServices(db).inventory;
+
+      await expect(
+        service?.transferBatch?.(auth(), {
+          asset_ids: ["monitor-1", "pc-1", "pc-2", "ja-la"],
+          user_id: OTHER_USER_ID,
+        }),
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        code: "TI_INVENTORY_ITEMS_BLOCKED",
+        message:
+          "Nenhum item foi movimentado. Itens impeditivos: pc-1 (o usuário ficaria com mais de um computador ativo); pc-2 (o usuário ficaria com mais de um computador ativo); ja-la (já está no destino).",
+      });
+      expect(holders(assets)).toEqual(holders(seed));
+      expect(events).toEqual([]);
+    });
+
+    it("troca os computadores de duas pessoas e recusa as trocas inválidas", async () => {
+      const { db, assets, events, lockedKeys } = store([
+        computer("pc-1", { user_id: USER_ID, location_id: ROOM_A }),
+        computer("pc-2", { user_id: OTHER_USER_ID }),
+        monitor("monitor-1", { user_id: USER_ID }),
+        monitor("sem-dono", { location_id: ROOM_A }),
+        computer("pc-3", { user_id: THIRD_USER_ID }),
+        monitor("monitor-3", { user_id: THIRD_USER_ID }),
+      ]);
+      const service = createTiDomainServices(db).inventory;
+
+      await service?.swap?.(auth(), { asset_id: "pc-1", other_asset_id: "pc-2" });
+      expect(holders(assets)).toMatchObject({ "pc-1": OTHER_USER_ID, "pc-2": USER_ID });
+      expect(events).toEqual([
+        event({
+          inventory_id: "pc-1",
+          action: "swap",
+          from_user_id: USER_ID,
+          from_location_id: ROOM_A,
+          to_user_id: OTHER_USER_ID,
+        }),
+        event({
+          inventory_id: "pc-2",
+          action: "swap",
+          from_user_id: OTHER_USER_ID,
+          to_user_id: USER_ID,
+        }),
+      ]);
+      // Os bloqueios das duas pessoas são tomados em ordem.
+      expect(lockedKeys).toEqual([...lockedKeys].sort());
+      expect(lockedKeys).toHaveLength(2);
+
+      const before = holders(assets);
+      // Quem recebe o pc-2 já tem o pc-3, que não entra na troca.
+      await expect(
+        service?.swap?.(auth(), { asset_id: "pc-2", other_asset_id: "monitor-3" }),
+      ).rejects.toMatchObject({ statusCode: 409, code: "TI_INVENTORY_ITEMS_BLOCKED" });
+      await expect(
+        service?.swap?.(auth(), { asset_id: "pc-2", other_asset_id: "sem-dono" }),
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        message: "A troca exige dois itens que estejam com pessoas.",
+      });
+      await expect(
+        service?.swap?.(auth(), { asset_id: "pc-2", other_asset_id: "monitor-1" }),
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        message: "Os dois itens já estão com a mesma pessoa.",
+      });
+      expect(holders(assets)).toEqual(before);
+      expect(events).toHaveLength(2);
+    });
+
+    it("lotes simultâneos para a mesma pessoa deixam um só computador ativo", async () => {
+      const { db, assets, lockedKeys } = store([
+        computer("pc-1", { location_id: ROOM_A }),
+        computer("pc-2", { location_id: ROOM_A }),
+      ]);
+      const service = createTiDomainServices(db).inventory;
+
+      const results = await Promise.allSettled([
+        service?.transferBatch?.(auth(), { asset_ids: ["pc-1"], user_id: OTHER_USER_ID }),
+        service?.transferBatch?.(auth(), { asset_ids: ["pc-2"], user_id: OTHER_USER_ID }),
+      ]);
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(assets.filter((item) => item.user_id === OTHER_USER_ID)).toHaveLength(1);
+      expect(new Set(lockedKeys)).toEqual(
+        new Set([`ti.inventory.active-computer:${ORGANIZATION_ID}:${OTHER_USER_ID}`]),
+      );
+    });
+
+    it("recusa a troca com uma pessoa inativa", async () => {
+      const { db, models, assets, events } = store([
+        computer("pc-1", { user_id: USER_ID }),
+        computer("pc-2", { user_id: OTHER_USER_ID }),
+      ]);
+      // O ex-colaborador ainda aparece no item, mas não está ativo na organização.
+      models.user.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) =>
+        where.id === OTHER_USER_ID ? (null as never) : { id: where.id, status: "active" },
+      );
+
+      await expect(
+        createTiDomainServices(db).inventory?.swap?.(auth(), {
+          asset_id: "pc-1",
+          other_asset_id: "pc-2",
+        }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      expect(holders(assets)).toEqual({ "pc-1": USER_ID, "pc-2": OTHER_USER_ID });
+      expect(events).toEqual([]);
+    });
+
+    it("não movimenta item de outra organização e desfaz o lote em falha no meio", async () => {
+      const { db, models, assets, events } = store([
+        monitor("monitor-1", { user_id: USER_ID }),
+        monitor("monitor-2", { user_id: USER_ID }),
+        monitor("alheio", { user_id: OTHER_USER_ID, organization_id: "outra-organizacao" }),
+      ]);
+      const service = createTiDomainServices(db).inventory;
+
+      await expect(
+        service?.transferBatch?.(auth(), {
+          asset_ids: ["monitor-1", "alheio"],
+          user_id: THIRD_USER_ID,
+        }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      await expect(
+        service?.swap?.(auth(), { asset_id: "monitor-1", other_asset_id: "alheio" }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+
+      // Outra operação move o segundo item depois que o lote já gravou o primeiro.
+      const writeAsset = models.inventoryTecnologia.updateMany.getMockImplementation();
+      models.inventoryTecnologia.updateMany.mockImplementationOnce(async (args) => {
+        const written = await writeAsset?.(args);
+        const second = assets.find((item) => item.id === "monitor-2");
+        if (second) second.user_id = THIRD_USER_ID;
+        return written ?? { count: 0 };
+      });
+      await expect(
+        service?.transferBatch?.(auth(), {
+          asset_ids: ["monitor-1", "monitor-2"],
+          user_id: OTHER_USER_ID,
+        }),
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        message:
+          "Nenhum item foi movimentado. Itens impeditivos: monitor-2 (movimentado por outra operação).",
+      });
+      expect(assets.find((item) => item.id === "monitor-1")).toMatchObject({ user_id: USER_ID });
+      expect(events).toEqual([]);
+    });
   });
 
   it("lista o histórico do item com nomes, só da organização", async () => {

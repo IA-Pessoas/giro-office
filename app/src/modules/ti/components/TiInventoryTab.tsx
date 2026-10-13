@@ -3,8 +3,10 @@ import {
   ArrowRightLeft,
   Boxes,
   Eye,
+  ListChecks,
   Pencil,
   Plus,
+  Repeat,
   RotateCcw,
   Save,
   Tags,
@@ -25,12 +27,14 @@ import {
   useCreateTiInventoryAssetMutation,
   useCreateTiInventoryCategoryMutation,
   useReturnTiInventoryAssetMutation,
+  useSwapTiInventoryAssetsMutation,
   useTiInventory,
   useTiInventoryAsset,
   useTiInventoryAssetHistory,
   useTiInventoryCategories,
   useTiInventoryLocations,
   useTransferTiInventoryAssetMutation,
+  useTransferTiInventoryAssetsBatchMutation,
   useUpdateTiInventoryAssetMutation,
   useUpdateTiInventoryCategoryMutation,
 } from "../hooks";
@@ -71,6 +75,8 @@ type InventoryDialogState =
   | { type: "assign"; asset: TiInventoryAsset }
   | { type: "return"; asset: TiInventoryAsset }
   | { type: "transfer"; asset: TiInventoryAsset }
+  | { type: "transferBatch" }
+  | { type: "swap"; asset: TiInventoryAsset }
   | { type: "categories" };
 
 type TransferTarget = "user" | "location";
@@ -84,6 +90,7 @@ const INVENTORY_EVENT_LABELS: Record<string, string> = {
   assign: "Atribuição",
   return: "Devolução",
   transfer: "Transferência",
+  swap: "Troca",
 };
 
 function getEventPartyName(party?: { name?: string | null; full_name?: string | null } | null) {
@@ -294,11 +301,13 @@ export function TiInventoryTab() {
   const [categoryToDelete, setCategoryToDelete] = useState<TiInventoryCategory | null>(null);
   const [categoryDeleteError, setCategoryDeleteError] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<TransferTarget>("user");
+  const [batchAssetIds, setBatchAssetIds] = useState<TiId[]>([]);
   const isUserSelectorEnabled =
     canManage &&
     (dialogState?.type === "asset" ||
       dialogState?.type === "assign" ||
-      dialogState?.type === "transfer");
+      dialogState?.type === "transfer" ||
+      dialogState?.type === "transferBatch");
   const assetUsersQuery = useAssignableUsers({ enabled: isUserSelectorEnabled });
   const technologyResponsibleUsersQuery = useAssignableUsers({
     enabled: isUserSelectorEnabled && dialogState?.type === "asset",
@@ -329,6 +338,8 @@ export function TiInventoryTab() {
   const assignUserMutation = useAssignTiInventoryAssetUserMutation();
   const returnAssetMutation = useReturnTiInventoryAssetMutation();
   const transferAssetMutation = useTransferTiInventoryAssetMutation();
+  const transferBatchMutation = useTransferTiInventoryAssetsBatchMutation();
+  const swapAssetsMutation = useSwapTiInventoryAssetsMutation();
   const createCategoryMutation = useCreateTiInventoryCategoryMutation();
   const updateCategoryMutation = useUpdateTiInventoryCategoryMutation();
 
@@ -421,6 +432,24 @@ export function TiInventoryTab() {
     (asset) => String(asset.id) === String(selectedAssetId),
   );
   const selectedAsset = selectedAssetQuery.data ?? selectedListAsset;
+
+  // Troca: só ativos que estão com outro usuário.
+  const swapAsset = dialogState?.type === "swap" ? dialogState.asset : null;
+  const swapAssetOptions = [
+    { value: "", label: "Selecione" },
+    ...(inventoryQuery.data ?? [])
+      .filter(
+        (asset) =>
+          swapAsset !== null &&
+          Boolean(asset.user_id) &&
+          !asset.return_date &&
+          asset.user_id !== swapAsset.user_id,
+      )
+      .map((asset) => ({
+        value: String(asset.id),
+        label: `${getAssetTitle(asset)} · ${getAssignedUser(asset)}`,
+      })),
+  ];
 
   function getCategoryName(id: unknown, fallback?: unknown): string {
     return getText(categoriesById.get(String(id))?.name ?? fallback);
@@ -552,6 +581,71 @@ export function TiInventoryTab() {
     }
   }
 
+  async function handleSubmitTransferBatch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canManage || dialogState?.type !== "transferBatch") {
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    const destinationId = getFormText(
+      formData,
+      transferTarget === "user" ? "user_id" : "location_id",
+    );
+
+    // Só vão os ativos que continuam na lista: ela pode ter sido recarregada com o diálogo aberto.
+    const assetIds = filteredInventory
+      .map((asset) => asset.id)
+      .filter((id) => batchAssetIds.includes(id));
+
+    if (assetIds.length === 0 || !destinationId) {
+      setDialogError("Selecione os ativos e o destino da transferência.");
+      return;
+    }
+
+    try {
+      setDialogError(null);
+      await transferBatchMutation.mutateAsync({
+        asset_ids: assetIds,
+        ...(transferTarget === "user"
+          ? { user_id: destinationId }
+          : { location_id: destinationId }),
+      });
+      closeDialog();
+    } catch (error) {
+      // O servidor não movimenta nenhum item e diz quais impediram o lote.
+      setDialogError(getTiInventoryMutationErrorMessage(error));
+    }
+  }
+
+  async function handleSubmitSwap(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canManage || dialogState?.type !== "swap") {
+      return;
+    }
+
+    const otherAssetId = getFormText(new FormData(event.currentTarget), "other_asset_id");
+
+    if (!otherAssetId) {
+      setDialogError("Selecione o ativo que será trocado.");
+      return;
+    }
+
+    try {
+      setDialogError(null);
+      await swapAssetsMutation.mutateAsync({
+        asset_id: dialogState.asset.id,
+        other_asset_id: otherAssetId,
+      });
+      setSelectedAssetId(dialogState.asset.id);
+      closeDialog();
+    } catch (error) {
+      setDialogError(getTiInventoryMutationErrorMessage(error));
+    }
+  }
+
   async function handleConfirmPendingAction() {
     if (!pendingAction) {
       return;
@@ -645,6 +739,15 @@ export function TiInventoryTab() {
                 icon={Tags}
                 label="Categorias"
                 onClick={() => openDialog({ type: "categories" })}
+              />
+              <TiIconAction
+                icon={ListChecks}
+                label="Transferir em lote"
+                onClick={() => {
+                  setTransferTarget("user");
+                  setBatchAssetIds([]);
+                  openDialog({ type: "transferBatch" });
+                }}
               />
             </div>
           ) : null
@@ -769,6 +872,13 @@ export function TiInventoryTab() {
                                 label="Devolver"
                                 onClick={() => openDialog({ type: "return", asset })}
                               />
+                              {asset.user_id && !asset.return_date ? (
+                                <TiTableAction
+                                  icon={Repeat}
+                                  label="Trocar"
+                                  onClick={() => openDialog({ type: "swap", asset })}
+                                />
+                              ) : null}
                               <TiTableAction
                                 icon={ArrowRightLeft}
                                 label="Transferir"
@@ -1142,6 +1252,136 @@ export function TiInventoryTab() {
               label={transferAssetMutation.isPending ? "Transferindo..." : "Transferir ativo"}
               variant="primary"
               disabled={transferAssetMutation.isPending || !canManage}
+            />
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={dialogState?.type === "transferBatch"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDialog();
+          }
+        }}
+        title="Transferir em lote"
+        description="Transferência de vários ativos para o mesmo usuário ou departamento."
+      >
+        <form className="space-y-4" onSubmit={handleSubmitTransferBatch}>
+          {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
+          <TiInlineNotice tone="warning">
+            A transferência vale para todos os ativos selecionados ou para nenhum.
+          </TiInlineNotice>
+          <fieldset className={tiDialogSubsectionClassName}>
+            <legend className="text-sm font-semibold text-slate-900 dark:text-white">
+              Ativos da lista atual
+            </legend>
+            <button
+              type="button"
+              className={tiCompactButtonClassName}
+              onClick={() =>
+                setBatchAssetIds(
+                  batchAssetIds.length === filteredInventory.length
+                    ? []
+                    : filteredInventory.map((asset) => asset.id),
+                )
+              }
+            >
+              {batchAssetIds.length === filteredInventory.length && filteredInventory.length > 0
+                ? "Limpar seleção"
+                : "Selecionar todos"}
+            </button>
+            <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+              {filteredInventory.map((asset) => (
+                <li key={asset.id}>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={batchAssetIds.includes(asset.id)}
+                      onChange={(event) =>
+                        setBatchAssetIds((current) =>
+                          event.target.checked
+                            ? [...current, asset.id]
+                            : current.filter((id) => id !== asset.id),
+                        )
+                      }
+                    />
+                    {`${getAssetTitle(asset)} · ${getAssignedUser(asset)}`}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+          <TiNativeSelect
+            label="Destino"
+            name="transfer_target"
+            options={TRANSFER_TARGET_OPTIONS}
+            value={transferTarget}
+            onChange={(event) => setTransferTarget(event.target.value as TransferTarget)}
+          />
+          {transferTarget === "user" ? (
+            <TiNativeSelect
+              label="Usuário"
+              name="user_id"
+              required
+              options={transferUserOptions}
+              disabled={assetUsersQuery.isLoading || assetUsersQuery.isError}
+            />
+          ) : (
+            <TiNativeSelect
+              label="Departamento"
+              name="location_id"
+              required
+              options={departmentFormOptions}
+              disabled={departmentsQuery.isLoading || departmentsQuery.isError}
+            />
+          )}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
+              Cancelar
+            </button>
+            <TiIconAction
+              icon={ListChecks}
+              type="submit"
+              label={transferBatchMutation.isPending ? "Transferindo..." : "Transferir selecionados"}
+              variant="primary"
+              disabled={transferBatchMutation.isPending || !canManage}
+            />
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={dialogState?.type === "swap"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDialog();
+          }
+        }}
+        title="Trocar ativo"
+        description="Troca de ativos entre dois usuários."
+      >
+        <form className="space-y-4" onSubmit={handleSubmitSwap}>
+          {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
+          <TiInlineNotice tone="warning">
+            Cada ativo passa para o usuário que está com o outro, e a troca fica no histórico.
+          </TiInlineNotice>
+          <TiNativeSelect
+            label="Trocar com"
+            name="other_asset_id"
+            required
+            options={swapAssetOptions}
+          />
+          <div className="flex justify-end gap-2">
+            <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
+              Cancelar
+            </button>
+            <TiIconAction
+              icon={Repeat}
+              type="submit"
+              label={swapAssetsMutation.isPending ? "Trocando..." : "Trocar ativos"}
+              variant="primary"
+              disabled={swapAssetsMutation.isPending || !canManage}
             />
           </div>
         </form>

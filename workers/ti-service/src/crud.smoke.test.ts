@@ -148,11 +148,32 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     // devolução, a nova atribuição e as duas transferências.
     await call("PATCH", `/ti/inventory/${assetId}/transfer`, { location_id: locationId });
     await call("PATCH", `/ti/inventory/${assetId}/transfer`, { user_id: userId });
+    // #1933: lote para o local e troca com um segundo item que está com outra pessoa.
+    const other = await call("POST", "/ti/inventory", {
+      asset_code: `PAT-TROCA-${suffix()}`,
+      category_id: categoryId,
+      user_id: ownerId,
+    });
+    await call("POST", "/ti/inventory/swap", {
+      asset_id: assetId,
+      other_asset_id: other.data.id,
+    });
+    await call("POST", "/ti/inventory/transfer-batch", {
+      asset_ids: [assetId, other.data.id],
+      location_id: locationId,
+    });
+    // Repetir o lote não movimenta nada e aponta os dois itens.
+    const repeated = await smokeCall(app(), env(), "POST", "/ti/inventory/transfer-batch", {
+      asset_ids: [assetId, other.data.id],
+      location_id: locationId,
+    });
+    expect(repeated.status).toBe(409);
+    expect(repeated.text).toContain("já está no destino");
     const history = await smokeCall(app(), env(), "GET", `/ti/inventory/${assetId}/history`);
     expect(history.status).toBe(200);
     expect(
       (history.json?.data as Array<{ action: string }>).map((event) => event.action).sort(),
-    ).toEqual(["assign", "assign", "return", "transfer", "transfer"]);
+    ).toEqual(["assign", "assign", "return", "swap", "transfer", "transfer", "transfer"]);
     await call("PATCH", `/ti/inventory-categories/${categoryId}`, { active: false });
     await call("PATCH", `/ti/inventory-locations/${locationId}`, { active: false });
   });
