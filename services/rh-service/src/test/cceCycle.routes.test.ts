@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import request from "supertest";
 import express, {
   type ErrorRequestHandler,
   type NextFunction,
   type Request,
   type Response,
 } from "express";
+import request from "supertest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { cceCycleServiceMock } = vi.hoisted(() => ({
   cceCycleServiceMock: {
