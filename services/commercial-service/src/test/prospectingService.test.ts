@@ -47,6 +47,7 @@ function createMockPrisma(): CommercialProspectingPrismaDeps {
     commercialProspecting: {
       findFirst: vi.fn(async () => null),
       findMany: vi.fn(async () => [item]),
+      count: vi.fn(async () => 1),
       create: vi.fn(async () => item),
       updateMany: vi.fn(async () => ({ count: 1 })),
       delete: vi.fn(async () => item),
@@ -80,7 +81,82 @@ describe("CommercialProspectingService", () => {
 
     expect(prisma.commercialProspecting.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: OTHER_ORGANIZATION_ID, archived_at: null },
+        where: expect.objectContaining({
+          organization_id: OTHER_ORGANIZATION_ID,
+          archived_at: null,
+          client: { is: { organization_id: OTHER_ORGANIZATION_ID } },
+        }),
+      }),
+    );
+  });
+
+  it("aplica filtros no banco e retorna paginação com os campos da prospecção", async () => {
+    const prisma = createMockPrisma();
+    prisma.commercialProspecting.count = vi.fn(async () => 41) as never;
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    const result = await service.list(OTHER_ORGANIZATION_ID, {
+      page: 2,
+      page_size: 20,
+      status: "Fechado",
+      search: "Acme",
+    });
+
+    expect(prisma.commercialProspecting.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: OTHER_ORGANIZATION_ID,
+          archived_at: null,
+          status: "Fechado",
+          OR: expect.any(Array),
+        }),
+        skip: 20,
+        take: 20,
+        orderBy: [{ status: "asc" }, { updated_at: "desc" }, { id: "asc" }],
+        select: expect.objectContaining({
+          client: expect.objectContaining({
+            select: expect.objectContaining({
+              cpf_cnpj: true,
+              number: true,
+              email: true,
+              indication: true,
+              partners: {
+                where: { organization_id: OTHER_ORGANIZATION_ID },
+                select: { clientPF: { select: { name: true } } },
+                orderBy: { entry: "asc" },
+              },
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(prisma.commercialProspecting.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: OTHER_ORGANIZATION_ID,
+          archived_at: null,
+          status: "Fechado",
+        }),
+      }),
+    );
+    expect(result).toEqual({ items: [item], page: 2, page_size: 20, total: 41, total_pages: 3 });
+  });
+
+  it("mantém a projeção de detalhe sem os campos pessoais exclusivos da lista", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.commercialProspecting.findFirst).mockResolvedValue(item as never);
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    await service.detail(PROSPECTING_ID, ORGANIZATION_ID);
+
+    expect(prisma.commercialProspecting.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: PROSPECTING_ID, organization_id: ORGANIZATION_ID, archived_at: null },
+        select: expect.objectContaining({
+          client: {
+            select: { id: true, name: true, company_name: true, fantasy_name: true },
+          },
+        }),
       }),
     );
   });

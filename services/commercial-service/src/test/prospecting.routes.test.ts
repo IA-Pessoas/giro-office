@@ -1,5 +1,7 @@
 import "./envBootstrap.js";
 
+import { createHmac } from "node:crypto";
+
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
@@ -44,7 +46,7 @@ function createServiceMock(): CommercialProspectingRouteDeps {
     detail: vi.fn(async () => {
       throw new Error("not used");
     }),
-    list: vi.fn(async () => []),
+    list: vi.fn(async () => ({ items: [], page: 1, page_size: 20, total: 0, total_pages: 0 })),
     listClients: vi.fn(async () => []),
     update: vi.fn(async () => {
       throw new Error("not used");
@@ -94,6 +96,42 @@ describe("commercial prospecting routes", () => {
     const response = await request(createTestApp(service)).get("/commercial/prospecting");
 
     expect(response.status).toBe(401);
+    expect(service.list).not.toHaveBeenCalled();
+  });
+
+  it("valida e encaminha os filtros paginados com o tenant autenticado", async () => {
+    const service = createServiceMock();
+    await request(createTestApp(service))
+      .get("/commercial/prospecting?page=2&page_size=25&status=Fechado&search=Acme")
+      .set(gatewayHeaders())
+      .expect(200);
+
+    expect(service.list).toHaveBeenCalledWith(ORGANIZATION_ID, {
+      page: 2,
+      page_size: 25,
+      status: "Fechado",
+      search: "Acme",
+    });
+    await request(createTestApp(service))
+      .get("/commercial/prospecting?page_size=101")
+      .set(gatewayHeaders())
+      .expect(400);
+  });
+
+  it("bloqueia acesso direto por JWT à lista que contém dados pessoais", async () => {
+    const service = createServiceMock();
+    const payload = Buffer.from(
+      JSON.stringify({ user_id: USER_ID, organization_id: ORGANIZATION_ID }),
+    ).toString("base64url");
+    const unsignedToken = `${Buffer.from('{"alg":"HS256","typ":"JWT"}').toString("base64url")}.${payload}`;
+    const token = `${unsignedToken}.${createHmac("sha256", getCommercialServiceEnv().jwtSecret)
+      .update(unsignedToken)
+      .digest("base64url")}`;
+    const response = await request(createTestApp(service))
+      .get("/commercial/prospecting")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(403);
     expect(service.list).not.toHaveBeenCalled();
   });
 

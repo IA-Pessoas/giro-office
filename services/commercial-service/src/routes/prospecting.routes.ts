@@ -1,5 +1,6 @@
 import {
   createSuccessResponse,
+  INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
   parseWithZod,
   requireAuthenticatedRequestContext,
@@ -8,6 +9,7 @@ import {
 import { validateUploadFileSignature } from "@workspace/shared/upload";
 import { type Request, Router } from "express";
 import multer from "multer";
+import { getCommercialServiceEnv } from "../config/env.js";
 import {
   PROSPECTING_ATTACHMENT_MIME_TYPES,
   type ProspectingAttachmentMimeType,
@@ -16,6 +18,7 @@ import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   createProspectingBodySchema,
   prospectingIdParamSchema,
+  prospectingListQuerySchema,
   updateProspectingBodySchema,
 } from "../schemas/prospecting.schemas.js";
 import type { CommercialProspectingService } from "../services/prospectingService.js";
@@ -109,14 +112,26 @@ export function createProspectingRoutes(
     }
   });
 
-  router.get("/", isAuthenticated, async (req, res, next) => {
-    try {
-      const { organization_id } = authContext(req);
-      res.json(createSuccessResponse(await service.list(organization_id)));
-    } catch (error) {
-      next(error);
-    }
-  });
+  router.get(
+    "/",
+    isAuthenticated,
+    (req, _res, next) => {
+      if (req.get(INTERNAL_SERVICE_TOKEN_HEADER) !== getCommercialServiceEnv().auditServiceToken) {
+        next(new ServiceError(403, "Acesso não autorizado."));
+        return;
+      }
+      next();
+    },
+    async (req, res, next) => {
+      try {
+        const { organization_id } = authContext(req);
+        const filters = parseWithZod(prospectingListQuerySchema, req.query);
+        res.json(createSuccessResponse(await service.list(organization_id, filters)));
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   router.get("/:id/history", isAuthenticated, async (req, res, next) => {
     try {
