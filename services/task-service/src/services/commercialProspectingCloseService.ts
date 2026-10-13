@@ -122,7 +122,9 @@ export class CommercialProspectingCloseService {
           if (regularizeTaskIds.length > 0) {
             const transitioningTaskIds = new Set(regularizeTaskIds);
             const transitioningTasks = tasks.filter((task) => transitioningTaskIds.has(task.id));
-            const regularizeTaskModels = [...new Set(transitioningTasks.map((task) => task.model_id))];
+            const regularizeTaskModels = [
+              ...new Set(transitioningTasks.map((task) => task.model_id)),
+            ];
             const links = await tx.tasksIntegrationRegularize.findMany({
               where: {
                 organization_id: event.organization_id,

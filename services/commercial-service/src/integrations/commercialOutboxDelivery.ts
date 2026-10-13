@@ -28,13 +28,18 @@ export class CommercialOutboxHttpDelivery implements CommercialOutboxDelivery {
       const prospectingEvent = event as CommercialProspectingTransitionEvent;
       const projection = await this.clientProjection.deliver(prospectingEvent);
       if (prospectingEvent.to_status === "Fechado") {
-        if (!this.taskClose) throw new Error("Dependência de fechamento comercial não configurada.");
+        if (!this.taskClose)
+          throw new Error("Dependência de fechamento comercial não configurada.");
         const taskResult = await this.taskClose.deliver(prospectingEvent);
         if (!prospectingEvent.suppress_notice) {
           if (!this.notifications) {
             throw new Error("Dependência de notificação comercial não configurada.");
           }
-          await this.notifications.notify(prospectingEvent, projection.client, taskResult.competence);
+          await this.notifications.notify(
+            prospectingEvent,
+            projection.client,
+            taskResult.competence,
+          );
         }
       } else {
         if (prospectingEvent.from_status === null) return;
