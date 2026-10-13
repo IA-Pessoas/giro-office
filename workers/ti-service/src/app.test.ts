@@ -1,4 +1,5 @@
 import { hashCsrfToken } from "@workspace/runtime";
+import { ServiceError } from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
 import {
   type CategoryPrisma,
@@ -395,6 +396,44 @@ describe("ti Worker", () => {
     expect(grantUse.create).toHaveBeenCalledTimes(2);
   });
 
+  // #1929: como no serviço Node, a posse do chamado é conferida antes de gravar a imagem.
+  it("checks request access before storing a message image", async () => {
+    const storage = { upload: vi.fn(), remove: vi.fn(), createSignedAccessUrl: vi.fn() };
+    const requests = {
+      getById: vi.fn(async () => {
+        throw new ServiceError(404, "Chamado de TI não encontrado.");
+      }),
+      createMessage: vi.fn(),
+    };
+    const form = new FormData();
+    form.set("message", "anexo em chamado alheio");
+    form.set(
+      "file",
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", {
+        type: "image/png",
+      }),
+    );
+    const app = createTiWorkerApp({
+      env: env(),
+      services: { requests } as never,
+      requestImageStorage: storage,
+    } as never);
+
+    const response = await app.request(`https://ti.test/ti/requests/${CATEGORY_ID}/messages`, {
+      method: "POST",
+      headers: headers("1"),
+      body: form,
+    });
+
+    expect(response.status).toBe(404);
+    expect(requests.getById).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: USER_ID, permission: 1 }),
+      CATEGORY_ID,
+    );
+    expect(storage.upload).not.toHaveBeenCalled();
+    expect(requests.createMessage).not.toHaveBeenCalled();
+  });
+
   it("removes an uploaded attachment when message creation fails", async () => {
     const attachment = `ti/organizations/${ORGANIZATION_ID}/requests/${CATEGORY_ID}/00000000-0000-4000-8000-000000000001.png`;
     const storage = {
@@ -403,6 +442,7 @@ describe("ti Worker", () => {
       createSignedAccessUrl: vi.fn(),
     };
     const requests = {
+      getById: vi.fn(async () => ({ id: CATEGORY_ID })),
       createMessage: vi.fn(async () => {
         throw new Error("message failed");
       }),
@@ -439,7 +479,10 @@ describe("ti Worker", () => {
       remove: vi.fn().mockResolvedValue(undefined),
       createSignedAccessUrl: vi.fn(),
     };
-    const requests = { createMessage: vi.fn(async () => ({ id: CATEGORY_ID })) };
+    const requests = {
+      getById: vi.fn(async () => ({ id: CATEGORY_ID })),
+      createMessage: vi.fn(async () => ({ id: CATEGORY_ID })),
+    };
     const form = new FormData();
     form.set("message", "patho invalido");
     form.set("type", "Message");
@@ -476,6 +519,7 @@ describe("ti Worker", () => {
       }),
     };
     const requests = {
+      getById: vi.fn(async () => ({ id: CATEGORY_ID })),
       createMessage: vi.fn(async () => ({ id: CATEGORY_ID, attachment })),
     };
     const form = new FormData();

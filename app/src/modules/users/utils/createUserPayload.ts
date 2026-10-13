@@ -31,6 +31,8 @@ interface BuildAdminCreateUserPayloadInput {
   organizationId: string;
   invitedBy?: string;
   canCreateOrganizationOwner?: boolean;
+  /** Só o owner concede módulos; os demais criam o usuário com o autoatendimento (#1930). */
+  canGrantModules?: boolean;
 }
 
 export function resolveCreateUserTopLevelPermission(
@@ -105,7 +107,22 @@ export function buildAdminCreateUserPayload({
   organizationId,
   invitedBy,
   canCreateOrganizationOwner = false,
+  canGrantModules = true,
 }: BuildAdminCreateUserPayloadInput): AdminCreateUserData {
+  if (!canGrantModules) {
+    return {
+      name: formData.name,
+      login: formData.login,
+      password: formData.password,
+      department_id: formData.department_id,
+      permission: 1,
+      organization_id: organizationId,
+      type: "user",
+      status: "active",
+      ...(invitedBy ? { invited_by: invitedBy } : {}),
+    };
+  }
+
   const isOrganizationOwner =
     canCreateOrganizationOwner && formData.isOrganizationOwner;
   const type = resolveCreateUserType(
