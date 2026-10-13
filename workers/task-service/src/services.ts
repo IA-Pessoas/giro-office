@@ -5,6 +5,7 @@ import {
   createAiTaskExtractionProvider,
 } from "@workspace/task-service/src/integrations/aiTaskExtraction.js";
 import { CommercialProspectingCloseService } from "@workspace/task-service/src/services/commercialProspectingCloseService.js";
+import { CommercialProspectingTransitionService } from "@workspace/task-service/src/services/commercialProspectingTransitionService.js";
 import { CommercialTaskBillingProjectionService } from "@workspace/task-service/src/services/commercialTaskBillingProjectionService.js";
 import { DepsTasksService } from "@workspace/task-service/src/services/depsTasksService.js";
 import { ProjectPlanService } from "@workspace/task-service/src/services/projectPlanService.js";
@@ -91,6 +92,7 @@ export function createTaskServices(prisma: unknown, env: TaskWorkerEnv) {
     reporting: () => new TaskReportingService(db),
     commercialTaskBilling: () => new CommercialTaskBillingProjectionService(db),
     commercialProspectingClose: () => new CommercialProspectingCloseService(db),
+    commercialProspectingTransition: () => new CommercialProspectingTransitionService(db),
   };
 }
 

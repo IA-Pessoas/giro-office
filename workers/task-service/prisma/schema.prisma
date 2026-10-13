@@ -603,6 +603,20 @@ model CommercialProspectingCloseEvent {
   @@map("commercial.prospecting_close_events")
 }
 
+model CommercialProspectingTransitionEvent {
+  event_id             String   @id
+  organization_id      String
+  client_id            String
+  prospecting_id       String
+  from_status          String?
+  to_status            String
+  audit_correlation_id String
+  created_at           DateTime @default(now())
+
+  @@index([organization_id, client_id, created_at], map: "idx_commercial_prospecting_transition_client")
+  @@map("commercial.prospecting_transition_events")
+}
+
 model CommercialTaskBillingProjectionEvent {
   id                   String   @id
   organization_id      String

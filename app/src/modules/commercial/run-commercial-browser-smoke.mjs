@@ -690,6 +690,12 @@ async function run() {
     await prospectingDialog.screenshot({ path: `${evidenceDir}/09-commercial-prospecting-create-modal.png` });
     const prospectingForm = prospectingDialog.getByRole("form", { name: "Nova prospecção" });
     await prospectingForm.getByText(client.company_name, { exact: true }).waitFor();
+    const prospectingStatus = prospectingForm.getByRole("combobox").first();
+    const prospectingStatusOptions = await prospectingStatus.locator("option").allTextContents();
+    assert.ok(prospectingStatusOptions.includes("Baixada"));
+    assert.ok(prospectingStatusOptions.includes("Inativo"));
+    await prospectingStatus.selectOption("Baixada");
+    await prospectingDialog.screenshot({ path: `${evidenceDir}/15-commercial-prospecting-baixada-option.png` });
     await prospectingForm.getByLabel("Data da etapa").fill("2026-09-15");
     await prospectingForm.getByLabel("Solução *").selectOption("META");
     await prospectingForm.getByLabel("Mês de referência *").fill("2026-09");
@@ -709,7 +715,7 @@ async function run() {
     const createProspectingResponse = await createProspectingResponsePromise;
     assert.deepEqual(JSON.parse(createProspectingResponse.request().postData() || "{}"), {
       client_id: client.id,
-      status: "Análise Financeira",
+      status: "Baixada",
       status_date: new Date("2026-09-15T12:00:00").toISOString(),
       solution: "META",
       reference_month: "2026-09",
@@ -720,7 +726,7 @@ async function run() {
       branch: "Matriz",
       pause_reason: null,
     });
-    await page.getByText("Análise Financeira").last().waitFor();
+    await page.getByText("Baixada").last().waitFor();
     const prospectingList = page.locator("[aria-labelledby='commercial-prospecting-title']");
     await prospectingList.getByText("21 prospecções encontradas").waitFor();
     await prospectingList.getByText("12.345.678/0001-90").first().waitFor();
@@ -732,6 +738,11 @@ async function run() {
 
     await prospectingList.getByLabel("Situação").selectOption("Fechado");
     await prospectingList.getByText("Nenhuma prospecção encontrada para os filtros aplicados.").waitFor();
+    await prospectingList.getByLabel("Situação").selectOption("Inativo");
+    await prospectingList.getByText("Nenhuma prospecção encontrada para os filtros aplicados.").waitFor();
+    await prospectingList.getByLabel("Situação").selectOption("Baixada");
+    await prospectingList.getByText("Sócio Smoke").first().waitFor();
+    await prospectingList.screenshot({ path: `${evidenceDir}/16-commercial-prospecting-baixada-filter.png` });
     await prospectingList.getByLabel("Situação").selectOption("Todas");
     await prospectingList.getByText("Sócio Smoke").first().waitFor();
     await prospectingList.getByText("Página 1 de 2").waitFor();
@@ -750,8 +761,9 @@ async function run() {
     await prospectingList.getByText("Sócio Smoke").first().waitFor();
     await prospectingList.getByLabel("Buscar").fill("");
     await prospectingList.getByRole("button", { name: "Kanban", exact: true }).click();
-    await prospectingList.getByRole("region", { name: "Análise Financeira: 19 prospecções" }).waitFor();
+    await prospectingList.getByRole("region", { name: "Análise Financeira: 18 prospecções" }).waitFor();
     await prospectingList.getByRole("region", { name: "Recusado pelo Cliente: 1 prospecções" }).waitFor();
+    await prospectingList.getByRole("region", { name: "Baixada: 1 prospecções" }).waitFor();
     await prospectingList.screenshot({ path: `${evidenceDir}/13-commercial-prospecting-kanban.png` });
     await prospectingList.getByRole("button", { name: "Lista", exact: true }).click();
     await page.emulateMedia({ media: "print" });

@@ -10,7 +10,9 @@ const prospectingStatuses = [
   "Envio de Proposta",
   "Paralisado",
   "Recusado pelo Cliente",
+  "Baixada",
   "Fechado",
+  "Inativo",
 ] as const;
 
 export const commercialProspectingCloseEventSchema = z

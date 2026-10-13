@@ -16,6 +16,7 @@ import { MemoryLogStream } from "@workspace/shared/testUtils";
 import { createTaskApp } from "@workspace/task-service/src/app.js";
 import { getTaskServiceEnv } from "@workspace/task-service/src/config/env.js";
 import * as commercialProspectingClose from "@workspace/task-service/src/services/commercialProspectingCloseService.js";
+import * as commercialProspectingTransition from "@workspace/task-service/src/services/commercialProspectingTransitionService.js";
 import * as commercialTaskBilling from "@workspace/task-service/src/services/commercialTaskBillingProjectionService.js";
 import * as depsTasks from "@workspace/task-service/src/services/depsTasksService.js";
 import * as projectPlan from "@workspace/task-service/src/services/projectPlanService.js";
@@ -36,6 +37,7 @@ import { createTaskWorkerApp } from "./app.js";
 import type { TaskWorkerEnv } from "./env.js";
 
 vi.mock("@workspace/task-service/src/services/commercialProspectingCloseService.js");
+vi.mock("@workspace/task-service/src/services/commercialProspectingTransitionService.js");
 vi.mock("@workspace/task-service/src/services/commercialTaskBillingProjectionService.js");
 vi.mock("@workspace/task-service/src/services/depsTasksService.js");
 vi.mock("@workspace/task-service/src/services/projectPlanService.js");
@@ -54,6 +56,8 @@ vi.mock("@workspace/task-service/src/services/taskReportingService.js");
 
 const SERVICE_CLASSES = {
   CommercialProspectingCloseService: commercialProspectingClose.CommercialProspectingCloseService,
+  CommercialProspectingTransitionService:
+    commercialProspectingTransition.CommercialProspectingTransitionService,
   CommercialTaskBillingProjectionService:
     commercialTaskBilling.CommercialTaskBillingProjectionService,
   DepsTasksService: depsTasks.DepsTasksService,
@@ -745,6 +749,43 @@ const CASES: Case[] = [
     headers: { "x-internal-service-token": nodeEnv.commercialServiceToken },
     json: { event_id: "x" },
   },
+  {
+    name: "commercial prospecting-transition",
+    method: "POST",
+    path: "/internal/commercial/prospecting-transition",
+    auth: "none",
+    headers: { "x-internal-service-token": nodeEnv.commercialServiceToken },
+    json: {
+      event_id: UUID,
+      event_type: COMMERCIAL_PROSPECTING_TRANSITION_EVENT,
+      event_version: COMMERCIAL_PROSPECTING_EVENT_VERSION,
+      organization_id: ORG,
+      client_id: UUID,
+      prospecting_id: UUID,
+      from_status: "Envio de Proposta",
+      to_status: "Paralisado",
+      status_date: null,
+      description: null,
+      audit_correlation_id: "c-3",
+      occurred_at: "2026-09-22T10:00:00.000Z",
+    },
+  },
+  {
+    name: "commercial prospecting-transition inválido",
+    method: "POST",
+    path: "/internal/commercial/prospecting-transition",
+    auth: "none",
+    headers: { "x-internal-service-token": nodeEnv.commercialServiceToken },
+    json: { event_id: "x" },
+  },
+  {
+    name: "commercial prospecting-transition token errado",
+    method: "POST",
+    path: "/internal/commercial/prospecting-transition",
+    auth: "none",
+    headers: { "x-internal-service-token": "errado" },
+    json: {},
+  },
 ];
 
 type Observed = { status: number; body: unknown; calls: Record<string, unknown[]> };
@@ -845,7 +886,7 @@ describe("paridade task-service: Worker Hono x Express do Node", () => {
 
   it("cobre todas as rotas do Node", () => {
     const covered = new Set(CASES.map(({ method, path }) => `${method} ${path.split("?")[0]}`));
-    expect(covered.size).toBe(57);
+    expect(covered.size).toBe(58);
   });
 
   it("não expõe rota fora do contrato", async () => {

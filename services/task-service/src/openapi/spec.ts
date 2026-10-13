@@ -1046,6 +1046,21 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/internal/commercial/prospecting-transition": {
+        post: {
+          tags: ["Commercial"],
+          summary: "Aplicar transição comercial nas tarefas",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: {
+            "200": successJson,
+            "400": { description: "Evento inválido." },
+            "403": { description: "Acesso negado." },
+          },
+        },
+      },
       "/task/conclusion": {
         put: {
           tags: ["Lifecycle"],

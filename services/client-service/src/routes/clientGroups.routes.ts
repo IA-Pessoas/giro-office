@@ -26,7 +26,7 @@ function authorization(request: Request) {
   } as const;
 }
 
-export function createClientGroupsRouter(deps: ClientRouterDeps) {
+export function createClientGroupsRouter(deps: ClientRouterDeps): ReturnType<typeof Router> {
   const router = Router();
   const service = new ClientGroupService(deps.prisma);
 

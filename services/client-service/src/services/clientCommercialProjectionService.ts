@@ -26,7 +26,10 @@ function mapClientStatus(status: CommercialProspectingTransitionEvent["to_status
     case "Paralisado":
       return "Paralisado";
     case "Recusado pelo Cliente":
+    case "Inativo":
       return "Não Contratado";
+    case "Baixada":
+      return "Paralisado";
     default:
       return "Prospecção";
   }

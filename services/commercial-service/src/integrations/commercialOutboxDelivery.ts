@@ -11,6 +11,7 @@ import type {
 } from "../services/commercialOutboxWorkerService.js";
 import type { ClientProjectionDelivery } from "./clientProjection.js";
 import type { ProspectingCloseDelivery } from "./prospectingClose.js";
+import type { ProspectingTaskTransitionDelivery } from "./prospectingTaskTransition.js";
 import type { TaskProjectionDelivery } from "./taskProjection.js";
 
 export class CommercialOutboxHttpDelivery implements CommercialOutboxDelivery {
@@ -19,6 +20,7 @@ export class CommercialOutboxHttpDelivery implements CommercialOutboxDelivery {
     private readonly taskProjection: TaskProjectionDelivery,
     private readonly taskClose?: ProspectingCloseDelivery,
     private readonly notifications?: Pick<CommercialEmailNotificationService, "notify">,
+    private readonly taskTransition?: ProspectingTaskTransitionDelivery,
   ) {}
 
   async deliver(event: CommercialOutboxEventPayload): Promise<void> {
@@ -31,6 +33,12 @@ export class CommercialOutboxHttpDelivery implements CommercialOutboxDelivery {
         }
         const taskResult = await this.taskClose.deliver(prospectingEvent);
         await this.notifications.notify(prospectingEvent, projection.client, taskResult.competence);
+      } else {
+        if (prospectingEvent.from_status === null) return;
+        if (!this.taskTransition) {
+          throw new Error("Dependência de transição comercial nas tarefas não configurada.");
+        }
+        await this.taskTransition.deliver(prospectingEvent);
       }
       return;
     }

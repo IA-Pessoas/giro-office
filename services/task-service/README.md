@@ -19,7 +19,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `JWT_SECRET`
 - `PROJECT_SERVICE_URL`
 - `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` para fonte interna de relatórios
-- `COMMERCIAL_SERVICE_TOKEN` para os contratos internos de fechamento comercial e projeção de cobrança do `commercial-service`
+- `COMMERCIAL_SERVICE_TOKEN` para os contratos internos de efeitos de situação comercial, fechamento e projeção de cobrança do `commercial-service` (Node e Worker)
 - `AUDIT_*` quando a auditoria estiver ativa
 - `AI_EXTRACTION_MODE` (`fake` por padrao, ou `openai`) escolhe o provedor da extracao de tarefas
   do wizard de Projetos. `fake` usa um adapter deterministico local, sem rede nem creditos;
@@ -90,6 +90,8 @@ Exemplos de paths publicos:
 
 `/internal/reporting` é contrato direto interno, não roteado pelo gateway.
 `/internal/commercial/task-billing` é contrato direto interno, protegido por `COMMERCIAL_SERVICE_TOKEN`.
+`/internal/commercial/prospecting-transition` aplica efeitos de transições comerciais nas tarefas e também é protegido por `COMMERCIAL_SERVICE_TOKEN`.
+O task Worker expõe o mesmo contrato de transição, usando o model Prisma reduzido correspondente para a idempotência.
 O antigo `PUT /task/comercial` foi removido no corte; cobrança pública ocorre em `/commercial/task-billing`.
 
 ## Desenvolvimento

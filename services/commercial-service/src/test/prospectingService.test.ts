@@ -331,6 +331,36 @@ describe("CommercialProspectingService", () => {
     expect(prisma.commercialProspecting.updateMany).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "Baixada",
+    "Inativo",
+  ] as const)("permite retornar de %s para análise e registra a nova transição", async (fromStatus) => {
+    const prisma = createMockPrisma();
+    prisma.commercialProspecting.findFirst = vi
+      .fn()
+      .mockResolvedValueOnce({ ...item, status: fromStatus })
+      .mockResolvedValueOnce({ ...item, status: "Análise/Agendamento" });
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    await service.update({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      prospecting_id: PROSPECTING_ID,
+      status: "Análise/Agendamento",
+    });
+
+    expect(prisma.commercialOutboxEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          payload: expect.objectContaining({
+            from_status: fromStatus,
+            to_status: "Análise/Agendamento",
+          }),
+        }),
+      }),
+    );
+  });
+
   it("oculta o histórico quando a prospecção não pertence à organização", async () => {
     const prisma = createMockPrisma();
     prisma.commercialProspecting.findFirst = vi.fn(async () => null);

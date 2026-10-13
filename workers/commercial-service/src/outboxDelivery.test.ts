@@ -110,3 +110,102 @@ it("preserva o envelope de prospecção fechada e aciona a notificação canôni
     expect(request.headers.get("x-request-id")).toBe(event.audit_correlation_id);
   }
 });
+
+it("entrega efeitos de transição às tarefas pela binding com token interno", async () => {
+  const clientFetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        success: true,
+        data: { client: { id: "c0000000-0000-4000-8000-000000000001" } },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    ),
+  );
+  const taskFetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          event_id: "10000000-0000-4000-8000-000000000002",
+          client_id: "c0000000-0000-4000-8000-000000000001",
+          updated_count: 3,
+          duplicate: false,
+        },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    ),
+  );
+  const event = {
+    event_id: "10000000-0000-4000-8000-000000000002",
+    event_type: "commercial.prospecting.transition" as const,
+    event_version: 1 as const,
+    organization_id: "a0000000-0000-4000-8000-000000000001",
+    client_id: "c0000000-0000-4000-8000-000000000001",
+    prospecting_id: "d0000000-0000-4000-8000-000000000001",
+    from_status: "Análise/Agendamento" as const,
+    to_status: "Baixada" as const,
+    status_date: "2026-09-22T00:00:00.000Z",
+    description: null,
+    audit_correlation_id: "request-transition-1",
+    occurred_at: "2026-09-22T00:00:00.000Z",
+  };
+  const delivery = new CommercialOutboxBindingDelivery({
+    INTERNAL_REQUEST_ORIGIN: "https://commercial.test",
+    CLIENT_SERVICE_INTERNAL_TOKEN: "client-token",
+    CLIENT_SERVICE: { fetch: clientFetch },
+    TASK_SERVICE_INTERNAL_TOKEN: "task-token",
+    TASK_SERVICE: { fetch: taskFetch },
+  });
+
+  await delivery.deliver(event);
+
+  expect(clientFetch).toHaveBeenCalledOnce();
+  expect(taskFetch).toHaveBeenCalledOnce();
+  const [request] = taskFetch.mock.calls[0] as [Request];
+  expect(new URL(request.url).pathname).toBe("/internal/commercial/prospecting-transition");
+  expect(request.headers.get("x-internal-service-token")).toBe("task-token");
+  expect(request.headers.get("x-request-id")).toBe(event.audit_correlation_id);
+  expect(await request.json()).toEqual(event);
+});
+
+it("não aplica efeitos de tarefa ao cadastrar uma prospecção já em uma situação", async () => {
+  const clientFetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        success: true,
+        data: { client: { id: "c0000000-0000-4000-8000-000000000001" } },
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    ),
+  );
+  const taskFetch = vi.fn();
+  const event = {
+    event_id: "10000000-0000-4000-8000-000000000003",
+    event_type: "commercial.prospecting.transition" as const,
+    event_version: 1 as const,
+    organization_id: "a0000000-0000-4000-8000-000000000001",
+    client_id: "c0000000-0000-4000-8000-000000000001",
+    prospecting_id: "d0000000-0000-4000-8000-000000000001",
+    from_status: null,
+    to_status: "Inativo" as const,
+    status_date: "2026-09-22T00:00:00.000Z",
+    description: null,
+    audit_correlation_id: "request-create-1",
+    occurred_at: "2026-09-22T00:00:00.000Z",
+  };
+  const delivery = new CommercialOutboxBindingDelivery({
+    INTERNAL_REQUEST_ORIGIN: "https://commercial.test",
+    CLIENT_SERVICE_INTERNAL_TOKEN: "client-token",
+    CLIENT_SERVICE: { fetch: clientFetch },
+    TASK_SERVICE_INTERNAL_TOKEN: "task-token",
+    TASK_SERVICE: { fetch: taskFetch },
+  });
+
+  await delivery.deliver(event);
+
+  expect(clientFetch).toHaveBeenCalledOnce();
+  expect(taskFetch).not.toHaveBeenCalled();
+});
