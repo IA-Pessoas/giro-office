@@ -1766,11 +1766,19 @@ async function createOrganizationUser(
     throw new ServiceError(503, "Criação de usuário não configurada.");
   }
   const type = input.type ?? null;
-  // Admin recebe o nível 3 no módulo do departamento: é concessão, só do owner (#1930).
-  if (actor && actor.claims.type !== "owner" && type === "admin") {
-    throw new ServiceError(403, "Apenas o owner cria administradores.");
-  }
   const requestedPermission = Number(input.permission);
+  // Admin recebe o nível 3 no módulo do departamento, e nível acima do básico é acesso
+  // elevado: são concessões, só do owner (#1930).
+  if (
+    actor &&
+    actor.claims.type !== "owner" &&
+    (type === "admin" || requestedPermission > DEFAULT_NON_OWNER_PERMISSION)
+  ) {
+    throw new ServiceError(
+      403,
+      "Apenas o owner cria administradores ou usuários com acesso elevado.",
+    );
+  }
   const permission =
     type === "owner" ? 2 : type === "admin" && requestedPermission >= 2 ? 1 : requestedPermission;
   const modules = modulesForCreate(type, permission, department.name, input.modules);

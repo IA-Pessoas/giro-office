@@ -502,9 +502,16 @@ class UserManagementService {
             ),
             normalizedPermission,
           );
-    // Admin recebe o nível 3 no módulo do departamento: é concessão, só do owner.
-    if (grantScope && normalizedType === "admin") {
-      throw new ServiceError(403, "Apenas o owner cria administradores.");
+    // Admin recebe o nível 3 no módulo do departamento, e nível acima do básico é acesso
+    // elevado: são concessões, só do owner.
+    if (
+      grantScope &&
+      (normalizedType === "admin" || normalizedPermission > DEFAULT_NON_OWNER_PERMISSION)
+    ) {
+      throw new ServiceError(
+        403,
+        "Apenas o owner cria administradores ou usuários com acesso elevado.",
+      );
     }
 
     const passwordHash = await hashPassword(data.password);
