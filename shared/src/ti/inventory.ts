@@ -13,7 +13,8 @@ export const ACTIVE_COMPUTER_CONFLICT_MESSAGE = "Esse usuário já possui um com
 export const COMPUTER_CATEGORY_LOCKED_MESSAGE =
   "A categoria Computador é usada pela regra do computador ativo e não pode ser renomeada nem desativada.";
 
-function normalizeCategoryName(name: unknown): string {
+/** Compara nomes do inventário sem depender de caixa, acento ou espaços nas pontas. */
+export function normalizeTiName(name: unknown): string {
   if (typeof name !== "string") return "";
   return name
     .normalize("NFD")
@@ -23,7 +24,7 @@ function normalizeCategoryName(name: unknown): string {
 }
 
 export function isComputerCategoryName(name: unknown): boolean {
-  return normalizeCategoryName(name) === COMPUTER_CATEGORY_NAME;
+  return normalizeTiName(name) === COMPUTER_CATEGORY_NAME;
 }
 
 export const COMPUTER_CATEGORY_RENAME_CONFLICT_MESSAGE =

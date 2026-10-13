@@ -12,6 +12,7 @@ export * from "./routes/services.js";
 export * from "./schemas/index.js";
 export * from "./security/index.js";
 export * from "./storage/index.js";
+export * from "./ti/equipmentMap.js";
 export * from "./ti/inventory.js";
 export * from "./triagem/index.js";
 export * from "./upload/index.js";

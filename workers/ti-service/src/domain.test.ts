@@ -1114,3 +1114,90 @@ describe("TI domain: transferências e histórico patrimonial", () => {
     );
   });
 });
+
+// #1934: mapa de equipamentos por usuário, somente leitura e derivado só do inventário.
+describe("TI domain: mapa de equipamentos do usuário", () => {
+  // Só os dois models que o mapa pode consultar: qualquer outro acesso (por exemplo o mapa de
+  // grupos de clientes do Regularize, `tb_workspace.mapas` no legado) quebraria o teste.
+  const dbWith = (assets: unknown[], user: unknown = { id: OTHER_USER_ID, name: "ana" }) => {
+    const models = {
+      user: { findFirst: vi.fn(async () => user) },
+      inventoryTecnologia: { findMany: vi.fn(async () => assets) },
+    };
+    return { db: models as unknown as TiDatabase, models };
+  };
+
+  it("monta o mapa com dados e conexões, só dos itens ativos da pessoa na organização", async () => {
+    const { db, models } = dbWith([
+      {
+        id: "pc-1",
+        asset_code: "PC-001",
+        notes: "Marca: Dell\nEntradas: HDMI, VGA\nConfigurações: i5, 8GB",
+        category: { name: "Computador" },
+      },
+      { id: "fone-1", asset_code: "FONE-1", notes: "Saída: P2", category: { name: "Fone" } },
+      {
+        id: "mon-1",
+        asset_code: "MON-001",
+        notes: "Entradas: HDMI",
+        category: { name: "Monitor" },
+      },
+    ]);
+
+    const map = await createTiDomainServices(db).inventory?.getUserEquipmentMap?.(
+      auth(),
+      OTHER_USER_ID,
+    );
+
+    expect(map).toMatchObject({
+      user: { id: OTHER_USER_ID, name: "ana" },
+      equipment: [
+        {
+          id: "pc-1",
+          asset_code: "PC-001",
+          category: "Computador",
+          is_host: true,
+          brand: "Dell",
+          inputs: ["HDMI", "VGA"],
+          configuration: ["i5", "8GB"],
+        },
+        { id: "fone-1", is_host: false, outputs: ["P2"] },
+        { id: "mon-1", is_host: false, inputs: ["HDMI"] },
+      ],
+      // O fone não tem porta em comum com o computador: fica sem conexão.
+      connections: [{ host_id: "pc-1", equipment_id: "mon-1", ports: ["HDMI"] }],
+    });
+    expect(models.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORGANIZATION_ID, user_id: OTHER_USER_ID, return_date: null },
+      }),
+    );
+    expect(models.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: OTHER_USER_ID, organization_id: ORGANIZATION_ID } }),
+    );
+  });
+
+  it("não inventa conexão e recusa usuário de outra organização", async () => {
+    const ambiguous = dbWith([
+      { id: "pc-1", asset_code: "PC-001", notes: null, category: { name: "Computador" } },
+      {
+        id: "mon-1",
+        asset_code: "MON-001",
+        notes: "ligado no HDMI do computador",
+        category: { name: "Monitor" },
+      },
+    ]);
+    expect(
+      await createTiDomainServices(ambiguous.db).inventory?.getUserEquipmentMap?.(
+        auth(),
+        OTHER_USER_ID,
+      ),
+    ).toMatchObject({ equipment: [{ id: "pc-1" }, { id: "mon-1" }], connections: [] });
+
+    const foreign = dbWith([], null);
+    await expect(
+      createTiDomainServices(foreign.db).inventory?.getUserEquipmentMap?.(auth(), OTHER_USER_ID),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(foreign.models.inventoryTecnologia.findMany).not.toHaveBeenCalled();
+  });
+});

@@ -4,6 +4,7 @@ import {
   Boxes,
   Eye,
   ListChecks,
+  Network,
   Pencil,
   Plus,
   Repeat,
@@ -32,6 +33,7 @@ import {
   useTiInventoryAsset,
   useTiInventoryAssetHistory,
   useTiInventoryCategories,
+  useTiInventoryEquipmentMap,
   useTiInventoryLocations,
   useTransferTiInventoryAssetMutation,
   useTransferTiInventoryAssetsBatchMutation,
@@ -43,6 +45,7 @@ import type {
   TiInventoryAsset,
   TiInventoryAssignUserPayload,
   TiInventoryCategory,
+  TiInventoryEquipmentMapItem,
   TiInventoryEvent,
   TiInventoryReturnPayload,
 } from "../types";
@@ -77,6 +80,7 @@ type InventoryDialogState =
   | { type: "transfer"; asset: TiInventoryAsset }
   | { type: "transferBatch" }
   | { type: "swap"; asset: TiInventoryAsset }
+  | { type: "equipmentMap" }
   | { type: "categories" };
 
 type TransferTarget = "user" | "location";
@@ -103,6 +107,36 @@ function getEventHolder(event: TiInventoryEvent, side: "from" | "to"): string {
   const location = side === "from" ? event.from_location : event.to_location;
 
   return getEventPartyName(user) ?? getEventPartyName(location) ?? "Disponível";
+}
+
+/** Dados do equipamento lidos das observações; sem dado confiável, só o que há no cadastro. */
+function EquipmentMapDetails({ item }: { item: TiInventoryEquipmentMapItem }) {
+  const details = [
+    ["Marca", item.brand ? [item.brand] : []],
+    ["Entradas", item.inputs],
+    ["Saídas", item.outputs],
+    ["Configuração", item.configuration],
+  ] as const;
+  const known = details.filter(([, values]) => values.length > 0);
+
+  return (
+    <>
+      <p className="font-medium text-slate-900 dark:text-white">
+        {`${item.category ?? "Sem categoria"} · ${item.asset_code}`}
+      </p>
+      {known.length === 0 ? (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Sem marca, entradas ou configuração cadastradas nas observações.
+        </p>
+      ) : (
+        known.map(([label, values]) => (
+          <p key={label} className="text-xs text-slate-600 dark:text-slate-300">
+            {`${label}: ${values.join(", ")}`}
+          </p>
+        ))
+      )}
+    </>
+  );
 }
 
 function formatEventDate(value: string): string {
@@ -302,12 +336,14 @@ export function TiInventoryTab() {
   const [categoryDeleteError, setCategoryDeleteError] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<TransferTarget>("user");
   const [batchAssetIds, setBatchAssetIds] = useState<TiId[]>([]);
+  const [equipmentMapUserId, setEquipmentMapUserId] = useState<TiId | "">("");
   const isUserSelectorEnabled =
     canManage &&
     (dialogState?.type === "asset" ||
       dialogState?.type === "assign" ||
       dialogState?.type === "transfer" ||
-      dialogState?.type === "transferBatch");
+      dialogState?.type === "transferBatch" ||
+      dialogState?.type === "equipmentMap");
   const assetUsersQuery = useAssignableUsers({ enabled: isUserSelectorEnabled });
   const technologyResponsibleUsersQuery = useAssignableUsers({
     enabled: isUserSelectorEnabled && dialogState?.type === "asset",
@@ -329,6 +365,9 @@ export function TiInventoryTab() {
   // "Departamento" do ativo é um local de inventário: é a FK e o que o backend valida.
   const departmentsQuery = useTiInventoryLocations();
   const selectedAssetQuery = useTiInventoryAsset(selectedAssetId, { enabled: Boolean(selectedAssetId) });
+  const equipmentMapQuery = useTiInventoryEquipmentMap(equipmentMapUserId || undefined, {
+    enabled: dialogState?.type === "equipmentMap",
+  });
   const assetHistoryQuery = useTiInventoryAssetHistory(selectedAssetId, {
     enabled: Boolean(selectedAssetId) && isDetailDialogOpen,
   });
@@ -432,6 +471,29 @@ export function TiInventoryTab() {
     (asset) => String(asset.id) === String(selectedAssetId),
   );
   const selectedAsset = selectedAssetQuery.data ?? selectedListAsset;
+
+  // Mapa: além dos usuários ativos, quem ainda está com algum ativo da lista (por exemplo um
+  // ex-colaborador de quem a TI precisa recolher o equipamento).
+  const equipmentMapUserOptions = [
+    ...transferUserOptions,
+    ...(inventoryQuery.data ?? [])
+      .filter((asset) => asset.user_id && !asset.return_date)
+      .map((asset) => ({ value: String(asset.user_id), label: getAssignedUser(asset) }))
+      .filter(
+        (option, index, options) =>
+          !transferUserOptions.some((known) => known.value === option.value) &&
+          options.findIndex((other) => other.value === option.value) === index,
+      ),
+  ];
+
+  // Mapa: periférico sem conexão confiável aparece à parte, sem ligação inventada.
+  const equipmentMapItems = equipmentMapQuery.data?.equipment ?? [];
+  const equipmentMapConnections = equipmentMapQuery.data?.connections ?? [];
+  const equipmentMapUnconnected = equipmentMapItems.filter(
+    (item) =>
+      !item.is_host &&
+      !equipmentMapConnections.some((connection) => connection.equipment_id === item.id),
+  );
 
   // Troca: só ativos que estão com outro usuário.
   const swapAsset = dialogState?.type === "swap" ? dialogState.asset : null;
@@ -739,6 +801,14 @@ export function TiInventoryTab() {
                 icon={Tags}
                 label="Categorias"
                 onClick={() => openDialog({ type: "categories" })}
+              />
+              <TiIconAction
+                icon={Network}
+                label="Mapa de equipamentos"
+                onClick={() => {
+                  setEquipmentMapUserId("");
+                  openDialog({ type: "equipmentMap" });
+                }}
               />
               <TiIconAction
                 icon={ListChecks}
@@ -1385,6 +1455,85 @@ export function TiInventoryTab() {
             />
           </div>
         </form>
+      </Dialog>
+
+      <Dialog
+        open={dialogState?.type === "equipmentMap"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDialog();
+          }
+        }}
+        title="Mapa de equipamentos"
+        description="Equipamentos ativos de um usuário e suas conexões, lidos do inventário."
+      >
+        <div className="space-y-4">
+          <TiNativeSelect
+            label="Usuário"
+            name="equipment_map_user_id"
+            options={equipmentMapUserOptions}
+            value={equipmentMapUserId}
+            onChange={(event) => setEquipmentMapUserId(event.target.value)}
+            disabled={assetUsersQuery.isLoading || assetUsersQuery.isError}
+          />
+          {!equipmentMapUserId ? (
+            <p className="text-sm">Selecione um usuário para ver os equipamentos.</p>
+          ) : equipmentMapQuery.isLoading ? (
+            <p className="text-sm">Carregando mapa...</p>
+          ) : equipmentMapQuery.isError ? (
+            <TiInlineNotice tone="danger">
+              Não foi possível carregar o mapa de equipamentos.
+            </TiInlineNotice>
+          ) : equipmentMapItems.length === 0 ? (
+            <p className="text-sm">Este usuário não tem equipamentos ativos no inventário.</p>
+          ) : (
+            <div className="space-y-3 text-sm">
+              {equipmentMapItems
+                .filter((item) => item.is_host)
+                .map((host) => (
+                  <div key={host.id} className={tiDialogSubsectionClassName}>
+                    <EquipmentMapDetails item={host} />
+                    {equipmentMapConnections.some(
+                      (connection) => connection.host_id === host.id,
+                    ) ? (
+                      <ul className="mt-2 space-y-2 border-l border-slate-300 pl-3 dark:border-slate-700">
+                        {equipmentMapConnections
+                          .filter((connection) => connection.host_id === host.id)
+                          .map((connection) => {
+                            const connected = equipmentMapItems.find(
+                              (item) => item.id === connection.equipment_id,
+                            );
+
+                            return connected ? (
+                              <li key={connected.id}>
+                                <EquipmentMapDetails item={connected} />
+                                <p className="text-xs text-slate-600 dark:text-slate-300">
+                                  {`Conexão: ${connection.ports.join(", ")}`}
+                                </p>
+                              </li>
+                            ) : null;
+                          })}
+                      </ul>
+                    ) : null}
+                  </div>
+                ))}
+              {equipmentMapUnconnected.length > 0 ? (
+                <div className={tiDialogSubsectionClassName}>
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    Sem conexão identificada
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {equipmentMapUnconnected.map((item) => (
+                      <li key={item.id}>
+                        <EquipmentMapDetails item={item} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
       </Dialog>
 
       <Dialog

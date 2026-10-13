@@ -2737,6 +2737,20 @@ const handlers = {
     });
   },
 
+  // #1934: mapa de equipamentos do usuário que recebeu o item nas transferências acima.
+  async tiInventoryEquipmentMap(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/equipment-map/${await ensureRhTargetUser()}`,
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (!Array.isArray(response.body?.data?.equipment)) {
+      throw new Error(`${op.id} did not return the equipment list.`);
+    }
+  },
+
   async tiInventoryHistory(op) {
     const response = await httpRequest(op, {
       expectedStatus: [200],

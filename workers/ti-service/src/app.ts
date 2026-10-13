@@ -31,6 +31,7 @@ import {
   returnTiInventoryBodySchema,
   swapTiInventoryBodySchema,
   tiInventoryIdParamsSchema,
+  tiInventoryUserIdParamsSchema,
   transferTiInventoryBatchBodySchema,
   transferTiInventoryBodySchema,
   updateTiInventoryBodySchema,
@@ -488,6 +489,11 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     requireTiPermission(c.get("auth"), 2);
     const query = parseWithZod(listTiInventoryQuerySchema, c.req.query());
     return respond(c, "inventory", "list", [requestContext(c), query]);
+  });
+  app.get("/ti/inventory/equipment-map/:userId", async (c) => {
+    requireTiPermission(c.get("auth"), 2);
+    const params = parseWithZod(tiInventoryUserIdParamsSchema, { userId: c.req.param("userId") });
+    return respond(c, "inventory", "getUserEquipmentMap", [requestContext(c), params.userId]);
   });
   app.get("/ti/inventory/:id", async (c) => {
     requireTiPermission(c.get("auth"), 2);

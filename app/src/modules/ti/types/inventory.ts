@@ -116,6 +116,32 @@ export interface TiInventoryEvent {
   to_location?: TiInventoryEventParty | null;
 }
 
+/** Equipamento do mapa: os dados vêm das observações do item, quando seguem o padrão. */
+export interface TiInventoryEquipmentMapItem {
+  id: TiId;
+  asset_code: string;
+  category: string | null;
+  /** Computador ou notebook: é onde os periféricos se ligam. */
+  is_host: boolean;
+  brand: string | null;
+  inputs: string[];
+  outputs: string[];
+  configuration: string[];
+}
+
+export interface TiInventoryEquipmentMapConnection {
+  host_id: TiId;
+  equipment_id: TiId;
+  ports: string[];
+}
+
+/** Mapa somente leitura dos equipamentos ativos de um usuário, derivado do inventário. */
+export interface TiInventoryEquipmentMap {
+  user?: TiInventoryRelatedUser | null;
+  equipment: TiInventoryEquipmentMapItem[];
+  connections: TiInventoryEquipmentMapConnection[];
+}
+
 export interface TiInventoryCategoryPayload {
   name?: string;
   tag?: string;

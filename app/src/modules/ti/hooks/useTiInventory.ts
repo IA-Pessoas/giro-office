@@ -14,6 +14,7 @@ import type {
   TiInventoryAssignUserPayload,
   TiInventoryCategory,
   TiInventoryCategoryPayload,
+  TiInventoryEquipmentMap,
   TiInventoryEvent,
   TiInventoryLocation,
   TiInventoryLocationPayload,
@@ -200,6 +201,20 @@ export function useSwapTiInventoryAssetsMutation(): UseMutationResult<
     mutationFn: (payload) => tiInventoryService.swapInventoryAssets(payload),
     onSuccess: () => invalidateTiInventoryQueries(queryClient),
   });
+}
+
+export function useTiInventoryEquipmentMap(
+  userId?: TiId,
+  options?: TiReadQueryOptions,
+): UseQueryResult<TiInventoryEquipmentMap, Error> {
+  return useFetch(
+    tiQueryKeys.inventory.equipmentMap(userId),
+    () => tiInventoryService.getUserEquipmentMap(userId as TiId),
+    {
+      ...options,
+      enabled: Boolean(userId) && options?.enabled !== false,
+    },
+  );
 }
 
 export function useTiInventoryAssetHistory(

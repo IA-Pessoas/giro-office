@@ -7,6 +7,7 @@ import type {
   TiInventoryAssignUserPayload,
   TiInventoryCategory,
   TiInventoryCategoryPayload,
+  TiInventoryEquipmentMap,
   TiInventoryEvent,
   TiInventoryLocation,
   TiInventoryLocationPayload,
@@ -108,6 +109,14 @@ export const tiInventoryService = {
     const response = await api.post(TI_ENDPOINTS.inventory.swap, payload);
 
     return unwrapTiList<TiInventoryAsset>(response.data);
+  },
+
+  async getUserEquipmentMap(userId: TiId): Promise<TiInventoryEquipmentMap> {
+    const response = await api.get<TiEnvelope<TiInventoryEquipmentMap>>(
+      buildTiPath(TI_ENDPOINTS.inventory.equipmentMap, userId),
+    );
+
+    return unwrapTiEnvelope<TiInventoryEquipmentMap>(response.data);
   },
 
   async listInventoryAssetHistory(id: TiId): Promise<TiInventoryEvent[]> {

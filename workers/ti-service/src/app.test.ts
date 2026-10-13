@@ -227,6 +227,35 @@ describe("ti Worker", () => {
     expect(inventory.swap).toHaveBeenCalledWith(self, swap);
   });
 
+  // #1934: mapa de equipamentos por usuário.
+  it("routes the user equipment map for TI technicians", async () => {
+    const inventory = {
+      getUserEquipmentMap: vi.fn(async () => ({ equipment: [], connections: [] })),
+      getById: vi.fn(),
+    };
+    const app = createTiWorkerApp({ env: env(), services: { inventory } } as never);
+    const get = (path: string, permission: string) =>
+      app.request(`https://ti.test${path}`, { headers: headers(permission) });
+
+    expect((await get(`/ti/inventory/equipment-map/${USER_ID}`, "1")).status).toBe(403);
+    expect((await get("/ti/inventory/equipment-map/nao-e-uuid", "2")).status).toBe(400);
+    expect(inventory.getUserEquipmentMap).not.toHaveBeenCalled();
+
+    const response = await get(`/ti/inventory/equipment-map/${USER_ID}`, "2");
+    expect(response.status).toBe(200);
+    expect(inventory.getUserEquipmentMap).toHaveBeenCalledWith(
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        permission: 2,
+        isOrganizationOwner: false,
+      },
+      USER_ID,
+    );
+    // Não cai na rota de detalhe do ativo.
+    expect(inventory.getById).not.toHaveBeenCalled();
+  });
+
   it("requires the TI module claim even when the legacy permission is high", async () => {
     const categoryService = service();
     const app = createTiWorkerApp({ env: env(), categoryService });

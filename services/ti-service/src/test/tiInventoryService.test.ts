@@ -1133,3 +1133,107 @@ describe("TiInventoryService: regra do computador ativo", () => {
     );
   });
 });
+
+// #1934: mapa de equipamentos por usuário, somente leitura e derivado só do inventário.
+describe("TiInventoryService: mapa de equipamentos do usuário", () => {
+  const mapUserId = "00000000-0000-4000-8000-0000000000b1";
+  // Só os dois models que o mapa pode consultar: qualquer outro acesso (por exemplo o mapa de
+  // grupos de clientes do Regularize, `tb_workspace.mapas` no legado) quebraria o teste.
+  const prismaWith = (assets: unknown[], user: unknown = { id: mapUserId, name: "ana" }) => ({
+    user: { findFirst: vi.fn(async () => user) },
+    inventoryTecnologia: { findMany: vi.fn(async () => assets) },
+  });
+
+  it("monta o mapa com código, marca, entradas, configuração e conexões", async () => {
+    const prisma = prismaWith([
+      {
+        id: "pc-1",
+        asset_code: "PC-001",
+        notes: "Marca: Dell\nEntradas: HDMI, VGA\nConfigurações: i5, 8GB",
+        category: { name: "Computador" },
+      },
+      {
+        id: "mon-1",
+        asset_code: "MON-001",
+        notes: "Marca: LG\nEntradas: HDMI",
+        category: { name: "Monitor horizontal" },
+      },
+    ]);
+    const service = new TiInventoryService(prisma as never);
+
+    const map = await service.getUserEquipmentMap(context, mapUserId);
+
+    expect(map).toEqual({
+      user: { id: mapUserId, name: "ana" },
+      equipment: [
+        {
+          id: "pc-1",
+          asset_code: "PC-001",
+          category: "Computador",
+          is_host: true,
+          brand: "Dell",
+          inputs: ["HDMI", "VGA"],
+          outputs: [],
+          configuration: ["i5", "8GB"],
+        },
+        {
+          id: "mon-1",
+          asset_code: "MON-001",
+          category: "Monitor horizontal",
+          is_host: false,
+          brand: "LG",
+          inputs: ["HDMI"],
+          outputs: [],
+          configuration: [],
+        },
+      ],
+      connections: [{ host_id: "pc-1", equipment_id: "mon-1", ports: ["HDMI"] }],
+    });
+    // Só os itens ativos da pessoa, dentro da organização de quem consulta.
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: context.organizationId, user_id: mapUserId, return_date: null },
+      }),
+    );
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: mapUserId, organization_id: context.organizationId },
+      }),
+    );
+  });
+
+  it("mostra o equipamento sem conexão quando a observação é ambígua ou não existe", async () => {
+    const prisma = prismaWith([
+      { id: "pc-1", asset_code: "PC-001", notes: null, category: { name: "Computador" } },
+      {
+        id: "mon-1",
+        asset_code: "MON-001",
+        notes: "ligado no HDMI do computador da Ana",
+        category: { name: "Monitor" },
+      },
+    ]);
+    const service = new TiInventoryService(prisma as never);
+
+    expect(await service.getUserEquipmentMap(context, mapUserId)).toMatchObject({
+      equipment: [
+        { id: "pc-1", brand: null, inputs: [], configuration: [] },
+        { id: "mon-1", brand: null, inputs: [], configuration: [] },
+      ],
+      connections: [],
+    });
+  });
+
+  it("devolve mapa vazio para quem não tem equipamento e 404 para usuário de outra organização", async () => {
+    const empty = new TiInventoryService(prismaWith([]) as never);
+    expect(await empty.getUserEquipmentMap(context, mapUserId)).toMatchObject({
+      equipment: [],
+      connections: [],
+    });
+
+    const prisma = prismaWith([], null);
+    await expect(
+      new TiInventoryService(prisma as never).getUserEquipmentMap(context, mapUserId),
+    ).rejects.toMatchObject({ statusCode: 404, message: "Usuário não encontrado na organização." });
+    expect(prisma.inventoryTecnologia.findMany).not.toHaveBeenCalled();
+  });
+});

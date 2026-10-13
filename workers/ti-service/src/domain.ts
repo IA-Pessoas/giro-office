@@ -2,6 +2,7 @@ import type { ReportingQuery } from "@workspace/shared";
 import {
   ACTIVE_COMPUTER_CONFLICT_MESSAGE,
   activeComputerLockKey,
+  buildEquipmentMap,
   COMPUTER_CATEGORY_LOCKED_MESSAGE,
   COMPUTER_CATEGORY_RENAME_CONFLICT_MESSAGE,
   EncryptionService,
@@ -449,6 +450,25 @@ function inventoryServices(database: TiDatabase): TiServices {
           { asset: first, to: { user_id: secondHolder, location_id: null } },
           { asset: second, to: { user_id: firstHolder, location_id: null } },
         ]);
+      },
+      // Mapa de equipamentos de um usuário (#1934): itens ativos e conexões, derivados só
+      // do inventário. Somente leitura.
+      getUserEquipmentMap: async (value, userId) => {
+        const auth = context(value);
+        const user = await delegate(database, "user").findFirst({
+          where: { id: userId, organization_id: auth.organizationId },
+          ...inventoryUserSelect,
+        });
+        if (!user) throw new ServiceError(404, "Usuário não encontrado na organização.");
+        const assets = await inventory.findMany({
+          where: { organization_id: auth.organizationId, user_id: userId, return_date: null },
+          select: { id: true, asset_code: true, notes: true, category: { select: { name: true } } },
+          orderBy: { asset_code: "asc" },
+        });
+        return {
+          user,
+          ...buildEquipmentMap(assets as Parameters<typeof buildEquipmentMap>[0]),
+        };
       },
       // Histórico patrimonial do item, do mais recente para o mais antigo.
       listHistory: async (value, id, query) => {
