@@ -161,6 +161,10 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
         (item) => item.id,
       ),
     ).toContain(assetId);
+    // #1935: o SQL cru sobre `logs` só é exercitado de verdade no Postgres.
+    const accessLogs = await smokeCall(app(), env(), "GET", `/ti/access-logs/${userId}`);
+    expect(accessLogs.status).toBe(200);
+    expect(Array.isArray((accessLogs.json?.data as { items: unknown[] }).items)).toBe(true);
     // #1933: lote para o local e troca com um segundo item que está com outra pessoa.
     const other = await call("POST", "/ti/inventory", {
       asset_code: `PAT-TROCA-${suffix()}`,

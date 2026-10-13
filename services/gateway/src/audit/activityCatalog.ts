@@ -898,6 +898,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/ti\/access-logs\/[^/]+$/,
+    description: { action: "consultou", item: "os logs de acesso de um usuário" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/ti\/inventory\/equipment-map\/[^/]+$/,
     description: { action: "consultou", item: "o mapa de equipamentos de um usuário" },
   },

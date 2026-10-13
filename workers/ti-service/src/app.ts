@@ -18,6 +18,10 @@ import {
   internalReportingGrantSchema,
 } from "@workspace/ti-service/src/schemas/internalReporting.schemas.js";
 import {
+  listTiAccessLogsQuerySchema,
+  tiAccessLogUserIdParamsSchema,
+} from "@workspace/ti-service/src/schemas/tiAccessLog.schemas.js";
+import {
   createTiExtensionBodySchema,
   listTiExtensionsQuerySchema,
   tiExtensionIdParamsSchema,
@@ -484,6 +488,13 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     args: unknown[],
     status: 200 | 201 = 200,
   ) => c.json(createSuccessResponse(await execute<T>(c, name, method, args)), status);
+
+  app.get("/ti/access-logs/:userId", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const params = parseWithZod(tiAccessLogUserIdParamsSchema, { userId: c.req.param("userId") });
+    const query = parseWithZod(listTiAccessLogsQuerySchema, c.req.query());
+    return respond(c, "accessLogs", "list", [requestContext(c), params.userId, query]);
+  });
 
   app.get("/ti/inventory/list", async (c) => {
     requireTiPermission(c.get("auth"), 2);

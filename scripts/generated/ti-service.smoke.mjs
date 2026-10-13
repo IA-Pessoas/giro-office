@@ -272,6 +272,14 @@ export const operations = [
   {
     service: "ti-service",
     method: "GET",
+    path: "/ti/access-logs/{userId}",
+    action: "tiAccessLogs",
+    target: "gateway",
+    auth: "admin-bearer",
+  },
+  {
+    service: "ti-service",
+    method: "GET",
     path: "/ti/inventory/equipment-map/{userId}",
     action: "tiInventoryEquipmentMap",
     target: "gateway",

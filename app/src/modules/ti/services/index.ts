@@ -7,3 +7,4 @@ export * from "./tiTermsService";
 export * from "./tiStockService";
 export * from "./tiPasswordsService";
 export * from "./tiExtensionsService";
+export * from "./tiAccessLogsService";

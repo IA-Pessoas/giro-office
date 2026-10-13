@@ -16,6 +16,7 @@ import {
   tiStockReportingCatalog,
   withReportingSnapshot,
 } from "@workspace/shared";
+import { listTiAccessLogs } from "@workspace/ti-service/src/services/tiAccessLogService.js";
 
 export type TiAuthContext = {
   organizationId: string;
@@ -37,6 +38,7 @@ type Delegate = {
 
 export type TiDatabase = {
   [model: string]: unknown;
+  $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
   $transaction<T>(
     callback: (database: TiDatabase) => Promise<T>,
     options?: { isolationLevel?: "RepeatableRead"; maxWait?: number; timeout?: number },
@@ -48,6 +50,7 @@ export type TiService = {
 };
 
 export type TiServices = {
+  accessLogs?: TiService;
   inventory?: TiService;
   inventoryCategories?: TiService;
   inventoryLocations?: TiService;
@@ -2293,6 +2296,11 @@ function reportingServices(database: TiDatabase, inSnapshot = false): TiServices
 
 export function createTiDomainServices(database: TiDatabase, encryptionKey?: string): TiServices {
   return {
+    // #1935: mesma consulta do serviço Node; `logs` fica fora do recorte Prisma.
+    accessLogs: {
+      list: (value, userId, query) =>
+        listTiAccessLogs(database, context(value), String(userId), row(query)),
+    },
     ...inventoryServices(database),
     ...extensionServices(database),
     ...passwordServices(database, encryptionKey),

@@ -871,6 +871,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
       { name: "TI Stock", description: "Estoque de TI filtrado pelo departamento Tecnologia" },
       { name: "TI Robots", description: "Robos e historico de execucao de TI" },
       { name: "TI Dashboard", description: "Resumo consolidado do modulo de TI" },
+      { name: "TI Access Logs", description: "Logs de acesso por usuario" },
       { name: "Internal", description: "Contratos internos entre serviços" },
     ],
     components: {
@@ -1007,6 +1008,26 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           ],
           successDescription: "Estoque de TI listado",
           errors: [400, 401, 403],
+        }),
+      },
+      "/ti/access-logs/{userId}": {
+        get: publicTiOperation({
+          operationId: "listTiAccessLogs",
+          tags: ["TI Access Logs"],
+          summary:
+            "Lista logins e acessos de um usuario migrados do Workspace legado, do mais recente para o mais antigo (nao inclui credenciais)",
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              description: "Usuario consultado",
+              schema: { type: "string", format: "uuid" },
+            },
+            ...paginationParameters(),
+          ],
+          successDescription: "Logs de acesso listados",
+          errors: [400, 401, 403, 404],
         }),
       },
       "/ti/dashboard": {
