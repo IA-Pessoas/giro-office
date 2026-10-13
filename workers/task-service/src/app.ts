@@ -17,6 +17,7 @@ import {
 } from "@workspace/shared/http";
 import { validateUploadFileSignature } from "@workspace/shared/upload";
 import { commercialProspectingCloseEventSchema } from "@workspace/task-service/src/schemas/commercialProspectingClose.schemas.js";
+import { commercialProspectingTransitionEventSchema } from "@workspace/task-service/src/schemas/commercialProspectingTransition.schemas.js";
 import { commercialTaskBillingEventSchema } from "@workspace/task-service/src/schemas/commercialTaskBilling.schemas.js";
 import {
   financeiroCollectorsBodySchema,
@@ -1404,6 +1405,16 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
       await expressJsonBody(c.req.raw),
     );
     const result = await withServices(c, (s) => s.commercialProspectingClose().apply(event));
+    return c.json(createSuccessResponse(result));
+  });
+
+  app.post("/internal/commercial/prospecting-transition", async (c) => {
+    requireCommercialToken(c);
+    const event = parseWithZod(
+      commercialProspectingTransitionEventSchema,
+      await expressJsonBody(c.req.raw),
+    );
+    const result = await withServices(c, (s) => s.commercialProspectingTransition().apply(event));
     return c.json(createSuccessResponse(result));
   });
 
