@@ -76,6 +76,54 @@ it("mantém o envelope público da prospecção sem expor organization_id", asyn
   expect(result).not.toHaveProperty("organization_id");
 });
 
+it("persiste Fechado SE como Fechado e suprime o aviso no evento", async () => {
+  const current = {
+    id: PROSPECTING,
+    client_id: CLIENT,
+    status: "Análise Financeira",
+    status_date: null,
+    description: null,
+  };
+  const closed = { ...current, status: "Fechado" };
+  const prisma = {
+    client: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: CLIENT,
+        name: "Cliente",
+        company_name: null,
+        fantasy_name: null,
+      }),
+    },
+    commercialProspecting: {
+      findFirst: vi.fn().mockResolvedValueOnce(current).mockResolvedValueOnce(closed),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    commercialOutboxEvent: { create: vi.fn().mockResolvedValue({ id: "event-1" }) },
+    $transaction: vi.fn(async (callback: (tx: typeof prisma) => unknown) => callback(prisma)),
+  };
+  const service = new CommercialProspectingService(prisma as never);
+
+  await service.update({
+    user_id: "user-1",
+    organization_id: ORG,
+    prospecting_id: PROSPECTING,
+    status: "Fechado SE",
+  });
+
+  expect(prisma.commercialProspecting.updateMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ status: "Fechado", closed_at: expect.any(Date) }),
+    }),
+  );
+  expect(prisma.commercialOutboxEvent.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        payload: expect.objectContaining({ to_status: "Fechado", suppress_notice: true }),
+      }),
+    }),
+  );
+});
+
 it.each(["P2002", "P2034"])("mapeia conflito Prisma de prospecção para 409 (%s)", async (code) => {
   const prisma = {
     $transaction: vi.fn().mockRejectedValue({ code }),

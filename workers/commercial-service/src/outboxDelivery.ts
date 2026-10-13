@@ -86,9 +86,6 @@ export class CommercialOutboxBindingDelivery implements CommercialOutboxDelivery
       event.audit_correlation_id,
     )) as { client?: CommercialClientProjection };
     if (event.to_status === "Fechado") {
-      if (!this.notifications) {
-        throw new Error("Notificação de fechamento comercial não configurada.");
-      }
       const close = (await postBinding(
         this.env.TASK_SERVICE,
         this.env.TASK_SERVICE_INTERNAL_TOKEN,
@@ -97,10 +94,18 @@ export class CommercialOutboxBindingDelivery implements CommercialOutboxDelivery
         event,
         event.audit_correlation_id,
       )) as unknown as CommercialProspectingCloseResult;
-      if (!projection.client || !close.competence) {
+      if (!close.competence) {
         throw new Error("Envelope de fechamento comercial inválido.");
       }
-      await this.notifications.notify(event, projection.client, close.competence);
+      if (!event.suppress_notice) {
+        if (!this.notifications) {
+          throw new Error("Notificação de fechamento comercial não configurada.");
+        }
+        if (!projection.client) {
+          throw new Error("Envelope de fechamento comercial inválido.");
+        }
+        await this.notifications.notify(event, projection.client, close.competence);
+      }
     } else if (event.from_status !== null) {
       await postBinding(
         this.env.TASK_SERVICE,

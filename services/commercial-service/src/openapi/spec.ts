@@ -149,6 +149,7 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
               ],
             },
             status_date: { type: "string", format: "date-time", nullable: true },
+            closed_at: { type: "string", format: "date-time", nullable: true },
             solution: {
               type: "string",
               enum: ["CASTELO", "KALANGO", "META", "NIT"],
@@ -190,7 +191,12 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           additionalProperties: false,
           minProperties: 1,
           properties: {
-            status: { $ref: "#/components/schemas/Prospecting/properties/status" },
+            status: {
+              anyOf: [
+                { $ref: "#/components/schemas/Prospecting/properties/status" },
+                { type: "string", enum: ["Fechado SE"] },
+              ],
+            },
             status_date: { type: "string", format: "date-time" },
             solution: { type: "string", enum: ["CASTELO", "KALANGO", "META", "NIT"] },
             reference_month: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },

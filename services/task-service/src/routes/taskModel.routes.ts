@@ -30,6 +30,7 @@ router.post("/model", isAuthenticated, async (req: Request, res: Response, next:
       billing,
       prevision,
       type,
+      unique_charge,
     } = req.body;
     const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
     const responsibleSequence = parseTaskModelResponsibleSequence({
@@ -44,6 +45,9 @@ router.post("/model", isAuthenticated, async (req: Request, res: Response, next:
         "Campos obrigatÃ³rios: name, department_id, responsible_id, billing, prevision.",
       );
     }
+    if (unique_charge !== undefined && typeof unique_charge !== "boolean") {
+      throw new ServiceError(400, "unique_charge deve ser booleano.");
+    }
 
     const result = await taskModelService.createModel({
       user_id,
@@ -57,6 +61,7 @@ router.post("/model", isAuthenticated, async (req: Request, res: Response, next:
       billing,
       prevision: Number(prevision),
       type: type ?? null,
+      unique_charge: unique_charge ?? false,
       integracaoLevel: normalizeModulePermission(req.modules?.integracao),
       isOwner: req.user_type === "owner",
     });
@@ -102,6 +107,7 @@ router.put("/model", isAuthenticated, async (req: Request, res: Response, next: 
       billing,
       prevision,
       type,
+      unique_charge,
     } = req.body;
     const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
     const responsibleSequence = parseTaskModelResponsibleSequence({
@@ -123,6 +129,9 @@ router.put("/model", isAuthenticated, async (req: Request, res: Response, next: 
         "Campos obrigatÃ³rios: task_id, name, department_id, responsible_id, billing, prevision.",
       );
     }
+    if (unique_charge !== undefined && typeof unique_charge !== "boolean") {
+      throw new ServiceError(400, "unique_charge deve ser booleano.");
+    }
 
     const result = await taskModelService.updateModel({
       user_id,
@@ -137,6 +146,7 @@ router.put("/model", isAuthenticated, async (req: Request, res: Response, next: 
       billing,
       prevision: Number(prevision),
       type: type ?? null,
+      ...(unique_charge !== undefined ? { unique_charge } : {}),
       integracaoLevel: normalizeModulePermission(req.modules?.integracao),
       isOwner: req.user_type === "owner",
     });

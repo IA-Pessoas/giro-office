@@ -97,6 +97,30 @@ describe("TaskModelService", () => {
     expect(prismaMock.taskModel.findFirst).not.toHaveBeenCalled();
   });
 
+  it("updateModel preserva unique_charge quando clientes antigos omitem o campo", async () => {
+    prismaMock.taskModel.findFirst.mockResolvedValue({ id: "model-1", unique_charge: true });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "user-1", department_id: "dep-1" }]);
+    prismaMock.taskModel.update.mockResolvedValue({ id: "model-1", unique_charge: true });
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
+
+    await service.updateModel({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "model-1",
+      name: "Modelo",
+      department_id: "dep-1",
+      responsible_id: "user-1",
+      billing: "Realizar",
+      prevision: 2,
+      integracaoLevel: 3,
+    });
+
+    const update = prismaMock.taskModel.update.mock.calls[0]?.[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(update.data).not.toHaveProperty("unique_charge");
+  });
+
   it("detailModel lança 404 quando modelo não existe", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValue(null);
     const service = new TaskModelService(prismaMock as never, auditMock as never);

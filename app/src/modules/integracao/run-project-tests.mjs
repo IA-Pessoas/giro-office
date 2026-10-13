@@ -885,6 +885,7 @@ runTest("buildUpdateTaskModelPayload maps id to task_id", () => {
       billing: "Não Realizar",
       prevision: 3,
       type: "Projeto",
+      unique_charge: true,
     }),
     {
       task_id: "model-1",
@@ -897,6 +898,7 @@ runTest("buildUpdateTaskModelPayload maps id to task_id", () => {
       billing: "Não Realizar",
       prevision: 3,
       type: "Projeto",
+      unique_charge: true,
     },
   );
 });
@@ -913,6 +915,7 @@ runTest("buildCreateTaskModelPayload maps nullable fields", () => {
       billing: "Realizar",
       prevision: 5,
       type: "Projeto",
+      unique_charge: false,
     }),
     {
       name: "Modelo",
@@ -924,6 +927,7 @@ runTest("buildCreateTaskModelPayload maps nullable fields", () => {
       billing: "Realizar",
       prevision: 5,
       type: "Projeto",
+      unique_charge: false,
     },
   );
 });
@@ -967,6 +971,7 @@ runTest("task model payloads omit responsible descendants without their predeces
       billing: "Realizar",
       prevision: 5,
       type: "Projeto",
+      unique_charge: false,
     }),
     {
       name: "Modelo",
@@ -978,6 +983,7 @@ runTest("task model payloads omit responsible descendants without their predeces
       billing: "Realizar",
       prevision: 5,
       type: "Projeto",
+      unique_charge: false,
     },
   );
 });

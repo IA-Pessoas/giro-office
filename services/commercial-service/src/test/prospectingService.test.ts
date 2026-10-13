@@ -331,6 +331,34 @@ describe("CommercialProspectingService", () => {
     expect(prisma.commercialProspecting.updateMany).not.toHaveBeenCalled();
   });
 
+  it("persiste Fechado SE como Fechado e marca o evento para suprimir o aviso", async () => {
+    const prisma = createMockPrisma();
+    prisma.commercialProspecting.findFirst = vi
+      .fn()
+      .mockResolvedValueOnce(item)
+      .mockResolvedValueOnce({ ...item, status: "Fechado" });
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    await service.update({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      prospecting_id: PROSPECTING_ID,
+      status: "Fechado SE",
+    });
+
+    expect(prisma.commercialProspecting.updateMany).toHaveBeenCalledWith({
+      where: { id: PROSPECTING_ID, organization_id: ORGANIZATION_ID, archived_at: null },
+      data: expect.objectContaining({ status: "Fechado", closed_at: expect.any(Date) }),
+    });
+    expect(prisma.commercialOutboxEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          payload: expect.objectContaining({ to_status: "Fechado", suppress_notice: true }),
+        }),
+      }),
+    );
+  });
+
   it.each([
     "Baixada",
     "Inativo",

@@ -19,6 +19,7 @@ import type {
   ProspectingListQuery,
   ProspectingSolution,
   ProspectingStatus,
+  ProspectingUpdateStatus,
 } from "../schemas/prospecting.schemas.js";
 import { assertProspectingTransition } from "./prospectingDomain.js";
 
@@ -29,6 +30,7 @@ const PROSPECTING_SELECT = {
   client_id: true,
   status: true,
   status_date: true,
+  closed_at: true,
   solution: true,
   reference_month: true,
   service: true,
@@ -66,6 +68,7 @@ const DUPLICATE_MESSAGE = "Este cliente já possui uma prospecção nesta organi
 const PROSPECTING_HISTORY_FIELDS = [
   "status",
   "status_date",
+  "closed_at",
   "solution",
   "reference_month",
   "service",
@@ -101,6 +104,7 @@ function buildTransitionEvent({
   toStatus,
   statusDate,
   description,
+  suppressNotice = false,
   auditCorrelationId,
 }: {
   eventId: string;
@@ -111,6 +115,7 @@ function buildTransitionEvent({
   toStatus: string;
   statusDate: Date | null;
   description: string | null;
+  suppressNotice?: boolean;
   auditCorrelationId: string;
 }) {
   return {
@@ -124,6 +129,7 @@ function buildTransitionEvent({
     to_status: asProjectionStatus(toStatus),
     status_date: toIsoDate(statusDate),
     description,
+    ...(suppressNotice ? { suppress_notice: true } : {}),
     audit_correlation_id: auditCorrelationId,
     occurred_at: new Date().toISOString(),
   };
@@ -134,6 +140,7 @@ export interface CommercialProspecting {
   client_id: string;
   status: string;
   status_date: Date | null;
+  closed_at: Date | null;
   solution: string | null;
   reference_month: string | null;
   service: string | null;
@@ -206,7 +213,7 @@ export interface UpdateCommercialProspectingRequest {
   user_id: string;
   organization_id: string;
   prospecting_id: string;
-  status?: ProspectingStatus;
+  status?: ProspectingUpdateStatus;
   status_date?: Date | null;
   solution?: ProspectingSolution;
   reference_month?: string;
@@ -543,6 +550,7 @@ export class CommercialProspectingService {
             organization_id: data.organization_id,
             status: data.status,
             status_date: data.status_date,
+            closed_at: data.status === "Fechado" ? data.status_date : null,
             solution: data.solution,
             reference_month: data.reference_month,
             service: data.service ?? null,
@@ -636,10 +644,19 @@ export class CommercialProspectingService {
           throw new ServiceError(400, "Preencha solução, data da situação e mês de referência.");
         }
 
-        const nextStatus = data.status ?? (current.status as ProspectingStatus);
+        const suppressNotice = data.status === "Fechado SE";
+        const nextStatus =
+          data.status === "Fechado SE"
+            ? "Fechado"
+            : (data.status ?? (current.status as ProspectingStatus));
         assertProspectingTransition(current.status, nextStatus);
         const updateData: Record<string, unknown> = {};
-        if (data.status !== undefined) updateData.status = data.status;
+        if (data.status !== undefined) {
+          updateData.status = nextStatus;
+          if (nextStatus === "Fechado" && current.status !== "Fechado") {
+            updateData.closed_at = new Date();
+          }
+        }
         if (data.status_date !== undefined) updateData.status_date = data.status_date;
         if (data.solution !== undefined) updateData.solution = data.solution;
         if (data.reference_month !== undefined) updateData.reference_month = data.reference_month;
@@ -710,6 +727,7 @@ export class CommercialProspectingService {
             toStatus: updated.status,
             statusDate: updated.status_date,
             description: updated.description,
+            suppressNotice,
             auditCorrelationId,
           });
           await tx.commercialOutboxEvent.create({

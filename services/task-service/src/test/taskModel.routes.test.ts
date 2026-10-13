@@ -34,6 +34,7 @@ describe("task model routes", () => {
       billing: "Realizar",
       prevision: 2,
       type: null,
+      unique_charge: false,
       integracaoLevel: 0,
       isOwner: false,
     });

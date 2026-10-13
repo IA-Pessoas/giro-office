@@ -28,6 +28,7 @@ export interface CreateModelRequest {
   billing: string;
   prevision: number;
   type?: string | null;
+  unique_charge?: boolean;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -45,6 +46,7 @@ export interface UpdateModelRequest {
   billing: string;
   prevision: number;
   type?: string | null;
+  unique_charge?: boolean;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -68,6 +70,7 @@ const TASK_MODEL_SELECT = {
   billing: true,
   prevision: true,
   type: true,
+  unique_charge: true,
 } as const;
 
 function taskModelListSelect(organizationId: string) {
@@ -170,6 +173,7 @@ export class TaskModelService {
           billing: data.billing,
           prevision: data.prevision,
           type: data.type ?? null,
+          unique_charge: data.unique_charge ?? false,
           organization_id: data.organization_id,
         },
         select: TASK_MODEL_SELECT,
@@ -259,6 +263,7 @@ export class TaskModelService {
           "billing",
           "prevision",
           "type",
+          ...(data.unique_charge !== undefined ? ["unique_charge"] : []),
         ],
       });
 
@@ -280,6 +285,7 @@ export class TaskModelService {
           billing: data.billing,
           prevision: data.prevision,
           type: data.type ?? null,
+          ...(data.unique_charge !== undefined ? { unique_charge: data.unique_charge } : {}),
         },
         select: TASK_MODEL_SELECT,
       });

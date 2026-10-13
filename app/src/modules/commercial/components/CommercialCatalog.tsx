@@ -60,7 +60,7 @@ type PendingConfirmation =
   | { type: "archive-prospecting"; item: CommercialProspecting };
 type ProspectingDraft = {
   client: ClientPickerOption | null;
-  status: (typeof COMMERCIAL_PROSPECTING_STATUSES)[number];
+  status: CommercialProspectingStatus | "Fechado SE";
   status_date: string;
   solution: "CASTELO" | "KALANGO" | "META" | "NIT" | "";
   reference_month: string;
@@ -418,9 +418,15 @@ export function CommercialCatalog() {
         const saved = await updateProspectingMutation.mutateAsync({ id: prospectingEditingId, payload });
         savedProspectingId = saved.id;
       } else {
+        const { status, ...createPayload } = payload;
+        if (status === "Fechado SE") {
+          setProspectingFormError("Fechado SE só pode ser usado ao atualizar uma prospecção.");
+          return;
+        }
         const saved = await createProspectingMutation.mutateAsync({
           client_id: prospectingDraft.client.id,
-          ...payload,
+          ...createPayload,
+          status,
         });
         savedProspectingId = saved.id;
       }
@@ -488,6 +494,7 @@ export function CommercialCatalog() {
               className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             >
               {COMMERCIAL_PROSPECTING_STATUSES.map((status) => <option key={status}>{status}</option>)}
+              {isEditing ? <option>Fechado SE</option> : null}
             </select>
           </label>
           <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Data da etapa

@@ -425,6 +425,7 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
           billing,
           prevision,
           type,
+          unique_charge,
         } = r.body;
         const { user_id, organization_id } = requireAuthenticatedRequestContext(r);
         const responsibleSequence = parseTaskModelResponsibleSequence({
@@ -438,6 +439,9 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
             "Campos obrigatÃ³rios: name, department_id, responsible_id, billing, prevision.",
           );
         }
+        if (unique_charge !== undefined && typeof unique_charge !== "boolean") {
+          throw new ServiceError(400, "unique_charge deve ser booleano.");
+        }
         return s.model().createModel({
           user_id,
           organization_id,
@@ -450,6 +454,7 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
           billing,
           prevision: Number(prevision),
           type: type ?? null,
+          unique_charge: unique_charge ?? false,
           integracaoLevel: integracao(r),
           isOwner: isOwner(r),
         });
@@ -488,6 +493,7 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
         billing,
         prevision,
         type,
+        unique_charge,
       } = r.body;
       const { user_id, organization_id } = requireAuthenticatedRequestContext(r);
       const responsibleSequence = parseTaskModelResponsibleSequence({
@@ -508,6 +514,9 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
           "Campos obrigatÃ³rios: task_id, name, department_id, responsible_id, billing, prevision.",
         );
       }
+      if (unique_charge !== undefined && typeof unique_charge !== "boolean") {
+        throw new ServiceError(400, "unique_charge deve ser booleano.");
+      }
       return s.model().updateModel({
         user_id,
         organization_id,
@@ -521,6 +530,7 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
         billing,
         prevision: Number(prevision),
         type: type ?? null,
+        ...(unique_charge !== undefined ? { unique_charge } : {}),
         integracaoLevel: integracao(r),
         isOwner: isOwner(r),
       });
