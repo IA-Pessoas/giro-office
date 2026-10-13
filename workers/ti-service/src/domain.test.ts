@@ -269,3 +269,314 @@ describe("TI domain", () => {
     );
   });
 });
+
+// #1931: uma pessoa não termina com mais de um computador ativo na organização.
+describe("TI domain: regra do computador ativo", () => {
+  const COMPUTER_CATEGORY_ID = "c0000000-0000-4000-8000-0000000000c1";
+  const MONITOR_CATEGORY_ID = "c0000000-0000-4000-8000-0000000000c2";
+
+  type Asset = {
+    id: string;
+    organization_id: string;
+    asset_code: string;
+    category_id: string;
+    user_id: string | null;
+    return_date: Date | null;
+  };
+
+  const asset = (id: string, overrides: Partial<Asset> = {}): Asset => ({
+    id,
+    organization_id: ORGANIZATION_ID,
+    asset_code: id,
+    category_id: COMPUTER_CATEGORY_ID,
+    user_id: null,
+    return_date: null,
+    ...overrides,
+  });
+
+  // Banco em memória: o bloqueio consultivo enfileira as transações da mesma chave, como o
+  // pg_advisory_xact_lock, e a leitura demora o bastante para duas escritas se cruzarem.
+  function inMemoryDatabase(
+    seed: Asset[],
+    categories = [
+      { id: COMPUTER_CATEGORY_ID, name: "Computador", active: true },
+      { id: MONITOR_CATEGORY_ID, name: "Monitor", active: true },
+    ],
+  ) {
+    const assets = seed.map((item) => ({ ...item }));
+    const queues = new Map<string, Promise<void>>();
+    const lockedKeys: string[] = [];
+    const matches = (item: Asset, where: Record<string, unknown>): boolean =>
+      Object.entries(where).every(([key, expected]) => {
+        if (key === "NOT") return item.id !== (expected as { id: string }).id;
+        if (key === "category_id" && expected && typeof expected === "object") {
+          return (expected as { in: string[] }).in.includes(item.category_id);
+        }
+        if (key === "user_id" && expected && typeof expected === "object") {
+          return item.user_id !== null;
+        }
+        return item[key as keyof Asset] === expected;
+      });
+    const models = {
+      inventoryTecnologia: {
+        findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
+          assets.filter((item) => matches(item, where)),
+        ),
+        findFirst: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return assets.find((item) => matches(item, where)) ?? null;
+        }),
+        create: vi.fn(async ({ data }: { data: Partial<Asset> }) => {
+          const created = asset(`created-${assets.length}`, data);
+          assets.push(created);
+          return created;
+        }),
+        update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<Asset> }) => {
+          const found = assets.find((item) => item.id === where.id);
+          if (!found) throw new Error("ativo inexistente");
+          return Object.assign(found, data);
+        }),
+      },
+      inventoryCategoryTecnologia: {
+        findMany: vi.fn(async () => categories),
+        findFirst: vi.fn(
+          async ({ where }: { where: { id?: string; name?: string } }) =>
+            categories.find((category) =>
+              where.id ? category.id === where.id : category.name === where.name,
+            ) ?? null,
+        ),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+      },
+      user: {
+        findFirst: vi.fn(async ({ where }: { where: { id: string } }) => ({
+          id: where.id,
+          status: "active",
+        })),
+      },
+    };
+    const transaction = vi.fn(async (callback: (database: TiDatabase) => Promise<unknown>) => {
+      const releases: Array<() => void> = [];
+      const scoped = {
+        ...models,
+        $executeRaw: vi.fn(async (_query: TemplateStringsArray, key: string) => {
+          lockedKeys.push(key);
+          const previous = queues.get(key) ?? Promise.resolve();
+          let release = () => {};
+          const held = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          queues.set(
+            key,
+            previous.then(() => held),
+          );
+          await previous;
+          releases.push(release);
+        }),
+      };
+      try {
+        return await callback(scoped as unknown as TiDatabase);
+      } finally {
+        for (const release of releases) release();
+      }
+    });
+    const db = { ...models, $transaction: transaction } as unknown as TiDatabase;
+    const activeComputers = (user: string) =>
+      assets.filter(
+        (item) =>
+          item.user_id === user && item.category_id === COMPUTER_CATEGORY_ID && !item.return_date,
+      );
+    return { db, models, transaction, assets, activeComputers, lockedKeys };
+  }
+
+  it("recusa um segundo computador ativo em cadastro, edição e atribuição", async () => {
+    const { db, assets, activeComputers } = inMemoryDatabase([
+      asset("pc-1", { user_id: USER_ID }),
+      asset("pc-2"),
+      asset("pc-3", { user_id: OTHER_USER_ID }),
+      asset("monitor-1", { user_id: USER_ID, category_id: MONITOR_CATEGORY_ID }),
+    ]);
+    const service = createTiDomainServices(db).inventory;
+    const conflict = {
+      statusCode: 409,
+      message: "Esse usuário já possui um computador ativo.",
+    };
+
+    await expect(service?.assignUser?.(auth(), "pc-2", { user_id: USER_ID })).rejects.toMatchObject(
+      conflict,
+    );
+    await expect(
+      service?.create?.(auth(), {
+        asset_code: "PC-NOVO",
+        category_id: COMPUTER_CATEGORY_ID,
+        user_id: USER_ID,
+      }),
+    ).rejects.toMatchObject(conflict);
+    await expect(service?.update?.(auth(), "pc-3", { user_id: USER_ID })).rejects.toMatchObject(
+      conflict,
+    );
+    await expect(
+      service?.update?.(auth(), "monitor-1", { category_id: COMPUTER_CATEGORY_ID }),
+    ).rejects.toMatchObject(conflict);
+
+    expect(assets).toHaveLength(4);
+    expect(activeComputers(USER_ID).map((item) => item.id)).toEqual(["pc-1"]);
+  });
+
+  it("libera depois da devolução, ignora devolvidos e não bloqueia outras categorias", async () => {
+    const { db, transaction, activeComputers, assets } = inMemoryDatabase([
+      asset("pc-1", { user_id: USER_ID }),
+      asset("pc-2"),
+      // Legado migrado: devolvido, mas ainda aponta para a última pessoa.
+      asset("pc-antigo", { user_id: OTHER_USER_ID, return_date: new Date("2024-01-10") }),
+      asset("pc-3"),
+      asset("monitor-1", { category_id: MONITOR_CATEGORY_ID }),
+    ]);
+    const service = createTiDomainServices(db).inventory;
+
+    await service?.assignUser?.(auth(), "monitor-1", { user_id: USER_ID });
+    expect(transaction).not.toHaveBeenCalled();
+
+    await service?.returnAsset?.(auth(), "pc-1", {});
+    await service?.assignUser?.(auth(), "pc-2", { user_id: USER_ID });
+    await service?.assignUser?.(auth(), "pc-3", { user_id: OTHER_USER_ID });
+
+    expect(activeComputers(USER_ID).map((item) => item.id)).toEqual(["pc-2"]);
+    expect(activeComputers(OTHER_USER_ID).map((item) => item.id)).toEqual(["pc-3"]);
+    expect(assets.filter((item) => item.user_id === USER_ID)).toHaveLength(2);
+  });
+
+  it("editar a pessoa de um item devolvido reatribui e passa pela regra", async () => {
+    const { db, assets, activeComputers } = inMemoryDatabase([
+      asset("pc-1", { user_id: USER_ID }),
+      asset("pc-devolvido", { return_date: new Date("2026-09-10") }),
+    ]);
+    const service = createTiDomainServices(db).inventory;
+
+    await expect(
+      service?.update?.(auth(), "pc-devolvido", { user_id: USER_ID }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    await service?.update?.(auth(), "pc-devolvido", { user_id: OTHER_USER_ID });
+    expect(assets.find((item) => item.id === "pc-devolvido")).toMatchObject({
+      user_id: OTHER_USER_ID,
+      return_date: null,
+    });
+    expect(activeComputers(USER_ID).map((item) => item.id)).toEqual(["pc-1"]);
+  });
+
+  // Legado: a troca do PHP não validava, então há quem tenha migrado com dois computadores.
+  it("edição que não troca pessoa nem categoria não reavalia a regra", async () => {
+    const { db, transaction, models } = inMemoryDatabase([
+      asset("pc-1", { user_id: USER_ID }),
+      asset("pc-2", { user_id: USER_ID }),
+    ]);
+    const service = createTiDomainServices(db).inventory;
+
+    await service?.update?.(auth(), "pc-2", { notes: "Revisado", user_id: USER_ID });
+
+    expect(transaction).not.toHaveBeenCalled();
+    expect(models.inventoryTecnologia.update).toHaveBeenCalledWith({
+      where: { id: "pc-2" },
+      data: { notes: "Revisado", user_id: USER_ID, return_date: null },
+    });
+  });
+
+  it("só renomeia uma categoria para Computador se ninguém tiver dois itens ativos dela", async () => {
+    const categories = [{ id: MONITOR_CATEGORY_ID, name: "Desktop", active: true }];
+    const blocked = inMemoryDatabase(
+      [
+        asset("d-1", { user_id: USER_ID, category_id: MONITOR_CATEGORY_ID }),
+        asset("d-2", { user_id: USER_ID, category_id: MONITOR_CATEGORY_ID }),
+      ],
+      categories,
+    );
+    await expect(
+      createTiDomainServices(blocked.db).inventoryCategories?.update?.(
+        auth(),
+        MONITOR_CATEGORY_ID,
+        { name: "Computador" },
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(blocked.models.inventoryCategoryTecnologia.update).not.toHaveBeenCalled();
+
+    const allowed = inMemoryDatabase(
+      [
+        asset("d-1", { user_id: USER_ID, category_id: MONITOR_CATEGORY_ID }),
+        asset("d-2", { user_id: OTHER_USER_ID, category_id: MONITOR_CATEGORY_ID }),
+        asset("d-3", {
+          user_id: USER_ID,
+          category_id: MONITOR_CATEGORY_ID,
+          return_date: new Date("2025-01-01"),
+        }),
+      ],
+      categories,
+    );
+    await createTiDomainServices(allowed.db).inventoryCategories?.update?.(
+      auth(),
+      MONITOR_CATEGORY_ID,
+      { name: "Computador" },
+    );
+    expect(allowed.models.inventoryCategoryTecnologia.update).toHaveBeenCalled();
+  });
+
+  it("escritas simultâneas deixam um só computador ativo por pessoa", async () => {
+    const { db, activeComputers, lockedKeys } = inMemoryDatabase([
+      asset("pc-1"),
+      asset("pc-2"),
+      asset("pc-3", { user_id: OTHER_USER_ID }),
+    ]);
+    const service = createTiDomainServices(db).inventory;
+
+    const results = await Promise.allSettled([
+      service?.assignUser?.(auth(), "pc-1", { user_id: USER_ID }),
+      service?.assignUser?.(auth(), "pc-2", { user_id: USER_ID }),
+      service?.create?.(auth(), {
+        asset_code: "PC-NOVO",
+        category_id: COMPUTER_CATEGORY_ID,
+        user_id: USER_ID,
+      }),
+      service?.update?.(auth(), "pc-3", { user_id: USER_ID }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(
+      results.flatMap((result) => (result.status === "rejected" ? [result.reason.statusCode] : [])),
+    ).toEqual([409, 409, 409]);
+    expect(activeComputers(USER_ID)).toHaveLength(1);
+    expect(new Set(lockedKeys)).toEqual(
+      new Set([`ti.inventory.active-computer:${ORGANIZATION_ID}:${USER_ID}`]),
+    );
+  });
+
+  it("mantém Computador como categoria única, sem renomear nem desativar", async () => {
+    const { db, models } = inMemoryDatabase(
+      [],
+      [
+        { id: COMPUTER_CATEGORY_ID, name: "Computador", active: true },
+        { id: MONITOR_CATEGORY_ID, name: "Monitor", active: true },
+      ],
+    );
+    const service = createTiDomainServices(db).inventoryCategories;
+    const locked = { statusCode: 409 };
+
+    await expect(service?.create?.(auth(), { name: " computador " })).rejects.toMatchObject(locked);
+    await expect(
+      service?.update?.(auth(), COMPUTER_CATEGORY_ID, { name: "Desktop" }),
+    ).rejects.toMatchObject(locked);
+    await expect(
+      service?.update?.(auth(), COMPUTER_CATEGORY_ID, { active: false }),
+    ).rejects.toMatchObject(locked);
+    await expect(
+      service?.update?.(auth(), MONITOR_CATEGORY_ID, { name: "COMPUTADOR" }),
+    ).rejects.toMatchObject(locked);
+    expect(models.inventoryCategoryTecnologia.create).not.toHaveBeenCalled();
+    expect(models.inventoryCategoryTecnologia.update).not.toHaveBeenCalled();
+
+    await service?.update?.(auth(), COMPUTER_CATEGORY_ID, { tag: "PC" });
+    expect(models.inventoryCategoryTecnologia.update).toHaveBeenCalledWith({
+      where: { id: COMPUTER_CATEGORY_ID },
+      data: { tag: "PC" },
+    });
+  });
+});

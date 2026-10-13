@@ -58,4 +58,101 @@ describe("TiInventoryCategoryService", () => {
       message: "Já existe uma categoria de inventário de TI ativa com este nome.",
     });
   });
+  // #1931: Computador é a categoria canônica da regra do computador ativo.
+  describe("categoria canônica Computador", () => {
+    const prismaWith = (
+      categories: Array<{ id: string; name: string }>,
+      activeAssets: Array<{ user_id: string }> = [],
+    ) => ({
+      inventoryTecnologia: { findMany: vi.fn(async () => activeAssets) },
+      inventoryCategoryTecnologia: {
+        findFirst: vi.fn(async ({ where }: { where: { id?: string; name?: string } }) =>
+          where.id
+            ? (categories.find((category) => category.id === where.id) ?? null)
+            : (categories.find((category) => category.name === where.name) ?? null),
+        ),
+        findMany: vi.fn(async () => categories),
+        create: vi.fn(async ({ data }) => ({ id: "cat-new", ...data })),
+        update: vi.fn(async ({ data }) => ({ id: "cat-1", ...data })),
+      },
+    });
+
+    it("não cria uma segunda categoria Computador, mesmo com outra grafia", async () => {
+      const prisma = prismaWith([{ id: "cat-1", name: "Computador" }]);
+      const service = new TiInventoryCategoryService(prisma as never);
+
+      await expect(service.create(context, { name: " computador " })).rejects.toMatchObject({
+        statusCode: 409,
+        message: "Já existe a categoria Computador nesta organização.",
+      });
+      expect(prisma.inventoryCategoryTecnologia.create).not.toHaveBeenCalled();
+    });
+
+    it("não renomeia nem desativa a categoria Computador", async () => {
+      const prisma = prismaWith([{ id: "cat-1", name: "Computador" }]);
+      const service = new TiInventoryCategoryService(prisma as never);
+
+      await expect(service.update(context, "cat-1", { name: "Desktop" })).rejects.toMatchObject({
+        statusCode: 409,
+      });
+      await expect(service.update(context, "cat-1", { active: false })).rejects.toMatchObject({
+        statusCode: 409,
+      });
+      expect(prisma.inventoryCategoryTecnologia.update).not.toHaveBeenCalled();
+
+      await service.update(context, "cat-1", { tag: "PC" });
+      expect(prisma.inventoryCategoryTecnologia.update).toHaveBeenCalledWith({
+        where: { id: "cat-1" },
+        data: { tag: "PC" },
+      });
+    });
+
+    it("só renomeia para Computador se ninguém tiver dois itens ativos da categoria", async () => {
+      const blocked = prismaWith(
+        [{ id: "cat-2", name: "Desktop" }],
+        [{ user_id: "user-1" }, { user_id: "user-2" }, { user_id: "user-1" }],
+      );
+      await expect(
+        new TiInventoryCategoryService(blocked as never).update(context, "cat-2", {
+          name: "Computador",
+        }),
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        message:
+          "Há pessoas com mais de um item ativo nesta categoria; ela não pode virar Computador.",
+      });
+      expect(blocked.inventoryTecnologia.findMany).toHaveBeenCalledWith({
+        where: {
+          organization_id: context.organizationId,
+          category_id: "cat-2",
+          user_id: { not: null },
+          return_date: null,
+        },
+        select: { user_id: true },
+      });
+      expect(blocked.inventoryCategoryTecnologia.update).not.toHaveBeenCalled();
+
+      const allowed = prismaWith(
+        [{ id: "cat-2", name: "Desktop" }],
+        [{ user_id: "user-1" }, { user_id: "user-2" }],
+      );
+      await new TiInventoryCategoryService(allowed as never).update(context, "cat-2", {
+        name: "Computador",
+      });
+      expect(allowed.inventoryCategoryTecnologia.update).toHaveBeenCalled();
+    });
+
+    it("não renomeia outra categoria para Computador quando ela já existe", async () => {
+      const prisma = prismaWith([
+        { id: "cat-1", name: "Computador" },
+        { id: "cat-2", name: "Desktop" },
+      ]);
+      const service = new TiInventoryCategoryService(prisma as never);
+
+      await expect(service.update(context, "cat-2", { name: "COMPUTADOR" })).rejects.toMatchObject({
+        statusCode: 409,
+      });
+      expect(prisma.inventoryCategoryTecnologia.update).not.toHaveBeenCalled();
+    });
+  });
 });
