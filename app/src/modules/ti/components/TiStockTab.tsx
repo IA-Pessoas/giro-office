@@ -748,8 +748,8 @@ export function TiStockTab() {
       return;
     }
 
-    if (hasActiveTiStockLocation(stockLocations, name)) {
-      toast.error("Já existe um local de estoque de TI ativo com este nome.");
+    if (hasActiveTiStockLocation(stockLocations, name, toOptionalFloor(locationFloor))) {
+      toast.error("Já existe um local de estoque de TI ativo com este nome neste andar.");
       return;
     }
 
@@ -1446,7 +1446,11 @@ export function TiStockTab() {
                   disabled={
                     !canEditStock ||
                     createLocationMutation.isPending ||
-                    hasActiveTiStockLocation(stockLocations, locationName)
+                    hasActiveTiStockLocation(
+                      stockLocations,
+                      locationName,
+                      toOptionalFloor(locationFloor),
+                    )
                   }
                 />
               </div>

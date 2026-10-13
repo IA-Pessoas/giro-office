@@ -336,7 +336,7 @@ describe("ti stock routes", () => {
     expect(response.status).toBe(409);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Já existe um local de estoque de TI ativo com este nome.",
+      error: "Já existe um local de estoque de TI ativo com este nome neste andar.",
       code: "CONFLICT",
     });
   });

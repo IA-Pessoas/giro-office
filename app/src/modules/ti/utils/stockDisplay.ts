@@ -35,7 +35,12 @@ export function filterTiStockLocations(
   );
 }
 
-export function hasActiveTiStockLocation(locations: TiStockLocation[], name: string): boolean {
+/** Como no serviço (e no legado), o nome do local de estoque é único por andar. */
+export function hasActiveTiStockLocation(
+  locations: TiStockLocation[],
+  name: string,
+  floor?: number | null,
+): boolean {
   const normalizedName = normalizeTiStockLocationName(name);
 
   if (!normalizedName) {
@@ -46,6 +51,7 @@ export function hasActiveTiStockLocation(locations: TiStockLocation[], name: str
     (location) =>
       location.status !== false &&
       location.status !== "inactive" &&
+      (location.floor ?? null) === (floor ?? null) &&
       normalizeTiStockLocationName(location.name ?? "") === normalizedName,
   );
 }

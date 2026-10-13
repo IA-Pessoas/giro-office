@@ -216,9 +216,54 @@ describe("TiStockService", () => {
       service.createLocation(context, { name: "  ALMOXARIFADO   SAO  " }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Já existe um local de estoque de TI ativo com este nome.",
+      message: "Já existe um local de estoque de TI ativo com este nome neste andar.",
     });
     expect(locationStock.create).not.toHaveBeenCalled();
+  });
+
+  // #1937: renomear ou reativar um local de estoque não repete o nome de outro ativo.
+  it("rejects renaming or reactivating a stock location into a name already in use", async () => {
+    const current = { id: "location-2", name: "Sala 2", floor: 2, status: true };
+    const locationStock = {
+      findFirst: vi.fn(async () => current),
+      findMany: vi.fn(async () => [{ id: locationId, name: "Almoxarifado São" }, current]),
+      update: vi.fn(async ({ data }) => ({ ...current, ...data })),
+    };
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      locationStock,
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(
+      service.updateLocation(context, current.id, { name: "almoxarifado sao" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Já existe um local de estoque de TI ativo com este nome neste andar.",
+    });
+    expect(locationStock.update).not.toHaveBeenCalled();
+    // Como no legado, o nome é único por andar: a busca é só entre os ativos do mesmo andar.
+    expect(locationStock.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: context.organizationId,
+        department_id: departmentId,
+        status: true,
+        floor: 2,
+      },
+      select: { id: true, name: true },
+    });
+
+    // Mudar de andar confere o nome no andar de destino; desativar não confere nada.
+    locationStock.findMany.mockClear();
+    locationStock.findMany.mockResolvedValueOnce([]);
+    await service.updateLocation(context, current.id, { floor: 3 });
+    expect(locationStock.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ floor: 3 }) }),
+    );
+    locationStock.findMany.mockClear();
+    await service.updateLocation(context, current.id, { status: false });
+    expect(locationStock.update).toHaveBeenCalledTimes(2);
+    expect(locationStock.findMany).not.toHaveBeenCalled();
   });
 
   it("creates an entry and increments stock quantity", async () => {
