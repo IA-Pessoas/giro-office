@@ -19,12 +19,7 @@ const TASK_SELECT = {
   responsible3_id: true,
   department: { select: { name: true } },
 } as const;
-const TASK_CLOSE_EXCLUDED_STATUSES = [
-  "Concluída",
-  "Em Espera",
-  "Não Contratado",
-  "Paralisado",
-];
+const TASK_CLOSE_EXCLUDED_STATUSES = ["Concluída", "Em Espera", "Não Contratado", "Paralisado"];
 
 type CommercialProspectingClosePrisma = Pick<
   PrismaClient,
