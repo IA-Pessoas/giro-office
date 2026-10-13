@@ -107,10 +107,23 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     const location = await call("POST", "/ti/inventory-locations", { name: `Sala ${suffix()}` });
     const locationId = location.data.id as string;
     await call("GET", "/ti/inventory-locations/list");
+    const locationName = `Sala editada ${suffix()}`;
     await call("PATCH", `/ti/inventory-locations/${locationId}`, {
-      name: `Sala editada ${suffix()}`,
+      name: locationName,
       active: true,
     });
+    // #1937: outro local não pode ser renomeado para um nome já em uso, nem com outra caixa.
+    const otherLocation = await call("POST", "/ti/inventory-locations", {
+      name: `Depósito ${suffix()}`,
+    });
+    const renamed = await smokeCall(
+      app(),
+      env(),
+      "PATCH",
+      `/ti/inventory-locations/${otherLocation.data.id}`,
+      { name: locationName.toUpperCase() },
+    );
+    expect(renamed.status).toBe(409);
 
     const asset = await call("POST", "/ti/inventory", {
       asset_code: `PAT-${suffix()}`,

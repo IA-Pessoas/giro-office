@@ -717,7 +717,15 @@ await runTest("ti stock locations filter progressively and identify normalized a
   );
   assert.equal(hasActiveTiStockLocation(locations, "ALMOXARIFADO SAO"), true);
   assert.equal(hasActiveTiStockLocation(locations, "Sala"), false);
-  assert.match(tabSource, /hasActiveTiStockLocation\(stockLocations, name\)/);
+  // #1937: o nome é único por andar, como no legado.
+  const byFloor = [{ id: 4, name: "Armário", floor: 1, status: true }];
+  assert.equal(hasActiveTiStockLocation(byFloor, "armario", 1), true);
+  assert.equal(hasActiveTiStockLocation(byFloor, "armario", 2), false);
+  assert.equal(hasActiveTiStockLocation(byFloor, "armario"), false);
+  assert.match(
+    tabSource,
+    /hasActiveTiStockLocation\(stockLocations, name, toOptionalFloor\(locationFloor\)\)/,
+  );
   assert.match(tabSource, /rows=\{filteredStockLocations\}/);
 });
 
@@ -1947,6 +1955,30 @@ await runTest("ti inventory write actions follow the level the service requires"
   assert.doesNotMatch(source, /const canManage = access\.canEdit/);
   // Quando só o departamento muda, o histórico mostra os departamentos, não "A → A".
   assert.match(source, /event\.from_user\?\.id === event\.to_user\?\.id/);
+});
+
+await runTest("ti inventory manages its own locations, apart from stock locations", async () => {
+  const tab = await readModuleSource("components/TiInventoryTab.tsx");
+  const dialog = await readModuleSource("components/TiInventoryLocationsDialog.tsx");
+  const stock = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(tab, /label="Departamentos e locais"/);
+  assert.match(tab, /<TiInventoryLocationsDialog/);
+  assert.match(tab, /title="Categorias de inventário"/);
+  // Dois cadastros, dois títulos: inventário sem andar, estoque com andar.
+  assert.match(dialog, /title="Departamentos e locais de inventário"/);
+  assert.match(stock, /title="Locais de estoque"/);
+  assert.match(stock, /label="Andar"/);
+  assert.doesNotMatch(dialog, /label="Andar"|floor/);
+  assert.match(dialog, /useCreateTiInventoryLocationMutation/);
+  assert.match(dialog, /useUpdateTiInventoryLocationMutation/);
+  // Desativar e reativar, sem exclusão: o item histórico continua apontando para o local.
+  assert.match(dialog, /label=\{isActive\(location\) \? "Desativar" : "Reativar"\}/);
+  assert.match(dialog, /payload: \{ active: !isActive\(location\) \}/);
+  assert.doesNotMatch(dialog, /Trash2|Excluir/);
+  // Erro do serviço (nome repetido) aparece no diálogo.
+  assert.match(dialog, /setError\(getTiInventoryMutationErrorMessage\(mutationError\)\)/);
+  assert.match(dialog, /disabled=\{!canManage \|\| isSubmitting\}/);
 });
 
 await runTest("ti change history tab lists field changes with masked credentials", async () => {
