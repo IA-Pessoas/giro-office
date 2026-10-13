@@ -36,7 +36,18 @@ model CommercialProspecting {
   organization_id String
   status          String
   status_date     DateTime?
+  solution        String?
+  reference_month String?
+  service         String?
   description     String?
+  participants    String?
+  meeting_mode    String?
+  branch          String?
+  pause_reason    String?
+  attachment_path String?
+  attachment_name String?
+  attachment_mime_type String?
+  attachment_size_bytes Int?
   archived_at     DateTime?
   registered_at   DateTime  @default(now())
   updated_at      DateTime  @updatedAt
