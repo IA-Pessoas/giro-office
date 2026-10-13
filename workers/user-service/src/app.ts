@@ -662,9 +662,12 @@ async function assertPhotoTarget(
   assertCanManageTarget(auth, target);
 }
 
-/** Criar ou promover owner é só do owner. Módulos seguem o teto de assertModulesWithinActor. */
+/**
+ * Criar ou promover owner e conceder módulos (permissões gerais) é só do owner (#1930).
+ * Os módulos que o servidor deriva do tipo seguem o teto de assertModulesWithinActor.
+ */
 function isOwnerMutation(input: Record<string, unknown>): boolean {
-  return input.type === "owner" || input.first_owner_flag === true;
+  return input.type === "owner" || input.first_owner_flag === true || input.modules !== undefined;
 }
 
 /** Troca da própria senha: prova a senha atual e aplica a política mínima (#1341). */
@@ -690,11 +693,34 @@ async function assertOwnPasswordChange(
   if (policyError) throw new ServiceError(400, policyError);
 }
 
+/**
+ * Tipo, nível de acesso e departamento de um admin definem os módulos do usuário, e mudá-los
+ * concede ou revoga acesso: é do owner (#1930). Valores iguais aos atuais saem do payload,
+ * para não rederivar os módulos numa edição que só troca o nome.
+ */
+function withoutAccessChanges(
+  input: Record<string, unknown>,
+  existing: Row,
+): Record<string, unknown> {
+  const { type, permission, department_id: departmentId, ...rest } = input;
+  const changesAccess =
+    (type !== undefined && type !== existing.type) ||
+    (permission !== undefined && Number(permission) !== Number(existing.permission));
+  const changesDepartment = departmentId !== undefined && departmentId !== existing.department_id;
+  if (changesAccess || (changesDepartment && existing.type === "admin")) {
+    throw new ServiceError(
+      403,
+      "Apenas o owner altera o tipo, o nível de acesso ou o departamento de um administrador.",
+    );
+  }
+  return changesDepartment ? { ...rest, department_id: departmentId } : rest;
+}
+
 async function updateOrganizationUser(
   db: UserPrismaClient,
   userId: string,
   organizationId: string,
-  input: Record<string, unknown>,
+  requested: Record<string, unknown>,
   hashPassword: (password: string) => Promise<string> = defaultHashPassword,
   actor?: UserAuthContext,
 ): Promise<Row> {
@@ -704,6 +730,8 @@ async function updateOrganizationUser(
   });
   if (!existing) throw new ServiceError(404, "Usuário não encontrado.");
   if (actor) assertCanManageTarget(actor, existing);
+  const grantsAccess = !actor || actor.claims.type === "owner";
+  const input = grantsAccess ? requested : withoutAccessChanges(requested, existing);
   if (input.organization_id !== undefined && input.organization_id !== organizationId) {
     throw new ServiceError(403, "Organização da requisição não confere.");
   }
@@ -747,8 +775,12 @@ async function updateOrganizationUser(
         ]),
       )
     : undefined;
+  // Quem não é owner só chega aqui com troca de departamento de usuário comum: sem módulos.
   const normalizesTypeOrPermission =
-    input.type !== undefined || input.permission !== undefined || input.department_id !== undefined;
+    grantsAccess &&
+    (input.type !== undefined ||
+      input.permission !== undefined ||
+      input.department_id !== undefined);
   if (requestedType === "admin" && normalizesTypeOrPermission) {
     const department = await requireDepartmentInOrganization(
       db,
@@ -1734,6 +1766,10 @@ async function createOrganizationUser(
     throw new ServiceError(503, "Criação de usuário não configurada.");
   }
   const type = input.type ?? null;
+  // Admin recebe o nível 3 no módulo do departamento: é concessão, só do owner (#1930).
+  if (actor && actor.claims.type !== "owner" && type === "admin") {
+    throw new ServiceError(403, "Apenas o owner cria administradores.");
+  }
   const requestedPermission = Number(input.permission);
   const permission =
     type === "owner" ? 2 : type === "admin" && requestedPermission >= 2 ? 1 : requestedPermission;
@@ -2350,7 +2386,8 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
   app.put("/user/permission/:userId", async (c) =>
     withDb(c, options, async (db) => {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
-      requireManageUsers(auth);
+      // Permissões gerais são do owner também em chamada direta, sem o gateway (#1930).
+      requireOwner(auth);
       await requireCsrf(c.req.raw, auth);
       const { userId } = parse(permissionUserIdParamsSchema, c.req.param());
       const modules = parse(updatePermissionBodySchema, await jsonBody(c));

@@ -1633,7 +1633,8 @@ describe("user Worker", () => {
   });
 });
 
-describe("admin de TI gerencia usuários com teto de permissão", () => {
+// #1930: TI nível 3 e RH nível 3 gerenciam usuários; permissões gerais são só do owner.
+describe("admin de TI gerencia usuários sem conceder permissões gerais", () => {
   // Perfil do Vinicius: admin de Tecnologia, ti=3 e rh=1.
   const tiAdmin = () =>
     forwardedHeaders({
@@ -1668,7 +1669,7 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
 
-  it("lista e cria usuário dentro do próprio nível", async () => {
+  it("lista, cria e edita usuário só com o autoatendimento", async () => {
     const db = prisma();
     const app = createUserWorkerApp({
       env: env(),
@@ -1677,13 +1678,128 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
     } as never);
 
     expect((await request(app, "GET", "/user")).status).toBe(200);
-    const created = await request(app, "POST", "/user", newUser({ modules: { ti: 2, rh: 1 } }));
+    const created = await request(app, "POST", "/user", newUser());
 
     expect(created.status).toBe(201);
     expect(db.user.create).toHaveBeenCalled();
+    // Sem `modules` no payload, o usuário comum recebe só o autoatendimento.
+    expect(db.permission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { rh: 1, ti: 1 } }),
+    );
+
+    db.user.findFirst.mockResolvedValue(nonOwnerTarget());
+    expect((await request(app, "PUT", `/user/${USER_ID}`, { name: "Outro" })).status).toBe(200);
   });
 
-  it("não concede módulo acima do próprio nível, nem via admin de outro departamento", async () => {
+  it.each([
+    ["TI nível 3", { ti: 3, rh: 1 }],
+    ["RH nível 3", { rh: 3, ti: 1 }],
+  ])("%s não envia módulos nem salva permissões gerais", async (_label, modules) => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue(nonOwnerTarget());
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword: async () => "h",
+    } as never);
+    const send = (method: string, path: string, body: unknown) =>
+      app.request(`https://user.test${path}`, {
+        method,
+        headers: forwardedHeaders({
+          "x-auth-type": "admin",
+          "x-auth-modules": JSON.stringify(modules),
+          "content-type": "application/json",
+        }),
+        body: JSON.stringify(body),
+      });
+
+    // Nem dentro do próprio nível: conceder módulo é do owner.
+    expect((await send("POST", "/user", newUser({ modules: { ti: 1, rh: 1 } }))).status).toBe(403);
+    expect((await send("PUT", `/user/${USER_ID}`, { modules: { ti: 1 } })).status).toBe(403);
+    expect((await send("PUT", `/user/permission/${USER_ID}`, { ti: 1 })).status).toBe(403);
+    expect((await send("PUT", `/user/permission/${USER_ID}`, { ti: 0 })).status).toBe(403);
+    expect(db.user.create).not.toHaveBeenCalled();
+    expect(db.permission.updateMany).not.toHaveBeenCalled();
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("owner concede módulos na criação e salva permissões gerais", async () => {
+    const db = prisma();
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword: async () => "h",
+    } as never);
+    const owner = { ...forwardedHeaders(), "content-type": "application/json" };
+
+    const created = await app.request("https://user.test/user", {
+      method: "POST",
+      headers: owner,
+      body: JSON.stringify(newUser({ modules: { fiscal: 2 } })),
+    });
+
+    expect(created.status).toBe(201);
+    expect(db.permission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { fiscal: 2, rh: 1, ti: 1 } }),
+    );
+    const saved = await app.request(`https://user.test/user/permission/${USER_ID}`, {
+      method: "PUT",
+      headers: owner,
+      body: JSON.stringify({ contabil: 2 }),
+    });
+    expect(saved.status).toBe(200);
+  });
+
+  it("usuário comum não lista, cria nem altera permissões", async () => {
+    const db = prisma();
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+    const send = (method: string, path: string, body?: unknown) =>
+      app.request(`https://user.test${path}`, {
+        method,
+        headers: forwardedHeaders({
+          "x-auth-type": "user",
+          "x-auth-modules": JSON.stringify({ ti: 1, rh: 1 }),
+          "content-type": "application/json",
+        }),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    expect((await send("GET", "/user")).status).toBe(403);
+    expect((await send("POST", "/user", newUser())).status).toBe(403);
+    expect((await send("PUT", `/user/permission/${USER_ID}`, { ti: 3 })).status).toBe(403);
+    expect(db.user.create).not.toHaveBeenCalled();
+  });
+
+  it("não muda tipo, nível de acesso nem departamento de admin", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({ ...nonOwnerTarget(), type: "admin" });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    for (const change of [{ type: "user" }, { permission: 0 }, { department_id: "dep-2" }]) {
+      expect((await request(app, "PUT", `/user/${USER_ID}`, change)).status).toBe(403);
+    }
+    expect(db.permission.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Payload do painel de Administração: reenvia permissão e departamento sem mudar.
+  it("edita o nome sem rederivar os módulos do usuário", async () => {
+    const db = prisma();
+    const target = nonOwnerTarget();
+    db.user.findFirst.mockResolvedValue(target);
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await request(app, "PUT", `/user/${USER_ID}`, {
+      name: "Outro",
+      permission: target.permission,
+      department_id: target.department_id,
+      status: "active",
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.permission.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("não cria admin, que receberia o módulo do departamento no nível 3", async () => {
     const db = prisma();
     const app = createUserWorkerApp({
       env: env(),
@@ -1691,8 +1807,13 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
       hashPassword: async () => "h",
     } as never);
 
-    const fiscal = await request(app, "POST", "/user", newUser({ modules: { fiscal: 2 } }));
-    expect(fiscal.status).toBe(403);
+    // Nem no próprio departamento: um admin de TI criaria outro admin de TI.
+    db.department.findFirst.mockResolvedValue({
+      id: "dep-1",
+      organization_id: ORGANIZATION_ID,
+      name: "Tecnologia",
+    });
+    expect((await request(app, "POST", "/user", newUser({ type: "admin" }))).status).toBe(403);
 
     // Admin do Fiscal recebe fiscal=3 na normalização do servidor.
     db.department.findFirst.mockResolvedValue({
@@ -1720,21 +1841,6 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
     expect(db.permission.updateMany).not.toHaveBeenCalled();
     // Foto: a checagem vem antes do storage (senão a do owner seria trocada antes do 403).
     expect((await request(app, "DELETE", `/user/${USER_ID}/photo`)).status).toBe(403);
-  });
-
-  it("salva permissões de não-owner até o próprio nível", async () => {
-    const db = prisma();
-    db.user.findFirst.mockResolvedValue(nonOwnerTarget());
-    const app = createUserWorkerApp({
-      env: env(),
-      prisma: db,
-      hashPassword: async () => "h",
-    } as never);
-
-    expect((await request(app, "PUT", `/user/permission/${USER_ID}`, { ti: 3 })).status).toBe(200);
-    expect((await request(app, "PUT", `/user/permission/${USER_ID}`, { contabil: 2 })).status).toBe(
-      403,
-    );
   });
 
   it("quem tem TI abaixo de admin continua sem acesso", async () => {
