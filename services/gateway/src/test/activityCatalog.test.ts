@@ -646,6 +646,13 @@ describe("activityCatalog", () => {
     });
   });
 
+  it("classifica consulta do cronograma como atividade visível", () => {
+    expect(classifyActivity("GET", "/task/cronograma")).toEqual({
+      kind: "visible",
+      description: { action: "consultou", item: "o cronograma de Integração" },
+    });
+  });
+
   it("classifica a extração de tarefas por IA como atividade visível sem expor a Ata", () => {
     expect(classifyActivity("POST", "/task/project-wizard/extract-tasks")).toEqual({
       kind: "visible",
