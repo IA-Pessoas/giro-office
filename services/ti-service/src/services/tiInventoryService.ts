@@ -1,6 +1,12 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  ACTIVE_COMPUTER_CONFLICT_MESSAGE,
+  activeComputerLockKey,
+  isComputerCategoryName,
+  error as logError,
+  ServiceError,
+} from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   AssignTiInventoryUserBody,
@@ -19,6 +25,16 @@ const SAFE_USER_SELECT = {
   department_id: true,
   organization_id: true,
 } as const;
+
+type InventoryWriter = Pick<Prisma.TransactionClient, "inventoryTecnologia">;
+
+/** Estado em que o ativo termina depois da escrita. */
+type AssetAssignment = {
+  id?: string;
+  category_id: string;
+  user_id?: string | null;
+  return_date?: Date | null;
+};
 
 const INVENTORY_INCLUDE = {
   category: true,
@@ -101,18 +117,23 @@ export class TiInventoryService {
         );
       }
 
-      return this.prisma.inventoryTecnologia.create({
-        data: {
-          asset_code: body.asset_code,
-          category_id: body.category_id,
-          location_id: body.location_id,
-          user_id: body.user_id,
-          responsible_it_staff_id: body.responsible_it_staff_id,
-          notes: body.notes,
-          delivery_date: body.delivery_date,
-          organization_id: context.organizationId,
-        },
-      });
+      return await this.writeWithComputerRule(
+        context.organizationId,
+        { category_id: body.category_id, user_id: body.user_id },
+        (writer) =>
+          writer.inventoryTecnologia.create({
+            data: {
+              asset_code: body.asset_code,
+              category_id: body.category_id,
+              location_id: body.location_id,
+              user_id: body.user_id,
+              responsible_it_staff_id: body.responsible_it_staff_id,
+              notes: body.notes,
+              delivery_date: body.delivery_date,
+              organization_id: context.organizationId,
+            },
+          }),
+      );
     } catch (err: unknown) {
       logError("Erro ao criar ativo de inventario de TI", { err });
       if (err instanceof ServiceError) throw err;
@@ -125,7 +146,7 @@ export class TiInventoryService {
 
   async update(context: TiAuthContext, id: string, body: UpdateTiInventoryBody): Promise<unknown> {
     try {
-      await this.getById(context, id);
+      const existing = await this.getAssignment(context, id);
 
       if (body.asset_code) {
         const duplicated = await this.prisma.inventoryTecnologia.findFirst({
@@ -156,10 +177,27 @@ export class TiInventoryService {
         );
       }
 
-      return this.prisma.inventoryTecnologia.update({
-        where: { id },
-        data: body,
-      });
+      // Informar a pessoa é atribuir: a devolução anterior deixa de valer.
+      const data = body.user_id === undefined ? body : { ...body, return_date: null };
+      const changesHolder =
+        (body.user_id !== undefined && body.user_id !== existing.user_id) ||
+        (body.category_id !== undefined && body.category_id !== existing.category_id) ||
+        (body.user_id !== undefined && existing.return_date != null);
+      // Edição que não troca pessoa nem categoria não reavalia a regra (dado legado).
+      if (!changesHolder) {
+        return await this.prisma.inventoryTecnologia.update({ where: { id }, data });
+      }
+
+      return await this.writeWithComputerRule(
+        context.organizationId,
+        {
+          id,
+          category_id: body.category_id ?? existing.category_id,
+          user_id: body.user_id ?? existing.user_id,
+          return_date: body.user_id === undefined ? existing.return_date : null,
+        },
+        (writer) => writer.inventoryTecnologia.update({ where: { id }, data }),
+      );
     } catch (err: unknown) {
       logError("Erro ao atualizar ativo de inventario de TI", { err });
       if (err instanceof ServiceError) throw err;
@@ -175,17 +213,22 @@ export class TiInventoryService {
     id: string,
     body: AssignTiInventoryUserBody,
   ): Promise<unknown> {
-    await this.getById(context, id);
+    const existing = await this.getAssignment(context, id);
     await this.ensureActiveOrganizationUser(context.organizationId, body.user_id);
 
-    return this.prisma.inventoryTecnologia.update({
-      where: { id },
-      data: {
-        user_id: body.user_id,
-        delivery_date: body.delivery_date ?? new Date(),
-        return_date: null,
-      },
-    });
+    return this.writeWithComputerRule(
+      context.organizationId,
+      { id, category_id: existing.category_id, user_id: body.user_id, return_date: null },
+      (writer) =>
+        writer.inventoryTecnologia.update({
+          where: { id },
+          data: {
+            user_id: body.user_id,
+            delivery_date: body.delivery_date ?? new Date(),
+            return_date: null,
+          },
+        }),
+    );
   }
 
   async returnAsset(
@@ -202,6 +245,56 @@ export class TiInventoryService {
         return_date: body.return_date ?? new Date(),
         ...(body.notes === undefined ? {} : { notes: body.notes }),
       },
+    });
+  }
+
+  private async getAssignment(context: TiAuthContext, id: string): Promise<AssetAssignment> {
+    return (await this.getById(context, id)) as AssetAssignment;
+  }
+
+  /**
+   * Uma pessoa não termina com mais de um computador ativo na organização (#1931). Quando a
+   * escrita deixa um computador com alguém, ela roda numa transação que primeiro toma o
+   * bloqueio dessa pessoa: duas escritas simultâneas se enfileiram e a segunda enxerga a
+   * primeira. Vale para cadastro, edição e atribuição; troca e lote reutilizam este caminho.
+   */
+  private async writeWithComputerRule<T>(
+    organizationId: string,
+    target: AssetAssignment,
+    write: (writer: InventoryWriter) => Promise<T>,
+  ): Promise<T> {
+    const userId = target.user_id;
+    if (!userId || (target.return_date !== null && target.return_date !== undefined)) {
+      return write(this.prisma);
+    }
+
+    const categories = await this.prisma.inventoryCategoryTecnologia.findMany({
+      where: { organization_id: organizationId },
+      select: { id: true, name: true },
+    });
+    const computerCategoryIds = categories
+      .filter((category) => isComputerCategoryName(category.name))
+      .map((category) => category.id);
+    if (!computerCategoryIds.includes(target.category_id)) {
+      return write(this.prisma);
+    }
+
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+      const activeComputer = await transaction.inventoryTecnologia.findFirst({
+        where: {
+          organization_id: organizationId,
+          user_id: userId,
+          return_date: null,
+          category_id: { in: computerCategoryIds },
+          ...(target.id ? { NOT: { id: target.id } } : {}),
+        },
+        select: { id: true },
+      });
+      if (activeComputer) {
+        throw new ServiceError(409, ACTIVE_COMPUTER_CONFLICT_MESSAGE);
+      }
+      return write(transaction);
     });
   }
 
