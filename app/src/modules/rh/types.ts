@@ -8,6 +8,63 @@ export type RhScoreQuestionType = "behavioral" | "technical" | "tech" | "leaders
 
 export type RhNitroMetricType = "projects" | "hours" | "errors" | "folders";
 
+export type CceOccurrenceKey =
+  | "organization"
+  | "cleanliness"
+  | "delays"
+  | "cellphone"
+  | "conversations"
+  | "demands"
+  | "dress_code";
+
+export interface CceOccurrences {
+  organization: boolean;
+  cleanliness: boolean;
+  delays: boolean;
+  cellphone: boolean;
+  conversations: boolean;
+  demands: boolean;
+  dress_code: boolean;
+}
+
+export interface CceFloorConfiguration {
+  organization_id: string;
+  floor_count: number;
+}
+
+export interface CceWeeklyEvaluation extends CceOccurrences {
+  id: string;
+  cycle_id: string;
+  floor: number;
+  week: number;
+  monitor_user_id: string | null;
+  monitor?: { id: string; name: string } | null;
+  evaluated_at: string | null;
+  completed_at: string | null;
+  total: number | null;
+}
+
+export interface CceCycle {
+  id: string;
+  organization_id: string;
+  created_by_user_id: string;
+  year: number;
+  month: number;
+  weekly_evaluations: CceWeeklyEvaluation[];
+}
+
+export interface CreateCceCyclePayload {
+  year: number;
+  month: number;
+}
+
+export interface UpdateCceWeeklyEvaluationPayload {
+  id: string;
+  monitor_user_id: string;
+  evaluated_at: string;
+  occurrences: CceOccurrences;
+}
+
 export interface RhCategory {
   id: string;
   name: string;

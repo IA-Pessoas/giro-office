@@ -840,4 +840,21 @@ describe("matriz de regressão das políticas modulares", () => {
       expect(canAccessRoute(authContext({ modules: { rh: 3 } }), policy)).toBe(true);
     }
   });
+
+  it("exige RH nível 3 para alterações do CCE e mantém a leitura no nível 1", () => {
+    const readPolicy = requiredRoutePolicy("GET", "/rh/cce/cycles");
+    const managementRoutes = [
+      ["PUT", "/rh/cce/floors"],
+      ["POST", "/rh/cce/cycles"],
+      ["PATCH", "/rh/cce/weeks/week-1"],
+    ] as const;
+
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), readPolicy)).toBe(true);
+
+    for (const [method, path] of managementRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(authContext({ modules: { rh: 2 } }), policy)).toBe(false);
+      expect(canAccessRoute(authContext({ modules: { rh: 3 } }), policy)).toBe(true);
+    }
+  });
 });

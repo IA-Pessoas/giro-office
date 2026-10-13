@@ -1282,6 +1282,108 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/cce/floors": {
+        get: {
+          tags: ["CCE"],
+          summary: "Consultar configuração de andares do CCE",
+          security: bearer,
+          responses: {
+            "200": { description: "Configuração", ...successJson },
+          },
+        },
+        put: {
+          tags: ["CCE"],
+          summary: "Configurar quantidade de andares do CCE",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { floor_count: 4 },
+            required: ["floor_count"],
+            properties: { floor_count: { type: "integer", minimum: 0, maximum: 4 } },
+          }),
+          responses: {
+            "200": { description: "Configuração atualizada", ...successJson },
+          },
+        },
+      },
+      "/rh/cce/cycles": {
+        post: {
+          tags: ["CCE"],
+          summary: "Criar ciclo mensal do CCE",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { year: 2026, month: 10 },
+            required: ["year", "month"],
+            properties: {
+              year: { type: "integer", minimum: 1, maximum: 9999 },
+              month: { type: "integer", minimum: 1, maximum: 12 },
+            },
+          }),
+          responses: {
+            "201": { description: "Ciclo criado", ...successJson },
+          },
+        },
+        get: {
+          tags: ["CCE"],
+          summary: "Listar ciclos mensais do CCE da organização",
+          security: bearer,
+          responses: {
+            "200": { description: "Ciclos", ...successJson },
+          },
+        },
+      },
+      "/rh/cce/weeks/{id}": {
+        patch: {
+          tags: ["CCE"],
+          summary: "Registrar avaliação semanal do CCE",
+          security: bearer,
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          ...createObjectRequestBody({
+            example: {
+              monitor_user_id: "00000000-0000-4000-8000-000000000001",
+              evaluated_at: "2026-10-07",
+              occurrences: {
+                organization: false,
+                cleanliness: false,
+                delays: false,
+                cellphone: false,
+                conversations: false,
+                demands: false,
+                dress_code: false,
+              },
+            },
+            required: ["monitor_user_id", "evaluated_at", "occurrences"],
+            properties: {
+              monitor_user_id: { type: "string", format: "uuid" },
+              evaluated_at: { type: "string", format: "date" },
+              occurrences: {
+                type: "object",
+                additionalProperties: false,
+                required: [
+                  "organization",
+                  "cleanliness",
+                  "delays",
+                  "cellphone",
+                  "conversations",
+                  "demands",
+                  "dress_code",
+                ],
+                properties: {
+                  organization: { type: "boolean" },
+                  cleanliness: { type: "boolean" },
+                  delays: { type: "boolean" },
+                  cellphone: { type: "boolean" },
+                  conversations: { type: "boolean" },
+                  demands: { type: "boolean" },
+                  dress_code: { type: "boolean" },
+                },
+              },
+            },
+          }),
+          responses: {
+            "200": { description: "Avaliação registrada", ...successJson },
+          },
+        },
+      },
       "/rh/holidays": {
         post: {
           tags: ["Feriados"],

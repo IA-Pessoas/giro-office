@@ -247,6 +247,8 @@ model Organization {
   scoreQuarters                 ScoreQuarter[]
   scoreEvaluations              ScoreEvaluation[]
   scoreNitros                   ScoreNitro[]
+  cceFloorConfiguration         CceFloorConfiguration?
+  cceCycles                     CceCycle[]
   scoreQuestions                ScoreQuestion[]
   timeBankReleases              TimeBankReleases[]
   timeClockRequests             TimeClockRequest[]
@@ -404,6 +406,8 @@ model User {
   rhMessageReads              RhMessageRead[]
   scores                      ScoreQuarter[]
   scoresEvaluaion             ScoreEvaluation[]
+  cceCyclesCreated            CceCycle[]             @relation("CceCycleCreator")
+  cceWeeklyEvaluationsMonitored CceWeeklyEvaluation[] @relation("CceWeeklyEvaluationMonitor")
   timeBankRealeasesAdded      TimeBankReleases[]     @relation("add")
   timeBankRealeases           TimeBankReleases[]     @relation("user")
   timeClockRequestApproved    TimeClockRequest[]     @relation("approver")
@@ -3060,6 +3064,56 @@ model ScoreEvaluation {
   scoreQuarter    ScoreQuarter       @relation(fields: [score_id], references: [id], onDelete: Cascade)
 
   @@map("rh.score_evaluations")
+}
+
+model CceFloorConfiguration {
+  id              String       @id @default(uuid())
+  organization_id String       @unique
+  floor_count     Int          @default(4)
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("rh.cce_floor_configuration")
+}
+
+model CceCycle {
+  id                  String                  @id @default(uuid())
+  organization_id     String
+  created_by_user_id  String
+  year                Int
+  month               Int
+  created_at          DateTime                @default(now())
+  updated_at          DateTime                @updatedAt
+  organization        Organization            @relation(fields: [organization_id], references: [id])
+  created_by_user     User                    @relation("CceCycleCreator", fields: [created_by_user_id], references: [id])
+  weekly_evaluations  CceWeeklyEvaluation[]
+
+  @@unique([organization_id, year, month], map: "uq_cce_cycle_org_year_month")
+  @@map("rh.cce_cycle")
+}
+
+model CceWeeklyEvaluation {
+  id                    String    @id @default(uuid())
+  cycle_id              String
+  floor                 Int
+  week                  Int
+  monitor_user_id       String?
+  evaluated_at          DateTime?
+  completed_at          DateTime?
+  organization          Boolean   @default(false)
+  cleanliness           Boolean   @default(false)
+  delays                Boolean   @default(false)
+  cellphone             Boolean   @default(false)
+  conversations         Boolean   @default(false)
+  demands               Boolean   @default(false)
+  dress_code            Boolean   @default(false)
+  cycle                 CceCycle  @relation(fields: [cycle_id], references: [id], onDelete: Cascade)
+  monitor               User?     @relation("CceWeeklyEvaluationMonitor", fields: [monitor_user_id], references: [id])
+
+  @@unique([cycle_id, floor, week], map: "uq_cce_week_cycle_floor_week")
+  @@index([cycle_id, week])
+  @@map("rh.cce_weekly_evaluation")
 }
 
 model RhRequest {

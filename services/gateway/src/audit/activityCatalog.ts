@@ -778,6 +778,31 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/rh\/cce\/floors$/,
+    description: { action: "consultou", item: "a configuração de andares do CCE" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/cce\/floors$/,
+    description: { action: "atualizou", item: "a configuração de andares do CCE" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/cce\/cycles$/,
+    description: { action: "consultou", item: "a lista de ciclos do CCE" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/cce\/cycles$/,
+    description: { action: "criou", item: "um ciclo mensal do CCE" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/rh\/cce\/weeks\/[^/]+$/,
+    description: { action: "registrou", item: "uma avaliação semanal do CCE" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/rh\/profile\/colaborator$/,
     description: { action: "consultou", item: "o dossiê de um colaborador" },
   },

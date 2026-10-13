@@ -295,6 +295,9 @@ const routePolicyMatchers: Array<{
     path: /^\/rh\/timesheets\/rebuild$/,
     policy: rhManagementPolicy,
   },
+  { method: "PUT", path: /^\/rh\/cce\/floors\/?$/, policy: rhManagementPolicy },
+  { method: "POST", path: /^\/rh\/cce\/cycles\/?$/, policy: rhManagementPolicy },
+  { method: "PATCH", path: /^\/rh\/cce\/weeks\/[^/]+\/?$/, policy: rhManagementPolicy },
   {
     method: "GET",
     path: /^\/rh\/timesheets\/[^/]+\/pdf$/,

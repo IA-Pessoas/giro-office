@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Award, BarChart3, Calendar, Clock, FileText, UserRound, Users } from "lucide-react";
+import { Award, BarChart3, Calendar, Clock, FileText, Star, UserRound, Users } from "lucide-react";
 import { useRouter } from "next/router";
 
 import {
   RhDashboardSection,
+  RhCceSection,
   RhDossierSection,
   RhHolidaysSection,
   RhPointSection,
@@ -15,7 +16,7 @@ import {
 import { useRhPermissions } from "@modules/rh/hooks/useRhPermissions";
 import { Dialog } from "@shared/components";
 
-type RhMainTab = "dashboard" | "dossier" | "requests" | "evaluations" | "point";
+type RhMainTab = "dashboard" | "dossier" | "requests" | "evaluations" | "cce" | "point";
 
 export function RH() {
   const router = useRouter();
@@ -86,7 +87,7 @@ export function RH() {
             Recursos Humanos
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Solicitações, ponto, folhas e avaliações em um único fluxo.
+            Solicitações, ponto, Score e 5 Estrelas em um único fluxo.
           </p>
         </div>
 
@@ -135,6 +136,12 @@ export function RH() {
               onClick={() => setActiveTab("evaluations")}
             />
             <RhTabButton
+              active={activeTab === "cce"}
+              icon={Star}
+              label="5 Estrelas"
+              onClick={() => setActiveTab("cce")}
+            />
+            <RhTabButton
               active={activeTab === "point"}
               icon={Clock}
               label="Ponto"
@@ -160,6 +167,7 @@ export function RH() {
         />
       ) : null}
       {activeTab === "evaluations" ? <RhScoreSection /> : null}
+      {activeTab === "cce" ? <RhCceSection /> : null}
       {activeTab === "point" ? <RhPointSection /> : null}
 
       <Dialog

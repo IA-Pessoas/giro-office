@@ -58,6 +58,9 @@ export const RH_ENDPOINTS = {
   pendingScoreEvaluations: "/rh/score/evaluations/pending",
   submitScoreEvaluation: "/rh/score/evaluations/submit",
   scoreNitroUpdate: "/rh/score/nitro/update",
+  cceFloors: "/rh/cce/floors",
+  cceCycles: "/rh/cce/cycles",
+  cceWeek: (id: string) => `/rh/cce/weeks/${id}`,
 } as const;
 
 export function buildRhDossierTargetParams(userId?: string) {
