@@ -15,6 +15,12 @@ interface RhExam {
   _count: { participants: number; questions: number };
 }
 
+interface RhExamDetails extends RhExam {
+  observations: string;
+  participants: Array<{ id: string; user: { id: string; name: string } }>;
+  questions: Array<{ id: string; prompt: string; value: number; answer_key: string; position: number }>;
+}
+
 interface QuestionDraft {
   prompt: string;
   value: string;
@@ -32,6 +38,8 @@ export function RhExamsSection() {
   const api = useMemo(() => setupAPIClient(), []);
   const users = useAssignableUsers({ module: "rh" });
   const [exams, setExams] = useState<RhExam[]>([]);
+  const [examDetails, setExamDetails] = useState<RhExamDetails | null>(null);
+  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,10 +108,28 @@ export function RhExamsSection() {
     try {
       await api.post(RH_ENDPOINTS.openExam(id));
       await loadExams();
+      setExamDetails((current) => (current?.id === id ? { ...current, status: "Open" } : current));
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : "Não foi possível abrir a prova.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function loadExamDetails(id: string) {
+    if (examDetails?.id === id) {
+      setExamDetails(null);
+      return;
+    }
+    setDetailsLoadingId(id);
+    setError(null);
+    try {
+      const response = await api.get(RH_ENDPOINTS.examDetail(id));
+      setExamDetails(unwrapRhEnvelope<RhExamDetails>(response.data));
+    } catch (detailError) {
+      setError(detailError instanceof Error ? detailError.message : "Não foi possível consultar a prova.");
+    } finally {
+      setDetailsLoadingId(null);
     }
   }
 
@@ -233,10 +259,58 @@ export function RhExamsSection() {
                 Avaliador: {exam.evaluator.name} · {exam._count.participants} participantes · {exam._count.questions} questões
               </p>
             </div>
-            {exam.status === "New" ? (
-              <button type="button" onClick={() => void openExam(exam.id)} disabled={saving} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-900/20">
-                Abrir prova
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-expanded={examDetails?.id === exam.id}
+                aria-controls={`rh-exam-details-${exam.id}`}
+                onClick={() => void loadExamDetails(exam.id)}
+                disabled={detailsLoadingId === exam.id}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                {detailsLoadingId === exam.id ? "Carregando…" : examDetails?.id === exam.id ? "Ocultar detalhes" : "Detalhes"}
               </button>
+              {exam.status === "New" ? (
+                <button type="button" onClick={() => void openExam(exam.id)} disabled={saving} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-900/20">
+                  Abrir prova
+                </button>
+              ) : null}
+            </div>
+            {examDetails?.id === exam.id ? (
+              <div id={`rh-exam-details-${exam.id}`} className="w-full space-y-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <div className="grid gap-3 text-sm md:grid-cols-2">
+                  <p className="text-gray-700 dark:text-gray-300">
+                    <span className="font-medium">Janela informativa:</span>{" "}
+                    {examDetails.window_start ? new Date(examDetails.window_start).toLocaleString("pt-BR") : "Sem início"}
+                    {" — "}
+                    {examDetails.window_end ? new Date(examDetails.window_end).toLocaleString("pt-BR") : "Sem fim"}
+                  </p>
+                  <p className="text-gray-700 dark:text-gray-300">
+                    <span className="font-medium">Observações:</span> {examDetails.observations || "Nenhuma"}
+                  </p>
+                </div>
+                <div>
+                  <h5 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Participantes</h5>
+                  <ul className="flex flex-wrap gap-2">
+                    {examDetails.participants.map((participant) => (
+                      <li key={participant.id} className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                        {participant.user.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="space-y-2">
+                  <h5 className="text-sm font-semibold text-gray-900 dark:text-white">Questões e gabarito</h5>
+                  {examDetails.questions.map((question, index) => (
+                    <div key={question.id} className="rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-900/60">
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {index + 1}. {question.prompt} <span className="font-normal text-gray-500">· Valor: {question.value}</span>
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-gray-600 dark:text-gray-400">Gabarito: {question.answer_key}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : null}
           </article>
         ))}

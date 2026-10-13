@@ -127,6 +127,14 @@ export class RhExamService {
       }
 
       return await this.db.$transaction(async (tx) => {
+        const transition = await tx.rhExam.updateMany({
+          where: { id, organization_id: organizationId, status: "New" },
+          data: { status: "Open" },
+        });
+        if (transition.count !== 1) {
+          throw new ServiceError(409, "Somente provas novas podem ser abertas.");
+        }
+
         await tx.rhExamAnswer.createMany({
           data: exam.participants.flatMap((participant) =>
             exam.questions.map((question) => ({
@@ -137,11 +145,7 @@ export class RhExamService {
           ),
           skipDuplicates: true,
         });
-        return tx.rhExam.update({
-          where: { id },
-          data: { status: "Open" },
-          include: { participants: true, questions: { orderBy: { position: "asc" } } },
-        });
+        return { ...exam, status: "Open" };
       });
     } catch (err: unknown) {
       logError("Erro ao abrir prova discursiva", { err });

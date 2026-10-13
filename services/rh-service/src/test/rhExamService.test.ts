@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { findMany: vi.fn() },
-    rhExam: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+    rhExam: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
     rhExamAnswer: { createMany: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -80,11 +85,13 @@ describe("RhExamService", () => {
       questions: [{ id: "q-1" }, { id: "q-2" }],
     });
     prismaMock.rhExamAnswer.createMany.mockResolvedValue({ count: 4 });
-    prismaMock.rhExam.update.mockResolvedValue({ id: "exam-1", status: "Open" });
+    prismaMock.rhExam.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await new RhExamService().open("org-1", "exam-1");
 
-    expect(result).toEqual({ id: "exam-1", status: "Open" });
+    expect(result).toEqual(
+      expect.objectContaining({ id: "exam-1", status: "Open", participants: expect.any(Array) }),
+    );
     expect(prismaMock.rhExamAnswer.createMany).toHaveBeenCalledWith({
       data: [
         { exam_participant_id: "p-1", question_id: "q-1", organization_id: "org-1" },
@@ -94,9 +101,10 @@ describe("RhExamService", () => {
       ],
       skipDuplicates: true,
     });
-    expect(prismaMock.rhExam.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "exam-1" }, data: { status: "Open" } }),
-    );
+    expect(prismaMock.rhExam.updateMany).toHaveBeenCalledWith({
+      where: { id: "exam-1", organization_id: "org-1", status: "New" },
+      data: { status: "Open" },
+    });
   });
 
   it("não reabre prova em estado diferente de Nova nem vaza prova de outra organização", async () => {
@@ -111,6 +119,21 @@ describe("RhExamService", () => {
       participants: [{ id: "p-1" }],
       questions: [{ id: "q-1" }],
     });
+    await expect(new RhExamService().open("org-1", "exam-1")).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    expect(prismaMock.rhExamAnswer.createMany).not.toHaveBeenCalled();
+  });
+
+  it("rejeita a segunda abertura concorrente na transição condicional", async () => {
+    prismaMock.rhExam.findFirst.mockResolvedValue({
+      id: "exam-1",
+      status: "New",
+      participants: [{ id: "p-1" }],
+      questions: [{ id: "q-1" }],
+    });
+    prismaMock.rhExam.updateMany.mockResolvedValue({ count: 0 });
+
     await expect(new RhExamService().open("org-1", "exam-1")).rejects.toMatchObject({
       statusCode: 409,
     });
