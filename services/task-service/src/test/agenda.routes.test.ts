@@ -35,7 +35,25 @@ function setup() {
     },
     recurringAgenda: { findMany: vi.fn().mockResolvedValue([]) },
     client: { count: vi.fn().mockResolvedValue(1) },
-    user: { count: vi.fn().mockResolvedValue(1) },
+    user: {
+      count: vi.fn().mockResolvedValue(1),
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { id: "user-1" },
+          { id: "user-2" },
+          { id: "user-3" },
+          { id: "user-4" },
+        ]),
+    },
+    pA: { findFirst: vi.fn().mockResolvedValue({ client_id: "client-1" }) },
+    organization: { findFirst: vi.fn().mockResolvedValue({ timezone: "UTC" }) },
+    clientHistory: { findMany: vi.fn().mockResolvedValue([]) },
+    clientHistoryPending: {
+      findMany: vi.fn().mockResolvedValue([]),
+      createMany: vi.fn().mockResolvedValue({ count: 4 }),
+    },
+    $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
   };
   const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
   const app = express();
@@ -150,5 +168,30 @@ describe("agenda Node HTTP (#1952)", () => {
     );
     prisma.agenda.findFirst.mockResolvedValue(null);
     expect((await request(app).put("/task/agenda").set(headers(2)).send(body)).status).toBe(404);
+  });
+
+  it("gera as quatro pendências de PA ao realizar pela rota Node", async () => {
+    const { app, prisma, headers } = setup();
+    prisma.agenda.findFirst.mockResolvedValueOnce({
+      id: "evt-1",
+      agenda: "Reunião",
+      date: new Date("2026-12-31T12:00:00.000Z"),
+      status: "Pendente",
+      client_id: "client-1",
+      participant_id: "user-1",
+      participant_id_2: "user-2",
+      participant_id_3: "user-3",
+      participant_id_4: "user-4",
+      recurring_agenda_id: null,
+    });
+
+    const response = await request(app).put("/task/agenda").set(headers(2)).send({
+      module: "integracao",
+      agenda_id: "evt-1",
+      status: "Realizado",
+    });
+
+    expect(response.status).toBe(200);
+    expect(prisma.clientHistoryPending.createMany.mock.calls[0][0].data).toHaveLength(4);
   });
 });

@@ -28,6 +28,8 @@ model Organization {
   agendas                       Agenda[]
   recurringAgendas              RecurringAgenda[]
   clients                       Client[]
+  clientHistorys                ClientHistory[]
+  clientHistorysPending         ClientHistoryPending[]
   pas                           PA[]
   clientsPF                     ClientPF[]
   departments                   Department[]
@@ -112,6 +114,8 @@ model User {
   agenda3                     Agenda[]               @relation("participant3")
   agenda4                     Agenda[]               @relation("participant4")
   agenda                      Agenda[]               @relation("participant")
+  clientHistorys              ClientHistory[]
+  clientHistorysPending       ClientHistoryPending[]
   sponso                      Project[]              @relation("sponsor")
   tasks2                      Task[]                 @relation("responsible2")
   tasks3                      Task[]                 @relation("responsible3")
@@ -248,6 +252,8 @@ model Client {
   type_registration             String                      @default("Novo")
   organization_id               String
   agenda                        Agenda[]
+  historys                      ClientHistory[]
+  historysPe                    ClientHistoryPending[]
   organization                  Organization                @relation(fields: [organization_id], references: [id])
   pa                            PA?
   projects                      Project[]
@@ -289,6 +295,34 @@ model PA {
   organization              Organization @relation(fields: [organization_id], references: [id])
 
   @@map("clients.pa")
+}
+
+model ClientHistory {
+  id              String       @id @default(uuid())
+  client_id       String
+  date            DateTime
+  history         String
+  file            String?
+  user_id         String
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@map("clients.history")
+}
+
+model ClientHistoryPending {
+  id              String       @id @default(uuid())
+  user_id         String
+  client_id       String
+  reason          String
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@map("clients.historyPending")
 }
 
 model ClientPF {
