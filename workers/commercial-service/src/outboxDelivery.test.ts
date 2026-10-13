@@ -118,14 +118,12 @@ it("aplica os efeitos de Fechado SE sem exigir ou disparar notificação", async
       headers: { "content-type": "application/json" },
     }),
   );
-  const taskFetch = vi
-    .fn()
-    .mockResolvedValue(
-      new Response(JSON.stringify({ success: true, data: { competence: "2026-09" } }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
+  const taskFetch = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ success: true, data: { competence: "2026-09" } }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  );
   const event = {
     event_id: "10000000-0000-4000-8000-000000000002",
     event_type: "commercial.prospecting.transition" as const,
