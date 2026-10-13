@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Pencil, Plus } from "lucide-react";
+import { CalendarDays, MessageCircle, Pencil, Plus } from "lucide-react";
 
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { departmentService, type DepItem } from "@modules/departments";
@@ -9,6 +9,7 @@ import { useFetch } from "@shared/hooks";
 import { agendaService } from "@shared/services/agendaService";
 import {
   INTEGRACAO_AGENDA_STATUSES,
+  buildPendingAgendaWhatsappHref,
   type AgendaEvent,
   type AgendaEventPayload,
   type IntegracaoAgendaParticipant,
@@ -248,7 +249,7 @@ export function IntegrationAgendaSection({ canEdit }: { canEdit: boolean }) {
           {events.data.map((item) => (
             <li key={item.id} className="flex flex-wrap items-start gap-3 py-3">
               <CalendarDays className="mt-1 h-4 w-4 text-blue-600" aria-hidden="true" />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-[calc(100%-2rem)] sm:basis-0">
                 <p className="font-medium text-slate-900 dark:text-white">{item.agenda}</p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">{new Date(item.date).toLocaleString("pt-BR")} · {item.client?.name ?? "Cliente não identificado"}{item.location ? ` · ${item.location}` : ""}</p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -260,8 +261,26 @@ export function IntegrationAgendaSection({ canEdit }: { canEdit: boolean }) {
                   }).filter(Boolean).join(" · ")}
                 </p>
               </div>
-              <span className="text-sm text-slate-700 dark:text-slate-300">{item.status ?? "Sem estado"}</span>
-              {canEdit && <button type="button" className={PROJECT_COMPACT_BUTTON_CLASSNAME} aria-label={`Editar ${item.agenda}`} onClick={() => openForm(item)}><Pencil className="h-4 w-4" /></button>}
+              <div className="flex w-full flex-wrap items-center gap-2 pl-7 sm:w-auto sm:pl-0">
+                <span className="text-sm text-slate-700 dark:text-slate-300">{item.status ?? "Sem estado"}</span>
+                {item.status === "Pendente" && (
+                  <a
+                    href={buildPendingAgendaWhatsappHref({
+                      agenda: item.agenda,
+                      when: new Date(item.date).toLocaleString("pt-BR"),
+                      clientName: item.client?.name,
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+                    aria-label={`Preparar WhatsApp para ${item.agenda}`}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    WhatsApp
+                  </a>
+                )}
+                {canEdit && <button type="button" className={PROJECT_COMPACT_BUTTON_CLASSNAME} aria-label={`Editar ${item.agenda}`} onClick={() => openForm(item)}><Pencil className="h-4 w-4" /></button>}
+              </div>
             </li>
           ))}
         </ul>

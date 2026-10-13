@@ -63,3 +63,18 @@ export function agendaDateToIso(day: string): string {
 export function agendaDay(isoDate: string): string {
   return isoDate.slice(0, 10);
 }
+
+/** Abre o compositor do WhatsApp com texto pronto; o contato e o envio ficam com a pessoa. */
+export function buildPendingAgendaWhatsappHref({
+  agenda,
+  when,
+  clientName,
+}: {
+  agenda: string;
+  when: string;
+  clientName?: string;
+}): string {
+  const greeting = clientName ? `Olá, ${clientName}!` : "Olá!";
+  const message = `${greeting} Gostaria de confirmar o compromisso de Integração "${agenda}" em ${when}.`;
+  return `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
