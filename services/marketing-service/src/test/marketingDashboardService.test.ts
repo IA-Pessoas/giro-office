@@ -147,7 +147,9 @@ describe("MarketingDashboardService", () => {
     expect(employeeQuery).toContain("department.name");
     expect(employeeQuery).not.toContain("EXTRACT(DAY FROM employee.birth_date) >=");
     expect(prisma.$queryRaw.mock.calls[0]?.slice(1)).toContain(2);
-    expect(prisma.$queryRaw.mock.calls[0]?.slice(1)).toContainEqual(new Date("2026-09-24T00:00:00.000Z"));
+    expect(prisma.$queryRaw.mock.calls[0]?.slice(1)).toContainEqual(
+      new Date("2026-09-24T00:00:00.000Z"),
+    );
     expect(prisma.$queryRaw.mock.calls[1]?.slice(1)).toContain(2);
   });
 });
