@@ -517,9 +517,10 @@ export class CommercialProspectingService implements ProspectingService {
         })) as ProspectingRow | null;
         if (!current) throw new ServiceError(404, "Prospecção comercial não encontrada.");
         const suppressNotice = input.status === "Fechado SE";
-        const nextStatus: ProspectingStatus = input.status === "Fechado SE"
-          ? "Fechado"
-          : (input.status ?? (current.status as ProspectingStatus));
+        const nextStatus: ProspectingStatus =
+          input.status === "Fechado SE"
+            ? "Fechado"
+            : (input.status ?? (current.status as ProspectingStatus));
         assertProspectingTransition(current.status, nextStatus);
         const data = {
           ...(input.status !== undefined
