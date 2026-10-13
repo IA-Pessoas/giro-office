@@ -6684,6 +6684,13 @@ const handlers = {
     });
   },
 
+  async taskCronogramaList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
   async taskAgendaUpdate(op) {
     await httpRequest(op, {
       expectedStatus: [200],

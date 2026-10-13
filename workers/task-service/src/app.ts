@@ -76,6 +76,7 @@ import {
   taskAttachmentListQuerySchema,
   taskAttachmentQuerySchema,
 } from "@workspace/task-service/src/schemas/taskAttachment.schemas.js";
+import { taskCronogramaQuerySchema } from "@workspace/task-service/src/schemas/taskCronograma.schemas.js";
 import {
   taskIntegrationRegularizeBodySchema,
   taskIntegrationRegularizeDeleteBodySchema,
@@ -1064,6 +1065,24 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
         integracaoLevel: integracao(r),
         isOwner: isOwner(r),
       });
+    }),
+  );
+
+  app.get(
+    "/task/cronograma",
+    route(async (r, s) => {
+      const { user_id, organization_id } = requireAuthenticatedRequestContext(r);
+      const { client_id } = parseWithZod(taskCronogramaQuerySchema, r.query);
+      const owner = isOwner(r);
+      return s.cronograma().list(
+        {
+          organizationId: organization_id,
+          userId: user_id,
+          level: owner ? 3 : integracao(r),
+          isOwner: owner,
+        },
+        client_id,
+      );
     }),
   );
 

@@ -307,6 +307,15 @@ export function TasksWorkspace() {
                 Agenda
               </Link>
             )}
+            {integracaoAccess.canView && (
+              <Link
+                href={selectedClient ? `/integracao/cronograma?clientId=${selectedClient.id}` : "/integracao/cronograma"}
+                className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                Cronograma
+              </Link>
+            )}
             {canManageTaskModels ? (
               <Link
                 href={TASK_MODEL_CONFIG_ENTRY.href}
