@@ -207,6 +207,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "a agenda de compromissos" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/task\/cronograma$/,
+    description: { action: "consultou", item: "o cronograma de Integração" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/task\/agenda$/,
     description: { action: "cadastrou", item: "um compromisso na agenda" },

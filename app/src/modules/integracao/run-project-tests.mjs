@@ -2,6 +2,23 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as taskFormUi from "./components/taskFormModalUi.ts";
 import { isServerErrorAlreadyNotified } from "../../shared/services/serverErrorToast.ts";
+import { formatCronogramaText, isCronogramaTaskOverdue } from "./cronogramaPresentation.ts";
+
+runTest("cronograma mantém datas passadas e só marca dias anteriores como vencidos", () => {
+  const cronograma = {
+    client: { id: "client-1", name: "Cliente", company_name: null },
+    tasks: [
+      { id: "task-1", name: "Preparação", prevision_date: "2026-10-12T00:00:00.000Z" },
+      { id: "task-2", name: "Entrega", prevision_date: "2026-10-13T00:00:00.000Z" },
+    ],
+  };
+  assert.equal(isCronogramaTaskOverdue(cronograma.tasks[0].prevision_date, "2026-10-13"), true);
+  assert.equal(isCronogramaTaskOverdue(cronograma.tasks[1].prevision_date, "2026-10-13"), false);
+  assert.equal(
+    formatCronogramaText(cronograma, "2026-10-13"),
+    "Cronograma de Integração — Cliente\n12/10/2026 — Preparação (vencida)\n13/10/2026 — Entrega",
+  );
+});
 
 runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
   assert.equal(typeof taskFormUi.getTaskEditValidationMessage, "function");

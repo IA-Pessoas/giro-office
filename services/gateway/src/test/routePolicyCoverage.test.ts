@@ -262,6 +262,18 @@ describe("Integração agenda catalogs", () => {
   });
 });
 
+describe("cronograma de Integração", () => {
+  it("exige nível 1 no gateway e não usa a exceção de tarefas próprias", () => {
+    expect(authorizeClientRequest("GET", "/task/cronograma", { integracao: 0 })).toMatchObject({
+      statusCode: 403,
+    });
+    expect(authorizeClientRequest("GET", "/task/cronograma", { integracao: 1 })).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/task/cronograma", { contabil: 3 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+});
+
 describe("platform default deny", () => {
   it("deixa público somente o login e exige platformOnly nas demais rotas", () => {
     expect(isPublicRoute("POST", "/platform/session")).toBe(true);

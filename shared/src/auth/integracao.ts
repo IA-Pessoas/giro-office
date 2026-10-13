@@ -368,6 +368,9 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC], "responsible"), readRule(readOrganization)],
     { test: "task.list" },
   ),
+  routePolicy("GET", "/task/cronograma", "task", "read", [readRule(readOrganization)], {
+    test: "task.cronograma",
+  }),
   routePolicy(
     "GET",
     "/task",
