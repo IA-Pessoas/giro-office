@@ -673,6 +673,27 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/task/cronograma": {
+        get: {
+          tags: ["IntegracaoTasks"],
+          summary: "Listar tarefas em andamento com previsão para um cliente de Integração",
+          security: bearer,
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": { description: "Cronograma do cliente", ...successJson },
+            "400": { description: "Cliente inválido" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Cliente não encontrado" },
+          },
+        },
+      },
       "/task/agenda": {
         get: {
           tags: ["Agenda"],

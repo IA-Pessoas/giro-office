@@ -380,6 +380,7 @@ const routePolicyMatchers: Array<{
     policy: integracaoResponsibleTaskPolicy,
   },
   { method: "GET", path: /^\/task\/agenda$/, policy: agendaViewPolicy },
+  { method: "GET", path: /^\/task\/cronograma$/, policy: integracaoProjectPolicy },
   { method: "DELETE", path: /^\/task\/agenda$/, policy: agendaDeletePolicy },
   { method: "ANY", path: /^\/task\/agenda$/, policy: agendaEditPolicy },
   { method: "GET", path: /^\/task(?:\/list)?$/, policy: integracaoResponsibleTaskPolicy },

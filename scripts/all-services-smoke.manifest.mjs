@@ -3249,6 +3249,14 @@ const baseManifest = [
   }),
   op({
     service: "task-service",
+    method: "GET",
+    path: "/task/cronograma",
+    action: "taskCronogramaList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
     method: "PUT",
     path: "/task/agenda",
     action: "taskAgendaUpdate",
