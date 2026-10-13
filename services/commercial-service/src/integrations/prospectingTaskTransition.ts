@@ -59,13 +59,11 @@ export class ProspectingTaskTransitionHttpClient implements ProspectingTaskTrans
         },
       );
       if (!response.ok) {
-        throw new Error(
-          `task-service prospecting transition failed with status ${response.status}`,
-        );
+        throw new Error(`Falha ao aplicar a situação comercial nas tarefas (${response.status}).`);
       }
       const body = (await response.json()) as SuccessResponse;
       if (!body.success || !isTransitionResult(body.data)) {
-        throw new Error("task-service prospecting transition returned an invalid response");
+        throw new Error("A resposta do serviço de tarefas para a situação comercial é inválida.");
       }
       return body.data;
     } finally {
