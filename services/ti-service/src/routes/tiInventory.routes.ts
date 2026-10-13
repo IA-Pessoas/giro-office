@@ -11,9 +11,14 @@ import { requireTiPermission, TiPermissionLevel } from "../middlewares/requireTi
 import {
   assignTiInventoryUserBodySchema,
   createTiInventoryBodySchema,
+  listTiInventoryHistoryQuerySchema,
   listTiInventoryQuerySchema,
   returnTiInventoryBodySchema,
+  swapTiInventoryBodySchema,
   tiInventoryIdParamsSchema,
+  tiInventoryUserIdParamsSchema,
+  transferTiInventoryBatchBodySchema,
+  transferTiInventoryBodySchema,
   updateTiInventoryBodySchema,
 } from "../schemas/tiInventory.schemas.js";
 import { TiInventoryService } from "../services/tiInventoryService.js";
@@ -47,6 +52,23 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
         logError("Erro ao listar inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/equipment-map/:userId",
+    requireTiPermission(TiPermissionLevel.Technician),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiInventoryUserIdParamsSchema, request.params);
+        const result = await service.getUserEquipmentMap(context, params.userId);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao montar mapa de equipamentos de TI", { err });
         next(err);
       }
     },
@@ -135,6 +157,76 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
         logError("Erro ao devolver ativo de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/transfer-batch",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const body = parseWithZod(transferTiInventoryBatchBodySchema, request.body);
+        const result = await service.transferBatch(context, body);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao transferir ativos de inventario de TI em lote", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/swap",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const body = parseWithZod(swapTiInventoryBodySchema, request.body);
+        const result = await service.swap(context, body);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao trocar ativos de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.patch(
+    "/:id/transfer",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiInventoryIdParamsSchema, request.params);
+        const body = parseWithZod(transferTiInventoryBodySchema, request.body);
+        const result = await service.transfer(context, params.id, body);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao transferir ativo de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/:id/history",
+    requireTiPermission(TiPermissionLevel.Technician),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiInventoryIdParamsSchema, request.params);
+        const query = parseWithZod(listTiInventoryHistoryQuerySchema, request.query);
+        const result = await service.listHistory(context, params.id, query);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao listar historico de ativo de inventario de TI", { err });
         next(err);
       }
     },

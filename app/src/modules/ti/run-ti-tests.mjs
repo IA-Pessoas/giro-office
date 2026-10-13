@@ -1863,6 +1863,92 @@ await runTest("ti inventory copy uses backend inventory labels", async () => {
   assert.doesNotMatch(source, /Criar departamento|Atualizar departamento|Adicionar departamento|Editar departamento/);
 });
 
+await runTest("ti inventory offers transfer to a user or department and shows asset history", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const service = await readModuleSource("services/tiInventoryService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /transfer: "\/ti\/inventory\/\{id\}\/transfer"/);
+  assert.match(contract, /history: "\/ti\/inventory\/\{id\}\/history"/);
+  assert.match(service, /transferInventoryAsset/);
+  assert.match(service, /listInventoryAssetHistory/);
+  assert.match(source, /label="Transferir"/);
+  assert.match(source, /title="Transferir ativo"/);
+  assert.match(source, /\{ value: "user", label: "Usuário" \}/);
+  assert.match(source, /\{ value: "location", label: "Departamento" \}/);
+  // O destino é um ou outro: o payload nunca leva os dois.
+  assert.match(
+    source,
+    /transferTarget === "user" \? \{ user_id: destinationId \} : \{ location_id: destinationId \}/,
+  );
+  assert.match(source, /Histórico patrimonial/);
+  assert.match(source, /useTiInventoryAssetHistory\(selectedAssetId/);
+  assert.match(source, /getTiInventoryMutationErrorMessage\(error\)/);
+});
+
+await runTest("ti inventory offers batch transfer and swap, showing the blocking items", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const service = await readModuleSource("services/tiInventoryService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /transferBatch: "\/ti\/inventory\/transfer-batch"/);
+  assert.match(contract, /swap: "\/ti\/inventory\/swap"/);
+  assert.match(service, /transferInventoryAssetsBatch/);
+  assert.match(service, /swapInventoryAssets/);
+  assert.match(source, /label="Transferir em lote"/);
+  assert.match(source, /title="Transferir em lote"/);
+  assert.match(source, /A transferência vale para todos os ativos selecionados ou para nenhum\./);
+  assert.match(source, /asset_ids: assetIds/);
+  assert.match(source, /\.filter\(\(id\) => batchAssetIds\.includes\(id\)\)/);
+  assert.match(source, /label="Trocar"/);
+  assert.match(source, /title="Trocar ativo"/);
+  assert.match(source, /other_asset_id: otherAssetId/);
+  // A troca só oferece ativos que estão com outro usuário.
+  assert.match(source, /asset\.user_id !== swapAsset\.user_id/);
+  // A mensagem do servidor, com os itens impeditivos, aparece no diálogo.
+  assert.match(
+    source,
+    /diz quais impediram o lote\.\s*setDialogError\(getTiInventoryMutationErrorMessage\(error\)\);/,
+  );
+  assert.match(source, /swap: "Troca"/);
+});
+
+await runTest("ti inventory shows a read-only equipment map per user", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const service = await readModuleSource("services/tiInventoryService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /equipmentMap: "\/ti\/inventory\/equipment-map\/\{id\}"/);
+  assert.match(service, /getUserEquipmentMap/);
+  assert.match(source, /label="Mapa de equipamentos"/);
+  assert.match(source, /title="Mapa de equipamentos"/);
+  assert.match(source, /useTiInventoryEquipmentMap\(equipmentMapUserId \|\| undefined/);
+  // Código, marca, entradas e configuração aparecem só quando existem.
+  assert.match(source, /\["Marca", item\.brand \? \[item\.brand\] : \[\]\]/);
+  assert.match(source, /\["Entradas", item\.inputs\]/);
+  assert.match(source, /\["Configuração", item\.configuration\]/);
+  assert.match(source, /Sem marca, entradas ou configuração cadastradas nas observações\./);
+  // Periférico sem conexão confiável fica à parte.
+  assert.match(source, /Sem conexão identificada/);
+  assert.match(source, /`Conexão: \$\{connection\.ports\.join\(", "\)\}`/);
+  // Somente leitura: o diálogo do mapa não tem formulário nem mutação.
+  const dialog = source.slice(
+    source.indexOf('title="Mapa de equipamentos"'),
+    source.indexOf('open={dialogState?.type === "categories"}'),
+  );
+  assert.doesNotMatch(dialog, /<form|onSubmit|Mutation/);
+});
+
+await runTest("ti inventory write actions follow the level the service requires", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  // Escrita no inventário exige TI nível 3 no serviço e no Worker: o nível 2 não vê os botões.
+  assert.match(source, /const canManage = access\.isAdmin;/);
+  assert.doesNotMatch(source, /const canManage = access\.canEdit/);
+  // Quando só o departamento muda, o histórico mostra os departamentos, não "A → A".
+  assert.match(source, /event\.from_user\?\.id === event\.to_user\?\.id/);
+});
+
 await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");

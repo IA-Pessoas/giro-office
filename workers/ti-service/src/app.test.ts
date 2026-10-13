@@ -115,6 +115,147 @@ describe("ti Worker", () => {
     expect(categoryService.list).not.toHaveBeenCalled();
   });
 
+  // #1931: as rotas de categoria aplicam as regras do domínio (categoria canônica Computador).
+  it("keeps the Computador category from being renamed or disabled over HTTP", async () => {
+    const update = vi.fn();
+    const prisma = {
+      inventoryCategoryTecnologia: {
+        findFirst: vi.fn(async () => ({ id: CATEGORY_ID, name: "Computador", active: true })),
+        update,
+      },
+    } as unknown as CategoryPrisma;
+    const app = createTiWorkerApp({ env: env(), prisma });
+    const patch = (body: unknown) =>
+      app.request(`https://ti.test/ti/inventory-categories/${CATEGORY_ID}`, {
+        method: "PATCH",
+        headers: { ...headers("3"), "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    expect((await patch({ name: "PC" })).status).toBe(409);
+    expect((await patch({ active: false })).status).toBe(409);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  // #1932: transferência e histórico patrimonial.
+  it("routes inventory transfer and history with their permission levels", async () => {
+    const inventory = {
+      transfer: vi.fn(async () => ({ id: CATEGORY_ID, user_id: USER_ID })),
+      listHistory: vi.fn(async () => []),
+    };
+    const app = createTiWorkerApp({ env: env(), services: { inventory } } as never);
+    const transfer = (permission: string, body: unknown) =>
+      app.request(`https://ti.test/ti/inventory/${CATEGORY_ID}/transfer`, {
+        method: "PATCH",
+        headers: { ...headers(permission), "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const self = {
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      permission: 3,
+      isOrganizationOwner: false,
+    };
+
+    expect((await transfer("2", { user_id: USER_ID })).status).toBe(403);
+    expect((await transfer("3", {})).status).toBe(400);
+    expect((await transfer("3", { user_id: USER_ID, location_id: CATEGORY_ID })).status).toBe(400);
+    expect(inventory.transfer).not.toHaveBeenCalled();
+
+    expect((await transfer("3", { user_id: USER_ID })).status).toBe(200);
+    expect(inventory.transfer).toHaveBeenCalledWith(self, CATEGORY_ID, { user_id: USER_ID });
+
+    const history = (permission: string) =>
+      app.request(`https://ti.test/ti/inventory/${CATEGORY_ID}/history?page=1&page_size=20`, {
+        headers: headers(permission),
+      });
+    expect((await history("1")).status).toBe(403);
+    expect((await history("2")).status).toBe(200);
+    expect(inventory.listHistory).toHaveBeenCalledWith({ ...self, permission: 2 }, CATEGORY_ID, {
+      page: 1,
+      page_size: 20,
+    });
+  });
+
+  // #1933: troca entre pessoas e transferência em lote.
+  it("routes inventory batch transfer and swap for TI admins only", async () => {
+    const OTHER_ID = "c0000000-0000-4000-8000-000000000009";
+    const inventory = {
+      transferBatch: vi.fn(async () => [{ id: CATEGORY_ID }]),
+      swap: vi.fn(async () => [{ id: CATEGORY_ID }, { id: OTHER_ID }]),
+    };
+    const app = createTiWorkerApp({ env: env(), services: { inventory } } as never);
+    const post = (path: string, permission: string, body: unknown) =>
+      app.request(`https://ti.test${path}`, {
+        method: "POST",
+        headers: { ...headers(permission), "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const self = {
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      permission: 3,
+      isOrganizationOwner: false,
+    };
+    const batch = { asset_ids: [CATEGORY_ID, OTHER_ID], user_id: USER_ID };
+    const swap = { asset_id: CATEGORY_ID, other_asset_id: OTHER_ID };
+
+    expect((await post("/ti/inventory/transfer-batch", "2", batch)).status).toBe(403);
+    expect((await post("/ti/inventory/swap", "2", swap)).status).toBe(403);
+    for (const invalid of [
+      { asset_ids: [], user_id: USER_ID },
+      { asset_ids: [CATEGORY_ID, CATEGORY_ID], user_id: USER_ID },
+      { asset_ids: [CATEGORY_ID] },
+      { asset_ids: [CATEGORY_ID], user_id: USER_ID, location_id: OTHER_ID },
+    ]) {
+      expect((await post("/ti/inventory/transfer-batch", "3", invalid)).status).toBe(400);
+    }
+    expect(
+      (
+        await post("/ti/inventory/swap", "3", {
+          asset_id: CATEGORY_ID,
+          other_asset_id: CATEGORY_ID,
+        })
+      ).status,
+    ).toBe(400);
+    expect(inventory.transferBatch).not.toHaveBeenCalled();
+    expect(inventory.swap).not.toHaveBeenCalled();
+
+    expect((await post("/ti/inventory/transfer-batch", "3", batch)).status).toBe(200);
+    expect(inventory.transferBatch).toHaveBeenCalledWith(self, batch);
+    expect((await post("/ti/inventory/swap", "3", swap)).status).toBe(200);
+    expect(inventory.swap).toHaveBeenCalledWith(self, swap);
+  });
+
+  // #1934: mapa de equipamentos por usuário.
+  it("routes the user equipment map for TI technicians", async () => {
+    const inventory = {
+      getUserEquipmentMap: vi.fn(async () => ({ equipment: [], connections: [] })),
+      getById: vi.fn(),
+    };
+    const app = createTiWorkerApp({ env: env(), services: { inventory } } as never);
+    const get = (path: string, permission: string) =>
+      app.request(`https://ti.test${path}`, { headers: headers(permission) });
+
+    expect((await get(`/ti/inventory/equipment-map/${USER_ID}`, "1")).status).toBe(403);
+    expect((await get("/ti/inventory/equipment-map/nao-e-uuid", "2")).status).toBe(400);
+    expect(inventory.getUserEquipmentMap).not.toHaveBeenCalled();
+
+    const response = await get(`/ti/inventory/equipment-map/${USER_ID}`, "2");
+    expect(response.status).toBe(200);
+    expect(inventory.getUserEquipmentMap).toHaveBeenCalledWith(
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        permission: 2,
+        isOrganizationOwner: false,
+      },
+      USER_ID,
+    );
+    // Não cai na rota de detalhe do ativo.
+    expect(inventory.getById).not.toHaveBeenCalled();
+  });
+
   it("requires the TI module claim even when the legacy permission is high", async () => {
     const categoryService = service();
     const app = createTiWorkerApp({ env: env(), categoryService });

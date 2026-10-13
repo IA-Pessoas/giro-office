@@ -14,10 +14,15 @@ import type {
   TiInventoryAssignUserPayload,
   TiInventoryCategory,
   TiInventoryCategoryPayload,
+  TiInventoryEquipmentMap,
+  TiInventoryEvent,
   TiInventoryLocation,
   TiInventoryLocationPayload,
   TiInventoryPayload,
   TiInventoryReturnPayload,
+  TiInventorySwapPayload,
+  TiInventoryTransferBatchPayload,
+  TiInventoryTransferPayload,
   TiListFilters,
   TiReadQueryOptions,
 } from "../types";
@@ -36,6 +41,11 @@ type TiInventoryAssignUserVariables = {
 type TiInventoryReturnVariables = {
   id: TiId;
   payload?: TiInventoryReturnPayload;
+};
+
+type TiInventoryTransferVariables = {
+  id: TiId;
+  payload: TiInventoryTransferPayload;
 };
 
 type TiInventoryCategoryUpdateVariables = {
@@ -152,6 +162,73 @@ export function useReturnTiInventoryAssetMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => tiInventoryService.returnInventoryAsset(id, payload),
     onSuccess: () => invalidateTiInventoryQueries(queryClient),
   });
+}
+
+export function useTransferTiInventoryAssetMutation(): UseMutationResult<
+  TiInventoryAsset,
+  Error,
+  TiInventoryTransferVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => tiInventoryService.transferInventoryAsset(id, payload),
+    onSuccess: () => invalidateTiInventoryQueries(queryClient),
+  });
+}
+
+export function useTransferTiInventoryAssetsBatchMutation(): UseMutationResult<
+  TiInventoryAsset[],
+  Error,
+  TiInventoryTransferBatchPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => tiInventoryService.transferInventoryAssetsBatch(payload),
+    onSuccess: () => invalidateTiInventoryQueries(queryClient),
+  });
+}
+
+export function useSwapTiInventoryAssetsMutation(): UseMutationResult<
+  TiInventoryAsset[],
+  Error,
+  TiInventorySwapPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => tiInventoryService.swapInventoryAssets(payload),
+    onSuccess: () => invalidateTiInventoryQueries(queryClient),
+  });
+}
+
+export function useTiInventoryEquipmentMap(
+  userId?: TiId,
+  options?: TiReadQueryOptions,
+): UseQueryResult<TiInventoryEquipmentMap, Error> {
+  return useFetch(
+    tiQueryKeys.inventory.equipmentMap(userId),
+    () => tiInventoryService.getUserEquipmentMap(userId as TiId),
+    {
+      ...options,
+      enabled: Boolean(userId) && options?.enabled !== false,
+    },
+  );
+}
+
+export function useTiInventoryAssetHistory(
+  id?: TiId,
+  options?: TiReadQueryOptions,
+): UseQueryResult<TiInventoryEvent[], Error> {
+  return useFetch(
+    tiQueryKeys.inventory.history(id),
+    () => tiInventoryService.listInventoryAssetHistory(id as TiId),
+    {
+      ...options,
+      enabled: Boolean(id) && options?.enabled !== false,
+    },
+  );
 }
 
 export function useCreateTiInventoryCategoryMutation(): UseMutationResult<

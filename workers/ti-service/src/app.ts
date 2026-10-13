@@ -26,9 +26,14 @@ import {
 import {
   assignTiInventoryUserBodySchema,
   createTiInventoryBodySchema,
+  listTiInventoryHistoryQuerySchema,
   listTiInventoryQuerySchema,
   returnTiInventoryBodySchema,
+  swapTiInventoryBodySchema,
   tiInventoryIdParamsSchema,
+  tiInventoryUserIdParamsSchema,
+  transferTiInventoryBatchBodySchema,
+  transferTiInventoryBodySchema,
   updateTiInventoryBodySchema,
 } from "@workspace/ti-service/src/schemas/tiInventory.schemas.js";
 import {
@@ -151,24 +156,15 @@ type TiRequestImageStorage = {
   createSignedAccessUrl(objectPath: string): Promise<string>;
 };
 
+/** As regras de categoria (nome duplicado, categoria canônica Computador) vivem no domínio. */
 function localService(prisma: CategoryPrisma): TiCategoryService {
+  const categories = createTiDomainServices(prisma as unknown as TiDatabase).inventoryCategories;
+  if (!categories) throw new ServiceError(501, "Serviço de TI não implementado: categorias.");
   return {
-    list: (organizationId) =>
-      prisma.inventoryCategoryTecnologia.findMany({
-        where: { organization_id: organizationId },
-        orderBy: { name: "asc" },
-      }),
-    create: (organizationId, input) =>
-      prisma.inventoryCategoryTecnologia.create({
-        data: { ...input, organization_id: organizationId, active: true },
-      }),
-    async update(organizationId, id, input) {
-      const existing = await prisma.inventoryCategoryTecnologia.findFirst({
-        where: { id, organization_id: organizationId },
-      });
-      if (!existing) throw new ServiceError(404, "Categoria de inventário de TI não encontrada.");
-      return prisma.inventoryCategoryTecnologia.update({ where: { id }, data: input });
-    },
+    list: (organizationId) => invoke(categories, "list", [{ organizationId }]),
+    create: (organizationId, input) => invoke(categories, "create", [{ organizationId }, input]),
+    update: (organizationId, id, input) =>
+      invoke(categories, "update", [{ organizationId }, id, input]),
   };
 }
 
@@ -448,6 +444,7 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     callback: (service: TiCategoryService) => Promise<T>,
   ) => {
     if (options.categoryService) return callback(options.categoryService);
+    if (options.prisma) return callback(localService(options.prisma));
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
       callback(localService(client as unknown as CategoryPrisma)),
     );
@@ -493,6 +490,11 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     const query = parseWithZod(listTiInventoryQuerySchema, c.req.query());
     return respond(c, "inventory", "list", [requestContext(c), query]);
   });
+  app.get("/ti/inventory/equipment-map/:userId", async (c) => {
+    requireTiPermission(c.get("auth"), 2);
+    const params = parseWithZod(tiInventoryUserIdParamsSchema, { userId: c.req.param("userId") });
+    return respond(c, "inventory", "getUserEquipmentMap", [requestContext(c), params.userId]);
+  });
   app.get("/ti/inventory/:id", async (c) => {
     requireTiPermission(c.get("auth"), 2);
     const params = parseWithZod(tiInventoryIdParamsSchema, { id: c.req.param("id") });
@@ -520,6 +522,28 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     const params = parseWithZod(tiInventoryIdParamsSchema, { id: c.req.param("id") });
     const body = parseWithZod(returnTiInventoryBodySchema, await c.req.json());
     return respond(c, "inventory", "returnAsset", [requestContext(c), params.id, body]);
+  });
+  app.post("/ti/inventory/transfer-batch", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const body = parseWithZod(transferTiInventoryBatchBodySchema, await c.req.json());
+    return respond(c, "inventory", "transferBatch", [requestContext(c), body]);
+  });
+  app.post("/ti/inventory/swap", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const body = parseWithZod(swapTiInventoryBodySchema, await c.req.json());
+    return respond(c, "inventory", "swap", [requestContext(c), body]);
+  });
+  app.patch("/ti/inventory/:id/transfer", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const params = parseWithZod(tiInventoryIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(transferTiInventoryBodySchema, await c.req.json());
+    return respond(c, "inventory", "transfer", [requestContext(c), params.id, body]);
+  });
+  app.get("/ti/inventory/:id/history", async (c) => {
+    requireTiPermission(c.get("auth"), 2);
+    const params = parseWithZod(tiInventoryIdParamsSchema, { id: c.req.param("id") });
+    const query = parseWithZod(listTiInventoryHistoryQuerySchema, c.req.query());
+    return respond(c, "inventory", "listHistory", [requestContext(c), params.id, query]);
   });
 
   app.get("/ti/inventory-locations/list", async (c) => {

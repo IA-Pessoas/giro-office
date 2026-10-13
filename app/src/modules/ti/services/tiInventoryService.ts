@@ -7,10 +7,15 @@ import type {
   TiInventoryAssignUserPayload,
   TiInventoryCategory,
   TiInventoryCategoryPayload,
+  TiInventoryEquipmentMap,
+  TiInventoryEvent,
   TiInventoryLocation,
   TiInventoryLocationPayload,
   TiInventoryPayload,
   TiInventoryReturnPayload,
+  TiInventorySwapPayload,
+  TiInventoryTransferBatchPayload,
+  TiInventoryTransferPayload,
   TiListFilters,
 } from "../types";
 import {
@@ -78,6 +83,46 @@ export const tiInventoryService = {
     );
 
     return unwrapTiEnvelope<TiInventoryAsset>(response.data);
+  },
+
+  async transferInventoryAsset(
+    id: TiId,
+    payload: TiInventoryTransferPayload,
+  ): Promise<TiInventoryAsset> {
+    const response = await api.patch<TiEnvelope<TiInventoryAsset>>(
+      buildTiPath(TI_ENDPOINTS.inventory.transfer, id),
+      payload,
+    );
+
+    return unwrapTiEnvelope<TiInventoryAsset>(response.data);
+  },
+
+  async transferInventoryAssetsBatch(
+    payload: TiInventoryTransferBatchPayload,
+  ): Promise<TiInventoryAsset[]> {
+    const response = await api.post(TI_ENDPOINTS.inventory.transferBatch, payload);
+
+    return unwrapTiList<TiInventoryAsset>(response.data);
+  },
+
+  async swapInventoryAssets(payload: TiInventorySwapPayload): Promise<TiInventoryAsset[]> {
+    const response = await api.post(TI_ENDPOINTS.inventory.swap, payload);
+
+    return unwrapTiList<TiInventoryAsset>(response.data);
+  },
+
+  async getUserEquipmentMap(userId: TiId): Promise<TiInventoryEquipmentMap> {
+    const response = await api.get<TiEnvelope<TiInventoryEquipmentMap>>(
+      buildTiPath(TI_ENDPOINTS.inventory.equipmentMap, userId),
+    );
+
+    return unwrapTiEnvelope<TiInventoryEquipmentMap>(response.data);
+  },
+
+  async listInventoryAssetHistory(id: TiId): Promise<TiInventoryEvent[]> {
+    const response = await api.get(buildTiPath(TI_ENDPOINTS.inventory.history, id));
+
+    return unwrapTiList<TiInventoryEvent>(response.data);
   },
 
   async listInventoryCategories(filters?: TiListFilters): Promise<TiInventoryCategory[]> {

@@ -2668,6 +2668,103 @@ const handlers = {
     });
   },
 
+  // #1932: depois da devolução o item vai para a pessoa; o histórico lista os eventos.
+  async tiInventoryTransfer(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/${requireState("tiInventoryId")}/transfer`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        user_id: await ensureRhTargetUser(),
+      },
+    });
+  },
+
+  // #1933: o lote leva o item para um local; a troca usa um segundo item de outro usuário.
+  async tiInventoryTransferBatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        asset_ids: [requireState("tiInventoryId")],
+        location_id: requireState("tiInventoryLocationId"),
+      },
+    });
+  },
+
+  async tiInventorySwap(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, { expectedStatus: op.expectedStatus, json: {} });
+      return;
+    }
+    const headers = getTiAdminHeaders();
+    // O segundo item fica com outro usuário criado pelo smoke, não com a sessão do admin.
+    await ensureRhManagerSessionCookies();
+    const created = await helperCall("ti-inventory-swap-asset-create", {
+      method: "POST",
+      path: "/ti/inventory",
+      target: "gateway",
+      service: "ti-service",
+      auth: "public",
+      headers,
+      json: {
+        asset_code: uniqueText("SMOKE-SWAP"),
+        category_id: requireState("tiInventoryCategoryId"),
+        user_id: requireState("rhManagerUserId"),
+      },
+      expectedStatus: [201],
+    });
+    await helperCall("ti-inventory-swap-asset-assign", {
+      method: "PATCH",
+      path: `/ti/inventory/${requireState("tiInventoryId")}/transfer`,
+      target: "gateway",
+      service: "ti-service",
+      auth: "public",
+      headers,
+      json: { user_id: await ensureRhTargetUser() },
+      expectedStatus: [200],
+    });
+    await httpRequest(op, {
+      expectedStatus: [200],
+      auth: "public",
+      headers,
+      json: {
+        asset_id: requireState("tiInventoryId"),
+        other_asset_id: pickFirst(created.body, "data.id") ?? findFirstId(created.body?.data),
+      },
+    });
+  },
+
+  // #1934: mapa de equipamentos do usuário que recebeu o item nas transferências acima.
+  async tiInventoryEquipmentMap(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/equipment-map/${await ensureRhTargetUser()}`,
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (!Array.isArray(response.body?.data?.equipment)) {
+      throw new Error(`${op.id} did not return the equipment list.`);
+    }
+  },
+
+  async tiInventoryHistory(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/inventory/${requireState("tiInventoryId")}/history`,
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const actions = (response.body?.data ?? []).map((event) => event.action);
+    if (!actions.includes("transfer")) {
+      throw new Error(`${op.id} did not list the transfer event.`);
+    }
+  },
+
   async tiStockCategoryList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

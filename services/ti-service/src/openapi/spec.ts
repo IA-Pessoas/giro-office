@@ -333,6 +333,47 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiInventoryTransferInput: {
+    type: "object",
+    description: "Destino da transferencia: informe a pessoa ou o local, nunca os dois.",
+    properties: {
+      user_id: { type: "string", format: "uuid" },
+      location_id: { type: "string", format: "uuid" },
+    },
+    minProperties: 1,
+    maxProperties: 1,
+    additionalProperties: false,
+  },
+  TiInventoryTransferBatchInput: {
+    type: "object",
+    description:
+      "Lote atomico: todos os ativos vao para a mesma pessoa ou o mesmo local, ou nenhum e movimentado.",
+    required: ["asset_ids"],
+    properties: {
+      asset_ids: {
+        type: "array",
+        items: { type: "string", format: "uuid" },
+        minItems: 1,
+        maxItems: 100,
+        uniqueItems: true,
+      },
+      user_id: { type: "string", format: "uuid" },
+      location_id: { type: "string", format: "uuid" },
+    },
+    minProperties: 2,
+    maxProperties: 2,
+    additionalProperties: false,
+  },
+  TiInventorySwapInput: {
+    type: "object",
+    description: "Troca entre duas pessoas: cada ativo passa para quem esta com o outro.",
+    required: ["asset_id", "other_asset_id"],
+    properties: {
+      asset_id: { type: "string", format: "uuid" },
+      other_asset_id: { type: "string", format: "uuid" },
+    },
+    additionalProperties: false,
+  },
   TiInventoryCategoryInput: {
     type: "object",
     required: ["name"],
@@ -1041,7 +1082,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Ativo de inventario de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiInventoryAssignInput"),
           successDescription: "Ativo atribuido",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/inventory/{id}/return": {
@@ -1052,6 +1093,66 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Ativo de inventario de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiInventoryReturnInput"),
           successDescription: "Devolucao registrada",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/inventory/equipment-map/{userId}": {
+        get: publicTiOperation({
+          operationId: "getTiInventoryEquipmentMap",
+          tags: ["TI Inventory"],
+          summary:
+            "Mapa somente leitura dos equipamentos ativos de um usuario e suas conexoes, derivado do inventario de TI",
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              description: "Usuario dono dos equipamentos",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          successDescription: "Mapa de equipamentos do usuario",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/inventory/transfer-batch": {
+        post: publicTiOperation({
+          operationId: "transferTiInventoryBatch",
+          tags: ["TI Inventory"],
+          summary: "Transfere varios ativos de inventario de TI em uma operacao atomica",
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryTransferBatchInput"),
+          successDescription: "Ativos transferidos",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/inventory/swap": {
+        post: publicTiOperation({
+          operationId: "swapTiInventory",
+          tags: ["TI Inventory"],
+          summary: "Troca dois ativos de inventario de TI entre as pessoas que estao com eles",
+          requestBody: jsonRequestBody("#/components/schemas/TiInventorySwapInput"),
+          successDescription: "Ativos trocados",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/inventory/{id}/transfer": {
+        patch: publicTiOperation({
+          operationId: "transferTiInventory",
+          tags: ["TI Inventory"],
+          summary: "Transfere ativo de inventario de TI para uma pessoa ou um local",
+          parameters: [pathIdParameter("Ativo de inventario de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiInventoryTransferInput"),
+          successDescription: "Ativo transferido",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/inventory/{id}/history": {
+        get: publicTiOperation({
+          operationId: "listTiInventoryHistory",
+          tags: ["TI Inventory"],
+          summary: "Lista o historico patrimonial do ativo de inventario de TI",
+          parameters: [pathIdParameter("Ativo de inventario de TI"), ...paginationParameters()],
+          successDescription: "Historico patrimonial listado",
           errors: [400, 401, 403, 404],
         }),
       },

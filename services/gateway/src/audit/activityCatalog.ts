@@ -898,6 +898,31 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/ti\/inventory\/equipment-map\/[^/]+$/,
+    description: { action: "consultou", item: "o mapa de equipamentos de um usuário" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/ti\/inventory\/transfer-batch$/,
+    description: { action: "transferiu", item: "itens de inventário em lote" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/ti\/inventory\/swap$/,
+    description: { action: "trocou", item: "itens de inventário entre usuários" },
+  },
+  {
+    methods: ["POST", "PATCH"],
+    pattern: /^\/ti\/inventory\/[^/]+\/transfer$/,
+    description: { action: "transferiu", item: "um item de inventário" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/ti\/inventory\/[^/]+\/history$/,
+    description: { action: "consultou", item: "o histórico de um item de inventário" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/ti\/stock$/,
     description: { action: "consultou", item: "o estoque de TI" },
   },

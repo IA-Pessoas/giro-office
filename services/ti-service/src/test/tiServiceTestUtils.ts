@@ -14,7 +14,35 @@ export function createPrismaMock(): PrismaClient {
   const userId = "00000000-0000-4000-8000-000000000001";
   const robotId = "90000000-0000-4000-8000-000000000001";
   let stockQuantity = 5;
+  // Movimentação de inventário: a escrita e o evento patrimonial rodam na mesma transação.
+  let movedInventory: Record<string, unknown> = {};
+  const inventoryEvents: Array<Record<string, unknown>> = [];
   const stockTransaction = {
+    $executeRaw: vi.fn(async () => 0),
+    inventoryCategoryTecnologia: { findMany: vi.fn(async () => []) },
+    inventoryTecnologia: {
+      findMany: vi.fn(async () => []),
+      updateMany: vi.fn(async ({ data }) => {
+        movedInventory = data;
+        return { count: 1 };
+      }),
+      findFirst: vi.fn(async ({ where }) => ({
+        id: where.id,
+        asset_code: "NB-001",
+        organization_id: where.organization_id,
+        ...movedInventory,
+      })),
+    },
+    inventoryEventTecnologia: {
+      create: vi.fn(async ({ data }) => {
+        inventoryEvents.push(data);
+        return data;
+      }),
+      createMany: vi.fn(async ({ data }) => {
+        inventoryEvents.push(...data);
+        return { count: data.length };
+      }),
+    },
     stock: {
       findFirst: vi.fn(async ({ where }) => {
         if (where.organization_id !== organizationId || where.department_id !== departmentId) {
@@ -265,6 +293,8 @@ export function createPrismaMock(): PrismaClient {
       }),
     },
     $transaction: vi.fn(async (callback) => callback(stockTransaction)),
+    inventoryEvents,
+    inventoryEventTecnologia: { findMany: vi.fn(async () => []) },
     inventoryCategoryTecnologia: {
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async ({ where }) => {

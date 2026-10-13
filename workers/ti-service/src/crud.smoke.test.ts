@@ -144,8 +144,83 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
       user_id: userId,
       delivery_date: "2026-09-11",
     });
+    // #1932: pessoa→local e local→pessoa; o histórico traz o cadastro já atribuído, a
+    // devolução, a nova atribuição e as duas transferências.
+    await call("PATCH", `/ti/inventory/${assetId}/transfer`, { location_id: locationId });
+    await call("PATCH", `/ti/inventory/${assetId}/transfer`, { user_id: userId });
+    // #1934: o mapa do usuário traz o item que está com ele, lido do inventário.
+    const equipmentMap = await smokeCall(
+      app(),
+      env(),
+      "GET",
+      `/ti/inventory/equipment-map/${userId}`,
+    );
+    expect(equipmentMap.status).toBe(200);
+    expect(
+      (equipmentMap.json?.data as { equipment: Array<{ id: string }> }).equipment.map(
+        (item) => item.id,
+      ),
+    ).toContain(assetId);
+    // #1933: lote para o local e troca com um segundo item que está com outra pessoa.
+    const other = await call("POST", "/ti/inventory", {
+      asset_code: `PAT-TROCA-${suffix()}`,
+      category_id: categoryId,
+      user_id: ownerId,
+    });
+    await call("POST", "/ti/inventory/swap", {
+      asset_id: assetId,
+      other_asset_id: other.data.id,
+    });
+    await call("POST", "/ti/inventory/transfer-batch", {
+      asset_ids: [assetId, other.data.id],
+      location_id: locationId,
+    });
+    // Repetir o lote não movimenta nada e aponta os dois itens.
+    const repeated = await smokeCall(app(), env(), "POST", "/ti/inventory/transfer-batch", {
+      asset_ids: [assetId, other.data.id],
+      location_id: locationId,
+    });
+    expect(repeated.status).toBe(409);
+    expect(repeated.text).toContain("já está no destino");
+    const history = await smokeCall(app(), env(), "GET", `/ti/inventory/${assetId}/history`);
+    expect(history.status).toBe(200);
+    expect(
+      (history.json?.data as Array<{ action: string }>).map((event) => event.action).sort(),
+    ).toEqual(["assign", "assign", "return", "swap", "transfer", "transfer", "transfer"]);
     await call("PATCH", `/ti/inventory-categories/${categoryId}`, { active: false });
     await call("PATCH", `/ti/inventory-locations/${locationId}`, { active: false });
+  });
+
+  // #1931: o bloqueio consultivo e a transação só são exercitados de verdade no Postgres.
+  it("inventário: atribuições simultâneas deixam um só computador ativo por pessoa", async () => {
+    const { userId } = requireSmokeState();
+    await call("POST", "/ti/inventory-categories", { name: "Computador" }, [201, 409]);
+    const categories = await smokeCall(app(), env(), "GET", "/ti/inventory-categories/list");
+    const computerCategory = (categories.json?.data as Array<{ id: string; name: string }>).find(
+      (category) => category.name.trim().toLowerCase() === "computador",
+    );
+    expect(computerCategory).toBeDefined();
+    const computers = await Promise.all(
+      ["A", "B"].map((label) =>
+        call("POST", "/ti/inventory", {
+          asset_code: `PC-${label}-${suffix()}`,
+          category_id: computerCategory?.id,
+        }),
+      ),
+    );
+
+    const assigned = await Promise.all(
+      computers.map((computer) =>
+        smokeCall(app(), env(), "PATCH", `/ti/inventory/${computer.data.id}/assign-user`, {
+          user_id: userId,
+        }),
+      ),
+    );
+
+    expect(assigned.map((result) => result.status).sort()).toEqual([200, 409]);
+    // Libera a pessoa para as próximas execuções do smoke.
+    const winner = computers[assigned.findIndex((result) => result.status === 200)];
+    await call("PATCH", `/ti/inventory/${winner?.data.id}/return`, {});
   });
 
   it("ramais", async () => {

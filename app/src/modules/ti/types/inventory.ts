@@ -83,6 +83,65 @@ export interface TiInventoryReturnPayload {
   [key: string]: unknown;
 }
 
+/** Destino da transferência: uma pessoa ou um local, nunca os dois. */
+export type TiInventoryTransferPayload = { user_id: TiId } | { location_id: TiId };
+
+/** Lote: vários ativos para o mesmo usuário ou departamento, todos ou nenhum. */
+export type TiInventoryTransferBatchPayload = { asset_ids: TiId[] } & TiInventoryTransferPayload;
+
+/** Troca: cada ativo passa para quem está com o outro. */
+export interface TiInventorySwapPayload {
+  asset_id: TiId;
+  other_asset_id: TiId;
+}
+
+export type TiInventoryEventAction = "assign" | "return" | "transfer" | "swap";
+
+interface TiInventoryEventParty {
+  id: TiId;
+  name?: string | null;
+  full_name?: string | null;
+}
+
+/** Evento do histórico patrimonial de um ativo. */
+export interface TiInventoryEvent {
+  id: TiId;
+  inventory_id: TiId;
+  action: TiInventoryEventAction | string;
+  created_at: string;
+  actor?: TiInventoryEventParty | null;
+  from_user?: TiInventoryEventParty | null;
+  to_user?: TiInventoryEventParty | null;
+  from_location?: TiInventoryEventParty | null;
+  to_location?: TiInventoryEventParty | null;
+}
+
+/** Equipamento do mapa: os dados vêm das observações do item, quando seguem o padrão. */
+export interface TiInventoryEquipmentMapItem {
+  id: TiId;
+  asset_code: string;
+  category: string | null;
+  /** Computador ou notebook: é onde os periféricos se ligam. */
+  is_host: boolean;
+  brand: string | null;
+  inputs: string[];
+  outputs: string[];
+  configuration: string[];
+}
+
+export interface TiInventoryEquipmentMapConnection {
+  host_id: TiId;
+  equipment_id: TiId;
+  ports: string[];
+}
+
+/** Mapa somente leitura dos equipamentos ativos de um usuário, derivado do inventário. */
+export interface TiInventoryEquipmentMap {
+  user?: TiInventoryRelatedUser | null;
+  equipment: TiInventoryEquipmentMapItem[];
+  connections: TiInventoryEquipmentMapConnection[];
+}
+
 export interface TiInventoryCategoryPayload {
   name?: string;
   tag?: string;
