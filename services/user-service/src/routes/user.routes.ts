@@ -65,6 +65,13 @@ export function createUserRoutes(
     }
   }
 
+  /** A conferência vem antes do storage, senão a foto do owner seria trocada antes do 403. */
+  function assertPhotoTarget(request: Request, target: { type?: string | null }): void {
+    if (actorGrantScope(request) && target.type === "owner") {
+      throw new ServiceError(403, "Apenas o owner pode alterar outro owner.");
+    }
+  }
+
   function isSelfPasswordUpdate(request: Request, id: string, body: object): boolean {
     return (
       request.user_id === id &&
@@ -237,6 +244,7 @@ export function createUserRoutes(
         }
 
         const existing = await userManagement(auth).getById(id);
+        assertPhotoTarget(request, existing);
         validateUploadFileSignature(request.file);
         const photoUrl = await storageService.uploadUserPhoto(request.file, id);
         const user = await userManagement(auth).update(id, { photo_url: photoUrl }, "UPDATE_PHOTO");
@@ -264,6 +272,7 @@ export function createUserRoutes(
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
         const existing = await userManagement(auth).getById(id);
+        assertPhotoTarget(request, existing);
         await storageService.deleteUserPhoto(id);
         const user = await userManagement(auth).update(id, { photo_url: null }, "UPDATE_PHOTO");
 

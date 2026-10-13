@@ -282,6 +282,21 @@ describe("user routes", () => {
     );
   });
 
+  // #1930: como no Worker, a conferência vem antes do storage.
+  it("quem não é owner não troca nem remove a foto de um owner", async () => {
+    userServiceMock.getById.mockResolvedValue({ id: "owner-1", type: "owner" });
+    const app = createTestApp();
+    const headers = gatewayAuthHeaders({ permission: 1, type: "admin", modules: { ti: 3 } });
+
+    const upload = await request(app).post("/user/owner-1/photo").set(headers);
+    const removal = await request(app).delete("/user/owner-1/photo").set(headers);
+
+    expect([upload.status, removal.status]).toEqual([403, 403]);
+    expect(storageServiceMock.uploadUserPhoto).not.toHaveBeenCalled();
+    expect(storageServiceMock.deleteUserPhoto).not.toHaveBeenCalled();
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("Marketing editor não envia foto quando o usuário está fora da organização", async () => {
     userServiceMock.getById.mockRejectedValue(new ServiceError(404, "Usuário não encontrado."));
     const app = createTestApp();

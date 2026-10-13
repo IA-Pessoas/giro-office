@@ -197,8 +197,10 @@ export function AdminUserDetailsPanel({
       toast.success("Usuário atualizado com sucesso!");
       await loadUser(userId);
     } catch (error) {
+      // O 403 aqui é de uma alteração reservada ao owner, não de perda de acesso à tela.
       if (isAxiosError(error) && error.response?.status === 403) {
-        await router.replace("/dashboard");
+        setSaveError("Somente o owner pode fazer esta alteração.");
+        toast.error("Você não tem permissão para esta alteração.");
         return;
       }
 
@@ -375,7 +377,7 @@ export function AdminUserDetailsPanel({
                 onChange={handleInputChange}
                 className={SELECT_FIELD_CLASSNAME}
                 style={SELECT_ARROW_STYLE}
-                disabled={departmentsError}
+                disabled={departmentsError || (!canChangeAccess && user?.type === "admin")}
               >
                 <option value="">Selecione um departamento</option>
                 {departments.map((department) => (
