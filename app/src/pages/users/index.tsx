@@ -147,6 +147,7 @@ export default function Users({
         onCreateUser={userService.create}
         departments={deps}
         canCreateOrganizationOwner={canManageOrganizationOwners}
+        canGrantModules={canManageOrganizationOwners}
       />
     </>
   );

@@ -658,6 +658,8 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     let uploadedStorage: TiRequestImageStorage | undefined;
     const file = form.file instanceof File ? form.file : undefined;
     if (file) {
+      // A posse do chamado é conferida antes de gravar a imagem, como no serviço Node.
+      await execute(c, "requests", "getById", [requestContext(c), params.id]);
       if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
         throw new ServiceError(400, "Formato de imagem não suportado.");
       const bytes = new Uint8Array(await file.arrayBuffer());

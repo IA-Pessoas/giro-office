@@ -933,7 +933,7 @@ await (async () => {
     assert.equal(adminPermissionsEditorSource.includes(': "Salvar"'), false);
     assert.match(
       adminPermissionsEditorSource,
-      /<select[\s\S]*disabled=\{isOwner \|\| isSaving\}/,
+      /<select[\s\S]*disabled=\{isReadOnly \|\| isSaving\}/,
     );
   });
   await runTest("RH permissions hook delegates to the shared capability contract", () => {

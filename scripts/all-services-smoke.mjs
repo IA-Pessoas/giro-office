@@ -334,6 +334,7 @@ const state = {
   pessoalCompetence: "",
   tiRequestCategoryId: "",
   tiRequestId: "",
+  tiSelfServiceRequestId: "",
   tiInventoryCategoryId: "",
   tiInventoryLocationId: "",
   tiInventoryId: "",
@@ -1439,7 +1440,8 @@ async function ensureRhTargetUser() {
       permission: 1,
       organization_id: requireState("session").organization_id,
       type: "user",
-      modules: { integracao: 1, rh: 1 },
+      // ti: 1 cobre o autoatendimento de TI nível 1 (#1929).
+      modules: { integracao: 1, rh: 1, ti: 1 },
     },
     expectedStatus: [201],
   });
@@ -1477,6 +1479,41 @@ async function ensureRhTargetUser() {
     });
   });
   return state.rhTargetUserId;
+}
+
+// #1929: TI nível 1 abre e responde o próprio chamado pelo gateway.
+async function ensureTiSelfServiceRequest() {
+  if (state.tiSelfServiceRequestId) return state.tiSelfServiceRequestId;
+  const headers = getSessionHeaders("POST", await ensureRhTargetUserSessionCookies());
+  const response = await helperCall("ti-self-service-request-create", {
+    method: "POST",
+    path: "/ti/requests",
+    target: "gateway",
+    service: "ti-service",
+    auth: "public",
+    headers,
+    json: {
+      title: uniqueText("Smoke TI Self Service"),
+      description: "Smoke TI request created by a TI level 1 user.",
+      category_id: requireState("tiRequestCategoryId"),
+      anydesk_code: "123456789",
+      urgency: "Medium",
+    },
+    expectedStatus: [201],
+  });
+  state.tiSelfServiceRequestId =
+    pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  await helperCall("ti-self-service-request-message-create", {
+    method: "POST",
+    path: `/ti/requests/${state.tiSelfServiceRequestId}/messages`,
+    target: "gateway",
+    service: "ti-service",
+    auth: "public",
+    headers,
+    json: { message: "Smoke message from a TI level 1 user." },
+    expectedStatus: [201],
+  });
+  return state.tiSelfServiceRequestId;
 }
 
 async function ensureRhTargetUserSessionCookies() {
@@ -2478,6 +2515,26 @@ const handlers = {
       json: {
         message: "Smoke message for TI request.",
       },
+    });
+  },
+
+  // #1929: TI nível 1 não lê chamado alheio nem executa gestão.
+  async tiSelfServiceForeignRequestGet(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/ti/requests/${requireState("tiRequestId")}`,
+      auth: "public",
+      headers: getSessionHeaders("GET", await ensureRhTargetUserSessionCookies()),
+    });
+  },
+
+  async tiSelfServiceRequestStatusPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/ti/requests/${await ensureTiSelfServiceRequest()}/status`,
+      auth: "public",
+      headers: getSessionHeaders("PATCH", await ensureRhTargetUserSessionCookies()),
+      json: { status: "In_Progress" },
     });
   },
 

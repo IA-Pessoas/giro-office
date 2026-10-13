@@ -105,6 +105,108 @@ describe("user routes", () => {
     });
   });
 
+  // #1930: TI nível 3 gerencia usuários como o RH nível 3; conceder módulos é só do owner.
+  describe("gestão de usuários por papel", () => {
+    const ORGANIZATION = "a0000000-0000-4000-8000-000000000001";
+    const ACTOR = "c0000000-0000-4000-8000-000000000001";
+    const newUser = {
+      name: "Novo Usuario",
+      login: "novo.usuario.papel",
+      password: "secret",
+      department_id: "dep-1",
+      permission: 1,
+      type: "user",
+    };
+    const roles = [
+      ["TI nível 3", { permission: 1, type: "admin", modules: { ti: 3, rh: 1 } }],
+      ["RH nível 3", { permission: 1, type: "admin", modules: { rh: 3, ti: 1 } }],
+    ] as const;
+
+    it.each(roles)("%s lista, cria e edita sem conceder módulos", async (_label, role) => {
+      userServiceMock.list.mockResolvedValue([{ id: "user-1" }]);
+      userServiceMock.create.mockResolvedValue({ id: "user-2" });
+      userServiceMock.update.mockResolvedValue({ id: "user-2" });
+      const app = createTestApp();
+      const headers = gatewayAuthHeaders(role);
+
+      expect((await request(app).get("/user").set(headers)).status).toBe(200);
+      expect((await request(app).post("/user").set(headers).send(newUser)).status).toBe(201);
+      expect(
+        (await request(app).put("/user/user-2").set(headers).send({ name: "Outro" })).status,
+      ).toBe(200);
+      // O serviço recebe que o solicitante não concede acessos.
+      expect(userServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ login: "novo.usuario.papel", organization_id: ORGANIZATION }),
+        ACTOR,
+        "none",
+      );
+      expect(userServiceMock.update).toHaveBeenCalledWith(
+        "user-2",
+        { name: "Outro" },
+        ORGANIZATION,
+        ACTOR,
+        "UPDATE",
+        "none",
+      );
+    });
+
+    it.each(roles)("%s não envia módulos nem cria owner", async (_label, role) => {
+      const app = createTestApp();
+      const headers = gatewayAuthHeaders(role);
+
+      const withModules = await request(app)
+        .post("/user")
+        .set(headers)
+        .send({ ...newUser, modules: { ti: 1, rh: 1 } });
+      const owner = await request(app)
+        .post("/user")
+        .set(headers)
+        .send({ ...newUser, type: "owner" });
+      const update = await request(app)
+        .put("/user/user-2")
+        .set(headers)
+        .send({ modules: { ti: 1 } });
+
+      expect([withModules.status, owner.status, update.status]).toEqual([403, 403, 403]);
+      expect(userServiceMock.create).not.toHaveBeenCalled();
+      expect(userServiceMock.update).not.toHaveBeenCalled();
+    });
+
+    it("owner cria usuário com módulos, sem teto de concessão", async () => {
+      userServiceMock.create.mockResolvedValue({ id: "user-2" });
+      const app = createTestApp();
+
+      const res = await request(app)
+        .post("/user")
+        .set(gatewayAuthHeaders())
+        .send({ ...newUser, modules: { fiscal: 2 } });
+
+      expect(res.status).toBe(201);
+      expect(userServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ modules: { fiscal: 2 } }),
+        ACTOR,
+      );
+    });
+
+    it("usuário comum e TI abaixo do nível 3 não gerenciam usuários", async () => {
+      const app = createTestApp();
+
+      for (const modules of [
+        { ti: 1, rh: 1 },
+        { ti: 2, rh: 2 },
+      ]) {
+        const headers = gatewayAuthHeaders({ permission: 1, type: "user", modules });
+        expect((await request(app).get("/user").set(headers)).status).toBe(403);
+        expect((await request(app).post("/user").set(headers).send(newUser)).status).toBe(403);
+        expect(
+          (await request(app).put("/user/user-2").set(headers).send({ name: "Outro" })).status,
+        ).toBe(403);
+      }
+      expect(userServiceMock.create).not.toHaveBeenCalled();
+      expect(userServiceMock.update).not.toHaveBeenCalled();
+    });
+  });
+
   it("GET /user libera ao Marketing somente a projeção de perfil da organização", async () => {
     userServiceMock.listMarketingProfiles.mockResolvedValue({
       users: [
@@ -178,6 +280,21 @@ describe("user routes", () => {
       "c0000000-0000-4000-8000-000000000001",
       "UPDATE_PHOTO",
     );
+  });
+
+  // #1930: como no Worker, a conferência vem antes do storage.
+  it("quem não é owner não troca nem remove a foto de um owner", async () => {
+    userServiceMock.getById.mockResolvedValue({ id: "owner-1", type: "owner" });
+    const app = createTestApp();
+    const headers = gatewayAuthHeaders({ permission: 1, type: "admin", modules: { ti: 3 } });
+
+    const upload = await request(app).post("/user/owner-1/photo").set(headers);
+    const removal = await request(app).delete("/user/owner-1/photo").set(headers);
+
+    expect([upload.status, removal.status]).toEqual([403, 403]);
+    expect(storageServiceMock.uploadUserPhoto).not.toHaveBeenCalled();
+    expect(storageServiceMock.deleteUserPhoto).not.toHaveBeenCalled();
+    expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
   it("Marketing editor não envia foto quando o usuário está fora da organização", async () => {
@@ -322,6 +439,7 @@ describe("user routes", () => {
         type: "admin",
       }),
       "c0000000-0000-4000-8000-000000000001",
+      "none",
     );
   });
 
@@ -663,6 +781,8 @@ describe("user routes", () => {
       },
       "a0000000-0000-4000-8000-000000000001",
       "c0000000-0000-4000-8000-000000000001",
+      "UPDATE",
+      "none",
     );
   });
 
