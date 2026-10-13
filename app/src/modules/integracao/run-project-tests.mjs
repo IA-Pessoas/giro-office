@@ -277,6 +277,21 @@ async function runAsyncTest(name, fn) {
   }
 }
 
+await runAsyncTest("compromisso pendente prepara mensagem no WhatsApp sem destinatário automático", async () => {
+  const { buildPendingAgendaWhatsappHref } = await import("../../shared/services/agendaService.contract.ts");
+  assert.equal(typeof buildPendingAgendaWhatsappHref, "function");
+  const url = new URL(buildPendingAgendaWhatsappHref({
+    agenda: "Reunião de implantação",
+    when: "13/10/2026, 14:00",
+    clientName: "Empresa Alpha",
+  }));
+  assert.equal(url.origin, "https://wa.me");
+  assert.equal(url.pathname, "/");
+  assert.match(url.searchParams.get("text"), /Empresa Alpha/);
+  assert.match(url.searchParams.get("text"), /Reunião de implantação/);
+  assert.match(url.searchParams.get("text"), /13\/10\/2026, 14:00/);
+});
+
 runTest("task and dependency confirmations retain contextual errors on failure", () => {
   const tasks = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
   const taskModel = readFileSync(

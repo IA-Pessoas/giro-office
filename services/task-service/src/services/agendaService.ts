@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   type ModulePermissionKey,
   resolveDepartmentModuleKey,
@@ -9,7 +10,16 @@ import { AGENDA_STATUSES, INTEGRACAO_AGENDA_STATUSES } from "../schemas/agenda.s
 
 export type AgendaPrisma = Pick<
   typeof prismaClient,
-  "agenda" | "client" | "department" | "recurringAgenda" | "user"
+  | "$transaction"
+  | "agenda"
+  | "client"
+  | "clientHistory"
+  | "clientHistoryPending"
+  | "department"
+  | "organization"
+  | "pA"
+  | "recurringAgenda"
+  | "user"
 >;
 
 /** Quem pede e por qual módulo: a agenda é uma só, o departamento é o filtro. */
@@ -89,7 +99,53 @@ export const AGENDA_LEVEL = { READ: 1, WRITE: 2, OWNER: 3 } as const;
 const NOT_FOUND = "Evento da agenda não encontrado.";
 
 const DEFAULT_STATUS = "Pendente" satisfies (typeof AGENDA_STATUSES)[number];
+const COMPLETED_STATUS = "Realizado" satisfies (typeof INTEGRACAO_AGENDA_STATUSES)[number];
 const MONTHLY = "mensal";
+
+/** UUID v5: mesmo cliente, participante e dia produz a mesma pendência em Node e Worker. */
+function paPendingId(
+  organizationId: string,
+  clientId: string,
+  userId: string,
+  day: string,
+): string {
+  const hash = createHash("sha1")
+    .update("6ba7b8109dad11d180b400c04fd430c8", "hex")
+    .update(`giro-office:integracao:pa:${organizationId}:${clientId}:${userId}:${day}`)
+    .digest("hex");
+  const variant = ((Number.parseInt(hash[16], 16) & 3) | 8).toString(16);
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${variant}${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
+
+/** Retorna o dia civil e seus limites UTC, incluindo dias de 23 ou 25 horas. */
+function organizationDay(now: Date, timeZone: string): { day: string; start: Date; end: Date } {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const civilDay = (instant: Date) => {
+    const parts = formatter.formatToParts(instant);
+    const part = (type: string) => parts.find((value) => value.type === type)?.value;
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  };
+  const day = civilDay(now);
+  const nextDay = new Date(`${day}T00:00:00.000Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const boundary = (target: string) => {
+    const nominal = Date.parse(`${target}T00:00:00.000Z`);
+    let low = nominal - 36 * 60 * 60 * 1000;
+    let high = nominal + 36 * 60 * 60 * 1000;
+    while (low + 1 < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (civilDay(new Date(middle)) < target) low = middle;
+      else high = middle;
+    }
+    return new Date(high);
+  };
+  return { day, start: boundary(day), end: boundary(nextDay.toISOString().slice(0, 10)) };
+}
 
 /** Competência (AAAA-MM) em UTC, o mesmo corte de mês usado na listagem. */
 const monthOf = (date: Date) => date.toISOString().slice(0, 7);
@@ -554,13 +610,107 @@ export class AgendaService {
     // Pedido que não muda nada (recorrência já ligada, por exemplo) não grava nem deixa trilha.
     if (Object.keys(data).length === 0) return { id };
     const newRuleId = link.recurring_agenda_id;
+    const completedIntegration =
+      scope.module === "integracao" &&
+      existing.status !== COMPLETED_STATUS &&
+      fields.status === COMPLETED_STATUS;
     let count = 0;
     try {
-      ({ count } = await this.prisma.agenda.updateMany({
-        // Regra nova só se liga a evento ainda sem regra: de duas edições simultâneas, uma perde.
-        where: newRuleId ? { ...where, recurring_agenda_id: null } : where,
-        data,
-      }));
+      if (completedIntegration) {
+        const clientId = fields.client_id ?? existing.client_id;
+        const participantIds = [
+          ...new Set(
+            (
+              participants?.map((pair) => pair.participant_id) ?? [
+                existing.participant_id,
+                existing.participant_id_2,
+                existing.participant_id_3,
+                existing.participant_id_4,
+              ]
+            ).filter((participantId): participantId is string => Boolean(participantId)),
+          ),
+        ];
+        ({ count } = await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.agenda.updateMany({
+            where: { ...where, OR: [{ status: null }, { status: { not: COMPLETED_STATUS } }] },
+            data,
+          });
+          if (updated.count === 0 || !clientId || participantIds.length === 0) return updated;
+
+          const pa = await tx.pA.findFirst({
+            where: { client_id: clientId, organization_id: scope.organizationId },
+            select: { client_id: true },
+          });
+          if (!pa) return updated;
+
+          const organization = await tx.organization.findFirst({
+            where: { id: scope.organizationId },
+            select: { timezone: true },
+          });
+          const {
+            day,
+            start: dayStart,
+            end: dayEnd,
+          } = organizationDay(now, organization?.timezone ?? "UTC");
+
+          const users = await tx.user.findMany({
+            where: {
+              id: { in: participantIds },
+              status: "active",
+              OR: [
+                { organization_id: scope.organizationId },
+                { organization_id: null, department: { organization_id: scope.organizationId } },
+              ],
+            },
+            select: { id: true },
+          });
+          const eligibleIds = users.map((user) => user.id);
+          if (eligibleIds.length === 0) return updated;
+
+          const histories = await tx.clientHistory.findMany({
+            where: {
+              organization_id: scope.organizationId,
+              client_id: clientId,
+              user_id: { in: eligibleIds },
+              date: { gte: dayStart, lt: dayEnd },
+            },
+            select: { user_id: true },
+          });
+          const reason = `Registrar histórico do PA em ${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
+          const openPendings = await tx.clientHistoryPending.findMany({
+            where: {
+              organization_id: scope.organizationId,
+              client_id: clientId,
+              reason,
+              user_id: { in: eligibleIds },
+            },
+            select: { user_id: true },
+          });
+          const excludedIds = new Set([
+            ...histories.map((history) => history.user_id),
+            ...openPendings.map((pending) => pending.user_id),
+          ]);
+          const pending = eligibleIds
+            .filter((userId) => !excludedIds.has(userId))
+            .map((userId) => ({
+              id: paPendingId(scope.organizationId, clientId, userId, day),
+              organization_id: scope.organizationId,
+              client_id: clientId,
+              user_id: userId,
+              reason,
+            }));
+          if (pending.length > 0) {
+            await tx.clientHistoryPending.createMany({ data: pending, skipDuplicates: true });
+          }
+          return updated;
+        }));
+      } else {
+        ({ count } = await this.prisma.agenda.updateMany({
+          // Regra nova só se liga a evento ainda sem regra: de duas edições simultâneas, uma perde.
+          where: newRuleId ? { ...where, recurring_agenda_id: null } : where,
+          data,
+        }));
+      }
     } finally {
       // Sem evento ligado, a regra recém-criada geraria ocorrências sem origem.
       if (count === 0 && newRuleId) {
