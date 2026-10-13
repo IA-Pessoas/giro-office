@@ -298,6 +298,7 @@ const routePolicyMatchers: Array<{
   { method: "PUT", path: /^\/rh\/cce\/floors\/?$/, policy: rhManagementPolicy },
   { method: "POST", path: /^\/rh\/cce\/cycles\/?$/, policy: rhManagementPolicy },
   { method: "PATCH", path: /^\/rh\/cce\/weeks\/[^/]+\/?$/, policy: rhManagementPolicy },
+  { method: "ANY", path: /^\/rh\/exams(?:\/|$)/, policy: rhManagementPolicy },
   {
     method: "GET",
     path: /^\/rh\/timesheets\/[^/]+\/pdf$/,

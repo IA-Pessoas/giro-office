@@ -61,6 +61,9 @@ export const RH_ENDPOINTS = {
   cceFloors: "/rh/cce/floors",
   cceCycles: "/rh/cce/cycles",
   cceWeek: (id: string) => `/rh/cce/weeks/${id}`,
+  exams: "/rh/exams",
+  examDetail: (id: string) => `/rh/exams/${id}`,
+  openExam: (id: string) => `/rh/exams/${id}/open`,
 } as const;
 
 export function buildRhDossierTargetParams(userId?: string) {

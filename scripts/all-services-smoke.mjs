@@ -396,6 +396,13 @@ const actionExecutionRank = {
   rhCceCycleCreate: 8311,
   rhCceCycleList: 8312,
   rhCceWeekPatch: 8313,
+  rhExamCreate: 8314,
+  rhExamOpen: 8315,
+  rhExamGet: 8316,
+  rhExamList: 8317,
+  rhExamCreateInvalid: 8318,
+  rhExamGetNotFound: 8319,
+  rhExamOpenConflict: 8320,
   platformSessionLogout: 9900,
   userSessionLogout: 10000,
 };
@@ -7955,6 +7962,62 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/cce/floors",
       json: { floor_count: 4 },
+    });
+  },
+
+  async rhExamList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/rh/exams" });
+  },
+
+  async rhExamCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/rh/exams",
+      json: {
+        title: uniqueText("Smoke discursiva"),
+        evaluator_id: requireState("session").id,
+        participant_ids: [await ensureRhTargetUser()],
+        observations: "Criada pelo smoke do workspace.",
+        questions: [{ prompt: "Explique o fluxo.", value: 10, answer_key: "Descrever os passos." }],
+      },
+    });
+    state.rhExamId = response.body?.data?.id;
+    if (!state.rhExamId) throw new Error("A criação da prova não retornou o id.");
+  },
+
+  async rhExamOpen(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/exams/${requireState("rhExamId")}/open`,
+    });
+  },
+
+  async rhExamGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/exams/${requireState("rhExamId")}`,
+    });
+  },
+
+  async rhExamCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      path: "/rh/exams",
+      json: { title: "", evaluator_id: "invalid", participant_ids: [], questions: [] },
+    });
+  },
+
+  async rhExamGetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/rh/exams/00000000-0000-0000-0000-000000000000",
+    });
+  },
+
+  async rhExamOpenConflict(op) {
+    await httpRequest(op, {
+      expectedStatus: [409],
+      path: `/rh/exams/${requireState("rhExamId")}/open`,
     });
   },
 

@@ -63,3 +63,14 @@ _Avoid_: finalizado
 **Fechado**:
 O solicitante aceitou a solução. É o único status terminal: não aceita novas mensagens.
 _Avoid_: encerrado, arquivado
+
+## Provas discursivas de RH
+
+**Prova discursiva**:
+Avaliação criada pelo RH com avaliador, participantes, janela informativa e questões com valor e gabarito. Estados da prova: Nova → Aberta → Fechada, ou Cancelada.
+
+**Abertura da prova**:
+Transição de Nova para Aberta. Cria uma resposta vazia por questão e participante, sem duplicar respostas existentes.
+
+**Janela da prova**:
+Datas previstas para realização. São informativas e não bloqueiam automaticamente respostas ou entregas.

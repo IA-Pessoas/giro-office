@@ -245,6 +245,10 @@ model Organization {
   rhMessages                    RhMessage[]
   rhRequests                    RhRequest[]
   scoreQuarters                 ScoreQuarter[]
+  rhExams                       RhExam[]
+  rhExamParticipants            RhExamParticipant[]
+  rhExamQuestions               RhExamQuestion[]
+  rhExamAnswers                 RhExamAnswer[]
   scoreEvaluations              ScoreEvaluation[]
   scoreNitros                   ScoreNitro[]
   cceFloorConfiguration         CceFloorConfiguration?
@@ -408,6 +412,9 @@ model User {
   scoresEvaluaion             ScoreEvaluation[]
   cceCyclesCreated            CceCycle[]             @relation("CceCycleCreator")
   cceWeeklyEvaluationsMonitored CceWeeklyEvaluation[] @relation("CceWeeklyEvaluationMonitor")
+  rhExamsCreated                RhExam[]              @relation("RhExamCreator")
+  rhExamsEvaluated               RhExam[]              @relation("RhExamEvaluator")
+  rhExamParticipants             RhExamParticipant[]
   timeBankRealeasesAdded      TimeBankReleases[]     @relation("add")
   timeBankRealeases           TimeBankReleases[]     @relation("user")
   timeClockRequestApproved    TimeClockRequest[]     @relation("approver")
@@ -3066,6 +3073,84 @@ model ScoreEvaluation {
   @@map("rh.score_evaluations")
 }
 
+model RhExam {
+  id              String                  @id @default(uuid())
+  organization_id String
+  title           String
+  evaluator_id    String
+  created_by_id   String
+  window_start    DateTime?
+  window_end      DateTime?
+  observations    String                  @default("")
+  status          RhExamStatus            @default(New)
+  created_at      DateTime                @default(now())
+  updated_at      DateTime                @updatedAt
+  organization    Organization            @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  evaluator       User                    @relation("RhExamEvaluator", fields: [evaluator_id], references: [id], onDelete: Restrict)
+  created_by      User                    @relation("RhExamCreator", fields: [created_by_id], references: [id], onDelete: Restrict)
+  participants    RhExamParticipant[]
+  questions       RhExamQuestion[]
+
+  @@index([organization_id, status, created_at])
+  @@map("rh.exams")
+}
+
+model RhExamParticipant {
+  id              String          @id @default(uuid())
+  exam_id         String
+  user_id         String
+  organization_id String
+  status          RhExamParticipantStatus @default(NotStarted)
+  created_at      DateTime        @default(now())
+  exam            RhExam          @relation(fields: [exam_id], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  organization    Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  answers         RhExamAnswer[]
+
+  @@unique([exam_id, user_id], map: "uq_rh_exam_participants_exam_user")
+  @@index([organization_id, user_id])
+  @@map("rh.exam_participants")
+}
+
+model RhExamQuestion {
+  id              String          @id @default(uuid())
+  exam_id         String
+  organization_id String
+  prompt          String
+  value           Float
+  answer_key      String
+  position        Int
+  created_at      DateTime        @default(now())
+  exam            RhExam          @relation(fields: [exam_id], references: [id], onDelete: Cascade)
+  organization    Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  answers         RhExamAnswer[]
+
+  @@unique([exam_id, position], map: "uq_rh_exam_questions_exam_position")
+  @@index([organization_id, exam_id])
+  @@map("rh.exam_questions")
+}
+
+model RhExamAnswer {
+  id                      String           @id @default(uuid())
+  exam_participant_id     String
+  question_id             String
+  organization_id         String
+  answer                  String           @default("")
+  score                   Float?
+  feedback                String           @default("")
+  submitted_at            DateTime?
+  graded_at               DateTime?
+  created_at              DateTime         @default(now())
+  updated_at              DateTime         @updatedAt
+  participant             RhExamParticipant @relation(fields: [exam_participant_id], references: [id], onDelete: Cascade)
+  question                RhExamQuestion    @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  organization            Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([exam_participant_id, question_id], map: "uq_rh_exam_answers_participant_question")
+  @@index([organization_id, question_id])
+  @@map("rh.exam_answers")
+}
+
 model CceFloorConfiguration {
   id              String       @id @default(uuid())
   organization_id String       @unique
@@ -3920,4 +4005,17 @@ enum ScoreEvaluatorRole {
   DIRECTOR
   SUBORDINATE
   TI
+}
+
+enum RhExamStatus {
+  New
+  Open
+  Closed
+  Cancelled
+}
+
+enum RhExamParticipantStatus {
+  NotStarted
+  Submitted
+  Graded
 }
