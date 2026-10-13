@@ -105,8 +105,12 @@ function getEventPartyName(party?: { name?: string | null; full_name?: string | 
 function getEventHolder(event: TiInventoryEvent, side: "from" | "to"): string {
   const user = side === "from" ? event.from_user : event.to_user;
   const location = side === "from" ? event.from_location : event.to_location;
+  // Mesma pessoa nos dois lados: o que mudou foi o departamento.
+  const sameUser = Boolean(event.from_user?.id) && event.from_user?.id === event.to_user?.id;
 
-  return getEventPartyName(user) ?? getEventPartyName(location) ?? "Disponível";
+  return (
+    (sameUser ? null : getEventPartyName(user)) ?? getEventPartyName(location) ?? "Disponível"
+  );
 }
 
 /** Dados do equipamento lidos das observações; sem dado confiável, só o que há no cadastro. */
@@ -320,7 +324,8 @@ function getAssetStatus(asset: TiInventoryAsset): string {
 
 export function TiInventoryTab() {
   const { access } = useModuleAccess("ti");
-  const canManage = access.canEdit || access.isAdmin;
+  // As rotas de escrita do inventário exigem TI nível 3 no serviço e no Worker.
+  const canManage = access.isAdmin;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [categoryId, setCategoryId] = useState("");
