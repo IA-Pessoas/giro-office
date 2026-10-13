@@ -1949,6 +1949,32 @@ await runTest("ti inventory write actions follow the level the service requires"
   assert.match(source, /event\.from_user\?\.id === event\.to_user\?\.id/);
 });
 
+await runTest("ti access logs tab lists logins and accesses per user for TI admins", async () => {
+  const source = await readModuleSource("components/TiAccessLogsTab.tsx");
+  const page = await readModuleSource("components/TiPage.tsx");
+  const service = await readModuleSource("services/tiAccessLogsService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /byUser: "\/ti\/access-logs\/\{id\}"/);
+  assert.match(service, /params: \{ page, page_size: TI_ACCESS_LOGS_PAGE_SIZE \}/);
+  assert.match(
+    source,
+    /headers=\{\["Tipo", "Referente", "Usuário", "Data", "Local\/origem"\]\}/,
+  );
+  // Paginação pelo servidor, do mais recente para o mais antigo.
+  assert.match(source, /disabled=\{!accessLogs\.has_more \|\| accessLogsQuery\.isFetching\}/);
+  assert.match(source, /Mais antigos/);
+  // Origem ausente não é inventada.
+  assert.match(source, /item\.origin \?\? "Não migrado"/);
+  // Só TI nível 3 vê a aba; o autoatendimento não.
+  const selfService = page.slice(page.indexOf("const SELF_SERVICE_TI_TABS"));
+  assert.match(page, /panel: TiAccessLogsTab/);
+  assert.doesNotMatch(selfService.slice(0, selfService.indexOf("];")), /TiAccessLogsTab/);
+  // Separado do relatório de credenciais “Logins”: não toca senhas.
+  assert.doesNotMatch(source, /password|Password|senha/i);
+  assert.doesNotMatch(service, /passwords/);
+});
+
 await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");

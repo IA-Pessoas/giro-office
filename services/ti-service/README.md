@@ -52,6 +52,10 @@ servico/VPS, junto com `SUPABASE_URL`.
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
 - Exemplo: `GET /ti/stock`
+- Exemplo: `GET /ti/access-logs/{userId}?page=1&page_size=20` (TI nível 3): logins e acessos do
+  usuário migrados de `tb_admin.logs` (`logs.action` 0/1), do mais recente para o mais antigo.
+  `origin` vem nulo porque o `local` legado não foi migrado. Login atual não entra
+  (`auth_sessions` é apagada ao expirar). Não lê credenciais.
 
 As rotas diretas `/internal/reporting/catalog` e `/internal/reporting/extract` são consumidas
 exclusivamente pelo reports-service e não passam pelo gateway. O catálogo combinado publica

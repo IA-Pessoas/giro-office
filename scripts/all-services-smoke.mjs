@@ -2751,6 +2751,20 @@ const handlers = {
     }
   },
 
+  // #1935: logs de acesso por usuário.
+  async tiAccessLogs(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/access-logs/${await ensureRhTargetUser()}`,
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (!Array.isArray(response.body?.data?.items)) {
+      throw new Error(`${op.id} did not return the access log list.`);
+    }
+  },
+
   async tiInventoryHistory(op) {
     const response = await httpRequest(op, {
       expectedStatus: [200],

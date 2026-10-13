@@ -3,6 +3,7 @@ import {
   Bot,
   Boxes,
   FileCheck2,
+  History,
   KeyRound,
   LayoutDashboard,
   Loader2,
@@ -17,6 +18,7 @@ import {
 import { useModuleAccess } from "@modules/auth";
 import { cn } from "@shared/ui/newLayout/utils";
 
+import { TiAccessLogsTab } from "./TiAccessLogsTab";
 import { TiDashboardTab } from "./TiDashboardTab";
 import { TiExtensionsTab } from "./TiExtensionsTab";
 import { TiInventoryTab } from "./TiInventoryTab";
@@ -35,7 +37,8 @@ type TiTabId =
   | "terms"
   | "passwords"
   | "extensions"
-  | "robots";
+  | "robots"
+  | "accessLogs";
 
 type TiTabConfig = {
   id: TiTabId;
@@ -92,6 +95,12 @@ const TI_TABS: TiTabConfig[] = [
     label: "Robôs",
     icon: Bot,
     panel: TiRobotsTab,
+  },
+  {
+    id: "accessLogs",
+    label: "Logs de acesso",
+    icon: History,
+    panel: TiAccessLogsTab,
   },
 ];
 
