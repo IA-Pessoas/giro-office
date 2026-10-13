@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import {
   createExpressErrorHandler,
   createSecurityHeadersMiddleware,
@@ -11,6 +12,7 @@ import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
 import type { CommercialServiceEnv } from "./config/env.js";
+import { SupabaseProspectingAttachmentStorage } from "./integrations/prospectingAttachmentStorage.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildCommercialServiceOpenApiSpec } from "./openapi/spec.js";
 import {
@@ -51,7 +53,19 @@ function errorContext(request: Request): Record<string, unknown> | undefined {
 export function createCommercialApp(options: CreateCommercialAppOptions): Express {
   const { env, logger } = options;
   const service = options.proposalConfigService ?? new CommercialProposalConfigService();
-  const prospectingService = options.prospectingService ?? new CommercialProspectingService();
+  const prospectingService =
+    options.prospectingService ??
+    new CommercialProspectingService(
+      undefined,
+      undefined,
+      new SupabaseProspectingAttachmentStorage(
+        createClient(
+          env.supabaseUrl ?? "http://localhost:54321",
+          env.supabaseServiceRoleKey ?? "local-commercial-storage-key",
+        ),
+        env.prospectingAttachmentBucket,
+      ),
+    );
   const taskBillingService = options.taskBillingService ?? new CommercialTaskBillingService();
   const outboxStatusService = options.outboxStatusService ?? new CommercialOutboxStatusService();
   const app = express();

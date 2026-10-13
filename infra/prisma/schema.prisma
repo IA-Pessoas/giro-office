@@ -220,6 +220,7 @@ model Organization {
   unionsPessoal                 UnionPessoal[]
   proposalConfigs               ProposalConfig[]
   commercialProspectings        CommercialProspecting[]
+  commercialProspectingHistory  CommercialProspectingHistory[]
   commercialTaskBillings        CommercialTaskBilling[]
   licenses                      License[]
   municipalTaxes                MunicipalTaxes[]
@@ -1242,17 +1243,46 @@ model CommercialProspecting {
   organization_id String
   status          String
   status_date     DateTime?
+  solution        String?
+  reference_month String?
+  service         String?
   description     String?
+  participants    String?
+  meeting_mode    String?
+  branch          String?
+  pause_reason    String?
+  attachment_path String?
+  attachment_name String?
+  attachment_mime_type String?
+  attachment_size_bytes Int?
   archived_at     DateTime?
   registered_at   DateTime     @default(now())
   updated_at      DateTime     @updatedAt
   client          Client       @relation(fields: [client_id], references: [id])
   organization    Organization @relation(fields: [organization_id], references: [id])
+  history         CommercialProspectingHistory[]
 
   @@unique([organization_id, client_id], map: "uq_commercial_prospecting_org_client")
   @@index([organization_id, status], map: "idx_commercial_prospecting_org_status")
   @@index([organization_id, archived_at, updated_at], map: "idx_commercial_prospecting_org_archived_updated")
   @@map("commercial.prospecting")
+}
+
+model CommercialProspectingHistory {
+  id              String   @id @default(uuid())
+  organization_id String
+  prospecting_id  String
+  changed_by      String
+  field           String
+  old_value       Json?
+  new_value       Json?
+  created_at      DateTime @default(now())
+  prospecting     CommercialProspecting @relation(fields: [prospecting_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, prospecting_id, created_at], map: "idx_commercial_prospecting_history_scope")
+  @@index([prospecting_id], map: "idx_commercial_prospecting_history_prospecting")
+  @@map("commercial.prospecting_history")
 }
 
 model CommercialTaskBilling {

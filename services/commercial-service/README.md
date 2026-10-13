@@ -6,6 +6,9 @@ Serviço responsável pelo catálogo de propostas e pela operação de prospecç
 
 - Porta padrão: `3045` (`COMMERCIAL_SERVICE_PORT`).
 - Banco e autenticação: `DATABASE_URL`, `JWT_SECRET`.
+- Anexos privados de prospecção: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e
+  `COMMERCIAL_PROSPECTING_ATTACHMENT_BUCKET` (padrão `CommercialProspectingPrivate`). Em produção,
+  URL e chave de serviço são obrigatórias; o bucket deve permanecer privado.
 - Auditoria: `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN`.
 - Projeção de Cliente: `CLIENT_SERVICE_URL`, `CLIENT_SERVICE_INTERNAL_TOKEN`.
 - Contrato de fechamento e projeção de Tarefa: `TASK_SERVICE_URL`, `TASK_SERVICE_INTERNAL_TOKEN`.
@@ -37,6 +40,9 @@ Leitura exige nível 1; criação, edição, exclusão e arquivamento exigem ní
 - `GET /commercial/prospecting/:id`
 - `POST /commercial/prospecting`
 - `PATCH /commercial/prospecting/:id`
+- `GET /commercial/prospecting/:id/history`
+- `GET /commercial/prospecting/:id/attachment` (URL assinada de curta duração)
+- `PUT /commercial/prospecting/:id/attachment` (multipart `file`, somente enquanto Paralisado)
 - `DELETE /commercial/prospecting/:id` (arquivamento lógico idempotente)
 - `GET /commercial/outbox/status`
 - `GET /commercial/task-billing`
@@ -44,7 +50,7 @@ Leitura exige nível 1; criação, edição, exclusão e arquivamento exigem ní
 
 Cada consulta filtra `proposal.config` por `organization_id` derivado do contexto autenticado.
 O serviço não cria propostas transacionais nem altera o catálogo de Clientes.
-As prospecções pertencem à organização autenticada, referenciam um Cliente existente e usam somente os status legados aprovados. O arquivamento é lógico, preserva o histórico e não libera novo cadastro para o mesmo Cliente. Alterações e arquivamentos geram auditoria no recurso `commercial.prospecting`.
+As prospecções pertencem à organização autenticada, referenciam um Cliente existente e usam somente os status legados aprovados. Solução, mês de referência, data do status e campos da reunião são persistidos; prospecções antigas sem esses dados precisam ser preenchidas ao editar. O status `Paralisado` exige motivo. Anexos são privados e mantêm o arquivo anterior quando uma edição não envia novo arquivo. O histórico registra autor, data e valores alterados, sempre escopado à organização. O arquivamento é lógico, preserva o histórico e não libera novo cadastro para o mesmo Cliente. Alterações e arquivamentos geram auditoria no recurso `commercial.prospecting`.
 
 As transições são gravadas com a prospecção na outbox na mesma transação. O worker entrega o contrato interno `POST /internal/commercial/prospecting-transition` do `client-service` com token interno, tenant e correlação de auditoria; o endpoint de status expõe contagens e a última falha para suporte.
 

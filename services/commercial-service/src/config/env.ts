@@ -19,6 +19,9 @@ const envSchema = z
         return Number.isNaN(parsed) ? 3045 : parsed;
       }),
     databaseUrl: z.string().url("DATABASE_URL não definida."),
+    supabaseUrl: z.string().url().optional(),
+    supabaseServiceRoleKey: z.string().min(1).optional(),
+    prospectingAttachmentBucket: z.string().trim().min(1).default("CommercialProspectingPrivate"),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o commercial-service."),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),
@@ -53,6 +56,14 @@ const envSchema = z
       .transform((value) => parseAllowedOrigins(value)),
   })
   .superRefine((env, ctx) => {
+    if (env.nodeEnv === "production" && (!env.supabaseUrl || !env.supabaseServiceRoleKey)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórias em produção para anexos comerciais.",
+        path: ["supabaseUrl"],
+      });
+    }
     if (env.nodeEnv === "production") {
       if (!env.emailAdapterUrl) {
         ctx.addIssue({
@@ -127,6 +138,9 @@ export function getCommercialServiceEnv(): CommercialServiceEnv {
   return envSchema.parse({
     port: process.env.COMMERCIAL_SERVICE_PORT ?? process.env.PORT,
     databaseUrl: process.env.DATABASE_URL,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    prospectingAttachmentBucket: process.env.COMMERCIAL_PROSPECTING_ATTACHMENT_BUCKET,
     jwtSecret: process.env.JWT_SECRET,
     nodeEnv: process.env.NODE_ENV,
     logLevel: process.env.LOG_LEVEL,

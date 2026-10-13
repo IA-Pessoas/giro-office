@@ -9,6 +9,8 @@ const productionServiceToken = "unit-test-internal-token-with-at-least-32-chars"
 function stubValidProductionEnvironment(): void {
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/giro_test");
+  vi.stubEnv("SUPABASE_URL", "https://example.supabase.co");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "unit-test-supabase-service-role-key");
   vi.stubEnv("JWT_SECRET", "unit-test-jwt-secret");
   vi.stubEnv("AUDIT_SERVICE_TOKEN", productionServiceToken);
   vi.stubEnv("CLIENT_SERVICE_INTERNAL_TOKEN", productionServiceToken);

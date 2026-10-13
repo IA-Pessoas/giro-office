@@ -28,7 +28,17 @@ function createServiceMock(): CommercialProspectingRouteDeps {
       client_id: CLIENT_ID,
       status: "Análise Financeira",
       status_date: null,
+      solution: "CASTELO",
+      reference_month: "2026-10",
+      service: null,
       description: null,
+      participants: null,
+      meeting_mode: null,
+      branch: null,
+      pause_reason: null,
+      attachment_name: null,
+      attachment_mime_type: null,
+      attachment_size_bytes: null,
       client: { id: CLIENT_ID, name: "Cliente", company_name: null, fantasy_name: null },
     })),
     detail: vi.fn(async () => {
@@ -40,6 +50,16 @@ function createServiceMock(): CommercialProspectingRouteDeps {
       throw new Error("not used");
     }),
     archive: vi.fn(async () => ({ id: PROSPECTING_ID, deleted: true })),
+    history: vi.fn(async () => []),
+    attachmentAccess: vi.fn(async () => ({
+      name: "motivo.pdf",
+      url: "https://example.test/signed",
+    })),
+    uploadAttachment: vi.fn(async () => ({
+      name: "motivo.pdf",
+      mime_type: "application/pdf",
+      size_bytes: 128,
+    })),
   };
 }
 
@@ -90,7 +110,13 @@ describe("commercial prospecting routes", () => {
     await request(createTestApp(service))
       .post("/commercial/prospecting")
       .set(gatewayHeaders())
-      .send({ client_id: CLIENT_ID, status: "Análise Financeira" });
+      .send({
+        client_id: CLIENT_ID,
+        status: "Análise Financeira",
+        status_date: "2026-10-13T12:00:00.000Z",
+        solution: "CASTELO",
+        reference_month: "2026-10",
+      });
 
     expect(service.create).toHaveBeenCalledWith({
       user_id: USER_ID,
@@ -98,8 +124,15 @@ describe("commercial prospecting routes", () => {
       audit_correlation_id: expect.any(String),
       client_id: CLIENT_ID,
       status: "Análise Financeira",
-      status_date: undefined,
+      status_date: new Date("2026-10-13T12:00:00.000Z"),
+      solution: "CASTELO",
+      reference_month: "2026-10",
+      service: undefined,
       description: undefined,
+      participants: undefined,
+      meeting_mode: undefined,
+      branch: undefined,
+      pause_reason: undefined,
     });
   });
 
@@ -121,7 +154,17 @@ describe("commercial prospecting routes", () => {
       client_id: CLIENT_ID,
       status: "Envio de Proposta",
       status_date: null,
+      solution: "CASTELO",
+      reference_month: "2026-10",
+      service: null,
       description: "Retorno confirmado",
+      participants: null,
+      meeting_mode: null,
+      branch: null,
+      pause_reason: null,
+      attachment_name: null,
+      attachment_mime_type: null,
+      attachment_size_bytes: null,
       client: { id: CLIENT_ID, name: "Cliente", company_name: null, fantasy_name: null },
     }));
 
@@ -138,7 +181,14 @@ describe("commercial prospecting routes", () => {
       prospecting_id: PROSPECTING_ID,
       status: "Envio de Proposta",
       status_date: undefined,
+      solution: undefined,
+      reference_month: undefined,
+      service: undefined,
       description: "Retorno confirmado",
+      participants: undefined,
+      meeting_mode: undefined,
+      branch: undefined,
+      pause_reason: undefined,
     });
   });
 
@@ -203,6 +253,50 @@ describe("commercial prospecting routes", () => {
       .set(gatewayHeaders());
 
     expect(service.listClients).toHaveBeenCalledWith(ORGANIZATION_ID);
+  });
+
+  it("consulta histórico dentro do tenant autenticado", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service))
+      .get(`/commercial/prospecting/${PROSPECTING_ID}/history`)
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(service.history).toHaveBeenCalledWith(PROSPECTING_ID, ORGANIZATION_ID);
+  });
+
+  it("emite link de anexo somente para a prospecção do tenant autenticado", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service))
+      .get(`/commercial/prospecting/${PROSPECTING_ID}/attachment`)
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ name: "motivo.pdf", url: "https://example.test/signed" });
+    expect(service.attachmentAccess).toHaveBeenCalledWith(PROSPECTING_ID, ORGANIZATION_ID);
+  });
+
+  it("valida e encaminha upload multipart do anexo da prospecção", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service))
+      .put(`/commercial/prospecting/${PROSPECTING_ID}/attachment`)
+      .set(gatewayHeaders())
+      .attach("file", Buffer.from("%PDF-1.7\nconteúdo sintético"), {
+        filename: "motivo.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(response.status).toBe(200);
+    expect(service.uploadAttachment).toHaveBeenCalledWith({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      prospecting_id: PROSPECTING_ID,
+      file: expect.objectContaining({
+        originalname: "motivo.pdf",
+        mimetype: "application/pdf",
+        buffer: expect.any(Buffer),
+      }),
+    });
   });
 
   it("expõe o estado da outbox somente para o tenant autenticado", async () => {

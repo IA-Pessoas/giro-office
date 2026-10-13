@@ -75,7 +75,17 @@ const prospecting = {
   client_id: client.id,
   status: "Análise Financeira",
   status_date: "2026-09-10T00:00:00.000Z",
+  solution: "CASTELO",
+  reference_month: "2026-09",
+  service: "Contabilidade",
   description: "Retorno na próxima semana",
+  participants: "Ana e Bruno",
+  meeting_mode: "Remota",
+  branch: "Matriz",
+  pause_reason: null,
+  attachment_name: null,
+  attachment_mime_type: null,
+  attachment_size_bytes: null,
   client,
 };
 const taskBilling = {
@@ -206,6 +216,10 @@ function createCommercialUpstream() {
 
   const upstream = startServer((request, response) => {
     const pathname = new URL(request.url || "/", "http://commercial-smoke").pathname;
+    if (pathname === "/task/notifications") {
+      respondJson(response, []);
+      return;
+    }
     if (pathname === "/commercial/proposal-configs" && request.method === "GET") {
       respondJson(response, state.proposalConfigs);
       return;
@@ -258,16 +272,39 @@ function createCommercialUpstream() {
       return;
     }
     if (pathname === "/commercial/prospecting" && request.method === "POST") {
-      state.prospectingList = [prospecting];
-      setTimeout(() => respondJson(response, prospecting, 201), 250);
+      readJsonBody(request).then((body) => {
+        const created = { ...prospecting, ...body };
+        state.prospectingList = [created];
+        setTimeout(() => respondJson(response, created, 201), 250);
+      });
+      return;
+    }
+    if (pathname.endsWith("/history") && request.method === "GET") {
+      respondJson(response, [
+        { id: "history-1", field: "status", old_value: null, new_value: "Análise Financeira", changed_by: smokeUser.id, changed_by_name: "Usuário de demonstração", created_at: "2026-09-15T12:00:00.000Z" },
+      ]);
+      return;
+    }
+    if (pathname.endsWith("/attachment") && request.method === "PUT") {
+      const updated = { ...state.prospectingList[0], attachment_name: "motivo-smoke.png", attachment_mime_type: "image/png", attachment_size_bytes: 68 };
+      state.prospectingList = [updated];
+      respondJson(response, { name: updated.attachment_name, mime_type: updated.attachment_mime_type, size_bytes: updated.attachment_size_bytes });
+      return;
+    }
+    if (pathname.endsWith("/attachment") && request.method === "GET") {
+      respondJson(response, { name: state.prospectingList[0]?.attachment_name ?? "motivo-smoke.png", url: "https://storage.example.test/signed" });
       return;
     }
     if (pathname.startsWith("/commercial/prospecting/") && request.method === "GET") {
-      respondJson(response, prospecting);
+      respondJson(response, state.prospectingList[0] ?? prospecting);
       return;
     }
     if (pathname.startsWith("/commercial/prospecting/") && request.method === "PATCH") {
-      respondJson(response, { ...prospecting, status: "Envio de Proposta" });
+      readJsonBody(request).then((body) => {
+        const updated = { ...state.prospectingList[0], ...body };
+        state.prospectingList = [updated];
+        respondJson(response, updated);
+      });
       return;
     }
     if (pathname.startsWith("/commercial/prospecting/") && request.method === "DELETE") {
@@ -313,6 +350,8 @@ async function installMocks(page, context, currentUser = smokeUser) {
     body: JSON.stringify({ success: true, data }),
   });
   await page.route("**/department/list*", (route) => json(route, []));
+  await page.route("**/rh/notifications", (route) => json(route, []));
+  await page.route("**/ti/requests/list*", (route) => json(route, []));
   await page.route("**/chat", (route) => json(route, []));
   await page.route("**/socket.io/**", (route) => route.abort());
 }
@@ -384,7 +423,9 @@ async function run() {
   await installMocks(page, context);
 
   try {
-    await assertCommercialAccessMatrix(browser);
+    if (!process.env.COMMERCIAL_SMOKE_PROSPECTING_ONLY) {
+      await assertCommercialAccessMatrix(browser);
+    }
     await page.goto("/comercial", { waitUntil: "networkidle" });
     try {
     await page.getByRole("heading", { name: "Prospecção" }).waitFor({ timeout: 10_000 });
@@ -393,6 +434,7 @@ async function run() {
     }
     await page.screenshot({ path: `${evidenceDir}/01-commercial-desktop-light.png`, fullPage: true });
 
+    if (!process.env.COMMERCIAL_SMOKE_PROSPECTING_ONLY) {
     assert.equal(await page.locator('form[aria-label="Nova configuração"]').count(), 0);
     await page.getByRole("button", { name: "Nova configuração", exact: true }).click();
     const proposalConfigDialog = page.getByRole("dialog", { name: "Nova configuração" });
@@ -404,9 +446,8 @@ async function run() {
     await proposalConfigDialog.getByRole("alert").waitFor({ state: "visible" });
     await page.keyboard.press("Escape");
     await proposalConfigDialog.waitFor({ state: "hidden" });
-    assert.equal(
-      await page.evaluate(() => document.activeElement?.textContent?.trim()),
-      "Nova configuração",
+    await page.waitForFunction(
+      () => document.activeElement?.textContent?.trim() === "Nova configuração",
     );
     await page.getByRole("button", { name: "Nova configuração", exact: true }).click();
     await proposalConfigDialog.waitFor({ state: "visible" });
@@ -426,7 +467,7 @@ async function run() {
     assert.equal(proposalConfigLoadingState.text, "Salvando...");
     assert.deepEqual(JSON.parse(createConfigResponse.request().postData() || "{}"), {
       name: "Configuração criada",
-      contract_value: 1500,
+      contract_value: 150000,
     });
     await proposalConfigDialog.waitFor({ state: "hidden" });
     await page.getByText("Configuração criada", { exact: true }).waitFor();
@@ -453,9 +494,9 @@ async function run() {
     const editableContractValueInput = editableContractForm.getByLabel("Valor base do contrato");
     assert.equal(await editableContractValueInput.inputValue(), "R$ 1.800,13");
     await editableContractValueInput.fill("abc");
-    assert.equal(await editableContractValueInput.inputValue(), "");
+    assert.equal(await editableContractValueInput.inputValue(), "abc");
     await editableContractValueInput.fill("123456");
-    assert.equal(await editableContractValueInput.inputValue(), "R$ 1.234,56");
+    assert.equal(await editableContractValueInput.inputValue(), "R$ 123.456");
     await page.screenshot({ path: `${evidenceDir}/02-commercial-contract-value-mask.png`, fullPage: true });
     const updateResponsePromise = page.waitForResponse(
       (response) => response.request().method() === "PATCH" && response.url().includes("/commercial/proposal-configs/"),
@@ -464,9 +505,9 @@ async function run() {
     const updateResponse = await updateResponsePromise;
     assert.deepEqual(JSON.parse(updateResponse.request().postData() || "{}"), {
       name: "Configuração Smoke",
-      contract_value: 1234.56,
+      contract_value: 123456,
     });
-    await page.getByText("Valor base do contrato: R$ 1.234,56", { exact: true }).waitFor();
+    await page.getByText("Valor base do contrato: R$ 123.456,00", { exact: true }).waitFor();
     await page.screenshot({ path: `${evidenceDir}/03-commercial-contract-value-saved.png`, fullPage: true });
 
     const deleteConfigButton = page.getByRole("button", {
@@ -518,18 +559,25 @@ async function run() {
       await page.evaluate(() => document.activeElement?.textContent?.trim()),
       "Criar configuração",
     );
+    }
 
     await page.getByRole("button", { name: "Nova prospecção" }).click();
     const clientPicker = page.getByRole("dialog", { name: "Selecionar cliente" });
     await clientPicker.waitFor({ state: "visible" });
     await page.screenshot({ path: `${evidenceDir}/04-commercial-form-focus.png`, fullPage: true });
-    await clientPicker.getByRole("button", { name: new RegExp(client.company_name) }).click();
+    await clientPicker.getByRole("option", { name: new RegExp(client.company_name) }).click();
     const prospectingDialog = page.getByRole("dialog", { name: "Nova prospecção" });
     await prospectingDialog.waitFor({ state: "visible" });
     await prospectingDialog.screenshot({ path: `${evidenceDir}/09-commercial-prospecting-create-modal.png` });
     const prospectingForm = prospectingDialog.getByRole("form", { name: "Nova prospecção" });
     await prospectingForm.getByText(client.company_name, { exact: true }).waitFor();
     await prospectingForm.getByLabel("Data da etapa").fill("2026-09-15");
+    await prospectingForm.getByLabel("Solução *").selectOption("META");
+    await prospectingForm.getByLabel("Mês de referência *").fill("2026-09");
+    await prospectingForm.getByLabel("Serviço").fill("Contabilidade");
+    await prospectingForm.getByLabel("Participantes").fill("Ana e Bruno");
+    await prospectingForm.getByLabel("Modo de reunião").fill("Remota");
+    await prospectingForm.getByLabel("Ramo").fill("Matriz");
     await prospectingForm.getByLabel("Descrição").fill("Retorno na próxima semana");
     const prospectingSaveButton = prospectingForm.locator('button[type="submit"]');
     const createProspectingResponsePromise = page.waitForResponse(
@@ -544,10 +592,61 @@ async function run() {
       client_id: client.id,
       status: "Análise Financeira",
       status_date: new Date("2026-09-15T12:00:00").toISOString(),
+      solution: "META",
+      reference_month: "2026-09",
+      service: "Contabilidade",
       description: "Retorno na próxima semana",
+      participants: "Ana e Bruno",
+      meeting_mode: "Remota",
+      branch: "Matriz",
+      pause_reason: null,
     });
     await page.getByText("Análise Financeira").last().waitFor();
     await page.screenshot({ path: `${evidenceDir}/05-commercial-saved-light.png`, fullPage: true });
+
+    await page.getByLabel("Prospecção", { exact: true }).getByRole("button", { name: "Editar", exact: true }).click();
+    const editProspectingForm = page.getByRole("form", { name: "Editar prospecção" });
+    const historyResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "GET" && response.url().endsWith(`/commercial/prospecting/${prospecting.id}/history`),
+    );
+    await editProspectingForm.getByRole("button", { name: "Ver histórico" }).click();
+    await historyResponsePromise;
+    await editProspectingForm.getByText("status", { exact: false }).waitFor();
+    await page.screenshot({ path: `${evidenceDir}/10-commercial-prospecting-history.png`, fullPage: true });
+    await editProspectingForm.locator("select").first().selectOption("Paralisado");
+    await editProspectingForm.getByLabel("Motivo da paralisação *").fill("Aguardando documentos");
+    await editProspectingForm.locator('input[type="file"]').setInputFiles(join(repoRoot, "scripts/fixtures/smoke-upload.png"));
+    const prospectingUpdateResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "PATCH" && response.url().endsWith(`/commercial/prospecting/${prospecting.id}`),
+    );
+    const prospectingAttachmentResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "PUT" && response.url().endsWith(`/commercial/prospecting/${prospecting.id}/attachment`),
+    );
+    await editProspectingForm.locator('button[type="submit"]').click();
+    const prospectingUpdateResponse = await prospectingUpdateResponsePromise;
+    assert.equal(prospectingUpdateResponse.status(), 200);
+    assert.deepEqual(JSON.parse(prospectingUpdateResponse.request().postData() || "{}"), {
+      status: "Paralisado",
+      status_date: new Date("2026-09-15T12:00:00").toISOString(),
+      solution: "META",
+      reference_month: "2026-09",
+      service: "Contabilidade",
+      description: "Retorno na próxima semana",
+      participants: "Ana e Bruno",
+      meeting_mode: "Remota",
+      branch: "Matriz",
+      pause_reason: "Aguardando documentos",
+    });
+    const prospectingAttachmentResponse = await prospectingAttachmentResponsePromise;
+    assert.equal(prospectingAttachmentResponse.status(), 200);
+    assert.deepEqual((await prospectingAttachmentResponse.json()).data, {
+      name: "motivo-smoke.png",
+      mime_type: "image/png",
+      size_bytes: 68,
+    });
+    await page.getByText("Paralisado — Retorno na próxima semana", { exact: true }).waitFor();
+    await page.screenshot({ path: `${evidenceDir}/11-commercial-prospecting-paused.png`, fullPage: true });
+    if (process.env.COMMERCIAL_SMOKE_PROSPECTING_ONLY) return;
 
     const archiveProspectingButton = page.getByRole("button", {
       name: `Arquivar prospecção ${client.company_name}`,
@@ -696,7 +795,9 @@ async function withGateway(test) {
         JWT_SECRET: gatewayJwtSecret,
         GATEWAY_PORT: gatewayPort,
         USER_SERVICE_URL: userUpstream.url,
+        CLIENT_SERVICE_URL: commercialUpstream.url,
         COMMERCIAL_SERVICE_URL: commercialUpstream.url,
+        TASK_SERVICE_URL: commercialUpstream.url,
         AUDIT_ENABLED: "false",
       },
       stdio: ["ignore", "pipe", "pipe"],

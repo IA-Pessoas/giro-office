@@ -3,9 +3,15 @@ import {
   error as logError,
   parseWithZod,
   requireAuthenticatedRequestContext,
+  ServiceError,
 } from "@workspace/shared";
+import { validateUploadFileSignature } from "@workspace/shared/upload";
 import { type Request, Router } from "express";
-
+import multer from "multer";
+import {
+  PROSPECTING_ATTACHMENT_MIME_TYPES,
+  type ProspectingAttachmentMimeType,
+} from "../integrations/prospectingAttachmentStorage.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   createProspectingBodySchema,
@@ -16,8 +22,62 @@ import type { CommercialProspectingService } from "../services/prospectingServic
 
 export type CommercialProspectingRouteDeps = Pick<
   CommercialProspectingService,
-  "archive" | "create" | "detail" | "list" | "listClients" | "update"
+  | "archive"
+  | "attachmentAccess"
+  | "create"
+  | "detail"
+  | "history"
+  | "list"
+  | "listClients"
+  | "update"
+  | "uploadAttachment"
 >;
+
+const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter(_request, file, callback) {
+    if (
+      !PROSPECTING_ATTACHMENT_MIME_TYPES.includes(file.mimetype as ProspectingAttachmentMimeType)
+    ) {
+      callback(new ServiceError(400, "Tipo de arquivo não permitido."));
+      return;
+    }
+    callback(null, true);
+  },
+});
+
+function parseAttachment(
+  request: Request,
+  response: Parameters<import("express").RequestHandler>[1],
+  next: Parameters<import("express").RequestHandler>[2],
+): void {
+  attachmentUpload.single("file")(request, response, (err) => {
+    if (err instanceof multer.MulterError) {
+      next(
+        new ServiceError(
+          400,
+          err.code === "LIMIT_FILE_SIZE" ? "Arquivo excede o limite de 10 MB." : "Upload inválido.",
+        ),
+      );
+      return;
+    }
+    if (err) {
+      next(err);
+      return;
+    }
+    if (!request.file) {
+      next(new ServiceError(400, "Arquivo é obrigatório."));
+      return;
+    }
+    try {
+      validateUploadFileSignature(request.file);
+      next();
+    } catch (validationError) {
+      next(validationError);
+    }
+  });
+}
 
 function authContext(req: Request): {
   user_id: string;
@@ -54,6 +114,54 @@ export function createProspectingRoutes(
       const { organization_id } = authContext(req);
       res.json(createSuccessResponse(await service.list(organization_id)));
     } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/:id/history", isAuthenticated, async (req, res, next) => {
+    try {
+      const { organization_id } = authContext(req);
+      const { id } = parseWithZod(prospectingIdParamSchema, req.params);
+      res.json(createSuccessResponse(await service.history(id, organization_id)));
+    } catch (error) {
+      logError("Falha ao consultar histórico de prospecção", { err: error });
+      next(error);
+    }
+  });
+
+  router.get("/:id/attachment", isAuthenticated, async (req, res, next) => {
+    try {
+      const { organization_id } = authContext(req);
+      const { id } = parseWithZod(prospectingIdParamSchema, req.params);
+      res.json(createSuccessResponse(await service.attachmentAccess(id, organization_id)));
+    } catch (error) {
+      logError("Falha ao consultar anexo de prospecção", { err: error });
+      next(error);
+    }
+  });
+
+  router.put("/:id/attachment", isAuthenticated, parseAttachment, async (req, res, next) => {
+    try {
+      const { user_id, organization_id } = authContext(req);
+      const { id } = parseWithZod(prospectingIdParamSchema, req.params);
+      const file = req.file;
+      if (!file) throw new ServiceError(400, "Arquivo é obrigatório.");
+      res.json(
+        createSuccessResponse(
+          await service.uploadAttachment({
+            user_id,
+            organization_id,
+            prospecting_id: id,
+            file: {
+              buffer: file.buffer,
+              mimetype: file.mimetype as ProspectingAttachmentMimeType,
+              originalname: file.originalname,
+            },
+          }),
+        ),
+      );
+    } catch (error) {
+      logError("Falha ao enviar anexo de prospecção", { err: error });
       next(error);
     }
   });

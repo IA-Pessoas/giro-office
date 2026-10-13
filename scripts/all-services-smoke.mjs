@@ -4023,6 +4023,9 @@ const handlers = {
       json: {
         client_id: requireState("primaryClientId"),
         status: "Análise Financeira",
+        status_date: "2026-10-13T12:00:00.000Z",
+        solution: "CASTELO",
+        reference_month: "2026-10",
         description: "Smoke commercial prospecting",
       },
     });
@@ -4038,11 +4041,47 @@ const handlers = {
     });
   },
 
+  async commercialProspectingHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}/history`,
+    });
+  },
+
+  async commercialProspectingAttachmentUpload(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}/attachment`,
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "motivo-paralisacao-smoke.png",
+          contentType: "image/png",
+        },
+      },
+    });
+  },
+
+  async commercialProspectingAttachmentAccess(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}/attachment`,
+    });
+    if (!isBadExpectation(op) && !response.body?.data?.url) {
+      throw new Error("Commercial prospecting attachment did not return a signed URL.");
+    }
+  },
+
   async commercialProspectingUpdate(op) {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
-      json: { status: "Envio de Proposta", description: "Smoke commercial prospecting updated" },
+      json: {
+        status: "Paralisado",
+        pause_reason: "Aguardando validação do smoke",
+        description: "Smoke commercial prospecting updated",
+      },
     });
   },
 

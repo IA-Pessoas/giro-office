@@ -92,19 +92,40 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
               ],
             },
             status_date: { type: "string", format: "date-time", nullable: true },
+            solution: {
+              type: "string",
+              enum: ["CASTELO", "KALANGO", "META", "NIT"],
+              nullable: true,
+            },
+            reference_month: { type: "string", nullable: true },
+            service: { type: "string", nullable: true },
             description: { type: "string", nullable: true },
+            participants: { type: "string", nullable: true },
+            meeting_mode: { type: "string", nullable: true },
+            branch: { type: "string", nullable: true },
+            pause_reason: { type: "string", nullable: true },
+            attachment_name: { type: "string", nullable: true },
+            attachment_mime_type: { type: "string", nullable: true },
+            attachment_size_bytes: { type: "integer", nullable: true },
             client: { $ref: "#/components/schemas/ProspectingClient" },
           },
         },
         ProspectingInput: {
           type: "object",
           additionalProperties: false,
-          required: ["client_id", "status"],
+          required: ["client_id", "status", "status_date", "solution", "reference_month"],
           properties: {
             client_id: { type: "string", format: "uuid" },
             status: { $ref: "#/components/schemas/Prospecting/properties/status" },
-            status_date: { type: "string", format: "date-time", nullable: true },
+            status_date: { type: "string", format: "date-time" },
+            solution: { type: "string", enum: ["CASTELO", "KALANGO", "META", "NIT"] },
+            reference_month: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            service: { type: "string", nullable: true },
             description: { type: "string", maxLength: 5000, nullable: true },
+            participants: { type: "string", nullable: true },
+            meeting_mode: { type: "string", nullable: true },
+            branch: { type: "string", nullable: true },
+            pause_reason: { type: "string", nullable: true },
           },
         },
         ProspectingPatch: {
@@ -113,8 +134,15 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           minProperties: 1,
           properties: {
             status: { $ref: "#/components/schemas/Prospecting/properties/status" },
-            status_date: { type: "string", format: "date-time", nullable: true },
+            status_date: { type: "string", format: "date-time" },
+            solution: { type: "string", enum: ["CASTELO", "KALANGO", "META", "NIT"] },
+            reference_month: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            service: { type: "string", nullable: true },
             description: { type: "string", maxLength: 5000, nullable: true },
+            participants: { type: "string", nullable: true },
+            meeting_mode: { type: "string", nullable: true },
+            branch: { type: "string", nullable: true },
+            pause_reason: { type: "string", nullable: true },
           },
         },
         TaskBilling: {
@@ -299,6 +327,62 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
             "401": { description: "Não autenticado." },
             "400": { description: "Identificador inválido." },
             "404": { description: "Não encontrado." },
+          },
+        },
+      },
+      "/commercial/prospecting/{id}/history": {
+        get: {
+          tags: ["Commercial"],
+          summary: "Consultar histórico por campo da prospecção",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": successResponse,
+            "401": { description: "Não autenticado." },
+            "404": { description: "Não encontrado." },
+          },
+        },
+      },
+      "/commercial/prospecting/{id}/attachment": {
+        get: {
+          tags: ["Commercial"],
+          summary: "Criar link temporário para o anexo da prospecção",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": successResponse,
+            "401": { description: "Não autenticado." },
+            "404": { description: "Anexo não encontrado." },
+          },
+        },
+        put: {
+          tags: ["Commercial"],
+          summary: "Anexar arquivo à prospecção paralisada",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["file"],
+                  properties: { file: { type: "string", format: "binary" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": successResponse,
+            "400": { description: "Arquivo inválido ou situação sem paralisação." },
+            "401": { description: "Não autenticado." },
+            "404": { description: "Prospecção não encontrada." },
           },
         },
       },

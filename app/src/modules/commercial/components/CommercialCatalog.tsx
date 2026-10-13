@@ -14,7 +14,9 @@ import {
   useArchiveCommercialProspecting,
   useCreateCommercialProspecting,
   useUpdateCommercialProspecting,
+  useUploadCommercialProspectingAttachment,
 } from "../hooks/useCommercialProspecting";
+import { commercialService } from "../services/commercialService";
 import {
   useCommercialTaskBilling,
   useUpdateCommercialTaskBilling,
@@ -31,6 +33,7 @@ import {
   type CommercialTaskHiringStatus,
   type CommercialTaskBilling,
   type CommercialProspecting,
+  type CommercialProspectingHistoryEntry,
   type CommercialProposalConfig,
 } from "../types";
 
@@ -58,7 +61,14 @@ type ProspectingDraft = {
   client: ClientPickerOption | null;
   status: (typeof COMMERCIAL_PROSPECTING_STATUSES)[number];
   status_date: string;
+  solution: "CASTELO" | "KALANGO" | "META" | "NIT" | "";
+  reference_month: string;
+  service: string;
   description: string;
+  participants: string;
+  meeting_mode: string;
+  branch: string;
+  pause_reason: string;
 };
 
 const emptyDraft: Draft = { name: "", contract_value: "" };
@@ -66,7 +76,14 @@ const emptyProspectingDraft: ProspectingDraft = {
   client: null,
   status: COMMERCIAL_PROSPECTING_STATUSES[0],
   status_date: "",
+  solution: "",
+  reference_month: "",
+  service: "",
   description: "",
+  participants: "",
+  meeting_mode: "",
+  branch: "",
+  pause_reason: "",
 };
 
 export function CommercialCatalog() {
@@ -80,6 +97,7 @@ export function CommercialCatalog() {
   const updateMutation = useUpdateCommercialProposalConfig();
   const createProspectingMutation = useCreateCommercialProspecting();
   const updateProspectingMutation = useUpdateCommercialProspecting();
+  const uploadProspectingAttachmentMutation = useUploadCommercialProspectingAttachment();
   const archiveProspectingMutation = useArchiveCommercialProspecting();
   const taskBillingsQuery = useCommercialTaskBilling();
   const updateTaskBillingMutation = useUpdateCommercialTaskBilling();
@@ -95,6 +113,10 @@ export function CommercialCatalog() {
   const [isCreatingProspecting, setIsCreatingProspecting] = useState(false);
   const [prospectingEditingId, setProspectingEditingId] = useState<string | null>(null);
   const [prospectingFormError, setProspectingFormError] = useState("");
+  const [prospectingHistoryId, setProspectingHistoryId] = useState<string | null>(null);
+  const [prospectingHistory, setProspectingHistory] = useState<CommercialProspectingHistoryEntry[]>([]);
+  const [prospectingHistoryError, setProspectingHistoryError] = useState("");
+  const [prospectingFile, setProspectingFile] = useState<File | null>(null);
   const [taskBillingEditingId, setTaskBillingEditingId] = useState<string | null>(null);
   const [taskBillingDraft, setTaskBillingDraft] = useState<{
     hiring_status: CommercialTaskHiringStatus;
@@ -114,7 +136,9 @@ export function CommercialCatalog() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isSavingProspecting =
-    createProspectingMutation.isPending || updateProspectingMutation.isPending;
+    createProspectingMutation.isPending ||
+    updateProspectingMutation.isPending ||
+    uploadProspectingAttachmentMutation.isPending;
   const canEdit = access.canEdit;
 
   function startTaskBillingEdit(item: CommercialTaskBilling) {
@@ -321,6 +345,7 @@ export function CommercialCatalog() {
     setProspectingEditingId(null);
     setProspectingDraft({ ...emptyProspectingDraft, client });
     setProspectingFormError("");
+    setProspectingFile(null);
   }
 
   function startProspectingEdit(item: CommercialProspecting) {
@@ -330,9 +355,17 @@ export function CommercialCatalog() {
       client: { id: item.client_id, name: getClientDisplayName(item.client) },
       status: item.status,
       status_date: item.status_date ? item.status_date.slice(0, 10) : "",
+      solution: item.solution ?? "",
+      reference_month: item.reference_month ?? "",
+      service: item.service ?? "",
       description: item.description ?? "",
+      participants: item.participants ?? "",
+      meeting_mode: item.meeting_mode ?? "",
+      branch: item.branch ?? "",
+      pause_reason: item.pause_reason ?? "",
     });
     setProspectingFormError("");
+    setProspectingFile(null);
   }
 
   function cancelProspectingForm() {
@@ -340,6 +373,7 @@ export function CommercialCatalog() {
     setProspectingEditingId(null);
     setProspectingDraft(emptyProspectingDraft);
     setProspectingFormError("");
+    setProspectingFile(null);
   }
 
   async function submitProspectingForm(event: FormEvent<HTMLFormElement>) {
@@ -348,26 +382,70 @@ export function CommercialCatalog() {
       setProspectingFormError("Selecione um cliente.");
       return;
     }
+    if (!prospectingDraft.status_date || !prospectingDraft.solution || !prospectingDraft.reference_month) {
+      setProspectingFormError("Preencha solução, data da situação e mês de referência.");
+      return;
+    }
     setProspectingFormError("");
     const payload = {
       status: prospectingDraft.status,
       status_date: prospectingDraft.status_date
         ? new Date(`${prospectingDraft.status_date}T12:00:00`).toISOString()
-        : null,
+        : "",
+      solution: prospectingDraft.solution,
+      reference_month: prospectingDraft.reference_month,
+      service: prospectingDraft.service.trim() || null,
       description: prospectingDraft.description.trim() || null,
+      participants: prospectingDraft.participants.trim() || null,
+      meeting_mode: prospectingDraft.meeting_mode.trim() || null,
+      branch: prospectingDraft.branch.trim() || null,
+      pause_reason: prospectingDraft.pause_reason.trim() || null,
     };
+    let savedProspectingId = prospectingEditingId;
     try {
       if (prospectingEditingId) {
-        await updateProspectingMutation.mutateAsync({ id: prospectingEditingId, payload });
+        const saved = await updateProspectingMutation.mutateAsync({ id: prospectingEditingId, payload });
+        savedProspectingId = saved.id;
       } else {
-        await createProspectingMutation.mutateAsync({
+        const saved = await createProspectingMutation.mutateAsync({
           client_id: prospectingDraft.client.id,
           ...payload,
+        });
+        savedProspectingId = saved.id;
+      }
+      if (prospectingFile && savedProspectingId) {
+        await uploadProspectingAttachmentMutation.mutateAsync({
+          id: savedProspectingId,
+          file: prospectingFile,
         });
       }
       cancelProspectingForm();
     } catch (error) {
+      if (!prospectingEditingId && savedProspectingId) {
+        setIsCreatingProspecting(false);
+        setProspectingEditingId(savedProspectingId);
+      }
       setProspectingFormError(getErrorMessage(error, "Não foi possível salvar a prospecção."));
+    }
+  }
+
+  async function loadProspectingHistory(id: string) {
+    setProspectingHistoryId(id);
+    setProspectingHistory([]);
+    setProspectingHistoryError("");
+    try {
+      setProspectingHistory(await commercialService.listProspectingHistory(id));
+    } catch (error) {
+      setProspectingHistoryError(getErrorMessage(error, "Não foi possível carregar o histórico."));
+    }
+  }
+
+  async function openProspectingAttachment(id: string) {
+    try {
+      const attachment = await commercialService.getProspectingAttachment(id);
+      window.location.assign(attachment.url);
+    } catch (error) {
+      setProspectingFormError(getErrorMessage(error, "Não foi possível abrir o anexo."));
     }
   }
 
@@ -404,12 +482,36 @@ export function CommercialCatalog() {
           <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Data da etapa
             <input
               type="date"
+              required
               value={prospectingDraft.status_date}
               onChange={(event) =>
                 setProspectingDraft((current) => ({ ...current, status_date: event.target.value }))
               }
               className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
+          </label>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Solução *
+            <select required value={prospectingDraft.solution} onChange={(event) => setProspectingDraft((current) => ({ ...current, solution: event.target.value as ProspectingDraft["solution"] }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white">
+              <option value="">Selecione</option>
+              {["CASTELO", "KALANGO", "META", "NIT"].map((solution) => <option key={solution}>{solution}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Mês de referência *
+            <input required type="month" value={prospectingDraft.reference_month} onChange={(event) => setProspectingDraft((current) => ({ ...current, reference_month: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+          </label>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Serviço
+            <input value={prospectingDraft.service} onChange={(event) => setProspectingDraft((current) => ({ ...current, service: event.target.value }))} maxLength={1000} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+          </label>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Participantes
+            <input value={prospectingDraft.participants} onChange={(event) => setProspectingDraft((current) => ({ ...current, participants: event.target.value }))} maxLength={1000} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+          </label>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Modo de reunião
+            <input value={prospectingDraft.meeting_mode} onChange={(event) => setProspectingDraft((current) => ({ ...current, meeting_mode: event.target.value }))} maxLength={1000} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+          </label>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Ramo
+            <input value={prospectingDraft.branch} onChange={(event) => setProspectingDraft((current) => ({ ...current, branch: event.target.value }))} maxLength={1000} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
           </label>
         </div>
         <label className="mt-4 block text-sm font-medium text-slate-800 dark:text-slate-100">Descrição
@@ -423,6 +525,31 @@ export function CommercialCatalog() {
             className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
           />
         </label>
+        {prospectingDraft.status === "Paralisado" ? (
+          <label className="mt-4 block text-sm font-medium text-slate-800 dark:text-slate-100">Motivo da paralisação *
+            <textarea required value={prospectingDraft.pause_reason} onChange={(event) => setProspectingDraft((current) => ({ ...current, pause_reason: event.target.value }))} maxLength={1000} rows={2} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+          </label>
+        ) : null}
+        {prospectingDraft.status === "Paralisado" ? (
+          <div className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-300">
+            <label className="block font-medium">Anexo opcional (PDF, imagem ou texto)
+              <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp,text/plain" onChange={(event) => setProspectingFile(event.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" />
+            </label>
+            {isEditing && prospectingQuery.data?.find((item) => item.id === prospectingEditingId)?.attachment_name ? (
+              <button type="button" onClick={() => { if (prospectingEditingId) void openProspectingAttachment(prospectingEditingId); }} className="min-h-10 text-blue-700 underline dark:text-blue-300">Abrir anexo atual: {prospectingQuery.data.find((item) => item.id === prospectingEditingId)?.attachment_name}</button>
+            ) : null}
+          </div>
+        ) : null}
+        {isEditing ? (
+          <div className="mt-4">
+            <button type="button" onClick={() => { if (prospectingEditingId) void loadProspectingHistory(prospectingEditingId); }} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200">{prospectingHistoryId === prospectingEditingId ? "Atualizar histórico" : "Ver histórico"}</button>
+            {prospectingHistoryId === prospectingEditingId ? (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900" aria-live="polite">
+                {prospectingHistoryError ? <p role="alert" className="text-sm text-red-700">{prospectingHistoryError}</p> : prospectingHistory.length ? <ul className="space-y-2">{prospectingHistory.map((entry) => <li key={entry.id} className="text-sm text-slate-700 dark:text-slate-300"><strong>{entry.field}</strong>: {String(entry.old_value ?? "—")} → {String(entry.new_value ?? "—")} · {new Date(entry.created_at).toLocaleString("pt-BR")} · {entry.changed_by_name ?? entry.changed_by}</li>)}</ul> : <p className="text-sm text-slate-500">Nenhuma alteração registrada.</p>}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
             type="submit"

@@ -445,6 +445,9 @@ importers:
       '@prisma/client':
         specifier: 7.9.1
         version: 7.9.1(prisma@7.9.1(@types/node@25.5.2)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.3.3))(typescript@5.3.3)
+      '@supabase/supabase-js':
+        specifier: ^2.102.1
+        version: 2.102.1
       '@workspace/shared':
         specifier: workspace:*
         version: link:../../shared
@@ -460,6 +463,9 @@ importers:
       express-async-errors:
         specifier: ^3.1.1
         version: 3.1.1(express@4.22.1)
+      multer:
+        specifier: ^2.3.0
+        version: 2.4.0
       pg:
         specifier: ^8.13.0
         version: 8.20.0
@@ -479,6 +485,9 @@ importers:
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25
+      '@types/multer':
+        specifier: ^2.1.0
+        version: 2.1.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.2
@@ -1082,12 +1091,12 @@ importers:
       express-async-errors:
         specifier: ^3.1.1
         version: 3.1.1(express@4.22.1)
-      pg:
-        specifier: ^8.13.0
-        version: 8.20.0
       pdfkit:
         specifier: 0.19.1
         version: 0.19.1
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
       prisma:
         specifier: 7.9.1
         version: 7.9.1(@types/node@25.5.2)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.3.3)
