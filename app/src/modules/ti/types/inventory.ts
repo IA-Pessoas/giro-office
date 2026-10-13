@@ -86,7 +86,16 @@ export interface TiInventoryReturnPayload {
 /** Destino da transferência: uma pessoa ou um local, nunca os dois. */
 export type TiInventoryTransferPayload = { user_id: TiId } | { location_id: TiId };
 
-export type TiInventoryEventAction = "assign" | "return" | "transfer";
+/** Lote: vários ativos para o mesmo usuário ou departamento, todos ou nenhum. */
+export type TiInventoryTransferBatchPayload = { asset_ids: TiId[] } & TiInventoryTransferPayload;
+
+/** Troca: cada ativo passa para quem está com o outro. */
+export interface TiInventorySwapPayload {
+  asset_id: TiId;
+  other_asset_id: TiId;
+}
+
+export type TiInventoryEventAction = "assign" | "return" | "transfer" | "swap";
 
 interface TiInventoryEventParty {
   id: TiId;

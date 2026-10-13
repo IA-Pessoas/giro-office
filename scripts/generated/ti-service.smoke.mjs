@@ -255,6 +255,22 @@ export const operations = [
   },
   {
     service: "ti-service",
+    method: "POST",
+    path: "/ti/inventory/transfer-batch",
+    action: "tiInventoryTransferBatch",
+    target: "gateway",
+    auth: "admin-bearer",
+  },
+  {
+    service: "ti-service",
+    method: "POST",
+    path: "/ti/inventory/swap",
+    action: "tiInventorySwap",
+    target: "gateway",
+    auth: "admin-bearer",
+  },
+  {
+    service: "ti-service",
     method: "GET",
     path: "/ti/inventory/{id}/history",
     action: "tiInventoryHistory",

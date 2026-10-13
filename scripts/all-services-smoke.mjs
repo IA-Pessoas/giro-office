@@ -2681,6 +2681,60 @@ const handlers = {
     });
   },
 
+  // #1933: o lote leva o item para um local; a troca usa um segundo item do administrador.
+  async tiInventoryTransferBatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        asset_ids: [requireState("tiInventoryId")],
+        location_id: requireState("tiInventoryLocationId"),
+      },
+    });
+  },
+
+  async tiInventorySwap(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, { expectedStatus: op.expectedStatus, json: {} });
+      return;
+    }
+    const headers = getTiAdminHeaders();
+    const created = await helperCall("ti-inventory-swap-asset-create", {
+      method: "POST",
+      path: "/ti/inventory",
+      target: "gateway",
+      service: "ti-service",
+      auth: "public",
+      headers,
+      json: {
+        asset_code: uniqueText("SMOKE-SWAP"),
+        category_id: requireState("tiInventoryCategoryId"),
+        user_id: requireState("session").id,
+      },
+      expectedStatus: [201],
+    });
+    await helperCall("ti-inventory-swap-asset-assign", {
+      method: "PATCH",
+      path: `/ti/inventory/${requireState("tiInventoryId")}/transfer`,
+      target: "gateway",
+      service: "ti-service",
+      auth: "public",
+      headers,
+      json: { user_id: await ensureRhTargetUser() },
+      expectedStatus: [200],
+    });
+    await httpRequest(op, {
+      expectedStatus: [200],
+      auth: "public",
+      headers,
+      json: {
+        asset_id: requireState("tiInventoryId"),
+        other_asset_id: pickFirst(created.body, "data.id") ?? findFirstId(created.body?.data),
+      },
+    });
+  },
+
   async tiInventoryHistory(op) {
     const response = await httpRequest(op, {
       expectedStatus: [200],

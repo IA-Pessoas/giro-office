@@ -19,6 +19,8 @@ import type {
   TiInventoryLocationPayload,
   TiInventoryPayload,
   TiInventoryReturnPayload,
+  TiInventorySwapPayload,
+  TiInventoryTransferBatchPayload,
   TiInventoryTransferPayload,
   TiListFilters,
   TiReadQueryOptions,
@@ -170,6 +172,32 @@ export function useTransferTiInventoryAssetMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, payload }) => tiInventoryService.transferInventoryAsset(id, payload),
+    onSuccess: () => invalidateTiInventoryQueries(queryClient),
+  });
+}
+
+export function useTransferTiInventoryAssetsBatchMutation(): UseMutationResult<
+  TiInventoryAsset[],
+  Error,
+  TiInventoryTransferBatchPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => tiInventoryService.transferInventoryAssetsBatch(payload),
+    onSuccess: () => invalidateTiInventoryQueries(queryClient),
+  });
+}
+
+export function useSwapTiInventoryAssetsMutation(): UseMutationResult<
+  TiInventoryAsset[],
+  Error,
+  TiInventorySwapPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => tiInventoryService.swapInventoryAssets(payload),
     onSuccess: () => invalidateTiInventoryQueries(queryClient),
   });
 }
