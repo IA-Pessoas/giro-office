@@ -8,6 +8,8 @@ export const TI_ENDPOINTS = {
     detail: "/ti/inventory/{id}",
     assignUser: "/ti/inventory/{id}/assign-user",
     returnAsset: "/ti/inventory/{id}/return",
+    transfer: "/ti/inventory/{id}/transfer",
+    history: "/ti/inventory/{id}/history",
   },
   inventoryCategories: {
     list: "/ti/inventory-categories/list",

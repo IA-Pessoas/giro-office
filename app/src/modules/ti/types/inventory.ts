@@ -83,6 +83,30 @@ export interface TiInventoryReturnPayload {
   [key: string]: unknown;
 }
 
+/** Destino da transferência: uma pessoa ou um local, nunca os dois. */
+export type TiInventoryTransferPayload = { user_id: TiId } | { location_id: TiId };
+
+export type TiInventoryEventAction = "assign" | "return" | "transfer";
+
+interface TiInventoryEventParty {
+  id: TiId;
+  name?: string | null;
+  full_name?: string | null;
+}
+
+/** Evento do histórico patrimonial de um ativo. */
+export interface TiInventoryEvent {
+  id: TiId;
+  inventory_id: TiId;
+  action: TiInventoryEventAction | string;
+  created_at: string;
+  actor?: TiInventoryEventParty | null;
+  from_user?: TiInventoryEventParty | null;
+  to_user?: TiInventoryEventParty | null;
+  from_location?: TiInventoryEventParty | null;
+  to_location?: TiInventoryEventParty | null;
+}
+
 export interface TiInventoryCategoryPayload {
   name?: string;
   tag?: string;

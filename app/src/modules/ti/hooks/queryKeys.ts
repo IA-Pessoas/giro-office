@@ -25,6 +25,7 @@ export const tiQueryKeys = {
     list: (filters?: TiListFilters) =>
       [...tiQueryKeys.inventory.all(), "list", filters ?? {}] as const,
     detail: (id?: TiId) => [...tiQueryKeys.inventory.all(), "detail", id] as const,
+    history: (id?: TiId) => [...tiQueryKeys.inventory.all(), "history", id] as const,
     categories: (filters?: TiListFilters) =>
       [...tiQueryKeys.inventory.all(), "categories", filters ?? {}] as const,
     locations: (filters?: TiListFilters) =>
