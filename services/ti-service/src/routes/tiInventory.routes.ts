@@ -11,9 +11,11 @@ import { requireTiPermission, TiPermissionLevel } from "../middlewares/requireTi
 import {
   assignTiInventoryUserBodySchema,
   createTiInventoryBodySchema,
+  listTiInventoryHistoryQuerySchema,
   listTiInventoryQuerySchema,
   returnTiInventoryBodySchema,
   tiInventoryIdParamsSchema,
+  transferTiInventoryBodySchema,
   updateTiInventoryBodySchema,
 } from "../schemas/tiInventory.schemas.js";
 import { TiInventoryService } from "../services/tiInventoryService.js";
@@ -135,6 +137,42 @@ export function createTiInventoryRoutes(prisma: PrismaClient): Router {
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
         logError("Erro ao devolver ativo de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.patch(
+    "/:id/transfer",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiInventoryIdParamsSchema, request.params);
+        const body = parseWithZod(transferTiInventoryBodySchema, request.body);
+        const result = await service.transfer(context, params.id, body);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao transferir ativo de inventario de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/:id/history",
+    requireTiPermission(TiPermissionLevel.Technician),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiInventoryIdParamsSchema, request.params);
+        const query = parseWithZod(listTiInventoryHistoryQuerySchema, request.query);
+        const result = await service.listHistory(context, params.id, query);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao listar historico de ativo de inventario de TI", { err });
         next(err);
       }
     },
