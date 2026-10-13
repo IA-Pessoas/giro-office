@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createProspectingBodySchema,
+  prospectingListQuerySchema,
   updateProspectingBodySchema,
 } from "../schemas/prospecting.schemas.js";
 
@@ -15,6 +16,20 @@ const validFields = {
 };
 
 describe("prospecting schemas", () => {
+  it("validates and normalizes the paginated prospecting filters", () => {
+    expect(
+      prospectingListQuerySchema.parse({
+        page: "2",
+        page_size: "25",
+        status: "Fechado",
+        search: "  Acme  ",
+      }),
+    ).toEqual({ page: 2, page_size: 25, status: "Fechado", search: "Acme" });
+    expect(prospectingListQuerySchema.parse({})).toEqual({ page: 1, page_size: 20 });
+    expect(prospectingListQuerySchema.safeParse({ page_size: "101" }).success).toBe(false);
+    expect(prospectingListQuerySchema.safeParse({ status: "Todas" }).success).toBe(false);
+  });
+
   it("requires the legacy solution, status date, and reference month on create", () => {
     expect(
       createProspectingBodySchema.safeParse({ client_id: clientId, status: validFields.status })

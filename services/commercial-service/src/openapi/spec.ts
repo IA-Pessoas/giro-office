@@ -74,6 +74,63 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
             fantasy_name: { type: "string", nullable: true },
           },
         },
+        ProspectingListClient: {
+          allOf: [
+            { $ref: "#/components/schemas/ProspectingClient" },
+            {
+              type: "object",
+              required: ["cpf_cnpj"],
+              properties: {
+                cpf_cnpj: { type: "string" },
+                number: { type: "string", nullable: true },
+                email: { type: "string", nullable: true },
+                indication: { type: "string", nullable: true },
+                partners: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["clientPF"],
+                    properties: {
+                      clientPF: {
+                        type: "object",
+                        required: ["name"],
+                        properties: { name: { type: "string" } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+        ProspectingListItem: {
+          allOf: [
+            { $ref: "#/components/schemas/Prospecting" },
+            {
+              type: "object",
+              properties: { client: { $ref: "#/components/schemas/ProspectingListClient" } },
+            },
+          ],
+        },
+        ProspectingPage: {
+          type: "object",
+          required: ["items", "page", "page_size", "total", "total_pages"],
+          properties: {
+            items: { type: "array", items: { $ref: "#/components/schemas/ProspectingListItem" } },
+            page: { type: "integer", minimum: 1 },
+            page_size: { type: "integer", minimum: 1, maximum: 100 },
+            total: { type: "integer", minimum: 0 },
+            total_pages: { type: "integer", minimum: 0 },
+          },
+        },
+        ProspectingPageEnvelope: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean" },
+            data: { $ref: "#/components/schemas/ProspectingPage" },
+          },
+        },
         Prospecting: {
           type: "object",
           required: ["id", "client_id", "status", "status_date", "description", "client"],
@@ -268,7 +325,41 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
         get: {
           tags: ["Commercial"],
           security: [{ bearerAuth: [] }],
-          responses: { "200": successResponse, "401": { description: "Não autenticado." } },
+          parameters: [
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "page_size",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+            {
+              name: "status",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: [
+                  "Análise Financeira",
+                  "Análise/Agendamento",
+                  "Envio de Proposta",
+                  "Paralisado",
+                  "Recusado pelo Cliente",
+                  "Fechado",
+                ],
+              },
+            },
+            { name: "search", in: "query", schema: { type: "string", maxLength: 120 } },
+          ],
+          responses: {
+            "200": {
+              description: "Lista paginada de prospecções da organização.",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ProspectingPageEnvelope" },
+                },
+              },
+            },
+            "401": { description: "Não autenticado." },
+          },
         },
         post: {
           tags: ["Commercial"],

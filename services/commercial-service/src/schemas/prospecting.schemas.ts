@@ -12,6 +12,21 @@ export const prospectingStatuses = [
 export const prospectingStatusSchema = z.enum(prospectingStatuses);
 export type ProspectingStatus = z.infer<typeof prospectingStatusSchema>;
 
+export const prospectingListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().positive().default(1),
+    page_size: z.coerce.number().int().positive().max(100).default(20),
+    status: prospectingStatusSchema.optional(),
+    search: z
+      .string()
+      .trim()
+      .max(120)
+      .optional()
+      .transform((value) => value || undefined),
+  })
+  .strict();
+export type ProspectingListQuery = z.infer<typeof prospectingListQuerySchema>;
+
 export const prospectingSolutions = ["CASTELO", "KALANGO", "META", "NIT"] as const;
 export const prospectingSolutionSchema = z.enum(prospectingSolutions);
 export type ProspectingSolution = z.infer<typeof prospectingSolutionSchema>;

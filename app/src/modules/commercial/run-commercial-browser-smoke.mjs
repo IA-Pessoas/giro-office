@@ -64,6 +64,11 @@ const client = {
   name: "Cliente Smoke",
   company_name: "Empresa Smoke",
   fantasy_name: "Smoke Ltda.",
+  cpf_cnpj: "12.345.678/0001-90",
+  partners: [{ clientPF: { name: "Sócio Smoke" } }],
+  number: "(11) 3333-4444",
+  email: "contato@smoke.test",
+  indication: "Indicação de teste",
 };
 const proposalConfig = {
   id: "c0000000-0000-4000-8000-000000000001",
@@ -268,13 +273,41 @@ function createCommercialUpstream() {
       return;
     }
     if (pathname === "/commercial/prospecting" && request.method === "GET") {
-      respondJson(response, state.prospectingList);
+      const url = new URL(request.url || "/", "http://commercial-smoke");
+      const page = Number(url.searchParams.get("page") || 1);
+      const pageSize = Number(url.searchParams.get("page_size") || 20);
+      const status = url.searchParams.get("status");
+      const search = url.searchParams.get("search")?.toLocaleLowerCase();
+      const filtered = state.prospectingList.filter((item) =>
+        (!status || item.status === status) &&
+        (!search || [item.client.name, item.client.company_name, item.client.cpf_cnpj, ...item.client.partners.map((partner) => partner.clientPF.name), item.client.number, item.client.email, item.client.indication, item.branch, item.description].some((value) => value?.toLocaleLowerCase().includes(search))),
+      );
+      respondJson(response, {
+        items: filtered.slice((page - 1) * pageSize, page * pageSize),
+        page,
+        page_size: pageSize,
+        total: filtered.length,
+        total_pages: Math.ceil(filtered.length / pageSize),
+      });
       return;
     }
     if (pathname === "/commercial/prospecting" && request.method === "POST") {
       readJsonBody(request).then((body) => {
         const created = { ...prospecting, ...body };
-        state.prospectingList = [created];
+        state.prospectingList = [
+          created,
+          ...Array.from({ length: 20 }, (_, index) => ({
+            ...created,
+            id: `d0000000-0000-4000-8000-${String(index + 2).padStart(12, "0")}`,
+            status: index === 0 ? "Recusado pelo Cliente" : "Análise Financeira",
+            client: {
+              ...created.client,
+              id: `b0000000-0000-4000-8000-${String(index + 2).padStart(12, "0")}`,
+              name: `Cliente ${index + 1}`,
+              company_name: `Empresa ${index + 1}`,
+            },
+          })),
+        ];
         setTimeout(() => respondJson(response, created, 201), 250);
       });
       return;
@@ -287,7 +320,7 @@ function createCommercialUpstream() {
     }
     if (pathname.endsWith("/attachment") && request.method === "PUT") {
       const updated = { ...state.prospectingList[0], attachment_name: "motivo-smoke.png", attachment_mime_type: "image/png", attachment_size_bytes: 68 };
-      state.prospectingList = [updated];
+      state.prospectingList = state.prospectingList.map((item) => item.id === updated.id ? updated : item);
       respondJson(response, { name: updated.attachment_name, mime_type: updated.attachment_mime_type, size_bytes: updated.attachment_size_bytes });
       return;
     }
@@ -296,13 +329,16 @@ function createCommercialUpstream() {
       return;
     }
     if (pathname.startsWith("/commercial/prospecting/") && request.method === "GET") {
-      respondJson(response, state.prospectingList[0] ?? prospecting);
+      const prospectingId = pathname.split("/").pop();
+      respondJson(response, state.prospectingList.find((item) => item.id === prospectingId) ?? prospecting);
       return;
     }
     if (pathname.startsWith("/commercial/prospecting/") && request.method === "PATCH") {
       readJsonBody(request).then((body) => {
-        const updated = { ...state.prospectingList[0], ...body };
-        state.prospectingList = [updated];
+        const prospectingId = pathname.split("/").pop();
+        const current = state.prospectingList.find((item) => item.id === prospectingId) ?? prospecting;
+        const updated = { ...current, ...body };
+        state.prospectingList = state.prospectingList.map((item) => item.id === prospectingId ? updated : item);
         respondJson(response, updated);
       });
       return;
@@ -336,6 +372,7 @@ function createCommercialUpstream() {
 }
 
 async function installMocks(page, context, currentUser = smokeUser) {
+  const prospectingState = { items: [] };
   await context.addCookies([
     { name: "cw.session", value: createSessionToken(currentUser), url: baseUrl, httpOnly: true },
     { name: "cw.csrf", value: smokeCsrfToken, url: baseUrl, httpOnly: false },
@@ -350,6 +387,84 @@ async function installMocks(page, context, currentUser = smokeUser) {
     body: JSON.stringify({ success: true, data }),
   });
   await page.route("**/department/list*", (route) => json(route, []));
+  await page.route("**/api/user/me", (route) => json(route, currentUser));
+  await page.route("**/api/commercial/proposal-configs", (route) => json(route, [proposalConfig]));
+  await page.route("**/api/commercial/task-billing", (route) => json(route, [taskBilling]));
+  await page.route("**/api/client/list**", (route) => json(route, {
+    items: [{ ...client, cpf_cnpj: client.cpf_cnpj }],
+    total: 1,
+    page: 1,
+    pageSize: 50,
+    hasMore: false,
+  }));
+  await page.route("**/commercial/prospecting**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.replace(/^\/api/u, "");
+    const prospectingId = path.split("/").pop();
+    if (path === "/commercial/prospecting/clients" && request.method() === "GET") {
+      return json(route, prospectingState.items.length ? [] : [client]);
+    }
+    if (path === "/commercial/prospecting" && request.method() === "GET") {
+      const page = Number(url.searchParams.get("page") || 1);
+      const pageSize = Number(url.searchParams.get("page_size") || 20);
+      const status = url.searchParams.get("status");
+      const search = url.searchParams.get("search")?.toLocaleLowerCase();
+      const items = prospectingState.items.filter((item) =>
+        (!status || item.status === status) &&
+        (!search || [item.client.name, item.client.company_name, item.client.cpf_cnpj, ...item.client.partners.map((partner) => partner.clientPF.name), item.client.number, item.client.email, item.client.indication, item.branch, item.description].some((value) => value?.toLocaleLowerCase().includes(search))),
+      );
+      return json(route, {
+        items: items.slice((page - 1) * pageSize, page * pageSize),
+        page,
+        page_size: pageSize,
+        total: items.length,
+        total_pages: Math.ceil(items.length / pageSize),
+      });
+    }
+    if (path === "/commercial/prospecting" && request.method() === "POST") {
+      const created = { ...prospecting, ...request.postDataJSON() };
+      prospectingState.items = [created, ...Array.from({ length: 20 }, (_, index) => ({
+        ...created,
+        id: `d0000000-0000-4000-8000-${String(index + 2).padStart(12, "0")}`,
+        status: index === 0 ? "Recusado pelo Cliente" : "Análise Financeira",
+        client: {
+          ...created.client,
+          id: `b0000000-0000-4000-8000-${String(index + 2).padStart(12, "0")}`,
+          name: `Cliente ${index + 1}`,
+          company_name: `Empresa ${index + 1}`,
+        },
+      }))];
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      return json(route, created, 201);
+    }
+    if (path.endsWith("/history") && request.method() === "GET") {
+      return json(route, [
+        { id: "history-1", field: "status", old_value: null, new_value: "Análise Financeira", changed_by: currentUser.id, changed_by_name: "Usuário de demonstração", created_at: "2026-09-15T12:00:00.000Z" },
+      ]);
+    }
+    if (path.endsWith("/attachment") && request.method() === "PUT") {
+      return json(route, { name: "motivo-smoke.png", mime_type: "image/png", size_bytes: 68 });
+    }
+    if (path.endsWith("/attachment") && request.method() === "GET") {
+      return json(route, { name: "motivo-smoke.png", url: "https://storage.example.test/signed" });
+    }
+    if (request.method() === "GET") {
+      return json(route, prospectingState.items.find((item) => item.id === prospectingId) ?? prospecting);
+    }
+    if (request.method() === "PATCH") {
+      const current = prospectingState.items.find((item) => item.id === prospectingId) ?? prospecting;
+      const updated = { ...current, ...request.postDataJSON() };
+      prospectingState.items = prospectingState.items.map((item) => item.id === prospectingId ? updated : item);
+      return json(route, updated);
+    }
+    if (request.method() === "DELETE") {
+      prospectingState.items = prospectingState.items.filter((item) => item.id !== prospectingId);
+      return json(route, { id: prospectingId, deleted: true });
+    }
+    return route.fallback();
+  });
+  await page.route("**/api/commercial/prospecting/clients", (route) => json(route, [client]));
   await page.route("**/rh/notifications", (route) => json(route, []));
   await page.route("**/ti/requests/list*", (route) => json(route, []));
   await page.route("**/chat", (route) => json(route, []));
@@ -565,7 +680,11 @@ async function run() {
     const clientPicker = page.getByRole("dialog", { name: "Selecionar cliente" });
     await clientPicker.waitFor({ state: "visible" });
     await page.screenshot({ path: `${evidenceDir}/04-commercial-form-focus.png`, fullPage: true });
-    await clientPicker.getByRole("option", { name: new RegExp(client.company_name) }).click();
+    try {
+      await clientPicker.getByRole("option", { name: new RegExp(client.company_name) }).click({ timeout: 5_000 });
+    } catch (error) {
+      throw new Error(`Cliente não carregou; requests=${requests.join(" | ")}`, { cause: error });
+    }
     const prospectingDialog = page.getByRole("dialog", { name: "Nova prospecção" });
     await prospectingDialog.waitFor({ state: "visible" });
     await prospectingDialog.screenshot({ path: `${evidenceDir}/09-commercial-prospecting-create-modal.png` });
@@ -602,9 +721,59 @@ async function run() {
       pause_reason: null,
     });
     await page.getByText("Análise Financeira").last().waitFor();
+    const prospectingList = page.locator("[aria-labelledby='commercial-prospecting-title']");
+    await prospectingList.getByText("21 prospecções encontradas").waitFor();
+    await prospectingList.getByText("12.345.678/0001-90").first().waitFor();
+    await prospectingList.getByText("Sócio Smoke").first().waitFor();
+    await prospectingList.getByText("contato@smoke.test").first().waitFor();
+    await prospectingList.getByText("Indicação de teste").first().waitFor();
+    await page.waitForTimeout(5_500);
+    await prospectingList.screenshot({ path: `${evidenceDir}/12-commercial-prospecting-list.png` });
+
+    await prospectingList.getByLabel("Situação").selectOption("Fechado");
+    await prospectingList.getByText("Nenhuma prospecção encontrada para os filtros aplicados.").waitFor();
+    await prospectingList.getByLabel("Situação").selectOption("Todas");
+    await prospectingList.getByText("Sócio Smoke").first().waitFor();
+    await prospectingList.getByText("Página 1 de 2").waitFor();
+    await prospectingList.getByRole("button", { name: "Próxima" }).click();
+    await prospectingList.getByText("Página 2 de 2").waitFor();
+    await prospectingList.getByText("Empresa 20").waitFor();
+    await prospectingList.getByRole("button", { name: "Anterior" }).click();
+    await prospectingList.getByText("Página 1 de 2").waitFor();
+    const searchResponsePromise = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === "GET" && url.pathname.endsWith("/commercial/prospecting") && url.searchParams.get("search") === "contato@smoke.test";
+    });
+    await prospectingList.getByLabel("Buscar").fill("contato@smoke.test");
+    const searchResponse = await searchResponsePromise;
+    assert.equal(searchResponse.status(), 200);
+    await prospectingList.getByText("Sócio Smoke").first().waitFor();
+    await prospectingList.getByLabel("Buscar").fill("");
+    await prospectingList.getByRole("button", { name: "Kanban", exact: true }).click();
+    await prospectingList.getByRole("region", { name: "Análise Financeira: 19 prospecções" }).waitFor();
+    await prospectingList.getByRole("region", { name: "Recusado pelo Cliente: 1 prospecções" }).waitFor();
+    await prospectingList.screenshot({ path: `${evidenceDir}/13-commercial-prospecting-kanban.png` });
+    await prospectingList.getByRole("button", { name: "Lista", exact: true }).click();
+    await page.emulateMedia({ media: "print" });
+    const printState = await page.evaluate(() => ({
+      appRootDisplay: getComputedStyle(document.querySelector("#__next")).display,
+      listVisibility: getComputedStyle(document.querySelector(".commercial-prospecting-print")).visibility,
+      pageHeadingVisibility: getComputedStyle(document.querySelector("h1")).visibility,
+      filtersDisplay: getComputedStyle(document.querySelector(".commercial-prospecting-print p.print\\:block")).display,
+      controlsDisplay: getComputedStyle(document.querySelector(".commercial-prospecting-print [data-print-hide]")).display,
+    }));
+    assert.deepEqual(printState, {
+      appRootDisplay: "block",
+      listVisibility: "visible",
+      pageHeadingVisibility: "hidden",
+      filtersDisplay: "block",
+      controlsDisplay: "none",
+    });
+    await prospectingList.screenshot({ path: `${evidenceDir}/14-commercial-prospecting-print.png` });
+    await page.emulateMedia({ media: "screen" });
     await page.screenshot({ path: `${evidenceDir}/05-commercial-saved-light.png`, fullPage: true });
 
-    await page.getByLabel("Prospecção", { exact: true }).getByRole("button", { name: "Editar", exact: true }).click();
+    await page.getByLabel("Prospecção", { exact: true }).getByRole("button", { name: "Editar", exact: true }).first().click();
     const editProspectingForm = page.getByRole("form", { name: "Editar prospecção" });
     const historyResponsePromise = page.waitForResponse(
       (response) => response.request().method() === "GET" && response.url().endsWith(`/commercial/prospecting/${prospecting.id}/history`),
@@ -644,7 +813,8 @@ async function run() {
       mime_type: "image/png",
       size_bytes: 68,
     });
-    await page.getByText("Paralisado — Retorno na próxima semana", { exact: true }).waitFor();
+    await page.getByRole("cell", { name: "Paralisado", exact: true }).waitFor();
+    await page.getByRole("cell", { name: "Retorno na próxima semana", exact: true }).first().waitFor();
     await page.screenshot({ path: `${evidenceDir}/11-commercial-prospecting-paused.png`, fullPage: true });
     if (process.env.COMMERCIAL_SMOKE_PROSPECTING_ONLY) return;
 

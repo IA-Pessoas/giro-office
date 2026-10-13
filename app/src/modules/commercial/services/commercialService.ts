@@ -2,6 +2,8 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   CommercialProspecting,
+  CommercialProspectingFilters,
+  CommercialProspectingPage,
   CommercialProspectingHistoryEntry,
   CommercialProspectingClient,
   ArchiveCommercialProspectingResult,
@@ -65,12 +67,13 @@ export const commercialService = {
     return unwrapCommercialEnvelope<CommercialProspectingClient[]>(response.data);
   },
 
-  async listProspecting(): Promise<CommercialProspecting[]> {
+  async listProspecting(filters: CommercialProspectingFilters): Promise<CommercialProspectingPage> {
     const api = setupAPIClient();
-    const response = await api.get<CommercialSuccessEnvelope<CommercialProspecting[]>>(
+    const response = await api.get<CommercialSuccessEnvelope<CommercialProspectingPage>>(
       COMMERCIAL_ENDPOINTS.prospecting,
+      { params: filters },
     );
-    return unwrapCommercialEnvelope<CommercialProspecting[]>(response.data);
+    return unwrapCommercialEnvelope<CommercialProspectingPage>(response.data);
   },
 
   async listProspectingHistory(id: string): Promise<CommercialProspectingHistoryEntry[]> {
