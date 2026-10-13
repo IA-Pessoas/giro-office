@@ -256,6 +256,34 @@ describe("ti Worker", () => {
     expect(inventory.getById).not.toHaveBeenCalled();
   });
 
+  // #1936: histórico de alterações de TI, só para TI nível 3.
+  it("routes the TI change history for TI admins only", async () => {
+    const changeHistory = { list: vi.fn(async () => ({ items: [], has_more: false })) };
+    const app = createTiWorkerApp({ env: env(), services: { changeHistory } } as never);
+    const get = (path: string, permission: string) =>
+      app.request(`https://ti.test${path}`, { headers: headers(permission) });
+
+    expect((await get("/ti/change-history/list", "2")).status).toBe(403);
+    expect((await get("/ti/change-history/list?item_type=estoque", "3")).status).toBe(400);
+    expect((await get("/ti/change-history/list?item_id=nao-e-uuid", "3")).status).toBe(400);
+    expect(changeHistory.list).not.toHaveBeenCalled();
+
+    const response = await get(
+      `/ti/change-history/list?item_type=inventory&item_id=${CATEGORY_ID}&page=2`,
+      "3",
+    );
+    expect(response.status).toBe(200);
+    expect(changeHistory.list).toHaveBeenCalledWith(
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        permission: 3,
+        isOrganizationOwner: false,
+      },
+      { item_type: "inventory", item_id: CATEGORY_ID, page: 2 },
+    );
+  });
+
   // #1935: logs de acesso por usuário, só para TI nível 3.
   it("routes the user access logs for TI admins only", async () => {
     const accessLogs = { list: vi.fn(async () => ({ items: [], has_more: false })) };

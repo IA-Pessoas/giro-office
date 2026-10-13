@@ -2,6 +2,9 @@ import type { TiEnvelope, TiId, TiListFilters, TiListResponse } from "../types";
 
 export const TI_ENDPOINTS = {
   dashboard: "/ti/dashboard",
+  changeHistory: {
+    list: "/ti/change-history/list",
+  },
   accessLogs: {
     byUser: "/ti/access-logs/{id}",
   },

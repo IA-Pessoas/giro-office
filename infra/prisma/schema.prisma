@@ -259,6 +259,7 @@ model Organization {
   extensionsTecnologia          ExtensionsTecnologia[]
   inventoryTecnologia           InventoryTecnologia[]
   inventoryEventsTecnologia     InventoryEventTecnologia[]
+  changeHistoryTecnologia       ChangeHistoryTecnologia[]
   inventoryCategoriesTecnologia InventoryCategoryTecnologia[]
   inventoryLocationsTecnologia  InventoryLocationTecnologia[]
   passwordsTecnologia           PasswordTecnologia[]
@@ -3264,6 +3265,24 @@ model InventoryEventTecnologia {
 
   @@index([organization_id, inventory_id, created_at], map: "idx_tecnologia_inventory_events_org_item")
   @@map("tecnologia.inventoryEvents")
+}
+
+model ChangeHistoryTecnologia {
+  id              String       @id @default(uuid())
+  item_type       String
+  item_id         String
+  field           String
+  before          String?
+  after           String?
+  note            String?
+  actor_user_id   String
+  created_at      DateTime     @default(now())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, created_at(sort: Desc)], map: "idx_tecnologia_change_history_org_date")
+  @@index([organization_id, item_type, item_id], map: "idx_tecnologia_change_history_org_item")
+  @@map("tecnologia.changeHistory")
 }
 
 model TermTecnologia {

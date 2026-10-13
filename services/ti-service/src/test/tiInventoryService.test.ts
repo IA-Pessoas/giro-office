@@ -348,6 +348,7 @@ describe("TiInventoryService: regra do computador ativo", () => {
     const queues = new Map<string, Promise<void>>();
     const lockedKeys: string[] = [];
     const events: Array<Record<string, unknown>> = [];
+    const changes: Array<Record<string, unknown>> = [];
     const matches = (item: Asset, where: Record<string, unknown>): boolean =>
       Object.entries(where).every(([key, expected]) => {
         if (key === "NOT") return item.id !== (expected as { id: string }).id;
@@ -398,6 +399,12 @@ describe("TiInventoryService: regra do computador ativo", () => {
         }),
         createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
           events.push(...data);
+          return { count: data.length };
+        }),
+      },
+      changeHistoryTecnologia: {
+        createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+          changes.push(...data);
           return { count: data.length };
         }),
       },
@@ -473,7 +480,7 @@ describe("TiInventoryService: regra do computador ativo", () => {
         (item) =>
           item.user_id === user && item.category_id === computerCategoryId && !item.return_date,
       );
-    return { prisma, assets, activeComputers, lockedKeys, events };
+    return { prisma, assets, activeComputers, lockedKeys, events, changes };
   }
 
   it("recusa atribuir um segundo computador ativo à mesma pessoa", async () => {
@@ -560,7 +567,7 @@ describe("TiInventoryService: regra do computador ativo", () => {
 
   // Legado: a troca do PHP não validava, então há quem tenha migrado com dois computadores.
   it("edição que não troca pessoa nem categoria não reavalia a regra", async () => {
-    const { prisma } = inMemoryPrisma([
+    const { prisma, lockedKeys, changes, events } = inMemoryPrisma([
       asset("pc-1", { user_id: userId }),
       asset("pc-2", { user_id: userId }),
     ]);
@@ -568,17 +575,31 @@ describe("TiInventoryService: regra do computador ativo", () => {
 
     await service.update(context, "pc-2", { notes: "Revisado", user_id: userId });
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(lockedKeys).toEqual([]);
     expect(prisma.inventoryTecnologia.update).toHaveBeenCalledWith({
       where: { id: "pc-2" },
       data: { notes: "Revisado", user_id: userId },
     });
+    // #1936: o campo editado entra no histórico de alterações, não no patrimonial.
+    expect(changes).toEqual([
+      {
+        item_type: "inventory",
+        item_id: "pc-2",
+        field: "notes",
+        before: null,
+        after: "Revisado",
+        note: "Atualização do item",
+        actor_user_id: context.userId,
+        organization_id: context.organizationId,
+      },
+    ]);
+    expect(events).toEqual([]);
   });
 
   // O formulário reenvia a pessoa: num item legado já devolvido isso não pode reatribuí-lo.
   it("editar as notas de um item devolvido que ainda aponta para a pessoa não o reatribui", async () => {
     const returnedAt = new Date("2024-01-10");
-    const { prisma, assets, events } = inMemoryPrisma([
+    const { prisma, assets, events, lockedKeys } = inMemoryPrisma([
       asset("pc-1", { user_id: userId }),
       asset("pc-antigo", { user_id: userId, return_date: returnedAt }),
     ]);
@@ -586,7 +607,7 @@ describe("TiInventoryService: regra do computador ativo", () => {
 
     await service.update(context, "pc-antigo", { notes: "Revisado", user_id: userId });
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(lockedKeys).toEqual([]);
     expect(assets.find((item) => item.id === "pc-antigo")).toMatchObject({
       user_id: userId,
       return_date: returnedAt,
