@@ -44,6 +44,7 @@ type Delegate = {
 export type TiDatabase = {
   [model: string]: unknown;
   $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
+  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
   $transaction<T>(
     callback: (database: TiDatabase) => Promise<T>,
     options?: { isolationLevel?: "RepeatableRead"; maxWait?: number; timeout?: number },
@@ -896,11 +897,8 @@ async function lockActiveComputer(
   organizationId: string,
   userId: string,
 ): Promise<void> {
-  const lock = transaction.$executeRaw as (
-    query: TemplateStringsArray,
-    ...values: unknown[]
-  ) => Promise<unknown>;
-  await lock`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+  // Chamado no próprio cliente: o Prisma real perde o `this` se o método for destacado.
+  await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
 }
 
 /** Toma o bloqueio da pessoa e recusa se ela já tem outro computador ativo. */

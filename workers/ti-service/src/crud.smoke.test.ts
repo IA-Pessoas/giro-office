@@ -299,6 +299,7 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     const created = await call("POST", "/ti/requests", {
       title: "Notebook não liga",
       description: "Aberto pelo smoke",
+      anydesk_code: "123456789",
       category_id: categoryId,
       requester_id: userId,
       assigned_to_id: ownerId,
