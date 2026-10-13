@@ -20,7 +20,18 @@ const item = {
   client_id: CLIENT_ID,
   status: "Paralisado",
   status_date: new Date("2026-09-10T00:00:00.000Z"),
+  solution: "CASTELO",
+  reference_month: "2026-09",
+  service: "Contabilidade",
   description: "Retorno em outubro",
+  participants: "Ana e Bruno",
+  meeting_mode: "Remota",
+  branch: "Matriz",
+  pause_reason: "Aguardando documentos",
+  attachment_mime_type: null,
+  attachment_size_bytes: null,
+  attachment_path: `comercial/organizations/${ORGANIZATION_ID}/prospecting/${PROSPECTING_ID}/old.pdf`,
+  attachment_name: "motivo-anterior.pdf",
   client,
 };
 
@@ -30,12 +41,20 @@ function createMockPrisma(): CommercialProspectingPrismaDeps {
       findFirst: vi.fn(async () => client),
       findMany: vi.fn(async () => [client]),
     },
+    user: {
+      findMany: vi.fn(async () => [{ id: USER_ID, full_name: "Usuária de Teste", name: "teste" }]),
+    },
     commercialProspecting: {
       findFirst: vi.fn(async () => null),
       findMany: vi.fn(async () => [item]),
       create: vi.fn(async () => item),
       updateMany: vi.fn(async () => ({ count: 1 })),
       delete: vi.fn(async () => item),
+    },
+    commercialProspectingHistory: {
+      create: vi.fn(async () => ({ id: "history-id" })),
+      createMany: vi.fn(async () => ({ count: 1 })),
+      findMany: vi.fn(async () => []),
     },
     commercialOutboxEvent: {
       create: vi.fn(async () => ({ id: "event-id" })),
@@ -82,6 +101,31 @@ describe("CommercialProspectingService", () => {
     );
   });
 
+  it("inclui nome do autor no histórico, limitado à organização", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.commercialProspecting.findFirst).mockResolvedValue(item as never);
+    vi.mocked(prisma.commercialProspectingHistory.findMany).mockResolvedValue([
+      {
+        id: "history-id",
+        field: "status",
+        old_value: null,
+        new_value: "Fechado",
+        changed_by: USER_ID,
+        created_at: new Date("2026-10-13T12:00:00.000Z"),
+      },
+    ] as never);
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    await expect(service.history(PROSPECTING_ID, ORGANIZATION_ID)).resolves.toEqual([
+      expect.objectContaining({ changed_by_name: "Usuária de Teste" }),
+    ]);
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organization_id: ORGANIZATION_ID }),
+      }),
+    );
+  });
+
   it("não permite cadastrar cliente de outra organização", async () => {
     const prisma = createMockPrisma();
     prisma.client.findFirst = vi.fn(async () => null);
@@ -93,6 +137,9 @@ describe("CommercialProspectingService", () => {
         organization_id: OTHER_ORGANIZATION_ID,
         client_id: CLIENT_ID,
         status: "Análise Financeira",
+        status_date: new Date("2026-10-13T00:00:00.000Z"),
+        solution: "CASTELO",
+        reference_month: "2026-10",
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
     expect(prisma.commercialProspecting.create).not.toHaveBeenCalled();
@@ -112,6 +159,9 @@ describe("CommercialProspectingService", () => {
         organization_id: ORGANIZATION_ID,
         client_id: CLIENT_ID,
         status: "Envio de Proposta",
+        status_date: new Date("2026-10-13T00:00:00.000Z"),
+        solution: "CASTELO",
+        reference_month: "2026-10",
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
   });
@@ -127,6 +177,9 @@ describe("CommercialProspectingService", () => {
       organization_id: ORGANIZATION_ID,
       client_id: CLIENT_ID,
       status: "Análise Financeira",
+      status_date: new Date("2026-10-13T00:00:00.000Z"),
+      solution: "CASTELO",
+      reference_month: "2026-10",
     });
 
     expect(audit.createLog).toHaveBeenCalledWith(
@@ -134,6 +187,17 @@ describe("CommercialProspectingService", () => {
         userId: USER_ID,
         organizationId: ORGANIZATION_ID,
         referring: "commercial.prospecting",
+      }),
+    );
+    expect(prisma.commercialProspectingHistory.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            organization_id: ORGANIZATION_ID,
+            changed_by: USER_ID,
+            field: "solution",
+          }),
+        ]),
       }),
     );
   });
@@ -158,6 +222,9 @@ describe("CommercialProspectingService", () => {
       where: { id: PROSPECTING_ID, organization_id: ORGANIZATION_ID, archived_at: null },
       data: { status: "Análise/Agendamento" },
     });
+    expect(prisma.commercialProspecting.updateMany.mock.calls[0]?.[0]?.data).not.toHaveProperty(
+      "attachment_path",
+    );
     expect(prisma.commercialOutboxEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -186,6 +253,53 @@ describe("CommercialProspectingService", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
     expect(prisma.commercialProspecting.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("oculta o histórico quando a prospecção não pertence à organização", async () => {
+    const prisma = createMockPrisma();
+    prisma.commercialProspecting.findFirst = vi.fn(async () => null);
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    await expect(service.history(PROSPECTING_ID, OTHER_ORGANIZATION_ID)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(prisma.commercialProspectingHistory.findMany).not.toHaveBeenCalled();
+  });
+
+  it("troca o anexo só depois de salvar o novo arquivo no tenant da prospecção", async () => {
+    const prisma = createMockPrisma();
+    prisma.commercialProspecting.findFirst = vi.fn(async () => item);
+    const storage = {
+      upload: vi.fn(async () => "comercial/organizations/org-1/prospecting/prospecting-1/new.pdf"),
+      createSignedAccessUrl: vi.fn(async () => "https://example.test/signed"),
+      remove: vi.fn(async () => {}),
+    };
+    const service = new CommercialProspectingService(prisma, createAuditMock(), storage);
+
+    await expect(
+      service.uploadAttachment({
+        user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+        prospecting_id: PROSPECTING_ID,
+        file: {
+          buffer: Buffer.from("%PDF-1.7"),
+          mimetype: "application/pdf",
+          originalname: "motivo-novo.pdf",
+        },
+      }),
+    ).resolves.toEqual({ name: "motivo-novo.pdf", mime_type: "application/pdf", size_bytes: 8 });
+    expect(storage.upload).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, prospectingId: PROSPECTING_ID }),
+    );
+    expect(prisma.commercialProspecting.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organization_id: ORGANIZATION_ID, status: "Paralisado" }),
+        data: expect.objectContaining({ attachment_name: "motivo-novo.pdf" }),
+      }),
+    );
+    expect(storage.remove).toHaveBeenCalledWith(
+      `comercial/organizations/${ORGANIZATION_ID}/prospecting/${PROSPECTING_ID}/old.pdf`,
+    );
   });
 
   it("arquiva sem excluir fisicamente e registra auditoria", async () => {

@@ -6,6 +6,8 @@ export const COMMERCIAL_ENDPOINTS = {
   prospecting: "/commercial/prospecting",
   prospectingClients: "/commercial/prospecting/clients",
   prospectingItem: (id: string) => `/commercial/prospecting/${id}`,
+  prospectingHistory: (id: string) => `/commercial/prospecting/${id}/history`,
+  prospectingAttachment: (id: string) => `/commercial/prospecting/${id}/attachment`,
   taskBillings: "/commercial/task-billing",
   taskBilling: (taskId: string) => `/commercial/task-billing/${taskId}`,
 } as const;

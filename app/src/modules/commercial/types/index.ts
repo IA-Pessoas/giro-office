@@ -44,8 +44,28 @@ export interface CommercialProspecting {
   client_id: string;
   status: CommercialProspectingStatus;
   status_date: string | null;
+  solution: "CASTELO" | "KALANGO" | "META" | "NIT" | null;
+  reference_month: string | null;
+  service: string | null;
   description: string | null;
+  participants: string | null;
+  meeting_mode: string | null;
+  branch: string | null;
+  pause_reason: string | null;
+  attachment_name: string | null;
+  attachment_mime_type: string | null;
+  attachment_size_bytes: number | null;
   client: CommercialProspectingClient;
+}
+
+export interface CommercialProspectingHistoryEntry {
+  id: string;
+  field: string;
+  old_value: unknown;
+  new_value: unknown;
+  changed_by: string;
+  changed_by_name?: string;
+  created_at: string;
 }
 
 export interface ArchiveCommercialProspectingResult {
@@ -56,8 +76,15 @@ export interface ArchiveCommercialProspectingResult {
 export interface CreateCommercialProspectingPayload {
   client_id: string;
   status: CommercialProspectingStatus;
-  status_date?: string | null;
+  status_date: string;
+  solution: "CASTELO" | "KALANGO" | "META" | "NIT";
+  reference_month: string;
+  service?: string | null;
   description?: string | null;
+  participants?: string | null;
+  meeting_mode?: string | null;
+  branch?: string | null;
+  pause_reason?: string | null;
 }
 
 export type UpdateCommercialProspectingPayload = Partial<

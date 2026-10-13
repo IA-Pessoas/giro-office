@@ -197,7 +197,19 @@ describe("matriz de regressão das políticas modulares", () => {
     ["owner", 3, true, true],
   ])("aplica a matriz Comercial para %s com comercial=%i", (type, commercialLevel, canRead, canWrite) => {
     const readPolicy = requiredRoutePolicy("GET", "/commercial/prospecting");
+    const historyPolicy = requiredRoutePolicy(
+      "GET",
+      "/commercial/prospecting/prospecting-1/history",
+    );
+    const attachmentReadPolicy = requiredRoutePolicy(
+      "GET",
+      "/commercial/prospecting/prospecting-1/attachment",
+    );
     const editPolicy = requiredRoutePolicy("PATCH", "/commercial/prospecting/prospecting-1");
+    const attachmentWritePolicy = requiredRoutePolicy(
+      "PUT",
+      "/commercial/prospecting/prospecting-1/attachment",
+    );
     const archivePolicy = requiredRoutePolicy("DELETE", "/commercial/prospecting/prospecting-1");
     const context = authContext({
       permission: type === "admin" ? 2 : 0,
@@ -206,7 +218,10 @@ describe("matriz de regressão das políticas modulares", () => {
     });
 
     expect(canAccessRoute(context, readPolicy)).toBe(canRead);
+    expect(canAccessRoute(context, historyPolicy)).toBe(canRead);
+    expect(canAccessRoute(context, attachmentReadPolicy)).toBe(canRead);
     expect(canAccessRoute(context, editPolicy)).toBe(canWrite);
+    expect(canAccessRoute(context, attachmentWritePolicy)).toBe(canWrite);
     expect(canAccessRoute(context, archivePolicy)).toBe(canWrite);
   });
 

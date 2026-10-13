@@ -41,6 +41,16 @@ export function useUpdateCommercialProspecting() {
   });
 }
 
+export function useUploadCommercialProspectingAttachment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) =>
+      commercialService.uploadProspectingAttachment(id, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
+  });
+}
+
 export function useArchiveCommercialProspecting() {
   const queryClient = useQueryClient();
 

@@ -2,6 +2,7 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   CommercialProspecting,
+  CommercialProspectingHistoryEntry,
   CommercialProspectingClient,
   ArchiveCommercialProspectingResult,
   CommercialProposalConfig,
@@ -70,6 +71,29 @@ export const commercialService = {
       COMMERCIAL_ENDPOINTS.prospecting,
     );
     return unwrapCommercialEnvelope<CommercialProspecting[]>(response.data);
+  },
+
+  async listProspectingHistory(id: string): Promise<CommercialProspectingHistoryEntry[]> {
+    const api = setupAPIClient();
+    const response = await api.get<CommercialSuccessEnvelope<CommercialProspectingHistoryEntry[]>>(
+      COMMERCIAL_ENDPOINTS.prospectingHistory(id),
+    );
+    return unwrapCommercialEnvelope<CommercialProspectingHistoryEntry[]>(response.data);
+  },
+
+  async uploadProspectingAttachment(id: string, file: File): Promise<void> {
+    const api = setupAPIClient();
+    const form = new FormData();
+    form.append("file", file);
+    await api.put(COMMERCIAL_ENDPOINTS.prospectingAttachment(id), form);
+  },
+
+  async getProspectingAttachment(id: string): Promise<{ name: string; url: string }> {
+    const api = setupAPIClient();
+    const response = await api.get<CommercialSuccessEnvelope<{ name: string; url: string }>>(
+      COMMERCIAL_ENDPOINTS.prospectingAttachment(id),
+    );
+    return unwrapCommercialEnvelope<{ name: string; url: string }>(response.data);
   },
 
   async createProspecting(

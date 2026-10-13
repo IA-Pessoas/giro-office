@@ -34,6 +34,24 @@ describe("activityCatalog", () => {
     ],
     ["GET", "/commercial/prospecting", "consultou", "a lista de prospecções comerciais"],
     ["POST", "/commercial/prospecting", "cadastrou", "uma nova prospecção comercial"],
+    [
+      "GET",
+      "/commercial/prospecting/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/history",
+      "consultou",
+      "o histórico de uma prospecção comercial",
+    ],
+    [
+      "GET",
+      "/commercial/prospecting/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/attachment",
+      "consultou",
+      "o anexo de uma prospecção comercial",
+    ],
+    [
+      "PUT",
+      "/commercial/prospecting/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/attachment",
+      "atualizou",
+      "o anexo de uma prospecção comercial",
+    ],
     ["GET", "/pessoal/groups", "consultou", "a lista de grupos de pessoal"],
     ["POST", "/pessoal/groups", "cadastrou", "um novo grupo de pessoal"],
     [
