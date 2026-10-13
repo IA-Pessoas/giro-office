@@ -103,7 +103,13 @@ describe("commercial Worker remainder", () => {
     await app.request("https://commercial.test/commercial/prospecting", {
       method: "POST",
       headers: { ...headers(), "content-type": "application/json" },
-      body: JSON.stringify({ client_id: CLIENT_ID, status: "Análise Financeira" }),
+      body: JSON.stringify({
+        client_id: CLIENT_ID,
+        status: "Análise Financeira",
+        status_date: "2026-10-01",
+        solution: "CASTELO",
+        reference_month: "2026-10",
+      }),
     });
     await app.request(`https://commercial.test/commercial/prospecting/${PROSPECTING_ID}`, {
       method: "PATCH",
