@@ -11,6 +11,7 @@ export const TI_ENDPOINTS = {
     transfer: "/ti/inventory/{id}/transfer",
     transferBatch: "/ti/inventory/transfer-batch",
     swap: "/ti/inventory/swap",
+    equipmentMap: "/ti/inventory/equipment-map/{id}",
     history: "/ti/inventory/{id}/history",
   },
   inventoryCategories: {
