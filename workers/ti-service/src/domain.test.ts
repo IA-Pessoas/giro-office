@@ -500,7 +500,7 @@ describe("TI domain: regra do computador ativo", () => {
     expect(transaction).not.toHaveBeenCalled();
     expect(models.inventoryTecnologia.update).toHaveBeenCalledWith({
       where: { id: "pc-2" },
-      data: { notes: "Revisado", user_id: USER_ID, return_date: null },
+      data: { notes: "Revisado", user_id: USER_ID },
     });
   });
 
@@ -801,7 +801,7 @@ describe("TI domain: transferências e histórico patrimonial", () => {
     // Edição que não muda pessoa nem local não gera evento.
     await service?.update?.(auth(), "monitor-1", { notes: "Revisado", location_id: ROOM_A });
     await expect(
-      service?.assignUser?.(auth(), "monitor-1", { user_id: USER_ID }),
+      service?.assignUser?.(auth(), "monitor-1", { user_id: OTHER_USER_ID }),
     ).rejects.toMatchObject({ statusCode: 409, message: "O item já está com esta pessoa." });
 
     expect(events).toEqual([
@@ -812,6 +812,50 @@ describe("TI domain: transferências e histórico patrimonial", () => {
         to_location_id: ROOM_A,
       }),
     ]);
+  });
+
+  // O formulário reenvia a pessoa: num item legado já devolvido isso não pode reatribuí-lo.
+  it("não reatribui item devolvido ao editar e recusa devolver o que não está com ninguém", async () => {
+    const returnedAt = new Date("2024-01-10");
+    const { db, assets, events } = store([
+      asset("antigo", { user_id: USER_ID, return_date: returnedAt }),
+      asset("livre"),
+    ]);
+    (db as unknown as { inventoryTecnologia: Record<string, unknown> }).inventoryTecnologia.update =
+      vi.fn(async ({ data }: { data: object }) => data);
+    const service = createTiDomainServices(db).inventory;
+
+    await service?.update?.(auth(), "antigo", { notes: "Revisado", user_id: USER_ID });
+    expect(assets[0]).toMatchObject({ user_id: USER_ID, return_date: returnedAt });
+
+    for (const id of ["antigo", "livre"]) {
+      await expect(service?.returnAsset?.(auth(), id, {})).rejects.toMatchObject({
+        statusCode: 409,
+        message: "O item não está com ninguém para ser devolvido.",
+      });
+    }
+    expect(events).toEqual([]);
+  });
+
+  it("edição e transferência simultâneas do mesmo item não se sobrepõem", async () => {
+    const { db, assets, events } = store([asset("monitor-1", { user_id: USER_ID })]);
+    const service = createTiDomainServices(db).inventory;
+
+    const results = await Promise.allSettled([
+      service?.update?.(auth(), "monitor-1", { location_id: ROOM_B }),
+      service?.transfer?.(auth(), "monitor-1", { user_id: OTHER_USER_ID }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(
+      results.flatMap((result) => (result.status === "rejected" ? [result.reason.statusCode] : [])),
+    ).toEqual([409]);
+    // O único evento gravado descreve o estado em que o item ficou.
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      to_user_id: assets[0]?.user_id,
+      to_location_id: assets[0]?.location_id,
+    });
   });
 
   it("recusa destino igual à origem, item de outra organização e segundo computador", async () => {

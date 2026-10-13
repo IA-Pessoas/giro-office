@@ -197,7 +197,16 @@ describe("ti inventory routes", () => {
   });
 
   it("PATCH /ti/inventory/:id/return returns an asset", async () => {
-    const response = await request(createTestApp())
+    const prisma = createPrismaMock();
+    prisma.inventoryTecnologia.findFirst.mockResolvedValueOnce({
+      id: assetId,
+      category_id: categoryId,
+      location_id: locationId,
+      user_id: userId,
+      return_date: null,
+      organization_id: organizationId,
+    });
+    const response = await request(createTestApp(prisma))
       .patch(`/ti/inventory/${assetId}/return`)
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({ notes: "Devolvido sem avarias." });
@@ -211,6 +220,21 @@ describe("ti inventory routes", () => {
         notes: "Devolvido sem avarias.",
       },
     });
+  });
+
+  it("PATCH /ti/inventory/:id/return rejects an asset nobody holds", async () => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/inventory/${assetId}/return`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({});
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "O item não está com ninguém para ser devolvido.",
+    });
+    expect(prisma.inventoryEvents).toEqual([]);
   });
 
   // #1932: transferência e histórico patrimonial.
