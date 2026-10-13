@@ -29,7 +29,9 @@ import {
   listTiInventoryHistoryQuerySchema,
   listTiInventoryQuerySchema,
   returnTiInventoryBodySchema,
+  swapTiInventoryBodySchema,
   tiInventoryIdParamsSchema,
+  transferTiInventoryBatchBodySchema,
   transferTiInventoryBodySchema,
   updateTiInventoryBodySchema,
 } from "@workspace/ti-service/src/schemas/tiInventory.schemas.js";
@@ -514,6 +516,16 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     const params = parseWithZod(tiInventoryIdParamsSchema, { id: c.req.param("id") });
     const body = parseWithZod(returnTiInventoryBodySchema, await c.req.json());
     return respond(c, "inventory", "returnAsset", [requestContext(c), params.id, body]);
+  });
+  app.post("/ti/inventory/transfer-batch", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const body = parseWithZod(transferTiInventoryBatchBodySchema, await c.req.json());
+    return respond(c, "inventory", "transferBatch", [requestContext(c), body]);
+  });
+  app.post("/ti/inventory/swap", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const body = parseWithZod(swapTiInventoryBodySchema, await c.req.json());
+    return respond(c, "inventory", "swap", [requestContext(c), body]);
   });
   app.patch("/ti/inventory/:id/transfer", async (c) => {
     requireTiPermission(c.get("auth"), 3);

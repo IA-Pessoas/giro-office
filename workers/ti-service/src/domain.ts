@@ -28,6 +28,7 @@ type Delegate = {
   findMany(input: Row): Promise<unknown[]>;
   findFirst(input: Row): Promise<Row | null>;
   create(input: Row): Promise<unknown>;
+  createMany(input: Row): Promise<unknown>;
   update(input: Row): Promise<unknown>;
   updateMany(input: Row): Promise<{ count: number }>;
   count(input: Row): Promise<number>;
@@ -398,6 +399,57 @@ function inventoryServices(database: TiDatabase): TiServices {
           return_date: null,
         });
       },
+      // Vários itens para a mesma pessoa ou o mesmo local, todos ou nenhum (#1933).
+      transferBatch: async (value, body) => {
+        const auth = context(value);
+        const input = row(body);
+        const assets = await loadMovableAssets(database, auth, input.asset_ids as string[]);
+        if (typeof input.user_id === "string") {
+          await activeUserInOrganization(database, auth.organizationId, input.user_id);
+        } else {
+          const location = await locations.findFirst({
+            where: { id: input.location_id, organization_id: auth.organizationId, active: true },
+          });
+          if (!location) {
+            throw new ServiceError(404, "Departamento/local de inventário não encontrado.");
+          }
+        }
+        const to =
+          typeof input.user_id === "string"
+            ? { user_id: input.user_id, location_id: null }
+            : { user_id: null, location_id: String(input.location_id) };
+        return moveManyInventory(
+          database,
+          auth,
+          "transfer",
+          inventoryInclude,
+          assets.map((asset) => ({ asset, to })),
+        );
+      },
+      // Troca entre duas pessoas: cada item passa para quem está com o outro (#1933).
+      swap: async (value, body) => {
+        const auth = context(value);
+        const input = row(body);
+        const [first, second] = await loadMovableAssets(database, auth, [
+          String(input.asset_id),
+          String(input.other_asset_id),
+        ]);
+        const firstHolder = first ? activeHolderId(first) : null;
+        const secondHolder = second ? activeHolderId(second) : null;
+        if (!first || !second || !firstHolder || !secondHolder) {
+          throw new ServiceError(409, "A troca exige dois itens que estejam com pessoas.");
+        }
+        if (firstHolder === secondHolder) {
+          throw new ServiceError(409, "Os dois itens já estão com a mesma pessoa.");
+        }
+        // Cada pessoa passa a ser destino de um item: precisa estar ativa, como na transferência.
+        await activeUserInOrganization(database, auth.organizationId, firstHolder);
+        await activeUserInOrganization(database, auth.organizationId, secondHolder);
+        return moveManyInventory(database, auth, "swap", inventoryInclude, [
+          { asset: first, to: { user_id: secondHolder, location_id: null } },
+          { asset: second, to: { user_id: firstHolder, location_id: null } },
+        ]);
+      },
       // Histórico patrimonial do item, do mais recente para o mais antigo.
       listHistory: async (value, id, query) => {
         const auth = context(value);
@@ -452,6 +504,142 @@ function inventoryServices(database: TiDatabase): TiServices {
   };
 }
 
+type InventoryEventAction = "assign" | "return" | "transfer" | "swap";
+
+/** Movimentação planejada de um item dentro de uma troca ou de um lote (#1933). */
+type PlannedMove = { asset: Row; to: { user_id: string | null; location_id: string | null } };
+
+/** A operação vale para todos os itens ou para nenhum; a mensagem diz quais impediram. */
+function itemsBlockedError(blocked: string[]): ServiceError {
+  return new ServiceError(
+    409,
+    `Nenhum item foi movimentado. Itens impeditivos: ${blocked.join("; ")}.`,
+    undefined,
+    "TI_INVENTORY_ITEMS_BLOCKED",
+  );
+}
+
+async function loadMovableAssets(
+  database: TiDatabase,
+  auth: TiAuthContext,
+  ids: string[],
+): Promise<Row[]> {
+  const found = (
+    await delegate(database, "inventoryTecnologia").findMany({
+      where: { id: { in: ids }, organization_id: auth.organizationId },
+      select: {
+        id: true,
+        asset_code: true,
+        category_id: true,
+        user_id: true,
+        location_id: true,
+        return_date: true,
+      },
+    })
+  ).map(row);
+  const byId = new Map(found.map((asset) => [asset.id, asset]));
+  const assets: Row[] = [];
+  for (const id of ids) {
+    const asset = byId.get(id);
+    if (asset) assets.push(asset);
+  }
+  if (assets.length !== ids.length) throw new ServiceError(404, "Ativo de TI não encontrado.");
+  return assets;
+}
+
+/**
+ * Aplica várias movimentações numa só transação. Tudo é conferido antes da primeira escrita —
+ * destino igual à origem e regra do computador ativo sobre o estado final —, e a resposta
+ * lista os itens que impediram. Os bloqueios das pessoas de destino são tomados em ordem,
+ * para duas operações cruzadas não se travarem.
+ */
+async function moveManyInventory(
+  database: TiDatabase,
+  auth: TiAuthContext,
+  action: InventoryEventAction,
+  include: Row,
+  moves: PlannedMove[],
+): Promise<unknown> {
+  const organizationId = auth.organizationId;
+  const ids = moves.map((move) => move.asset.id);
+
+  const run = async (transaction: TiDatabase) => {
+    const inventory = delegate(transaction, "inventoryTecnologia");
+    const destinationUserIds = uniqueIds(moves.map((move) => move.to.user_id)).sort();
+    for (const userId of destinationUserIds) {
+      await lockActiveComputer(transaction, organizationId, userId);
+    }
+
+    const computerCategoryIds = await computerCategoryIdsOf(transaction, organizationId);
+    const isComputer = (move: PlannedMove) => computerCategoryIds.includes(move.asset.category_id);
+    // Computadores que cada pessoa de destino terá no fim: os que ficam mais os que chegam.
+    const staying =
+      destinationUserIds.length === 0
+        ? []
+        : await inventory.findMany({
+            where: {
+              organization_id: organizationId,
+              user_id: { in: destinationUserIds },
+              return_date: null,
+              category_id: { in: computerCategoryIds },
+              id: { notIn: ids },
+            },
+            select: { user_id: true },
+          });
+    const computersByUser = new Map<unknown, number>();
+    const count = (userId: unknown) => {
+      if (userId) computersByUser.set(userId, (computersByUser.get(userId) ?? 0) + 1);
+    };
+    for (const asset of staying) count(row(asset).user_id);
+    for (const move of moves) if (isComputer(move)) count(move.to.user_id);
+
+    const blocked = moves.flatMap((move) => {
+      const holderId = activeHolderId(move.asset);
+      const alreadyThere = move.to.user_id
+        ? move.to.user_id === holderId
+        : !holderId && move.asset.location_id === move.to.location_id;
+      if (alreadyThere) return [`${move.asset.asset_code} (já está no destino)`];
+      if (move.to.user_id && isComputer(move) && (computersByUser.get(move.to.user_id) ?? 0) > 1) {
+        return [`${move.asset.asset_code} (o usuário ficaria com mais de um computador ativo)`];
+      }
+      return [];
+    });
+    if (blocked.length > 0) throw itemsBlockedError(blocked);
+
+    const deliveryDate = new Date();
+    for (const move of moves) {
+      const moved = await inventory.updateMany({
+        where: {
+          id: move.asset.id,
+          organization_id: organizationId,
+          category_id: move.asset.category_id,
+          user_id: move.asset.user_id ?? null,
+          location_id: move.asset.location_id ?? null,
+          return_date: move.asset.return_date ?? null,
+        },
+        data: { ...move.to, delivery_date: deliveryDate, return_date: null },
+      });
+      if (moved.count !== 1) {
+        throw itemsBlockedError([`${move.asset.asset_code} (movimentado por outra operação)`]);
+      }
+    }
+    await delegate(transaction, "inventoryEventTecnologia").createMany({
+      data: moves.map((move) =>
+        inventoryEventData(auth, String(move.asset.id), action, move.asset, move.to),
+      ),
+    });
+
+    return inventory.findMany({
+      where: { id: { in: ids }, organization_id: organizationId },
+      include,
+      orderBy: { asset_code: "asc" },
+    });
+  };
+
+  // Um lote de 100 itens faz uma escrita por item: o padrão de 5 s do Prisma não basta.
+  return database.$transaction(run, { maxWait: 5_000, timeout: 30_000 });
+}
+
 /** Pessoa que está com o item agora; item devolvido não está com ninguém. */
 function activeHolderId(asset: Row): string | null {
   return typeof asset.user_id === "string" &&
@@ -464,7 +652,7 @@ function activeHolderId(asset: Row): string | null {
 function inventoryEventData(
   auth: TiAuthContext,
   inventoryId: string,
-  action: "assign" | "return" | "transfer",
+  action: InventoryEventAction,
   from: Row | null,
   to: { user_id: unknown; location_id: unknown },
 ): Row {
@@ -494,7 +682,7 @@ async function moveInventory(
   auth: TiAuthContext,
   id: string,
   existing: Row,
-  action: "assign" | "return" | "transfer",
+  action: InventoryEventAction,
   include: Row,
   data: Row & { user_id: string | null; location_id?: string | null },
 ): Promise<unknown> {
@@ -519,6 +707,7 @@ async function moveInventory(
       where: {
         id,
         organization_id: organizationId,
+        category_id: existing.category_id,
         user_id: existing.user_id ?? null,
         location_id: existing.location_id ?? null,
         return_date: existing.return_date ?? null,
@@ -623,6 +812,19 @@ async function computerCategoryIdsOf(
     .map((category) => row(category).id);
 }
 
+/** Bloqueio transacional que serializa as escritas de computador de uma pessoa. */
+async function lockActiveComputer(
+  transaction: TiDatabase,
+  organizationId: string,
+  userId: string,
+): Promise<void> {
+  const lock = transaction.$executeRaw as (
+    query: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<unknown>;
+  await lock`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+}
+
 /** Toma o bloqueio da pessoa e recusa se ela já tem outro computador ativo. */
 async function lockAndCheckActiveComputer(
   transaction: TiDatabase,
@@ -631,11 +833,7 @@ async function lockAndCheckActiveComputer(
   computerCategoryIds: unknown[],
   assetId?: string,
 ): Promise<void> {
-  const lock = transaction.$executeRaw as (
-    query: TemplateStringsArray,
-    ...values: unknown[]
-  ) => Promise<unknown>;
-  await lock`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+  await lockActiveComputer(transaction, organizationId, userId);
   const activeComputer = await delegate(transaction, "inventoryTecnologia").findFirst({
     where: {
       organization_id: organizationId,
