@@ -17,6 +17,8 @@ interface AdminUserDetailsPanelProps {
   departmentsError: boolean;
   onUserUpdated: () => Promise<unknown> | unknown;
   canManageUsers?: boolean;
+  /** Só o owner altera o nível de acesso de um usuário (#1930). */
+  canChangeAccess?: boolean;
   dataSource: AdminUserDetailsDataSource;
 }
 
@@ -76,6 +78,7 @@ export function AdminUserDetailsPanel({
   departmentsError,
   onUserUpdated,
   canManageUsers,
+  canChangeAccess = true,
   dataSource,
 }: AdminUserDetailsPanelProps) {
   const router = useRouter();
@@ -174,11 +177,15 @@ export function AdminUserDetailsPanel({
     setIsSaving(true);
     setSaveError(null);
 
+    // Departamento e permissão só seguem quando mudam: reenviá-los faz o servidor rederivar
+    // os módulos do usuário e recusa quem não pode concedê-los (#1930).
+    const departmentChanged = formData.department_id !== user?.department_id;
+    const permissionChanged = Number(formData.permission) !== user?.permission;
     const payload: UpdateUserData = {
       name: formData.name,
-      department_id: formData.department_id,
+      ...(departmentChanged ? { department_id: formData.department_id } : {}),
       // O papel do owner não é um nível de permissão (ADR 0002): não sobrescrever.
-      ...(isOwner ? {} : { permission: Number(formData.permission) }),
+      ...(isOwner || !permissionChanged ? {} : { permission: Number(formData.permission) }),
       status: formData.status,
     };
 
@@ -190,8 +197,10 @@ export function AdminUserDetailsPanel({
       toast.success("Usuário atualizado com sucesso!");
       await loadUser(userId);
     } catch (error) {
+      // O 403 aqui é de uma alteração reservada ao owner, não de perda de acesso à tela.
       if (isAxiosError(error) && error.response?.status === 403) {
-        await router.replace("/dashboard");
+        setSaveError("Somente o owner pode fazer esta alteração.");
+        toast.error("Você não tem permissão para esta alteração.");
         return;
       }
 
@@ -345,6 +354,8 @@ export function AdminUserDetailsPanel({
                   onChange={handleInputChange}
                   className={SELECT_FIELD_CLASSNAME}
                   style={SELECT_ARROW_STYLE}
+                  disabled={!canChangeAccess}
+                  title={canChangeAccess ? undefined : "Somente o owner altera a permissão."}
                 >
                   {!hasKnownPermission ? (
                     <option value={formData.permission}>Permissão atual ({formData.permission})</option>
@@ -366,7 +377,7 @@ export function AdminUserDetailsPanel({
                 onChange={handleInputChange}
                 className={SELECT_FIELD_CLASSNAME}
                 style={SELECT_ARROW_STYLE}
-                disabled={departmentsError}
+                disabled={departmentsError || (!canChangeAccess && user?.type === "admin")}
               >
                 <option value="">Selecione um departamento</option>
                 {departments.map((department) => (

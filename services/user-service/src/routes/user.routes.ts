@@ -17,6 +17,7 @@ import {
   userIdParamsSchema,
 } from "../schemas/user.schemas.js";
 import {
+  actorGrantScope,
   isMarketingOnlyUserListAccess,
   isMarketingOnlyUserPhotoUpdate,
   isOwnerMutationPayload,
@@ -31,7 +32,7 @@ import {
   OrganizationUserManagementAdapter,
   type UserManagement,
 } from "../services/userManagementService.js";
-import { UserService } from "../services/userService.js";
+import { type ActorGrantScope, UserService } from "../services/userService.js";
 
 export function createUserRoutes(
   options: { audit?: UserAuditRecorder } = {},
@@ -41,9 +42,12 @@ export function createUserRoutes(
   const userService = new UserService(options.audit);
   const storageService = new StorageService();
 
-  function userManagement(auth: { user_id: string; organization_id: string }): UserManagement {
+  function userManagement(
+    auth: { user_id: string; organization_id: string },
+    grantScope?: ActorGrantScope,
+  ): UserManagement {
     return new OrganizationUserManagementAdapter(userService, {
-      actor: { kind: "organization", userId: auth.user_id },
+      actor: { kind: "organization", userId: auth.user_id, ...(grantScope ? { grantScope } : {}) },
       organizationId: auth.organization_id,
     });
   }
@@ -58,6 +62,13 @@ export function createUserRoutes(
       next();
     } catch (err) {
       next(err);
+    }
+  }
+
+  /** A conferência vem antes do storage, senão a foto do owner seria trocada antes do 403. */
+  function assertPhotoTarget(request: Request, target: { type?: string | null }): void {
+    if (actorGrantScope(request) && target.type === "owner") {
+      throw new ServiceError(403, "Apenas o owner pode alterar outro owner.");
     }
   }
 
@@ -157,7 +168,7 @@ export function createUserRoutes(
           requireOwnerUserAuth(request);
         }
 
-        const user = await userManagement(auth).create({
+        const user = await userManagement(auth, actorGrantScope(request)).create({
           ...body,
           first_owner_flag: body.first_owner_flag ?? false,
         });
@@ -205,7 +216,10 @@ export function createUserRoutes(
           );
         }
 
-        const user = await userManagement(auth).update(id, changes);
+        const user = await userManagement(
+          auth,
+          selfPasswordUpdate ? undefined : actorGrantScope(request),
+        ).update(id, changes);
 
         response.json(createSuccessResponse(user));
       } catch (err) {
@@ -230,6 +244,7 @@ export function createUserRoutes(
         }
 
         const existing = await userManagement(auth).getById(id);
+        assertPhotoTarget(request, existing);
         validateUploadFileSignature(request.file);
         const photoUrl = await storageService.uploadUserPhoto(request.file, id);
         const user = await userManagement(auth).update(id, { photo_url: photoUrl }, "UPDATE_PHOTO");
@@ -257,6 +272,7 @@ export function createUserRoutes(
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
         const existing = await userManagement(auth).getById(id);
+        assertPhotoTarget(request, existing);
         await storageService.deleteUserPhoto(id);
         const user = await userManagement(auth).update(id, { photo_url: null }, "UPDATE_PHOTO");
 
@@ -280,7 +296,7 @@ export function createUserRoutes(
         const auth = requireManageUsersAuth(request);
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
-        await userManagement(auth).delete(id);
+        await userManagement(auth, actorGrantScope(request)).delete(id);
 
         response.json(createSuccessResponse({ message: "Usuário desativado com sucesso." }));
       } catch (err) {

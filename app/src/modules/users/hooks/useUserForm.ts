@@ -14,6 +14,7 @@ const getInitialState = (user: UserItem) => ({
 
 export const useUserForm = (initialUser: UserItem) => {
   const [formData, setFormData] = useState(getInitialState(initialUser));
+  const [savedUser, setSavedUser] = useState(initialUser);
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,14 +37,21 @@ export const useUserForm = (initialUser: UserItem) => {
       const updateData: UpdateUserData = {
         name: formData.name,
         // O papel do owner não é um nível de permissão (ADR 0002): não sobrescrever.
-        ...(isOrganizationOwner(initialUser) ? {} : { permission: formData.permission }),
-        department_id: formData.department_id,
+        // Permissão e departamento só seguem quando mudam: reenviá-los faz o servidor
+        // rederivar os módulos do usuário (#1930).
+        ...(isOrganizationOwner(initialUser) || formData.permission === savedUser.permission
+          ? {}
+          : { permission: formData.permission }),
+        ...(formData.department_id === savedUser.department_id
+          ? {}
+          : { department_id: formData.department_id }),
         status: formData.status,
         file: file || undefined,
       };
       
       const updatedUser = await userService.update(initialUser.id, updateData);
       setFormData(getInitialState(updatedUser));
+      setSavedUser(updatedUser);
       setFile(null);
       
       toast.success("Usuário atualizado com sucesso!");

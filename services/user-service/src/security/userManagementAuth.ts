@@ -5,8 +5,10 @@ import {
 } from "@workspace/shared";
 import type { Request } from "express";
 
+import type { ActorGrantScope } from "../services/userService.js";
+
 const ADMIN_PERMISSION = 3;
-const RH_MODULE_KEY = "rh";
+const USER_ADMIN_MODULE_KEYS = ["rh", "ti"] as const;
 const MARKETING_VIEW_PERMISSION = 1;
 const MARKETING_EDIT_PERMISSION = 2;
 
@@ -21,13 +23,21 @@ function isExplicitOwnerRequest(request: Request): boolean {
   return request.user_type === "owner";
 }
 
-function hasRhAdminPermission(request: Request): boolean {
-  const rhPermission = request.modules?.[RH_MODULE_KEY];
-  return typeof rhPermission === "number" && rhPermission >= ADMIN_PERMISSION;
+function hasUserAdminModulePermission(request: Request): boolean {
+  return USER_ADMIN_MODULE_KEYS.some((module) => {
+    const permission = request.modules?.[module];
+    return typeof permission === "number" && permission >= ADMIN_PERMISSION;
+  });
 }
 
+/** Owner, admin de RH (rh=3) e admin de TI (ti=3), como no gateway e no Worker. */
 function canManageUsers(request: Request): boolean {
-  return isExplicitOwnerRequest(request) || hasRhAdminPermission(request);
+  return isExplicitOwnerRequest(request) || hasUserAdminModulePermission(request);
+}
+
+/** Quem não é owner gerencia usuários sem conceder nem revogar acessos. */
+export function actorGrantScope(request: Request): ActorGrantScope | undefined {
+  return isExplicitOwnerRequest(request) ? undefined : "none";
 }
 
 function hasMarketingPermission(request: Request, minPermission: number): boolean {

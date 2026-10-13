@@ -1,6 +1,7 @@
 import type { ModulePermissions } from "@workspace/shared";
 
 import type {
+  ActorGrantScope,
   CreateUserInput,
   ListUsersParams,
   UpdateUserInput,
@@ -8,7 +9,7 @@ import type {
 } from "./userService.js";
 
 export interface OrganizationalUserManagementContext {
-  actor: { kind: "organization"; userId: string };
+  actor: { kind: "organization"; userId: string; grantScope?: ActorGrantScope };
   organizationId: string;
 }
 
@@ -62,10 +63,11 @@ export class OrganizationUserManagementAdapter implements UserManagement {
     organization_id: _organizationId,
     ...input
   }: CreateUserInput): ReturnType<UserManagementService["create"]> {
-    return this.userService.create(
-      { ...input, organization_id: this.context.organizationId },
-      this.context.actor.userId,
-    );
+    const { userId, grantScope } = this.context.actor;
+    const data = { ...input, organization_id: this.context.organizationId };
+    return grantScope
+      ? this.userService.create(data, userId, grantScope)
+      : this.userService.create(data, userId);
   }
 
   update(
@@ -73,7 +75,9 @@ export class OrganizationUserManagementAdapter implements UserManagement {
     { organization_id: _organizationId, ...input }: UpdateUserInput,
     action?: string,
   ): ReturnType<UserManagementService["update"]> {
-    const args = [id, input, this.context.organizationId, this.context.actor.userId] as const;
+    const { userId, grantScope } = this.context.actor;
+    const args = [id, input, this.context.organizationId, userId] as const;
+    if (grantScope) return this.userService.update(...args, action ?? "UPDATE", grantScope);
     return action === undefined
       ? this.userService.update(...args)
       : this.userService.update(...args, action);
@@ -92,7 +96,10 @@ export class OrganizationUserManagementAdapter implements UserManagement {
   }
 
   delete(id: string): ReturnType<UserManagementService["delete"]> {
-    return this.userService.delete(id, this.context.organizationId, this.context.actor.userId);
+    const { userId, grantScope } = this.context.actor;
+    return grantScope
+      ? this.userService.delete(id, this.context.organizationId, userId, grantScope)
+      : this.userService.delete(id, this.context.organizationId, userId);
   }
 }
 

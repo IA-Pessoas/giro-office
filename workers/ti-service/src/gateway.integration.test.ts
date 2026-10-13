@@ -16,6 +16,9 @@ const AUDIT_TOKEN = "gateway-ti-audit-token";
 const USER_ID = "b0000000-0000-4000-8000-000000000001";
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
 const CATEGORY_ID = "c0000000-0000-4000-8000-000000000001";
+const REQUEST_ID = "e0000000-0000-4000-8000-000000000001";
+const MESSAGE_ID = "e0000000-0000-4000-8000-000000000002";
+const TERM_ID = "f0000000-0000-4000-8000-000000000001";
 
 function encode(value: string | Uint8Array): string {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
@@ -134,6 +137,92 @@ describe("Gateway to TI Worker session contract", () => {
     expect(read.status).toBe(200);
     expect(categoryService.list).toHaveBeenCalledOnce();
     expect(userService.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  // #1929: abrir chamado, responder e assinar o próprio termo são do TI nível 1.
+  it("lets TI level 1 use self-service through the gateway and blocks management", async () => {
+    const csrf = "D".repeat(43);
+    const token = await signSession({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      auth_kind: "organization",
+      type: "user",
+      modules: { ti: 1 },
+      permission: 1,
+      session_id: "gateway-session-self-service",
+      session_version: 1,
+      csrf_hash: await hashCsrfToken(csrf),
+    });
+    const requests = {
+      create: vi.fn(async () => ({ id: REQUEST_ID })),
+      createMessage: vi.fn(async () => ({ id: MESSAGE_ID })),
+      updateStatus: vi.fn(async () => ({ id: REQUEST_ID })),
+    };
+    const terms = {
+      create: vi.fn(async () => ({ id: TERM_ID })),
+      sign: vi.fn(async () => ({ id: TERM_ID })),
+    };
+    const userService = { fetch: vi.fn(async () => new Response(null, { status: 204 })) };
+    const tiApp = createTiWorkerApp({
+      env: tiEnv(userService),
+      services: { requests, terms },
+    } as never);
+    const tiBinding = {
+      fetch: vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+        tiApp.fetch(new Request(input, init)),
+      ),
+    };
+    const gatewayApp = createGatewayWorkerApp({ env: gatewayEnv(tiBinding) });
+    const send = (method: string, path: string, body: unknown) =>
+      gatewayApp.request(`https://gateway.test${path}`, {
+        method,
+        headers: {
+          cookie: `cw.session=${token}; cw.csrf=${csrf}`,
+          "x-csrf-token": csrf,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    const self = {
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      permission: 1,
+      isOrganizationOwner: false,
+    };
+
+    const created = await send("POST", "/ti/requests", {
+      title: "Monitor sem imagem",
+      description: "O monitor não liga.",
+      category_id: CATEGORY_ID,
+      anydesk_code: "123456789",
+    });
+    const message = await send("POST", `/ti/requests/${REQUEST_ID}/messages`, {
+      message: "Segue o detalhe.",
+    });
+    const signed = await send("PATCH", `/ti/terms/${TERM_ID}/sign`, {});
+
+    expect([created.status, message.status, signed.status]).toEqual([201, 201, 200]);
+    expect(requests.create).toHaveBeenCalledWith(
+      self,
+      expect.objectContaining({ title: "Monitor sem imagem" }),
+    );
+    expect(requests.createMessage).toHaveBeenCalledWith(
+      self,
+      REQUEST_ID,
+      expect.objectContaining({ message: "Segue o detalhe." }),
+    );
+    expect(terms.sign).toHaveBeenCalledWith(self, TERM_ID, expect.anything());
+
+    const reached = tiBinding.fetch.mock.calls.length;
+    const status = await send("PATCH", `/ti/requests/${REQUEST_ID}/status`, {
+      status: "In_Progress",
+    });
+    const term = await send("POST", "/ti/terms", { user_id: USER_ID, reason: "Termo" });
+
+    expect([status.status, term.status]).toEqual([403, 403]);
+    expect(tiBinding.fetch).toHaveBeenCalledTimes(reached);
+    expect(requests.updateStatus).not.toHaveBeenCalled();
+    expect(terms.create).not.toHaveBeenCalled();
   });
 
   it("rejects an incorrect cookie CSRF before reaching TI", async () => {

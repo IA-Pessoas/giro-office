@@ -36,6 +36,7 @@ interface CreateUserModalProps {
   organizationIdLoading?: boolean;
   invitedBy?: string;
   canCreateOrganizationOwner?: boolean;
+  canGrantModules?: boolean;
 }
 
 const INITIAL_FORM_DATA: CreateUserFormState = {
@@ -126,6 +127,7 @@ export function CreateUserModal({
   organizationIdLoading = false,
   invitedBy,
   canCreateOrganizationOwner = false,
+  canGrantModules = true,
 }: CreateUserModalProps) {
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [moduleSelections, setModuleSelections] = useState<ModuleSelectionState>(createInitialModuleSelections);
@@ -221,6 +223,7 @@ export function CreateUserModal({
         organizationId,
         invitedBy,
         canCreateOrganizationOwner,
+        canGrantModules,
       });
 
       const newUser = await onCreateUser(payload);
@@ -358,7 +361,7 @@ export function CreateUserModal({
             </div>
           </div>
 
-          <div className={`grid grid-cols-1 gap-4 ${canCreateOrganizationOwner ? 'md:grid-cols-[minmax(0,1fr)_196px_160px]' : 'md:grid-cols-[minmax(0,1fr)_220px]'}`}>
+          <div className={`grid grid-cols-1 gap-4 ${canCreateOrganizationOwner ? 'md:grid-cols-[minmax(0,1fr)_196px_160px]' : canGrantModules ? 'md:grid-cols-[minmax(0,1fr)_220px]' : ''}`}>
             <div>
               <label htmlFor="user-department" className={FIELD_LABEL_CLASSNAME}>
                 <RequiredFieldLabel required>Departamento</RequiredFieldLabel>
@@ -380,21 +383,23 @@ export function CreateUserModal({
                 ))}
               </select>
             </div>
-            <div>
-              <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissão</label>
-              <select
-                id="user-permission"
-                name="departmentPermission"
-                value={formData.departmentPermission}
-                onChange={handleInputChange}
-                className={SELECT_FIELD_CLASSNAME}
-                style={SELECT_ARROW_STYLE}
-              >
-                {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
+            {canGrantModules ? (
+              <div>
+                <label htmlFor="user-permission" className={FIELD_LABEL_CLASSNAME}>Permissão</label>
+                <select
+                  id="user-permission"
+                  name="departmentPermission"
+                  value={formData.departmentPermission}
+                  onChange={handleInputChange}
+                  className={SELECT_FIELD_CLASSNAME}
+                  style={SELECT_ARROW_STYLE}
+                >
+                  {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             {canCreateOrganizationOwner ? (
               <div className="flex h-full flex-col justify-end">
                 <div className="flex h-[42px] items-center justify-center gap-3">
@@ -413,6 +418,7 @@ export function CreateUserModal({
           </div>
         </div>
 
+        {canGrantModules ? (
         <section className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
           <div className="mb-4 space-y-1">
             <label className={SECTION_TITLE_CLASSNAME}>Módulos adicionais</label>
@@ -463,6 +469,11 @@ export function CreateUserModal({
             })}
           </div>
         </section>
+        ) : (
+          <p className={SECTION_DESCRIPTION_CLASSNAME}>
+            O usuário é criado com o acesso básico. As permissões por módulo são definidas pelo owner.
+          </p>
+        )}
       </div>
     </Dialog>
   );

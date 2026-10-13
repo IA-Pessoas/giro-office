@@ -358,6 +358,49 @@ runTest("organization owner keeps owner type and lets backend grant all modules"
   assert.equal(Object.prototype.hasOwnProperty.call(payload, "modules"), false);
 });
 
+runTest("creator without module grant builds a self-service user without modules", () => {
+  const payload = buildAdminCreateUserPayload({
+    formData: { ...baseFormData, isOrganizationOwner: true },
+    moduleSelections: {
+      rh: { enabled: true, level: 3 },
+      comercial: { enabled: true, level: 1 },
+    },
+    departmentModuleKey: "rh",
+    organizationId: "org-1",
+    invitedBy: "ti-admin-1",
+    canCreateOrganizationOwner: false,
+    canGrantModules: false,
+  });
+
+  assert.deepEqual(payload, {
+    name: "Johan",
+    login: "johan",
+    password: "secret",
+    department_id: "dept-rh",
+    permission: 1,
+    organization_id: "org-1",
+    type: "user",
+    status: "active",
+    invited_by: "ti-admin-1",
+  });
+});
+
+runTest("only owners see and send module grants in administration", () => {
+  assert.match(createUserModalSource, /canGrantModules = true/);
+  assert.match(createUserModalSource, /\{canGrantModules \? \(\s*<section/);
+  assert.match(createUserModalSource, /\{canGrantModules \? \(\s*<div>\s*<label htmlFor="user-permission"/);
+  assert.match(administracaoSource, /canGrantModules=\{canManageOrganizationOwners\}/);
+  assert.match(administracaoSource, /canEditPermissions=\{canManageOrganizationOwners\}/);
+  assert.match(administracaoSource, /canChangeAccess=\{canManageOrganizationOwners\}/);
+  assert.match(adminUserDetailsPanelSource, /disabled=\{!canChangeAccess\}/);
+  assert.match(adminPermissionsEditorSource, /const isReadOnly = isOwner \|\| !canEditPermissions;/);
+  assert.doesNotMatch(adminPermissionsEditorSource, /disabled=\{[^}]*isOwner[^}]*\}/);
+  assert.match(
+    adminPermissionsEditorSource,
+    /if \(!selectedUserId \|\| !permissionSnapshot \|\| isReadOnly \|\| isSaving\) return;/,
+  );
+});
+
 runTest("non-owner creator cannot build organization owner payload", () => {
   const payload = buildAdminCreateUserPayload({
     formData: {
@@ -523,7 +566,7 @@ runTest("admin user details shows Owner instead of a permission level for the ow
   assert.match(adminUserDetailsPanelSource, /\{isOwner \? \([\s\S]*?value=\{OWNER_ROLE_LABEL\}[\s\S]*?readOnly/);
   assert.match(
     adminUserDetailsPanelSource,
-    /\.\.\.\(isOwner \? \{\} : \{ permission: Number\(formData\.permission\) \}\)/,
+    /\.\.\.\(isOwner \|\| !permissionChanged \? \{\} : \{ permission: Number\(formData\.permission\) \}\)/,
   );
 });
 

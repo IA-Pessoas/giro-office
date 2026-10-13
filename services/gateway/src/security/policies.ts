@@ -398,6 +398,11 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/triagem(?:\/|$)/, policy: triagemModulePolicy },
   { method: "ANY", path: /^\/triagem(?:\/|$)/, policy: triagemEditPolicy },
   { method: "GET", path: /^\/ti(?:\/|$)/, policy: tiModulePolicy },
+  // Autoatendimento: o nível 1 abre chamado, responde e assina o próprio termo; a posse
+  // do recurso é conferida no TI Service (#1929).
+  { method: "POST", path: /^\/ti\/requests$/, policy: tiModulePolicy },
+  { method: "POST", path: /^\/ti\/requests\/[^/]+\/messages$/, policy: tiModulePolicy },
+  { method: "PATCH", path: /^\/ti\/terms\/[^/]+\/sign$/, policy: tiModulePolicy },
   { method: "ANY", path: /^\/ti(?:\/|$)/, policy: tiEditPolicy },
   { method: "GET", path: /^\/certificate(?:\/|$)/, policy: certificateModulePolicy },
   { method: "ANY", path: /^\/certificate(?:\/|$)/, policy: certificateEditPolicy },
