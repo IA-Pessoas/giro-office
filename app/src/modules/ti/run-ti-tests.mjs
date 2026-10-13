@@ -1913,6 +1913,32 @@ await runTest("ti inventory offers batch transfer and swap, showing the blocking
   assert.match(source, /swap: "Troca"/);
 });
 
+await runTest("ti inventory shows a read-only equipment map per user", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+  const service = await readModuleSource("services/tiInventoryService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /equipmentMap: "\/ti\/inventory\/equipment-map\/\{id\}"/);
+  assert.match(service, /getUserEquipmentMap/);
+  assert.match(source, /label="Mapa de equipamentos"/);
+  assert.match(source, /title="Mapa de equipamentos"/);
+  assert.match(source, /useTiInventoryEquipmentMap\(equipmentMapUserId \|\| undefined/);
+  // Código, marca, entradas e configuração aparecem só quando existem.
+  assert.match(source, /\["Marca", item\.brand \? \[item\.brand\] : \[\]\]/);
+  assert.match(source, /\["Entradas", item\.inputs\]/);
+  assert.match(source, /\["Configuração", item\.configuration\]/);
+  assert.match(source, /Sem marca, entradas ou configuração cadastradas nas observações\./);
+  // Periférico sem conexão confiável fica à parte.
+  assert.match(source, /Sem conexão identificada/);
+  assert.match(source, /`Conexão: \$\{connection\.ports\.join\(", "\)\}`/);
+  // Somente leitura: o diálogo do mapa não tem formulário nem mutação.
+  const dialog = source.slice(
+    source.indexOf('title="Mapa de equipamentos"'),
+    source.indexOf('open={dialogState?.type === "categories"}'),
+  );
+  assert.doesNotMatch(dialog, /<form|onSubmit|Mutation/);
+});
+
 await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");
