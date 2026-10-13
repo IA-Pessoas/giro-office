@@ -157,6 +157,23 @@ describe("AgendaService", () => {
       const { prisma, audit, service } = setup();
       await service.create(scope, { ...event, client_id: "client-1", participants });
 
+      expect(prisma.client.count).toHaveBeenCalledWith({
+        where: { id: "client-1", organization_id: ORG },
+      });
+      for (const pair of participants) {
+        expect(prisma.user.count).toHaveBeenCalledWith({
+          where: {
+            id: pair.participant_id,
+            department_id: pair.department_id,
+            status: "active",
+            OR: [
+              { organization_id: ORG },
+              { organization_id: null, department: { organization_id: ORG } },
+            ],
+          },
+        });
+      }
+
       expect(prisma.agenda.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -238,6 +255,24 @@ describe("AgendaService", () => {
           updatedData: { status: "Agendada" },
         }),
       );
+    });
+
+    it("consulta o mês civil do usuário nas duas viradas de fuso", async () => {
+      const { prisma, service } = setup();
+      await service.list(scope, "2026-12", false, new Date("2026-12-15T00:00:00Z"), {
+        start: 180,
+        end: 120,
+      });
+      expect(prisma.agenda.findMany.mock.calls[0][0].where.date).toEqual({
+        gte: new Date("2026-12-01T03:00:00Z"),
+        lt: new Date("2027-01-01T02:00:00Z"),
+      });
+    });
+
+    it("não permite excluir compromisso de Integração", async () => {
+      const { prisma, service } = setup();
+      await expect(service.remove(scope, EVENT)).rejects.toMatchObject({ statusCode: 403 });
+      expect(prisma.agenda.deleteMany).not.toHaveBeenCalled();
     });
 
     it("substitui os pares e limpa os participantes removidos", async () => {

@@ -235,6 +235,31 @@ describe("Integração agenda catalogs", () => {
       statusCode: 403,
     });
   });
+
+  it("não libera exclusão de compromisso só com Integração nível 2", () => {
+    expect(
+      authorizeClientRequest(
+        "DELETE",
+        "/task/agenda",
+        { integracao: 2 },
+        {
+          module: "integracao",
+          agenda_id: "evt-1",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+    expect(
+      authorizeClientRequest(
+        "DELETE",
+        "/task/agenda",
+        { contabil: 2 },
+        {
+          module: "contabil",
+          agenda_id: "evt-1",
+        },
+      ),
+    ).toBeUndefined();
+  });
 });
 
 describe("platform default deny", () => {

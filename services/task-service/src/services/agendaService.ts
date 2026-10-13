@@ -263,6 +263,7 @@ export class AgendaService {
     month: string,
     mine = false,
     now = new Date(),
+    timezoneOffsets: { start: number; end: number } = { start: 0, end: 0 },
   ): Promise<AgendaEventRow[]> {
     const [year, monthNumber] = month.split("-").map(Number);
     const departmentIds = await this.departmentIds(scope, AGENDA_LEVEL.READ);
@@ -276,8 +277,8 @@ export class AgendaService {
           ? { module: "integracao" }
           : { module: null, department_control_id: { in: departmentIds } }),
         date: {
-          gte: new Date(Date.UTC(year, monthNumber - 1, 1)),
-          lt: new Date(Date.UTC(year, monthNumber, 1)),
+          gte: new Date(Date.UTC(year, monthNumber - 1, 1) + timezoneOffsets.start * 60_000),
+          lt: new Date(Date.UTC(year, monthNumber, 1) + timezoneOffsets.end * 60_000),
         },
         ...(mine
           ? {
@@ -584,6 +585,9 @@ export class AgendaService {
   }
 
   async remove(scope: AgendaScope, id: string): Promise<{ id: string }> {
+    if (scope.module === "integracao") {
+      throw new ServiceError(403, "Exclusão de compromissos não está disponível para Integração.");
+    }
     const { count } = await this.prisma.agenda.deleteMany({
       where: await this.scopedWhere(scope, id),
     });

@@ -221,6 +221,27 @@ describe("agenda de Integração (#1952)", () => {
     participants,
   };
 
+  it("aplica o mês civil e nega exclusão direta", async () => {
+    const { prisma, send } = setup();
+    const modules = { integracao: 2 };
+    const path =
+      "/task/agenda?module=integracao&month=2026-12&timezone_offset_start=180&timezone_offset_end=120";
+    expect((await send("GET", path, { modules })).status).toBe(200);
+    expect(prisma.agenda.findMany.mock.calls[0][0].where.date).toEqual({
+      gte: new Date("2026-12-01T03:00:00Z"),
+      lt: new Date("2027-01-01T02:00:00Z"),
+    });
+    expect(
+      (
+        await send("DELETE", "/task/agenda", {
+          modules,
+          body: { module: "integracao", agenda_id: "evt-1" },
+        })
+      ).status,
+    ).toBe(403);
+    expect(prisma.agenda.deleteMany).not.toHaveBeenCalled();
+  });
+
   it("permite leitura ao nível 1 e recusa nível 0 mesmo com permissão em outro módulo", async () => {
     const { prisma, send } = setup();
     const path = "/task/agenda?module=integracao&month=2026-12";

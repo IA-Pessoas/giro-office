@@ -41,9 +41,17 @@ export function createAgendaRoutes(service: AgendaRouteService): ReturnType<type
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const { module, month, mine } = parseWithZod(agendaListQuerySchema, req.query);
+        const { module, month, mine, timezone_offset_start, timezone_offset_end } = parseWithZod(
+          agendaListQuerySchema,
+          req.query,
+        );
         res.json(
-          createSuccessResponse(await service.list(scope(req, module), month, mine === "true")),
+          createSuccessResponse(
+            await service.list(scope(req, module), month, mine === "true", new Date(), {
+              start: timezone_offset_start ?? 0,
+              end: timezone_offset_end ?? 0,
+            }),
+          ),
         );
       } catch (err) {
         logError("Erro ao listar agenda", { err });

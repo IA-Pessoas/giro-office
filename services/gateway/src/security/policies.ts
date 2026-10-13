@@ -148,6 +148,12 @@ const agendaViewPolicy: AuthPolicy = {
 const agendaEditPolicy: AuthPolicy = {
   anyModulePermission: { modules: agendaModules, minPermission: moduleEditPermission },
 };
+const agendaDeletePolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: agendaModules.filter((module) => module !== "integracao"),
+    minPermission: moduleEditPermission,
+  },
+};
 /**
  * Rotas cuja matriz do task-service admite o responsável em nível 0/1; o escopo de
  * responsável continua sendo validado no serviço.
@@ -374,6 +380,7 @@ const routePolicyMatchers: Array<{
     policy: integracaoResponsibleTaskPolicy,
   },
   { method: "GET", path: /^\/task\/agenda$/, policy: agendaViewPolicy },
+  { method: "DELETE", path: /^\/task\/agenda$/, policy: agendaDeletePolicy },
   { method: "ANY", path: /^\/task\/agenda$/, policy: agendaEditPolicy },
   { method: "GET", path: /^\/task(?:\/list)?$/, policy: integracaoResponsibleTaskPolicy },
   { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },

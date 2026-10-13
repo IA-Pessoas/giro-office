@@ -196,7 +196,9 @@ describe("matriz de regressão das políticas modulares", () => {
       expect(canAccessRoute(authContext({ modules: { triagem: 2 } }), write)).toBe(true);
       expect(canAccessRoute(authContext({ modules: { contabil: 2 } }), write)).toBe(true);
       expect(canAccessRoute(authContext({ modules: { triagem: 1 } }), write)).toBe(false);
-      expect(canAccessRoute(authContext({ modules: { integracao: 2 } }), write)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { integracao: 2 } }), write)).toBe(
+        method !== "DELETE",
+      );
       expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), write)).toBe(false);
     }
   });

@@ -74,6 +74,36 @@ describe("agenda Node HTTP (#1952)", () => {
     expect((await request(app).get(path)).status).toBe(401);
   });
 
+  it("aplica os dois deslocamentos do mês civil e recusa exclusão de Integração", async () => {
+    const { app, prisma, headers } = setup();
+    const path =
+      "/task/agenda?module=integracao&month=2026-12&timezone_offset_start=180&timezone_offset_end=120";
+    expect((await request(app).get(path).set(headers(2))).status).toBe(200);
+    expect(prisma.agenda.findMany.mock.calls[0][0].where.date).toEqual({
+      gte: new Date("2026-12-01T03:00:00Z"),
+      lt: new Date("2027-01-01T02:00:00Z"),
+    });
+    expect(
+      (await request(app).get(`${path}&timezone_offset_end=9999`).set(headers(2))).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .get("/task/agenda?module=integracao&month=2026-12&timezone_offset_start=180")
+          .set(headers(2))
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .delete("/task/agenda")
+          .set(headers(2))
+          .send({ module: "integracao", agenda_id: "evt-1" })
+      ).status,
+    ).toBe(403);
+    expect(prisma.agenda.deleteMany).not.toHaveBeenCalled();
+  });
+
   it("exige nível 2, cliente e primeiro par para criar", async () => {
     const { app, prisma, headers } = setup();
     const body = {

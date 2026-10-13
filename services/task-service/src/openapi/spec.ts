@@ -687,6 +687,19 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
               schema: { type: "string", pattern: "^[0-9]{4}-[0-9]{2}$" },
             },
             { name: "mine", in: "query", schema: { type: "boolean" } },
+            {
+              name: "timezone_offset_start",
+              in: "query",
+              description:
+                "Minutos de UTC para o horário local no início do mês; enviar com timezone_offset_end.",
+              schema: { type: "integer", minimum: -840, maximum: 840 },
+            },
+            {
+              name: "timezone_offset_end",
+              in: "query",
+              description: "Minutos de UTC para o horário local no início do mês seguinte.",
+              schema: { type: "integer", minimum: -840, maximum: 840 },
+            },
           ],
           responses: {
             "200": { description: "Compromissos", ...successJson },
@@ -758,10 +771,10 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
         },
         delete: {
           tags: ["Agenda"],
-          summary: "Remover compromisso no próprio escopo",
+          summary: "Remover compromisso no próprio escopo, exceto Integração",
           security: bearer,
           ...createObjectRequestBody({
-            example: { module: "integracao", agenda_id: "agenda-uuid" },
+            example: { module: "contabil", agenda_id: "agenda-uuid" },
             required: ["module", "agenda_id"],
             properties: { module: { type: "string" }, agenda_id: { type: "string" } },
           }),

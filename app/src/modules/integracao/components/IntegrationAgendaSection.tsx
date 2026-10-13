@@ -106,14 +106,24 @@ function ParticipantPair({
 }
 
 export function IntegrationAgendaSection({ canEdit }: { canEdit: boolean }) {
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [mine, setMine] = useState(false);
   const [editing, setEditing] = useState<AgendaEvent | "new" | null>(null);
   const [client, setClient] = useState<ClientPickerOption | null>(null);
   const [pairs, setPairs] = useState<IntegracaoAgendaParticipant[]>([{ ...EMPTY_PAIR }]);
   const [formError, setFormError] = useState("");
   const queryClient = useQueryClient();
-  const events = useFetch([...queryKey, month, mine], () => agendaService.list("integracao", month, mine));
+  const [year, monthNumber] = month.split("-").map(Number);
+  const timezoneOffsets = {
+    start: new Date(year, monthNumber - 1, 1).getTimezoneOffset(),
+    end: new Date(year, monthNumber, 1).getTimezoneOffset(),
+  };
+  const events = useFetch([...queryKey, month, mine], () =>
+    agendaService.list("integracao", month, mine, timezoneOffsets),
+  );
   const departments = useFetch([...queryKey, "departments"], () => departmentService.list());
   const save = useMutation({
     mutationFn: async (payload: AgendaEventPayload) => {

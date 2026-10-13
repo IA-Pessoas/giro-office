@@ -126,8 +126,15 @@ export const agendaListQuerySchema = z
     module: moduleKey,
     month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u, "month deve ser AAAA-MM."),
     mine: z.enum(["true", "false"]).optional(),
+    timezone_offset_start: z.coerce.number().int().min(-840).max(840).optional(),
+    timezone_offset_end: z.coerce.number().int().min(-840).max(840).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    ({ timezone_offset_start, timezone_offset_end }) =>
+      (timezone_offset_start === undefined) === (timezone_offset_end === undefined),
+    "Informe os deslocamentos de fuso do início e do fim do mês.",
+  );
 
 export const agendaCreateBodySchema = z
   .object({

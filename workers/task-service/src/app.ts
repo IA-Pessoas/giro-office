@@ -1365,8 +1365,14 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
   app.get(
     "/task/agenda",
     route(async (r, s) => {
-      const { module, month, mine } = parseWithZod(agendaListQuerySchema, r.query);
-      return s.agenda().list(agendaScope(r, module), month, mine === "true");
+      const { module, month, mine, timezone_offset_start, timezone_offset_end } = parseWithZod(
+        agendaListQuerySchema,
+        r.query,
+      );
+      return s.agenda().list(agendaScope(r, module), month, mine === "true", new Date(), {
+        start: timezone_offset_start ?? 0,
+        end: timezone_offset_end ?? 0,
+      });
     }),
   );
 
