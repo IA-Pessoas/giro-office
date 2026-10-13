@@ -1939,6 +1939,16 @@ await runTest("ti inventory shows a read-only equipment map per user", async () 
   assert.doesNotMatch(dialog, /<form|onSubmit|Mutation/);
 });
 
+await runTest("ti inventory write actions follow the level the service requires", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  // Escrita no inventário exige TI nível 3 no serviço e no Worker: o nível 2 não vê os botões.
+  assert.match(source, /const canManage = access\.isAdmin;/);
+  assert.doesNotMatch(source, /const canManage = access\.canEdit/);
+  // Quando só o departamento muda, o histórico mostra os departamentos, não "A → A".
+  assert.match(source, /event\.from_user\?\.id === event\.to_user\?\.id/);
+});
+
 await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");

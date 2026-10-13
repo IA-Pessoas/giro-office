@@ -227,15 +227,15 @@ export class TiInventoryService {
         );
       }
 
-      // Informar a pessoa é atribuir: a devolução anterior deixa de valer.
-      const data = body.user_id === undefined ? body : { ...body, return_date: null };
+      // Informar outra pessoa é atribuir: a devolução anterior deixa de valer. Reenviar a mesma
+      // pessoa não muda nada — o formulário faz isso, inclusive em item legado já devolvido.
+      const reassigns = body.user_id !== undefined && body.user_id !== existing.user_id;
+      const data = reassigns ? { ...body, return_date: null } : body;
       const changesHolder =
-        (body.user_id !== undefined && body.user_id !== existing.user_id) ||
-        (body.category_id !== undefined && body.category_id !== existing.category_id) ||
-        (body.user_id !== undefined && existing.return_date != null);
+        reassigns || (body.category_id !== undefined && body.category_id !== existing.category_id);
       // Edição que não troca pessoa nem categoria não reavalia a regra (dado legado).
       // Trocar a pessoa ou o local pela edição é uma movimentação: entra no histórico.
-      const toUserId = body.user_id ?? activeHolderId(existing);
+      const toUserId = reassigns ? (body.user_id as string) : activeHolderId(existing);
       const toLocationId = body.location_id ?? existing.location_id ?? null;
       const movesAsset =
         toUserId !== activeHolderId(existing) || toLocationId !== (existing.location_id ?? null);
@@ -248,11 +248,25 @@ export class TiInventoryService {
         {
           id,
           category_id: body.category_id ?? existing.category_id,
-          user_id: body.user_id ?? existing.user_id,
-          return_date: body.user_id === undefined ? existing.return_date : null,
+          user_id: reassigns ? body.user_id : existing.user_id,
+          return_date: reassigns ? null : existing.return_date,
         },
         async (writer) => {
-          const updated = await writer.inventoryTecnologia.update({ where: { id }, data });
+          // Como nas movimentações: só grava se o item ainda estiver no estado lido.
+          const written = await writer.inventoryTecnologia.updateMany({
+            where: {
+              id,
+              organization_id: context.organizationId,
+              category_id: existing.category_id,
+              user_id: existing.user_id ?? null,
+              location_id: existing.location_id ?? null,
+              return_date: existing.return_date ?? null,
+            },
+            data,
+          });
+          if (written.count !== 1) {
+            throw new ServiceError(409, ASSET_MOVED_MESSAGE);
+          }
           if (movesAsset) {
             await writer.inventoryEventTecnologia.create({
               data: this.eventData(context, id, "transfer", existing, {
@@ -261,9 +275,11 @@ export class TiInventoryService {
               }),
             });
           }
-          return updated;
+          return writer.inventoryTecnologia.findFirst({
+            where: { id, organization_id: context.organizationId },
+          });
         },
-        movesAsset,
+        true,
       );
     } catch (err: unknown) {
       logError("Erro ao atualizar ativo de inventario de TI", { err });
@@ -571,6 +587,9 @@ export class TiInventoryService {
     body: ReturnTiInventoryBody,
   ): Promise<unknown> {
     const existing = await this.getAssignment(context, id);
+    if (!activeHolderId(existing)) {
+      throw new ServiceError(409, "O item não está com ninguém para ser devolvido.");
+    }
 
     return this.move(context, id, existing, "return", {
       user_id: null,
