@@ -803,6 +803,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/rh\/exams$/,
+    description: { action: "consultou", item: "a lista de provas discursivas" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/exams\/[^/]+$/,
+    description: { action: "consultou", item: "uma prova discursiva" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/exams$/,
+    description: { action: "criou", item: "uma prova discursiva" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/exams\/[^/]+\/open$/,
+    description: { action: "abriu", item: "uma prova discursiva" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/rh\/profile\/colaborator$/,
     description: { action: "consultou", item: "o dossiê de um colaborador" },
   },

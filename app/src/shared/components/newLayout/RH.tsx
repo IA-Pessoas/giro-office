@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Award, BarChart3, Calendar, Clock, FileText, Star, UserRound, Users } from "lucide-react";
+import { Award, BarChart3, BookOpenCheck, Calendar, Clock, FileText, Star, UserRound, Users } from "lucide-react";
 import { useRouter } from "next/router";
 
 import {
   RhDashboardSection,
   RhCceSection,
+  RhExamsSection,
   RhDossierSection,
   RhHolidaysSection,
   RhPointSection,
@@ -16,7 +17,7 @@ import {
 import { useRhPermissions } from "@modules/rh/hooks/useRhPermissions";
 import { Dialog } from "@shared/components";
 
-type RhMainTab = "dashboard" | "dossier" | "requests" | "evaluations" | "cce" | "point";
+type RhMainTab = "dashboard" | "dossier" | "requests" | "evaluations" | "cce" | "exams" | "point";
 
 export function RH() {
   const router = useRouter();
@@ -141,6 +142,14 @@ export function RH() {
               label="5 Estrelas"
               onClick={() => setActiveTab("cce")}
             />
+            {canManageRh ? (
+              <RhTabButton
+                active={activeTab === "exams"}
+                icon={BookOpenCheck}
+                label="Provas"
+                onClick={() => setActiveTab("exams")}
+              />
+            ) : null}
             <RhTabButton
               active={activeTab === "point"}
               icon={Clock}
@@ -168,6 +177,7 @@ export function RH() {
       ) : null}
       {activeTab === "evaluations" ? <RhScoreSection /> : null}
       {activeTab === "cce" ? <RhCceSection /> : null}
+      {canManageRh && activeTab === "exams" ? <RhExamsSection /> : null}
       {activeTab === "point" ? <RhPointSection /> : null}
 
       <Dialog

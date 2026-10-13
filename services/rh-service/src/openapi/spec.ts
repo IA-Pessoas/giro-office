@@ -314,6 +314,41 @@ const scoreQuestionDeleteRequestBody = createObjectRequestBody({
   },
 });
 
+const rhExamCreateRequestBody = createObjectRequestBody({
+  example: {
+    title: "Prova discursiva de onboarding",
+    evaluator_id: "evaluator-uuid",
+    window_start: "2026-10-20T09:00:00.000Z",
+    window_end: "2026-10-22T18:00:00.000Z",
+    observations: "Responder às duas questões.",
+    participant_ids: ["participant-uuid"],
+    questions: [{ prompt: "Descreva o processo.", value: 10, answer_key: "Critérios esperados." }],
+  },
+  required: ["title", "evaluator_id", "participant_ids", "questions"],
+  properties: {
+    title: { type: "string", minLength: 1 },
+    evaluator_id: { type: "string", format: "uuid" },
+    window_start: { type: "string", format: "date-time" },
+    window_end: { type: "string", format: "date-time" },
+    observations: { type: "string", maxLength: 5000 },
+    participant_ids: { type: "array", minItems: 1, items: { type: "string", format: "uuid" } },
+    questions: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["prompt", "value", "answer_key"],
+        properties: {
+          prompt: { type: "string", minLength: 1 },
+          value: { type: "number", exclusiveMinimum: 0 },
+          answer_key: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  },
+});
+
 const scoreQuarterGenerateRequestBody = createObjectRequestBody({
   example: {
     target_user_id: "user-uuid",
@@ -1279,6 +1314,53 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           ...scoreEvaluationSubmitRequestBody,
           responses: {
             "200": { description: "Avaliacao enviada", ...successJson },
+          },
+        },
+      },
+      "/rh/exams": {
+        get: {
+          tags: ["Provas discursivas"],
+          summary: "Listar provas discursivas da organização",
+          security: bearer,
+          responses: { "200": { description: "Lista de provas", ...successJson } },
+        },
+        post: {
+          tags: ["Provas discursivas"],
+          summary: "Criar prova discursiva",
+          security: bearer,
+          ...rhExamCreateRequestBody,
+          responses: {
+            "201": { description: "Prova criada", ...successJson },
+            "400": { description: "Dados inválidos ou usuários fora da organização" },
+          },
+        },
+      },
+      "/rh/exams/{id}": {
+        get: {
+          tags: ["Provas discursivas"],
+          summary: "Consultar prova discursiva",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Detalhe da prova", ...successJson },
+            "404": { description: "Prova não encontrada" },
+          },
+        },
+      },
+      "/rh/exams/{id}/open": {
+        post: {
+          tags: ["Provas discursivas"],
+          summary: "Abrir prova e preparar respostas dos participantes",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Prova aberta", ...successJson },
+            "404": { description: "Prova não encontrada" },
+            "409": { description: "Transição de estado inválida" },
           },
         },
       },
