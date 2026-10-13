@@ -249,6 +249,8 @@ model Organization {
   rhExamParticipants            RhExamParticipant[]
   rhExamQuestions               RhExamQuestion[]
   rhExamAnswers                 RhExamAnswer[]
+  rhLifeProjects                RhLifeProject[]
+  rhLifeProjectObjectives       RhLifeProjectObjective[]
   scoreEvaluations              ScoreEvaluation[]
   scoreNitros                   ScoreNitro[]
   cceFloorConfiguration         CceFloorConfiguration?
@@ -415,6 +417,11 @@ model User {
   rhExamsCreated                RhExam[]              @relation("RhExamCreator")
   rhExamsEvaluated               RhExam[]              @relation("RhExamEvaluator")
   rhExamParticipants             RhExamParticipant[]
+  rhLifeProjectsOwned            RhLifeProject[]       @relation("RhLifeProjectOwner")
+  rhLifeProjectsCreated          RhLifeProject[]       @relation("RhLifeProjectCreator")
+  rhLifeProjectsUpdated          RhLifeProject[]       @relation("RhLifeProjectUpdater")
+  rhLifeProjectObjectivesCreated RhLifeProjectObjective[] @relation("RhLifeProjectObjectiveCreator")
+  rhLifeProjectObjectivesUpdated RhLifeProjectObjective[] @relation("RhLifeProjectObjectiveUpdater")
   timeBankRealeasesAdded      TimeBankReleases[]     @relation("add")
   timeBankRealeases           TimeBankReleases[]     @relation("user")
   timeClockRequestApproved    TimeClockRequest[]     @relation("approver")
@@ -3151,6 +3158,51 @@ model RhExamAnswer {
   @@map("rh.exam_answers")
 }
 
+model RhLifeProject {
+  id              String                    @id @default(uuid())
+  organization_id String
+  user_id         String
+  year            Int
+  life_story      String                    @default("")
+  company_story   String                    @default("")
+  created_by_id   String
+  updated_by_id   String
+  created_at      DateTime                  @default(now())
+  updated_at      DateTime                  @updatedAt
+  organization    Organization              @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user            User                      @relation("RhLifeProjectOwner", fields: [user_id], references: [id], onDelete: Restrict)
+  created_by      User                      @relation("RhLifeProjectCreator", fields: [created_by_id], references: [id], onDelete: Restrict)
+  updated_by      User                      @relation("RhLifeProjectUpdater", fields: [updated_by_id], references: [id], onDelete: Restrict)
+  objectives      RhLifeProjectObjective[]
+
+  @@unique([organization_id, user_id, year], map: "uq_rh_life_projects_org_user_year")
+  @@index([organization_id, year])
+  @@map("rh.life_projects")
+}
+
+model RhLifeProjectObjective {
+  id                    String                   @id @default(uuid())
+  organization_id       String
+  project_id            String
+  title                 String
+  forecast_date         DateTime?
+  completed_at          DateTime?
+  status                RhLifeObjectiveStatus    @default(ToDo)
+  rh_observations       String                   @default("")
+  employee_observations String                   @default("")
+  created_by_id         String
+  updated_by_id         String
+  created_at            DateTime                 @default(now())
+  updated_at            DateTime                 @updatedAt
+  organization          Organization             @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  project               RhLifeProject            @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  created_by            User                     @relation("RhLifeProjectObjectiveCreator", fields: [created_by_id], references: [id], onDelete: Restrict)
+  updated_by            User                     @relation("RhLifeProjectObjectiveUpdater", fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, project_id, status])
+  @@map("rh.life_project_objectives")
+}
+
 model CceFloorConfiguration {
   id              String       @id @default(uuid())
   organization_id String       @unique
@@ -4018,4 +4070,12 @@ enum RhExamParticipantStatus {
   NotStarted
   Submitted
   Graded
+}
+
+enum RhLifeObjectiveStatus {
+  ToDo
+  Realized
+  Discontinued
+
+  @@map("rh.life_objective_status")
 }

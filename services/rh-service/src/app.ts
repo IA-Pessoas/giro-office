@@ -28,6 +28,7 @@ import pointRoutes from "./routes/point.routes.js";
 import pointConfigRoutes from "./routes/pointConfig.routes.js";
 import requestRoutes from "./routes/request.routes.js";
 import rhExamRoutes from "./routes/rhExam.routes.js";
+import rhLifeProjectRoutes from "./routes/rhLifeProject.routes.js";
 import scoreEvaluationRoutes from "./routes/scoreEvaluation.routes.js";
 import scoreNitroRoutes from "./routes/scoreNitro.routes.js";
 import scoreQuarterRoutes from "./routes/scoreQuarter.routes.js";
@@ -105,6 +106,7 @@ export function createApp(
   app.use("/rh/categories", categoryRoutes);
   app.use("/rh/cce", cceCycleRoutes);
   app.use("/rh/exams", rhExamRoutes);
+  app.use("/rh/life-projects", rhLifeProjectRoutes);
   app.use("/rh/profile", employeeDossierRoutes);
   app.use("/rh/operational-users", operationalUserRoutes);
   app.use("/rh/requests", requestRoutes);

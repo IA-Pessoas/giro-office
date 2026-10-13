@@ -74,3 +74,17 @@ Transição de Nova para Aberta. Cria uma resposta vazia por questão e particip
 
 **Janela da prova**:
 Datas previstas para realização. São informativas e não bloqueiam automaticamente respostas ou entregas.
+
+## Projeto de Vida
+
+**Projeto de Vida**:
+Plano anual de um colaborador. Registra histórias de vida e da empresa e acompanha objetivos; cada colaborador pode ter um por ano.
+_Avoid_: projeto pessoal (sem ano), avaliação de desempenho
+
+**Objetivo do Projeto de Vida**:
+Meta com previsão, data de conclusão, estado e observações do RH e do colaborador. Estados: A realizar, Realizado e Descontinuado.
+_Avoid_: tarefa (quando não houver responsável e participação do catálogo de tarefas)
+
+**Progresso do Projeto de Vida**:
+Objetivos Realizados divididos pelo total de objetivos; sem objetivos, o progresso é zero.
+_Avoid_: média de progresso

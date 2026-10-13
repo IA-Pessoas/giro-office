@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Award, BarChart3, BookOpenCheck, Calendar, Clock, FileText, Star, UserRound, Users } from "lucide-react";
+import { Award, BarChart3, BookOpenCheck, Calendar, Clock, FileText, Star, Target, UserRound, Users } from "lucide-react";
 import { useRouter } from "next/router";
 
 import {
   RhDashboardSection,
   RhCceSection,
   RhExamsSection,
+  RhLifeProjectSection,
   RhDossierSection,
   RhHolidaysSection,
   RhPointSection,
@@ -17,7 +18,7 @@ import {
 import { useRhPermissions } from "@modules/rh/hooks/useRhPermissions";
 import { Dialog } from "@shared/components";
 
-type RhMainTab = "dashboard" | "dossier" | "requests" | "evaluations" | "cce" | "exams" | "point";
+type RhMainTab = "dashboard" | "dossier" | "life-project" | "requests" | "evaluations" | "cce" | "exams" | "point";
 
 export function RH() {
   const router = useRouter();
@@ -108,7 +109,11 @@ export function RH() {
 
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
         <div className="overflow-x-auto u-scrollbar-system">
-          <div className="flex min-w-max items-center justify-center gap-1">
+          <div
+            role="tablist"
+            aria-label="Seções de Recursos Humanos"
+            className="flex min-w-max items-center justify-center gap-1"
+          >
             {canViewRhDashboard ? (
               <RhTabButton
                 active={activeTab === "dashboard"}
@@ -122,6 +127,12 @@ export function RH() {
               icon={UserRound}
               label="Dossiê"
               onClick={() => setActiveTab("dossier")}
+            />
+            <RhTabButton
+              active={activeTab === "life-project"}
+              icon={Target}
+              label="Projeto de Vida"
+              onClick={() => setActiveTab("life-project")}
             />
             <RhTabButton
               active={activeTab === "requests"}
@@ -168,6 +179,7 @@ export function RH() {
       ) : null}
 
       {activeTab === "dossier" ? <RhDossierSection /> : null}
+      {activeTab === "life-project" ? <RhLifeProjectSection /> : null}
       {activeTab === "requests" ? (
         <RhRequestsSection
           initialRequestId={
@@ -210,6 +222,8 @@ function RhTabButton({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
         active

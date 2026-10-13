@@ -20,6 +20,7 @@ Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX
 - `POST /rh/requests` aceita criacao sem `assigned_to_user_id`; nesse caso o backend atribui automaticamente um responsavel RH elegivel antes de persistir.
 - `GET /rh/operational-users` lista colaboradores ativos da organizacao com payload minimo para seletores operacionais de RH.
 - O CCE/5 Estrelas usa `GET` e `PUT /rh/cce/floors` para consultar/configurar 0–4 pisos, `GET` e `POST /rh/cce/cycles` para consultar/criar um ciclo mensal e `PATCH /rh/cce/weeks/{id}` para registrar uma avaliação semanal. Leituras exigem acesso ao RH; alterações exigem permissão de gestão e validam a organização no servidor.
+- O Projeto de Vida oferece `GET` e `POST /rh/life-projects` por ano, `PATCH /rh/life-projects/{id}` para histórias e rotas `/objectives` para metas. Colaboradores editam o próprio plano; gestores consultam somente a equipe permitida e o RH administrativo gerencia a organização. Há um projeto por colaborador e ano.
 - `POST /rh/messages` aceita JSON ou multipart com um PDF, PNG ou JPEG privado de até 10 MB; `GET /rh/messages` só devolve URL assinada aos participantes autorizados.
 - `GET /rh/notifications` e `PUT /rh/notifications/read` fornecem a campainha global por usuário, organização e solicitação.
 

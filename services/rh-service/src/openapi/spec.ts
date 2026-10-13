@@ -1364,6 +1364,133 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/life-projects": {
+        get: {
+          tags: ["Projeto de Vida"],
+          summary: "Consultar Projeto de Vida de colaborador por ano",
+          security: bearer,
+          parameters: [
+            {
+              name: "year",
+              in: "query",
+              required: true,
+              schema: { type: "integer", minimum: 1900, maximum: 9999 },
+            },
+            {
+              name: "user_id",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": { description: "Projeto anual ou ausência de cadastro", ...successJson },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Colaborador não encontrado neste escopo" },
+          },
+        },
+        post: {
+          tags: ["Projeto de Vida"],
+          summary: "Criar Projeto de Vida anual",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { year: 2026 },
+            required: ["year"],
+            properties: {
+              year: { type: "integer", minimum: 1900, maximum: 9999 },
+              target_user_id: { type: "string", format: "uuid" },
+            },
+          }),
+          responses: {
+            "201": { description: "Projeto criado", ...successJson },
+            "400": { description: "Ano inválido" },
+            "403": { description: "Permissão insuficiente para editar" },
+            "409": { description: "Já existe projeto para o colaborador e ano" },
+          },
+        },
+      },
+      "/rh/life-projects/{id}": {
+        patch: {
+          tags: ["Projeto de Vida"],
+          summary: "Atualizar histórias de vida e empresa",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          ...createObjectRequestBody({
+            example: { life_story: "História pessoal", company_story: "História na empresa" },
+            properties: {
+              life_story: { type: "string", maxLength: 10000 },
+              company_story: { type: "string", maxLength: 10000 },
+            },
+          }),
+          responses: {
+            "200": { description: "Projeto atualizado", ...successJson },
+            "403": { description: "Permissão insuficiente para editar" },
+            "404": { description: "Projeto não encontrado" },
+          },
+        },
+      },
+      "/rh/life-projects/{id}/objectives": {
+        post: {
+          tags: ["Projeto de Vida"],
+          summary: "Adicionar objetivo ao Projeto de Vida",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          ...createObjectRequestBody({
+            example: {
+              title: "Concluir formação",
+              forecast_date: "2026-12-01",
+              employee_observations: "Inscrição realizada",
+            },
+            required: ["title"],
+            properties: {
+              title: { type: "string", minLength: 1 },
+              forecast_date: { type: "string", format: "date", nullable: true },
+              employee_observations: { type: "string", maxLength: 5000 },
+            },
+          }),
+          responses: {
+            "201": { description: "Objetivo criado", ...successJson },
+            "403": { description: "Permissão insuficiente para editar" },
+            "404": { description: "Projeto não encontrado" },
+          },
+        },
+      },
+      "/rh/life-projects/{id}/objectives/{objectiveId}": {
+        patch: {
+          tags: ["Projeto de Vida"],
+          summary: "Atualizar objetivo do Projeto de Vida",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "objectiveId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          ...createObjectRequestBody({
+            example: { status: "Realized", completed_at: "2026-11-30" },
+            properties: {
+              title: { type: "string", minLength: 1 },
+              forecast_date: { type: "string", format: "date", nullable: true },
+              completed_at: { type: "string", format: "date", nullable: true },
+              status: { type: "string", enum: ["ToDo", "Realized", "Discontinued"] },
+              rh_observations: { type: "string", maxLength: 5000 },
+              employee_observations: { type: "string", maxLength: 5000 },
+            },
+          }),
+          responses: {
+            "200": { description: "Objetivo atualizado", ...successJson },
+            "403": { description: "Permissão insuficiente para atualizar os campos solicitados" },
+            "404": { description: "Projeto ou objetivo não encontrado" },
+          },
+        },
+      },
       "/rh/cce/floors": {
         get: {
           tags: ["CCE"],

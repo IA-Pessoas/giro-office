@@ -64,6 +64,11 @@ export const RH_ENDPOINTS = {
   exams: "/rh/exams",
   examDetail: (id: string) => `/rh/exams/${id}`,
   openExam: (id: string) => `/rh/exams/${id}/open`,
+  lifeProjects: "/rh/life-projects",
+  lifeProjectDetail: (id: string) => `/rh/life-projects/${id}`,
+  lifeProjectObjectives: (id: string) => `/rh/life-projects/${id}/objectives`,
+  lifeProjectObjective: (id: string, objectiveId: string) =>
+    `/rh/life-projects/${id}/objectives/${objectiveId}`,
 } as const;
 
 export function buildRhDossierTargetParams(userId?: string) {
