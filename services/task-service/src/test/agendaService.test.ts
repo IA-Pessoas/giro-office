@@ -52,6 +52,7 @@ describe("AgendaService", () => {
       expect.objectContaining({
         where: {
           organization_id: ORG,
+          module: null,
           department_control_id: { in: [CONTABIL] },
           date: {
             gte: new Date("2026-12-01T00:00:00.000Z"),
@@ -114,7 +115,12 @@ describe("AgendaService", () => {
 
   it("edita e remove por ID só dentro da organização e do departamento", async () => {
     const { prisma, service } = setup();
-    const scoped = { id: EVENT, organization_id: ORG, department_control_id: { in: [CONTABIL] } };
+    const scoped = {
+      id: EVENT,
+      organization_id: ORG,
+      module: null,
+      department_control_id: { in: [CONTABIL] },
+    };
 
     await service.update(editor, EVENT, { status: "Realizado" });
     await service.remove(editor, EVENT);
@@ -136,6 +142,156 @@ describe("AgendaService", () => {
     });
     await expect(service.remove(editor, "alheio")).rejects.toMatchObject({ statusCode: 404 });
     expect(audit.createLog).not.toHaveBeenCalled();
+  });
+
+  describe("Integração (#1952)", () => {
+    const scope = { ...editor, module: "integracao" } as const;
+    const participants = [
+      { department_id: CONTABIL, participant_id: "user-1" },
+      { department_id: FISCAL, participant_id: "user-2" },
+      { department_id: CONTABIL, participant_id: "user-3" },
+      { department_id: FISCAL, participant_id: "user-4" },
+    ];
+
+    it("grava os quatro pares da organização e registra a criação", async () => {
+      const { prisma, audit, service } = setup();
+      await service.create(scope, { ...event, client_id: "client-1", participants });
+
+      expect(prisma.client.count).toHaveBeenCalledWith({
+        where: { id: "client-1", organization_id: ORG },
+      });
+      for (const pair of participants) {
+        expect(prisma.user.count).toHaveBeenCalledWith({
+          where: {
+            id: pair.participant_id,
+            department_id: pair.department_id,
+            status: "active",
+            OR: [
+              { organization_id: ORG },
+              { organization_id: null, department: { organization_id: ORG } },
+            ],
+          },
+        });
+      }
+
+      expect(prisma.agenda.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            module: "integracao",
+            department_control_id: CONTABIL,
+            participant_id: "user-1",
+            department_id_2: FISCAL,
+            participant_id_2: "user-2",
+            department_id_3: CONTABIL,
+            participant_id_3: "user-3",
+            department_id_4: FISCAL,
+            participant_id_4: "user-4",
+            status: "Pendente",
+          }),
+        }),
+      );
+      expect(audit.createLog).toHaveBeenCalledWith(expect.objectContaining({ action: "Cadastro" }));
+    });
+
+    it("nega participante de outro departamento ou organização", async () => {
+      const { prisma, service } = setup();
+      await expect(
+        service.create(scope, {
+          ...event,
+          client_id: "client-1",
+          participants: [{ department_id: "dep-alheio", participant_id: "user-1" }],
+        }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      prisma.user.count.mockResolvedValue(0);
+      await expect(
+        service.create(scope, {
+          ...event,
+          client_id: "client-1",
+          participants,
+        }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      expect(prisma.agenda.create).not.toHaveBeenCalled();
+    });
+
+    it("exige pares para mudar responsáveis e departamentos", async () => {
+      const { prisma, service } = setup();
+      await expect(
+        service.create(scope, {
+          ...event,
+          client_id: "client-1",
+          department_id: CONTABIL,
+          participants,
+        }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      await expect(
+        service.update(scope, EVENT, { participant_id: "user-2" }),
+      ).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(prisma.agenda.create).not.toHaveBeenCalled();
+      expect(prisma.agenda.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("isola leitura e edição pelo módulo, organização e nível; audita a transição", async () => {
+      const { prisma, audit, service } = setup();
+      await service.list({ ...scope, level: 1 }, "2026-12", true);
+      expect(prisma.agenda.findMany.mock.calls[0][0].where).toMatchObject({
+        organization_id: ORG,
+        module: "integracao",
+        OR: expect.arrayContaining([{ participant_id_4: "user-1" }]),
+      });
+      await expect(
+        service.update({ ...scope, level: 1 }, EVENT, { status: "Agendada" }),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      await service.update(scope, EVENT, { status: "Agendada" });
+      expect(prisma.agenda.updateMany).toHaveBeenCalledWith({
+        where: { id: EVENT, organization_id: ORG, module: "integracao" },
+        data: { status: "Agendada" },
+      });
+      expect(audit.logUpdateIfChanged).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "Atualização",
+          oldData: expect.any(Object),
+          updatedData: { status: "Agendada" },
+        }),
+      );
+    });
+
+    it("consulta o mês civil do usuário nas duas viradas de fuso", async () => {
+      const { prisma, service } = setup();
+      await service.list(scope, "2026-12", false, new Date("2026-12-15T00:00:00Z"), {
+        start: 180,
+        end: 120,
+      });
+      expect(prisma.agenda.findMany.mock.calls[0][0].where.date).toEqual({
+        gte: new Date("2026-12-01T03:00:00Z"),
+        lt: new Date("2027-01-01T02:00:00Z"),
+      });
+    });
+
+    it("não permite excluir compromisso de Integração", async () => {
+      const { prisma, service } = setup();
+      await expect(service.remove(scope, EVENT)).rejects.toMatchObject({ statusCode: 403 });
+      expect(prisma.agenda.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("substitui os pares e limpa os participantes removidos", async () => {
+      const { prisma, service } = setup();
+      await service.update(scope, EVENT, { participants: [participants[1]] });
+      expect(prisma.agenda.updateMany).toHaveBeenCalledWith({
+        where: { id: EVENT, organization_id: ORG, module: "integracao" },
+        data: {
+          department_control_id: FISCAL,
+          participant_id: "user-2",
+          department_id_2: null,
+          department_id_3: null,
+          department_id_4: null,
+          participant_id_2: null,
+          participant_id_3: null,
+          participant_id_4: null,
+        },
+      });
+    });
   });
 
   // O Pessoal consulta o recorte do seu departamento na mesma agenda (#1773).
@@ -188,7 +344,12 @@ describe("AgendaService", () => {
       await service.update(pessoal, EVENT, { status: "Realizado" });
 
       expect(prisma.agenda.updateMany).toHaveBeenCalledWith({
-        where: { id: EVENT, organization_id: ORG, department_control_id: { in: [PESSOAL] } },
+        where: {
+          id: EVENT,
+          organization_id: ORG,
+          module: null,
+          department_control_id: { in: [PESSOAL] },
+        },
         data: { status: "Realizado" },
       });
       await expect(service.remove(viewerPessoal, EVENT)).rejects.toMatchObject({ statusCode: 403 });

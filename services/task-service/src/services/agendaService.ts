@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   type ModulePermissionKey,
   resolveDepartmentModuleKey,
@@ -5,11 +6,20 @@ import {
 } from "@workspace/shared";
 import type { TaskAudit } from "../integrations/audit.js";
 import type prismaClient from "../prisma/index.js";
-import type { AGENDA_STATUSES } from "../schemas/agenda.schemas.js";
+import { AGENDA_STATUSES, INTEGRACAO_AGENDA_STATUSES } from "../schemas/agenda.schemas.js";
 
 export type AgendaPrisma = Pick<
   typeof prismaClient,
-  "agenda" | "client" | "department" | "recurringAgenda" | "user"
+  | "$transaction"
+  | "agenda"
+  | "client"
+  | "clientHistory"
+  | "clientHistoryPending"
+  | "department"
+  | "organization"
+  | "pA"
+  | "recurringAgenda"
+  | "user"
 >;
 
 /** Quem pede e por qual módulo: a agenda é uma só, o departamento é o filtro. */
@@ -24,12 +34,13 @@ export interface AgendaScope {
 export interface AgendaEventInput {
   agenda: string;
   date: Date;
-  status?: (typeof AGENDA_STATUSES)[number];
+  status?: (typeof AGENDA_STATUSES)[number] | (typeof INTEGRACAO_AGENDA_STATUSES)[number];
   obs?: string | null;
   location?: string | null;
   client_id?: string | null;
   /** Responsável pelo evento; nulo deixa o evento na "minha agenda" de todos. */
   participant_id?: string | null;
+  participants?: Array<{ department_id: string; participant_id: string }>;
 }
 
 /** `recurrent` repete o evento todo mês; ausente na edição, não mexe na recorrência. */
@@ -46,6 +57,13 @@ const AGENDA_SELECT = {
   client: { select: { id: true, name: true } },
   // Responsável do evento: o primeiro participante, como no `responsavel_id` do legado.
   participant: { select: { id: true, name: true } },
+  participant2: { select: { id: true, name: true } },
+  participant3: { select: { id: true, name: true } },
+  participant4: { select: { id: true, name: true } },
+  department_id_2: true,
+  department_id_3: true,
+  department_id_4: true,
+  module: true,
   recurring_agenda_id: true,
 } as const;
 
@@ -64,6 +82,13 @@ export interface AgendaEventRow {
   department_control_id: string;
   client: AgendaEventRef | null;
   participant: AgendaEventRef | null;
+  participant2: AgendaEventRef | null;
+  participant3: AgendaEventRef | null;
+  participant4: AgendaEventRef | null;
+  department_id_2: string | null;
+  department_id_3: string | null;
+  department_id_4: string | null;
+  module: string | null;
   /** Preenchido quando o evento é ocorrência de uma recorrência mensal. */
   recurring_agenda_id: string | null;
 }
@@ -74,7 +99,53 @@ export const AGENDA_LEVEL = { READ: 1, WRITE: 2, OWNER: 3 } as const;
 const NOT_FOUND = "Evento da agenda não encontrado.";
 
 const DEFAULT_STATUS = "Pendente" satisfies (typeof AGENDA_STATUSES)[number];
+const COMPLETED_STATUS = "Realizado" satisfies (typeof INTEGRACAO_AGENDA_STATUSES)[number];
 const MONTHLY = "mensal";
+
+/** UUID v5: mesmo cliente, participante e dia produz a mesma pendência em Node e Worker. */
+function paPendingId(
+  organizationId: string,
+  clientId: string,
+  userId: string,
+  day: string,
+): string {
+  const hash = createHash("sha1")
+    .update("6ba7b8109dad11d180b400c04fd430c8", "hex")
+    .update(`giro-office:integracao:pa:${organizationId}:${clientId}:${userId}:${day}`)
+    .digest("hex");
+  const variant = ((Number.parseInt(hash[16], 16) & 3) | 8).toString(16);
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${variant}${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
+
+/** Retorna o dia civil e seus limites UTC, incluindo dias de 23 ou 25 horas. */
+function organizationDay(now: Date, timeZone: string): { day: string; start: Date; end: Date } {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const civilDay = (instant: Date) => {
+    const parts = formatter.formatToParts(instant);
+    const part = (type: string) => parts.find((value) => value.type === type)?.value;
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  };
+  const day = civilDay(now);
+  const nextDay = new Date(`${day}T00:00:00.000Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const boundary = (target: string) => {
+    const nominal = Date.parse(`${target}T00:00:00.000Z`);
+    let low = nominal - 36 * 60 * 60 * 1000;
+    let high = nominal + 36 * 60 * 60 * 1000;
+    while (low + 1 < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (civilDay(new Date(middle)) < target) low = middle;
+      else high = middle;
+    }
+    return new Date(high);
+  };
+  return { day, start: boundary(day), end: boundary(nextDay.toISOString().slice(0, 10)) };
+}
 
 /** Competência (AAAA-MM) em UTC, o mesmo corte de mês usado na listagem. */
 const monthOf = (date: Date) => date.toISOString().slice(0, 7);
@@ -111,17 +182,51 @@ export class AgendaService {
       // Ordem estável: sem `department_id`, a criação usa sempre o mesmo departamento.
       orderBy: { name: "asc" },
     });
+    if (scope.module === "integracao") return departments.map((department) => department.id);
     return departments
       .filter((department) => resolveDepartmentModuleKey(department.name) === scope.module)
       .map((department) => department.id);
   }
 
   private async scopedWhere(scope: AgendaScope, id: string) {
+    const departmentIds = await this.departmentIds(scope, AGENDA_LEVEL.WRITE);
     return {
       id,
       organization_id: scope.organizationId,
-      department_control_id: { in: await this.departmentIds(scope, AGENDA_LEVEL.WRITE) },
+      ...(scope.module === "integracao"
+        ? { module: "integracao" }
+        : {
+            module: null,
+            department_control_id: { in: departmentIds },
+          }),
     };
+  }
+
+  private async assertIntegrationParticipants(
+    scope: AgendaScope,
+    participants: NonNullable<AgendaEventInput["participants"]>,
+  ): Promise<void> {
+    if (participants.length < 1 || participants.length > 4) {
+      throw new ServiceError(400, "Informe de um a quatro participantes.");
+    }
+    const departments = await this.departmentIds(scope, AGENDA_LEVEL.WRITE);
+    for (const { department_id, participant_id } of participants) {
+      if (!departments.includes(department_id)) {
+        throw new ServiceError(404, "Departamento não encontrado.");
+      }
+      const found = await this.prisma.user.count({
+        where: {
+          id: participant_id,
+          department_id,
+          status: "active",
+          OR: [
+            { organization_id: scope.organizationId },
+            { organization_id: null, department: { organization_id: scope.organizationId } },
+          ],
+        },
+      });
+      if (found === 0) throw new ServiceError(404, "Responsável não encontrado no departamento.");
+    }
   }
 
   /** Cliente e responsável informados precisam ser da organização; nulo só limpa o campo. */
@@ -214,19 +319,36 @@ export class AgendaService {
     month: string,
     mine = false,
     now = new Date(),
+    timezoneOffsets: { start: number; end: number } = { start: 0, end: 0 },
   ): Promise<AgendaEventRow[]> {
     const [year, monthNumber] = month.split("-").map(Number);
     const departmentIds = await this.departmentIds(scope, AGENDA_LEVEL.READ);
-    await this.generateRecurring(scope.organizationId, departmentIds, now);
+    if (scope.module !== "integracao") {
+      await this.generateRecurring(scope.organizationId, departmentIds, now);
+    }
     return this.prisma.agenda.findMany({
       where: {
         organization_id: scope.organizationId,
-        department_control_id: { in: departmentIds },
+        ...(scope.module === "integracao"
+          ? { module: "integracao" }
+          : { module: null, department_control_id: { in: departmentIds } }),
         date: {
-          gte: new Date(Date.UTC(year, monthNumber - 1, 1)),
-          lt: new Date(Date.UTC(year, monthNumber, 1)),
+          gte: new Date(Date.UTC(year, monthNumber - 1, 1) + timezoneOffsets.start * 60_000),
+          lt: new Date(Date.UTC(year, monthNumber, 1) + timezoneOffsets.end * 60_000),
         },
-        ...(mine ? { OR: [{ participant_id: scope.userId }, { participant_id: null }] } : {}),
+        ...(mine
+          ? {
+              OR:
+                scope.module === "integracao"
+                  ? [
+                      { participant_id: scope.userId },
+                      { participant_id_2: scope.userId },
+                      { participant_id_3: scope.userId },
+                      { participant_id_4: scope.userId },
+                    ]
+                  : [{ participant_id: scope.userId }, { participant_id: null }],
+            }
+          : {}),
       },
       select: AGENDA_SELECT,
       orderBy: [{ date: "asc" }, { id: "asc" }],
@@ -237,18 +359,60 @@ export class AgendaService {
     scope: AgendaScope,
     input: AgendaEventInput & AgendaRecurrenceInput & { department_id?: string },
   ): Promise<AgendaEventRow> {
-    const { department_id, recurrent, ...event } = input;
+    const { department_id, recurrent, participants, ...event } = input;
+    if (scope.module === "integracao") {
+      if (
+        recurrent !== undefined ||
+        department_id !== undefined ||
+        event.participant_id !== undefined ||
+        (event.status && event.status !== "Pendente")
+      ) {
+        throw new ServiceError(
+          400,
+          "Estado inicial, recorrência ou responsável direto inválido para Integração.",
+        );
+      }
+    } else if (
+      participants !== undefined ||
+      (event.status && !AGENDA_STATUSES.includes(event.status as (typeof AGENDA_STATUSES)[number]))
+    ) {
+      throw new ServiceError(400, "Campos inválidos para a agenda deste módulo.");
+    }
     const departmentIds = await this.departmentIds(scope, AGENDA_LEVEL.WRITE);
-    const departmentId = department_id ?? departmentIds[0];
+    const departmentId =
+      scope.module === "integracao"
+        ? participants?.[0]?.department_id
+        : (department_id ?? departmentIds[0]);
     if (!departmentId || !departmentIds.includes(departmentId)) {
       throw new ServiceError(404, "Departamento não encontrado para este módulo.");
     }
     await this.assertAssignment(scope, event);
+    if (scope.module === "integracao") {
+      if (!event.client_id || !participants?.length || !participants[0]?.participant_id) {
+        throw new ServiceError(
+          400,
+          "Cliente, primeiro departamento e responsável são obrigatórios.",
+        );
+      }
+      await this.assertIntegrationParticipants(scope, participants);
+    }
     const data = {
       ...event,
       status: event.status ?? DEFAULT_STATUS,
       organization_id: scope.organizationId,
       department_control_id: departmentId,
+      ...(scope.module === "integracao"
+        ? {
+            module: "integracao",
+            participant_id: participants?.[0]?.participant_id,
+            participant_id_2: participants?.[1]?.participant_id ?? null,
+            participant_id_3: participants?.[2]?.participant_id ?? null,
+            participant_id_4: participants?.[3]?.participant_id ?? null,
+            department_id_2: participants?.[1]?.department_id ?? null,
+            department_id_3: participants?.[2]?.department_id ?? null,
+            department_id_4: participants?.[3]?.department_id ?? null,
+          }
+        : {}),
     };
     const created = recurrent
       ? await this.createRecurring(data)
@@ -372,7 +536,28 @@ export class AgendaService {
     now = new Date(),
   ): Promise<{ id: string }> {
     const where = await this.scopedWhere(scope, id);
-    const { recurrent, ...fields } = input;
+    const { recurrent, participants, ...fields } = input;
+    if (scope.module === "integracao") {
+      if (
+        recurrent !== undefined ||
+        fields.participant_id !== undefined ||
+        (fields.status &&
+          !INTEGRACAO_AGENDA_STATUSES.includes(
+            fields.status as (typeof INTEGRACAO_AGENDA_STATUSES)[number],
+          ))
+      ) {
+        throw new ServiceError(
+          400,
+          "Estado, recorrência ou responsável direto inválido para Integração.",
+        );
+      }
+    } else if (
+      participants !== undefined ||
+      (fields.status &&
+        !AGENDA_STATUSES.includes(fields.status as (typeof AGENDA_STATUSES)[number]))
+    ) {
+      throw new ServiceError(400, "Campos inválidos para a agenda deste módulo.");
+    }
     const existing = await this.prisma.agenda.findFirst({
       where,
       select: {
@@ -382,25 +567,150 @@ export class AgendaService {
         location: true,
         client_id: true,
         participant_id: true,
+        participant_id_2: true,
+        participant_id_3: true,
+        participant_id_4: true,
         department_control_id: true,
+        department_id_2: true,
+        department_id_3: true,
+        department_id_4: true,
+        status: true,
         recurring_agenda_id: true,
         recurrence_month: true,
       },
     });
     if (!existing) throw new ServiceError(404, NOT_FOUND);
     await this.assertAssignment(scope, fields);
-    const link = await this.syncRecurrence(scope, existing, fields, recurrent, now);
-    const data = { ...fields, ...link };
+    if (scope.module === "integracao" && fields.client_id === null) {
+      throw new ServiceError(400, "Cliente é obrigatório.");
+    }
+    if (scope.module === "integracao" && participants) {
+      await this.assertIntegrationParticipants(scope, participants);
+    }
+    const link =
+      scope.module === "integracao"
+        ? {}
+        : await this.syncRecurrence(scope, existing, fields, recurrent, now);
+    const data = {
+      ...fields,
+      ...link,
+      ...(participants
+        ? {
+            department_control_id: participants[0].department_id,
+            participant_id: participants[0].participant_id,
+            participant_id_2: participants[1]?.participant_id ?? null,
+            participant_id_3: participants[2]?.participant_id ?? null,
+            participant_id_4: participants[3]?.participant_id ?? null,
+            department_id_2: participants[1]?.department_id ?? null,
+            department_id_3: participants[2]?.department_id ?? null,
+            department_id_4: participants[3]?.department_id ?? null,
+          }
+        : {}),
+    };
     // Pedido que não muda nada (recorrência já ligada, por exemplo) não grava nem deixa trilha.
     if (Object.keys(data).length === 0) return { id };
     const newRuleId = link.recurring_agenda_id;
+    const completedIntegration =
+      scope.module === "integracao" &&
+      existing.status !== COMPLETED_STATUS &&
+      fields.status === COMPLETED_STATUS;
     let count = 0;
     try {
-      ({ count } = await this.prisma.agenda.updateMany({
-        // Regra nova só se liga a evento ainda sem regra: de duas edições simultâneas, uma perde.
-        where: newRuleId ? { ...where, recurring_agenda_id: null } : where,
-        data,
-      }));
+      if (completedIntegration) {
+        const clientId = fields.client_id ?? existing.client_id;
+        const participantIds = [
+          ...new Set(
+            (
+              participants?.map((pair) => pair.participant_id) ?? [
+                existing.participant_id,
+                existing.participant_id_2,
+                existing.participant_id_3,
+                existing.participant_id_4,
+              ]
+            ).filter((participantId): participantId is string => Boolean(participantId)),
+          ),
+        ];
+        ({ count } = await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.agenda.updateMany({
+            where: { ...where, OR: [{ status: null }, { status: { not: COMPLETED_STATUS } }] },
+            data,
+          });
+          if (updated.count === 0 || !clientId || participantIds.length === 0) return updated;
+
+          const pa = await tx.pA.findFirst({
+            where: { client_id: clientId, organization_id: scope.organizationId },
+            select: { client_id: true },
+          });
+          if (!pa) return updated;
+
+          const organization = await tx.organization.findFirst({
+            where: { id: scope.organizationId },
+            select: { timezone: true },
+          });
+          const {
+            day,
+            start: dayStart,
+            end: dayEnd,
+          } = organizationDay(now, organization?.timezone ?? "UTC");
+
+          const users = await tx.user.findMany({
+            where: {
+              id: { in: participantIds },
+              status: "active",
+              OR: [
+                { organization_id: scope.organizationId },
+                { organization_id: null, department: { organization_id: scope.organizationId } },
+              ],
+            },
+            select: { id: true },
+          });
+          const eligibleIds = users.map((user) => user.id);
+          if (eligibleIds.length === 0) return updated;
+
+          const histories = await tx.clientHistory.findMany({
+            where: {
+              organization_id: scope.organizationId,
+              client_id: clientId,
+              user_id: { in: eligibleIds },
+              date: { gte: dayStart, lt: dayEnd },
+            },
+            select: { user_id: true },
+          });
+          const reason = `Registrar histórico do PA em ${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
+          const openPendings = await tx.clientHistoryPending.findMany({
+            where: {
+              organization_id: scope.organizationId,
+              client_id: clientId,
+              reason,
+              user_id: { in: eligibleIds },
+            },
+            select: { user_id: true },
+          });
+          const excludedIds = new Set([
+            ...histories.map((history) => history.user_id),
+            ...openPendings.map((pending) => pending.user_id),
+          ]);
+          const pending = eligibleIds
+            .filter((userId) => !excludedIds.has(userId))
+            .map((userId) => ({
+              id: paPendingId(scope.organizationId, clientId, userId, day),
+              organization_id: scope.organizationId,
+              client_id: clientId,
+              user_id: userId,
+              reason,
+            }));
+          if (pending.length > 0) {
+            await tx.clientHistoryPending.createMany({ data: pending, skipDuplicates: true });
+          }
+          return updated;
+        }));
+      } else {
+        ({ count } = await this.prisma.agenda.updateMany({
+          // Regra nova só se liga a evento ainda sem regra: de duas edições simultâneas, uma perde.
+          where: newRuleId ? { ...where, recurring_agenda_id: null } : where,
+          data,
+        }));
+      }
     } finally {
       // Sem evento ligado, a regra recém-criada geraria ocorrências sem origem.
       if (count === 0 && newRuleId) {
@@ -408,11 +718,26 @@ export class AgendaService {
       }
     }
     if (count === 0) throw new ServiceError(404, NOT_FOUND);
-    await this.log(scope, "Atualização", id, input);
+    if (scope.module === "integracao") {
+      await this.audit.logUpdateIfChanged({
+        userId: scope.userId,
+        organizationId: scope.organizationId,
+        action: "Atualização",
+        referring: "agenda",
+        referringId: id,
+        oldData: existing,
+        updatedData: data,
+      });
+    } else {
+      await this.log(scope, "Atualização", id, input);
+    }
     return { id };
   }
 
   async remove(scope: AgendaScope, id: string): Promise<{ id: string }> {
+    if (scope.module === "integracao") {
+      throw new ServiceError(403, "Exclusão de compromissos não está disponível para Integração.");
+    }
     const { count } = await this.prisma.agenda.deleteMany({
       where: await this.scopedWhere(scope, id),
     });

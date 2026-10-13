@@ -18,6 +18,7 @@ import { createAiTaskExtractionProvider } from "./integrations/aiTaskExtraction.
 import { requireCommercialServiceToken } from "./middlewares/requireCommercialServiceToken.js";
 import { nodeDeps } from "./nodeDeps.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
+import { agendaRoutes } from "./routes/agenda.routes.js";
 import {
   createDepsTasksRoutes,
   type DepsTasksRouteDeps,
@@ -43,6 +44,7 @@ import {
   type ProjectWizardRouteDeps,
 } from "./routes/projectWizard.routes.js";
 import { createTaskAttachmentRoutes } from "./routes/taskAttachment.routes.js";
+import { taskCronogramaRoutes } from "./routes/taskCronograma.routes.js";
 import { taskCrudRoutes } from "./routes/taskCrud.routes.js";
 import { taskDependentRoutes } from "./routes/taskDependent.routes.js";
 import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
@@ -182,6 +184,8 @@ export function createTaskApp(
   }
 
   app.use("/task", taskModelRoutes);
+  app.use("/task", agendaRoutes);
+  app.use("/task", taskCronogramaRoutes);
   app.use("/task", taskDependentRoutes);
   app.use("/task", taskIntegrationRegularizeRoutes);
   app.use("/task", taskLifecycleRoutes);

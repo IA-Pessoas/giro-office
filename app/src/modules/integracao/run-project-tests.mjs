@@ -2,6 +2,23 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as taskFormUi from "./components/taskFormModalUi.ts";
 import { isServerErrorAlreadyNotified } from "../../shared/services/serverErrorToast.ts";
+import { formatCronogramaText, isCronogramaTaskOverdue } from "./cronogramaPresentation.ts";
+
+runTest("cronograma mantém datas passadas e só marca dias anteriores como vencidos", () => {
+  const cronograma = {
+    client: { id: "client-1", name: "Cliente", company_name: null },
+    tasks: [
+      { id: "task-1", name: "Preparação", prevision_date: "2026-10-12T00:00:00.000Z" },
+      { id: "task-2", name: "Entrega", prevision_date: "2026-10-13T00:00:00.000Z" },
+    ],
+  };
+  assert.equal(isCronogramaTaskOverdue(cronograma.tasks[0].prevision_date, "2026-10-13"), true);
+  assert.equal(isCronogramaTaskOverdue(cronograma.tasks[1].prevision_date, "2026-10-13"), false);
+  assert.equal(
+    formatCronogramaText(cronograma, "2026-10-13"),
+    "Cronograma de Integração — Cliente\n12/10/2026 — Preparação (vencida)\n13/10/2026 — Entrega",
+  );
+});
 
 runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
   assert.equal(typeof taskFormUi.getTaskEditValidationMessage, "function");
@@ -276,6 +293,21 @@ async function runAsyncTest(name, fn) {
     throw error;
   }
 }
+
+await runAsyncTest("compromisso pendente prepara mensagem no WhatsApp sem destinatário automático", async () => {
+  const { buildPendingAgendaWhatsappHref } = await import("../../shared/services/agendaService.contract.ts");
+  assert.equal(typeof buildPendingAgendaWhatsappHref, "function");
+  const url = new URL(buildPendingAgendaWhatsappHref({
+    agenda: "Reunião de implantação",
+    when: "13/10/2026, 14:00",
+    clientName: "Empresa Alpha",
+  }));
+  assert.equal(url.origin, "https://wa.me");
+  assert.equal(url.pathname, "/");
+  assert.match(url.searchParams.get("text"), /Empresa Alpha/);
+  assert.match(url.searchParams.get("text"), /Reunião de implantação/);
+  assert.match(url.searchParams.get("text"), /13\/10\/2026, 14:00/);
+});
 
 runTest("task and dependency confirmations retain contextual errors on failure", () => {
   const tasks = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");

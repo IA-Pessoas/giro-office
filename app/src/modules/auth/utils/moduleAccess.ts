@@ -57,6 +57,8 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/clients": "integracao",
   "/projects": "integracao",
   "/tasks": "integracao",
+  "/integracao/agenda": "integracao",
+  "/integracao/cronograma": "integracao",
   "/configs/integracao": "integracao",
   "/certificados": "certificado",
   "/regularize": "regularize",

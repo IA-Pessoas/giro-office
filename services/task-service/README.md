@@ -41,6 +41,14 @@ Exemplos de paths publicos:
 
 - `/task`
 - `/task/list`
+- `/task/cronograma` — `GET` com `client_id` (UUID) lista todas as tarefas em andamento
+  com previsão do cliente, inclusive datas vencidas; exige Integração nível 1+.
+- `/task/agenda` — `GET` consulta mês e módulo (Integração nível 1+); pode receber
+  `timezone_offset_start` e `timezone_offset_end` em minutos para delimitar o mês civil do usuário.
+  `POST` e `PUT` exigem nível 2+ ou owner; `DELETE` não atende Integração. Em Integração,
+  criar exige cliente, pauta e primeiro par
+  departamento/participante, aceita até quatro pares, inicia em `Pendente` e mantém
+  o histórico de alterações na auditoria. O serviço Node e o Worker usam o mesmo contrato.
 - `/task/model`
 - `/task/model/list`
 - `/task/project-plan`

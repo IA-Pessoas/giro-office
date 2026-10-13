@@ -250,15 +250,16 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { pessoal: 0, fiscal: 3 } }), policy)).toBe(false);
   });
 
-  // #1699: a agenda é de departamento, não da Integração; o task-service confere o módulo pedido.
-  it("libera a agenda compartilhada para Contábil ou Triagem, sem exigir Integração", () => {
+  // O task-service confere o módulo pedido, inclusive Integração.
+  it("libera a agenda compartilhada nos módulos habilitados", () => {
     const read = requiredRoutePolicy("GET", "/task/agenda");
 
     expect(canAccessRoute(authContext({ modules: { triagem: 1 } }), read)).toBe(true);
     expect(canAccessRoute(authContext({ modules: { contabil: 1 } }), read)).toBe(true);
     // #1773: o Pessoal consulta o próprio recorte da agenda.
     expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), read)).toBe(true);
-    expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), read)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), read)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { integracao: 0 } }), read)).toBe(false);
 
     for (const method of ["POST", "PUT", "DELETE"]) {
       const write = requiredRoutePolicy(method, "/task/agenda");
@@ -266,7 +267,10 @@ describe("matriz de regressão das políticas modulares", () => {
       expect(canAccessRoute(authContext({ modules: { triagem: 2 } }), write)).toBe(true);
       expect(canAccessRoute(authContext({ modules: { contabil: 2 } }), write)).toBe(true);
       expect(canAccessRoute(authContext({ modules: { triagem: 1 } }), write)).toBe(false);
-      expect(canAccessRoute(authContext({ modules: { integracao: 3 } }), write)).toBe(false);
+      expect(canAccessRoute(authContext({ modules: { integracao: 2 } }), write)).toBe(
+        method !== "DELETE",
+      );
+      expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), write)).toBe(false);
     }
   });
 

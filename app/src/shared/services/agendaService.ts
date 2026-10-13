@@ -9,9 +9,24 @@ import {
 
 export const agendaService = {
   /** Com `mine`, só os eventos do usuário da sessão e os sem responsável. */
-  async list(module: AgendaModule, month: string, mine = false): Promise<AgendaEvent[]> {
+  async list(
+    module: AgendaModule,
+    month: string,
+    mine = false,
+    timezoneOffsets?: { start: number; end: number },
+  ): Promise<AgendaEvent[]> {
     const response = await setupAPIClient().get(AGENDA_ENDPOINT, {
-      params: { module, month, ...(mine ? { mine: true } : {}) },
+      params: {
+        module,
+        month,
+        ...(mine ? { mine: true } : {}),
+        ...(timezoneOffsets
+          ? {
+              timezone_offset_start: timezoneOffsets.start,
+              timezone_offset_end: timezoneOffsets.end,
+            }
+          : {}),
+      },
     });
     return (response.data as { data: AgendaEvent[] }).data;
   },
