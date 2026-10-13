@@ -292,45 +292,72 @@ function inventoryServices(database: TiDatabase): TiServices {
         if (!existing) throw new ServiceError(404, "Ativo de TI não encontrado.");
         await ensureInventoryReferences(database, auth.organizationId, input, String(id));
         const current = row(existing);
-        // Informar a pessoa é atribuir: a devolução anterior deixa de valer.
-        const data = input.user_id === undefined ? input : { ...input, return_date: null };
+        // Informar outra pessoa é atribuir: a devolução anterior deixa de valer. Reenviar a
+        // mesma pessoa não muda nada — o formulário faz isso, inclusive em item legado já
+        // devolvido.
+        const reassigns = input.user_id !== undefined && input.user_id !== current.user_id;
+        const data = reassigns ? { ...input, return_date: null } : input;
         const changesHolder =
-          (input.user_id !== undefined && input.user_id !== current.user_id) ||
-          (input.category_id !== undefined && input.category_id !== current.category_id) ||
-          (input.user_id !== undefined && current.return_date != null);
+          reassigns ||
+          (input.category_id !== undefined && input.category_id !== current.category_id);
         // Edição que não troca pessoa nem categoria não reavalia a regra (dado legado).
         // Trocar a pessoa ou o local pela edição é uma movimentação: entra no histórico.
-        const toUserId = input.user_id ?? activeHolderId(current);
+        const toUserId = reassigns ? input.user_id : activeHolderId(current);
         const toLocationId = input.location_id ?? current.location_id ?? null;
         const movesAsset =
           toUserId !== activeHolderId(current) || toLocationId !== (current.location_id ?? null);
-        if (!changesHolder && !movesAsset) return inventory.update({ where: { id }, data });
-        return writeWithComputerRule(
-          database,
-          auth.organizationId,
-          {
-            id: String(id),
-            category_id: input.category_id ?? current.category_id,
-            user_id: input.user_id ?? current.user_id,
-            return_date: input.user_id === undefined ? current.return_date : null,
-          },
-          async (writer) => {
-            const updated = await delegate(writer, "inventoryTecnologia").update({
-              where: { id },
-              data,
-            });
-            if (movesAsset) {
-              await delegate(writer, "inventoryEventTecnologia").create({
-                data: inventoryEventData(auth, String(id), "transfer", current, {
-                  user_id: toUserId,
-                  location_id: toLocationId,
-                }),
+        try {
+          if (!changesHolder && !movesAsset) {
+            return await inventory.update({ where: { id }, data });
+          }
+          return await writeWithComputerRule(
+            database,
+            auth.organizationId,
+            {
+              id: String(id),
+              category_id: input.category_id ?? current.category_id,
+              user_id: reassigns ? input.user_id : current.user_id,
+              return_date: reassigns ? null : current.return_date,
+            },
+            async (writer) => {
+              // Como nas movimentações: só grava se o item ainda estiver no estado lido.
+              const written = await delegate(writer, "inventoryTecnologia").updateMany({
+                where: {
+                  id,
+                  organization_id: auth.organizationId,
+                  category_id: current.category_id,
+                  user_id: current.user_id ?? null,
+                  location_id: current.location_id ?? null,
+                  return_date: current.return_date ?? null,
+                },
+                data,
               });
-            }
-            return updated;
-          },
-          movesAsset,
-        );
+              if (written.count !== 1) {
+                throw new ServiceError(
+                  409,
+                  "O item foi movimentado por outra operação. Atualize a tela e tente novamente.",
+                );
+              }
+              if (movesAsset) {
+                await delegate(writer, "inventoryEventTecnologia").create({
+                  data: inventoryEventData(auth, String(id), "transfer", current, {
+                    user_id: toUserId,
+                    location_id: toLocationId,
+                  }),
+                });
+              }
+              return delegate(writer, "inventoryTecnologia").findFirst({
+                where: { id, organization_id: auth.organizationId },
+              });
+            },
+            true,
+          );
+        } catch (error) {
+          if (error instanceof ServiceError) throw error;
+          if (uniqueError(error))
+            throw new ServiceError(409, "Já existe um ativo de TI com este código patrimonial.");
+          throw error;
+        }
       },
       assignUser: async (value, id, body) => {
         const auth = context(value);
@@ -355,6 +382,9 @@ function inventoryServices(database: TiDatabase): TiServices {
           where: { id, organization_id: auth.organizationId },
         });
         if (!existing) throw new ServiceError(404, "Ativo de TI não encontrado.");
+        if (!activeHolderId(existing)) {
+          throw new ServiceError(409, "O item não está com ninguém para ser devolvido.");
+        }
         const input = row(body);
         return moveInventory(database, auth, String(id), existing, "return", inventoryInclude, {
           user_id: null,

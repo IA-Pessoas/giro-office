@@ -571,7 +571,65 @@ describe("TiInventoryService: regra do computador ativo", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.inventoryTecnologia.update).toHaveBeenCalledWith({
       where: { id: "pc-2" },
-      data: { notes: "Revisado", user_id: userId, return_date: null },
+      data: { notes: "Revisado", user_id: userId },
+    });
+  });
+
+  // O formulário reenvia a pessoa: num item legado já devolvido isso não pode reatribuí-lo.
+  it("editar as notas de um item devolvido que ainda aponta para a pessoa não o reatribui", async () => {
+    const returnedAt = new Date("2024-01-10");
+    const { prisma, assets, events } = inMemoryPrisma([
+      asset("pc-1", { user_id: userId }),
+      asset("pc-antigo", { user_id: userId, return_date: returnedAt }),
+    ]);
+    const service = new TiInventoryService(prisma as never);
+
+    await service.update(context, "pc-antigo", { notes: "Revisado", user_id: userId });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(assets.find((item) => item.id === "pc-antigo")).toMatchObject({
+      user_id: userId,
+      return_date: returnedAt,
+    });
+    expect(events).toEqual([]);
+  });
+
+  it("recusa devolver um item que não está com ninguém", async () => {
+    const { prisma, events } = inMemoryPrisma([
+      asset("pc-livre"),
+      asset("pc-antigo", { user_id: userId, return_date: new Date("2024-01-10") }),
+    ]);
+    const service = new TiInventoryService(prisma as never);
+
+    for (const id of ["pc-livre", "pc-antigo"]) {
+      await expect(service.returnAsset(context, id, {})).rejects.toMatchObject({
+        statusCode: 409,
+        message: "O item não está com ninguém para ser devolvido.",
+      });
+    }
+    expect(events).toEqual([]);
+  });
+
+  it("edição e transferência simultâneas do mesmo item não se sobrepõem", async () => {
+    const { prisma, assets, events } = inMemoryPrisma([
+      asset("monitor-1", { user_id: userId, category_id: monitorCategoryId }),
+    ]);
+    const service = new TiInventoryService(prisma as never);
+
+    const results = await Promise.allSettled([
+      service.update(context, "monitor-1", { location_id: "30000000-0000-4000-8000-0000000000c1" }),
+      service.transfer(context, "monitor-1", { user_id: otherUserId }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(
+      results.flatMap((result) => (result.status === "rejected" ? [result.reason.statusCode] : [])),
+    ).toEqual([409]);
+    // O único evento gravado descreve o estado em que o item ficou.
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      to_user_id: assets[0]?.user_id,
+      to_location_id: assets[0]?.location_id,
     });
   });
 
