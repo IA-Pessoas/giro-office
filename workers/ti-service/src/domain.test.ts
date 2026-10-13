@@ -309,6 +309,7 @@ describe("TI domain: regra do computador ativo", () => {
     const queues = new Map<string, Promise<void>>();
     const lockedKeys: string[] = [];
     const events: Array<Record<string, unknown>> = [];
+    const changes: Array<Record<string, unknown>> = [];
     const matches = (item: Asset, where: Record<string, unknown>): boolean =>
       Object.entries(where).every(([key, expected]) => {
         if (key === "NOT") return item.id !== (expected as { id: string }).id;
@@ -367,6 +368,12 @@ describe("TI domain: regra do computador ativo", () => {
           status: "active",
         })),
       },
+      changeHistoryTecnologia: {
+        createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+          changes.push(...data);
+          return { count: data.length };
+        }),
+      },
       inventoryEventTecnologia: {
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
           events.push(data);
@@ -408,7 +415,7 @@ describe("TI domain: regra do computador ativo", () => {
         (item) =>
           item.user_id === user && item.category_id === COMPUTER_CATEGORY_ID && !item.return_date,
       );
-    return { db, models, transaction, assets, activeComputers, lockedKeys, events };
+    return { db, models, transaction, assets, activeComputers, lockedKeys, events, changes };
   }
 
   it("recusa um segundo computador ativo em cadastro, edição e atribuição", async () => {
@@ -489,7 +496,7 @@ describe("TI domain: regra do computador ativo", () => {
 
   // Legado: a troca do PHP não validava, então há quem tenha migrado com dois computadores.
   it("edição que não troca pessoa nem categoria não reavalia a regra", async () => {
-    const { db, transaction, models } = inMemoryDatabase([
+    const { db, lockedKeys, models, changes, events } = inMemoryDatabase([
       asset("pc-1", { user_id: USER_ID }),
       asset("pc-2", { user_id: USER_ID }),
     ]);
@@ -497,11 +504,23 @@ describe("TI domain: regra do computador ativo", () => {
 
     await service?.update?.(auth(), "pc-2", { notes: "Revisado", user_id: USER_ID });
 
-    expect(transaction).not.toHaveBeenCalled();
+    expect(lockedKeys).toEqual([]);
     expect(models.inventoryTecnologia.update).toHaveBeenCalledWith({
       where: { id: "pc-2" },
       data: { notes: "Revisado", user_id: USER_ID },
     });
+    // #1936: o campo editado entra no histórico de alterações, não no patrimonial.
+    expect(changes).toEqual([
+      expect.objectContaining({
+        item_type: "inventory",
+        item_id: "pc-2",
+        field: "notes",
+        after: "Revisado",
+        actor_user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+      }),
+    ]);
+    expect(events).toEqual([]);
   });
 
   it("só renomeia uma categoria para Computador se ninguém tiver dois itens ativos dela", async () => {
@@ -635,6 +654,7 @@ describe("TI domain: transferências e histórico patrimonial", () => {
   function store(seed: Asset[]) {
     const assets = seed.map((item) => ({ ...item }));
     const events: Array<Record<string, unknown>> = [];
+    const changes: Array<Record<string, unknown>> = [];
     const lockedKeys: unknown[] = [];
     const queues = new Map<string, Promise<void>>();
     const matches = (item: Asset, where: Record<string, unknown>): boolean =>
@@ -677,6 +697,12 @@ describe("TI domain: transferências e histórico patrimonial", () => {
       inventoryLocationTecnologia: {
         findFirst: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id })),
         findMany: vi.fn(async () => [{ id: ROOM_A, name: "Sala A" }]),
+      },
+      changeHistoryTecnologia: {
+        createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+          changes.push(...data);
+          return { count: data.length };
+        }),
       },
       inventoryEventTecnologia: {
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -745,7 +771,7 @@ describe("TI domain: transferências e histórico patrimonial", () => {
         }
       }),
     } as unknown as TiDatabase;
-    return { db, models, assets, events, lockedKeys };
+    return { db, models, assets, events, lockedKeys, changes };
   }
 
   it("move entre pessoas e locais e registra origem, destino, autor e ação", async () => {

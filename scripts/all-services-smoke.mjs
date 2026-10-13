@@ -2751,6 +2751,20 @@ const handlers = {
     }
   },
 
+  // #1936: histórico de alterações de TI (campo, antes e depois).
+  async tiChangeHistoryList(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/ti/change-history/list?item_type=inventory",
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (!Array.isArray(response.body?.data?.items)) {
+      throw new Error(`${op.id} did not return the change history list.`);
+    }
+  },
+
   // #1935: logs de acesso por usuário.
   async tiAccessLogs(op) {
     const response = await httpRequest(op, {

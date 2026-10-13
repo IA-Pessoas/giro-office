@@ -17,6 +17,11 @@ import {
   withReportingSnapshot,
 } from "@workspace/shared";
 import { listTiAccessLogs } from "@workspace/ti-service/src/services/tiAccessLogService.js";
+import {
+  inventoryFieldChanges,
+  listTiChangeHistory,
+  type TiChangeHistoryDatabase,
+} from "@workspace/ti-service/src/services/tiChangeHistoryService.js";
 
 export type TiAuthContext = {
   organizationId: string;
@@ -39,6 +44,7 @@ type Delegate = {
 export type TiDatabase = {
   [model: string]: unknown;
   $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
+  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
   $transaction<T>(
     callback: (database: TiDatabase) => Promise<T>,
     options?: { isolationLevel?: "RepeatableRead"; maxWait?: number; timeout?: number },
@@ -51,6 +57,7 @@ export type TiService = {
 
 export type TiServices = {
   accessLogs?: TiService;
+  changeHistory?: TiService;
   inventory?: TiService;
   inventoryCategories?: TiService;
   inventoryLocations?: TiService;
@@ -309,9 +316,25 @@ function inventoryServices(database: TiDatabase): TiServices {
         const toLocationId = input.location_id ?? current.location_id ?? null;
         const movesAsset =
           toUserId !== activeHolderId(current) || toLocationId !== (current.location_id ?? null);
+        // Campos editados entram no histórico de alterações (#1936), na mesma transação.
+        const changes = await inventoryFieldChanges(
+          database as unknown as TiChangeHistoryDatabase,
+          auth,
+          String(id),
+          current,
+          input,
+        );
         try {
           if (!changesHolder && !movesAsset) {
-            return await inventory.update({ where: { id }, data });
+            if (changes.length === 0) return await inventory.update({ where: { id }, data });
+            return await database.$transaction(async (transaction) => {
+              const updated = await delegate(transaction, "inventoryTecnologia").update({
+                where: { id },
+                data,
+              });
+              await delegate(transaction, "changeHistoryTecnologia").createMany({ data: changes });
+              return updated;
+            });
           }
           return await writeWithComputerRule(
             database,
@@ -340,6 +363,9 @@ function inventoryServices(database: TiDatabase): TiServices {
                   409,
                   "O item foi movimentado por outra operação. Atualize a tela e tente novamente.",
                 );
+              }
+              if (changes.length > 0) {
+                await delegate(writer, "changeHistoryTecnologia").createMany({ data: changes });
               }
               if (movesAsset) {
                 await delegate(writer, "inventoryEventTecnologia").create({
@@ -871,11 +897,8 @@ async function lockActiveComputer(
   organizationId: string,
   userId: string,
 ): Promise<void> {
-  const lock = transaction.$executeRaw as (
-    query: TemplateStringsArray,
-    ...values: unknown[]
-  ) => Promise<unknown>;
-  await lock`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+  // Chamado no próprio cliente: o Prisma real perde o `this` se o método for destacado.
+  await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
 }
 
 /** Toma o bloqueio da pessoa e recusa se ela já tem outro computador ativo. */
@@ -2300,6 +2323,15 @@ export function createTiDomainServices(database: TiDatabase, encryptionKey?: str
     accessLogs: {
       list: (value, userId, query) =>
         listTiAccessLogs(database, context(value), String(userId), row(query)),
+    },
+    // #1936: mesma consulta do serviço Node.
+    changeHistory: {
+      list: (value, query) =>
+        listTiChangeHistory(
+          database as unknown as TiChangeHistoryDatabase,
+          context(value),
+          row(query),
+        ),
     },
     ...inventoryServices(database),
     ...extensionServices(database),

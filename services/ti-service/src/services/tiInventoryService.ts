@@ -20,6 +20,7 @@ import type {
   TransferTiInventoryBody,
   UpdateTiInventoryBody,
 } from "../schemas/tiInventory.schemas.js";
+import { inventoryFieldChanges, type TiChangeHistoryDatabase } from "./tiChangeHistoryService.js";
 import { TiDepartmentResolverService } from "./tiDepartmentResolverService.js";
 import type { TiAuthContext } from "./tiRequestService.js";
 
@@ -33,7 +34,7 @@ const SAFE_USER_SELECT = {
 
 type InventoryWriter = Pick<
   Prisma.TransactionClient,
-  "inventoryTecnologia" | "inventoryEventTecnologia"
+  "inventoryTecnologia" | "inventoryEventTecnologia" | "changeHistoryTecnologia"
 >;
 
 /** Estado em que o ativo termina depois da escrita. */
@@ -239,8 +240,23 @@ export class TiInventoryService {
       const toLocationId = body.location_id ?? existing.location_id ?? null;
       const movesAsset =
         toUserId !== activeHolderId(existing) || toLocationId !== (existing.location_id ?? null);
+      // Campos editados entram no histórico de alterações (#1936), na mesma transação.
+      const changes = await inventoryFieldChanges(
+        this.prisma as unknown as TiChangeHistoryDatabase,
+        context,
+        id,
+        existing as unknown as Record<string, unknown>,
+        body,
+      );
       if (!changesHolder && !movesAsset) {
-        return await this.prisma.inventoryTecnologia.update({ where: { id }, data });
+        if (changes.length === 0) {
+          return await this.prisma.inventoryTecnologia.update({ where: { id }, data });
+        }
+        return await this.prisma.$transaction(async (transaction) => {
+          const updated = await transaction.inventoryTecnologia.update({ where: { id }, data });
+          await transaction.changeHistoryTecnologia.createMany({ data: changes });
+          return updated;
+        });
       }
 
       return await this.writeWithComputerRule(
@@ -266,6 +282,9 @@ export class TiInventoryService {
           });
           if (written.count !== 1) {
             throw new ServiceError(409, ASSET_MOVED_MESSAGE);
+          }
+          if (changes.length > 0) {
+            await writer.changeHistoryTecnologia.createMany({ data: changes });
           }
           if (movesAsset) {
             await writer.inventoryEventTecnologia.create({
