@@ -17,14 +17,14 @@ const TASK_SELECT = {
   responsible_id: true,
   responsible2_id: true,
   responsible3_id: true,
-  taskModel: { select: { department: { select: { name: true } } } },
+  department: { select: { name: true } },
 } as const;
 const TASK_CLOSE_EXCLUDED_STATUSES = [
   "Concluída",
   "Em Espera",
   "Não Contratado",
   "Paralisado",
-] as const;
+];
 
 type CommercialProspectingClosePrisma = Pick<
   PrismaClient,
@@ -116,7 +116,7 @@ export class CommercialProspectingCloseService {
             .filter(
               (task) =>
                 task.status !== INTEGRACAO_TASK_STATUS_IN_PROGRESS &&
-                task.taskModel.department.name.trim().toLowerCase() === "regularize",
+                task.department.name.trim().toLowerCase() === "regularize",
             )
             .map((task) => task.id);
           if (regularizeTaskIds.length > 0) {

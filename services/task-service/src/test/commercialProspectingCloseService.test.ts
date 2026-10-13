@@ -36,7 +36,7 @@ describe("CommercialProspectingCloseService", () => {
             responsible_id: "user-1",
             responsible2_id: null,
             responsible3_id: null,
-            taskModel: { department: { name: "Regularize" } },
+            department: { name: "Regularize" },
           },
           {
             id: "task-2",
@@ -47,7 +47,7 @@ describe("CommercialProspectingCloseService", () => {
             responsible_id: "user-2",
             responsible2_id: null,
             responsible3_id: null,
-            taskModel: { department: { name: "Contábil" } },
+            department: { name: "Contábil" },
           },
         ]),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
