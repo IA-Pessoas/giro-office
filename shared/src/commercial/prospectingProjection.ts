@@ -8,6 +8,8 @@ export type CommercialProspectingProjectionStatus =
   | "Envio de Proposta"
   | "Paralisado"
   | "Recusado pelo Cliente"
+  | "Baixada"
+  | "Inativo"
   | "Fechado";
 
 export interface CommercialProspectingTransitionEvent {

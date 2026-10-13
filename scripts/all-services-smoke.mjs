@@ -4152,6 +4152,27 @@ const handlers = {
     });
   },
 
+  async taskCommercialProspectingTransition(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        event_id: crypto.randomUUID(),
+        event_type: "commercial.prospecting.transition",
+        event_version: 1,
+        organization_id: requireState("session").organization_id,
+        client_id: requireState("primaryClientId"),
+        prospecting_id: crypto.randomUUID(),
+        from_status: "Análise/Agendamento",
+        to_status: "Baixada",
+        status_date: new Date().toISOString(),
+        description: "Smoke commercial prospecting transition",
+        audit_correlation_id: crypto.randomUUID(),
+        occurred_at: new Date().toISOString(),
+      },
+      headers: isBadExpectation(op) ? { "x-internal-service-token": "invalid-token" } : {},
+    });
+  },
+
   async clientList(op) {
     await httpRequest(op, {
       expectedStatus: [200],

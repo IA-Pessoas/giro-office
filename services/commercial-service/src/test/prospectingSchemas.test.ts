@@ -68,4 +68,9 @@ describe("prospecting schemas", () => {
       }).success,
     ).toBe(true);
   });
+
+  it.each(["Baixada", "Inativo"] as const)("accepts the legacy status %s", (status) => {
+    expect(updateProspectingBodySchema.safeParse({ status }).success).toBe(true);
+    expect(prospectingListQuerySchema.safeParse({ status }).success).toBe(true);
+  });
 });

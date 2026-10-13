@@ -28,6 +28,10 @@ import {
   type InternalCommercialProspectingRouteDeps,
 } from "./routes/internalCommercialProspecting.routes.js";
 import {
+  createInternalCommercialProspectingTransitionRouter,
+  type InternalCommercialProspectingTransitionRouteDeps,
+} from "./routes/internalCommercialProspectingTransition.routes.js";
+import {
   createInternalCommercialTaskBillingRouter,
   type InternalCommercialTaskBillingRouteDeps,
 } from "./routes/internalCommercialTaskBilling.routes.js";
@@ -53,6 +57,7 @@ import { taskOperationalNotificationRoutes } from "./routes/taskOperationalNotif
 import { taskPostponementRoutes } from "./routes/taskPostponement.routes.js";
 import { MEETING_MINUTES_MAX_SOURCE_BYTES } from "./schemas/projectWizardExtraction.schemas.js";
 import { CommercialProspectingCloseService } from "./services/commercialProspectingCloseService.js";
+import { CommercialProspectingTransitionService } from "./services/commercialProspectingTransitionService.js";
 import { CommercialTaskBillingProjectionService } from "./services/commercialTaskBillingProjectionService.js";
 import { ProjectWizardExtractionService } from "./services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "./services/projectWizardService.js";
@@ -88,6 +93,7 @@ export function createTaskApp(
     internalReportingService?: TaskReportingService;
     commercialTaskBillingProjectionService?: InternalCommercialTaskBillingRouteDeps;
     commercialProspectingCloseService?: InternalCommercialProspectingRouteDeps;
+    commercialProspectingTransitionService?: InternalCommercialProspectingTransitionRouteDeps;
     taskAttachmentService?: TaskAttachmentService;
   },
 ): Express {
@@ -134,6 +140,9 @@ export function createTaskApp(
   const commercialProspectingCloseService =
     options?.commercialProspectingCloseService ??
     new CommercialProspectingCloseService(nodeDeps.prisma);
+  const commercialProspectingTransitionService =
+    options?.commercialProspectingTransitionService ??
+    new CommercialProspectingTransitionService(nodeDeps.prisma);
   const taskAttachmentRoutes = createTaskAttachmentRoutes({
     service:
       options?.taskAttachmentService ??
@@ -208,6 +217,13 @@ export function createTaskApp(
     "/internal",
     createInternalCommercialProspectingRouter(
       commercialProspectingCloseService,
+      requireCommercialServiceToken(env),
+    ),
+  );
+  app.use(
+    "/internal",
+    createInternalCommercialProspectingTransitionRouter(
+      commercialProspectingTransitionService,
       requireCommercialServiceToken(env),
     ),
   );

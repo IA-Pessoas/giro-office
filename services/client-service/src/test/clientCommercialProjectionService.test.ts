@@ -106,6 +106,8 @@ describe("ClientCommercialProjectionService", () => {
   it.each([
     ["Paralisado", "Paralisado"],
     ["Recusado pelo Cliente", "Não Contratado"],
+    ["Baixada", "Paralisado"],
+    ["Inativo", "Não Contratado"],
     ["Análise/Agendamento", "Prospecção"],
   ] as const)("preserva o mapeamento legado %s -> %s", async (commercialStatus: CommercialProspectingTransitionEvent["to_status"], clientStatus: string) => {
     const prisma = createPrismaMock();

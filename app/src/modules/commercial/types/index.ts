@@ -27,7 +27,9 @@ export const COMMERCIAL_PROSPECTING_STATUSES = [
   "Envio de Proposta",
   "Paralisado",
   "Recusado pelo Cliente",
+  "Baixada",
   "Fechado",
+  "Inativo",
 ] as const;
 
 export type CommercialProspectingStatus = (typeof COMMERCIAL_PROSPECTING_STATUSES)[number];

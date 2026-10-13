@@ -14,6 +14,7 @@ import {
 import { CommercialOutboxHttpDelivery } from "./integrations/commercialOutboxDelivery.js";
 import prismaClient from "./integrations/prisma.js";
 import { ProspectingCloseHttpClient } from "./integrations/prospectingClose.js";
+import { ProspectingTaskTransitionHttpClient } from "./integrations/prospectingTaskTransition.js";
 import { TaskProjectionHttpClient } from "./integrations/taskProjection.js";
 import {
   type CommercialEmailNotificationPrisma,
@@ -52,6 +53,7 @@ const outboxWorker = new CommercialOutboxWorkerService(
       prismaClient as unknown as CommercialEmailNotificationPrisma,
       emailAdapter,
     ),
+    new ProspectingTaskTransitionHttpClient(env.taskServiceUrl, env.taskServiceInternalToken),
   ),
   {
     maxAttempts: env.outboxWorkerMaxAttempts,
