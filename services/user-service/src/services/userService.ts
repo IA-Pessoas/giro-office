@@ -105,6 +105,9 @@ export interface UpdateUserInput {
   expected_version?: number;
 }
 
+/** Quem gerencia usuários sem ser owner não concede nem revoga acessos (#1930). */
+export type ActorGrantScope = "none";
+
 export interface ListUsersParams {
   skip?: number;
   take?: number;
@@ -194,6 +197,39 @@ function removesActiveOwner(
     currentStatus === "active" &&
     (nextType !== "owner" || nextStatus === "inactive")
   );
+}
+
+/**
+ * Tipo, nível de acesso e departamento de um admin definem os módulos do usuário, e mudá-los
+ * concede ou revoga acesso: é do owner. Valores iguais aos atuais saem do payload, para o
+ * servidor não rederivar os módulos numa edição que só troca o nome.
+ */
+function withoutAccessChanges(
+  input: UpdateUserInput,
+  existing: { permission: number | null; department_id: string | null },
+  currentType: AuthUserType | null,
+): UpdateUserInput {
+  const { type, permission, department_id: departmentId, ...rest } = input;
+  const changesAccess =
+    (type !== undefined && normalizeUserType(type) !== currentType) ||
+    (permission !== undefined && permission !== existing.permission);
+  const changesDepartment = departmentId !== undefined && departmentId !== existing.department_id;
+  if (changesAccess || (changesDepartment && currentType === "admin")) {
+    throw new ServiceError(
+      403,
+      "Apenas o owner altera o tipo, o nível de acesso ou o departamento de um administrador.",
+    );
+  }
+  return changesDepartment ? { ...rest, department_id: departmentId } : rest;
+}
+
+function assertCanManageTarget(
+  scope: ActorGrantScope | undefined,
+  targetType: AuthUserType | null,
+): void {
+  if (scope && targetType === "owner") {
+    throw new ServiceError(403, "Apenas o owner pode alterar outro owner.");
+  }
 }
 
 function pickKnownModules(modules: Record<string, number> | undefined): ModulePatch {
@@ -447,6 +483,7 @@ class UserManagementService {
   async create(
     data: CreateUserInput,
     actorUserId?: string,
+    grantScope?: ActorGrantScope,
   ): Promise<UserPublicRow | UserCreateRow> {
     const department = data.organization_id
       ? await this.#requireDepartmentInOrganization(data.department_id, data.organization_id)
@@ -465,6 +502,10 @@ class UserManagementService {
             ),
             normalizedPermission,
           );
+    // Admin recebe o nível 3 no módulo do departamento: é concessão, só do owner.
+    if (grantScope && normalizedType === "admin") {
+      throw new ServiceError(403, "Apenas o owner cria administradores.");
+    }
 
     const passwordHash = await hashPassword(data.password);
 
@@ -540,10 +581,11 @@ class UserManagementService {
 
   async update(
     id: string,
-    data: UpdateUserInput,
+    input: UpdateUserInput,
     organizationId: string,
     actorUserId?: string,
     action = "UPDATE",
+    grantScope?: ActorGrantScope,
   ): Promise<UserPublicRow> {
     const existingUser = await prismaClient.user.findFirst({
       where: userOrganizationWhere(id, organizationId),
@@ -557,6 +599,8 @@ class UserManagementService {
     const updateData: Record<string, unknown> = {};
     let departmentForAccess: DepartmentAccessContext | null = null;
     const currentType = normalizeUserType(existingUser.type);
+    assertCanManageTarget(grantScope, currentType);
+    const data = grantScope ? withoutAccessChanges(input, existingUser, currentType) : input;
     const requestedType = data.type !== undefined ? normalizeUserType(data.type) : currentType;
 
     if (data.name !== undefined) updateData.name = data.name;
@@ -810,8 +854,14 @@ class UserManagementService {
     }
   }
 
-  async delete(id: string, organizationId: string, actorUserId?: string): Promise<void> {
+  async delete(
+    id: string,
+    organizationId: string,
+    actorUserId?: string,
+    grantScope?: ActorGrantScope,
+  ): Promise<void> {
     const existingUser = await this.getById(id, organizationId);
+    assertCanManageTarget(grantScope, normalizeUserType(existingUser.type));
 
     try {
       await prismaClient.$transaction(
