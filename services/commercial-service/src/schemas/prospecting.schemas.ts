@@ -50,7 +50,7 @@ const referenceMonthSchema = z
 const pauseReasonSchema = z.string().trim().min(1).max(1000).nullable().optional();
 
 function requirePauseReason(
-  data: { status?: ProspectingStatus; pause_reason?: string | null },
+  data: { status?: ProspectingUpdateStatus; pause_reason?: string | null },
   context: z.RefinementCtx,
 ): void {
   if (data.status === "Paralisado" && !data.pause_reason?.trim()) {
