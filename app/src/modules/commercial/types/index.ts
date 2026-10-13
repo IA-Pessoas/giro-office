@@ -39,6 +39,29 @@ export interface CommercialProspectingClient {
   fantasy_name: string | null;
 }
 
+export interface CommercialProspectingListClient extends CommercialProspectingClient {
+  cpf_cnpj: string;
+  number: string | null;
+  email: string | null;
+  indication: string | null;
+  partners: Array<{ clientPF: { name: string } }>;
+}
+
+export interface CommercialProspectingPage {
+  items: CommercialProspectingListItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
+
+export interface CommercialProspectingFilters {
+  page: number;
+  page_size: number;
+  status?: CommercialProspectingStatus;
+  search?: string;
+}
+
 export interface CommercialProspecting {
   id: string;
   client_id: string;
@@ -56,6 +79,10 @@ export interface CommercialProspecting {
   attachment_mime_type: string | null;
   attachment_size_bytes: number | null;
   client: CommercialProspectingClient;
+}
+
+export interface CommercialProspectingListItem extends Omit<CommercialProspecting, "client"> {
+  client: CommercialProspectingListClient;
 }
 
 export interface CommercialProspectingHistoryEntry {

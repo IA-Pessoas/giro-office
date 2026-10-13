@@ -15,8 +15,14 @@ import type {
   ProspectingAttachmentMimeType,
   ProspectingAttachmentStorage,
 } from "../integrations/prospectingAttachmentStorage.js";
-import type { ProspectingSolution, ProspectingStatus } from "../schemas/prospecting.schemas.js";
+import type {
+  ProspectingListQuery,
+  ProspectingSolution,
+  ProspectingStatus,
+} from "../schemas/prospecting.schemas.js";
 import { assertProspectingTransition } from "./prospectingDomain.js";
+
+const CLIENT_SELECT = { id: true, name: true, company_name: true, fantasy_name: true } as const;
 
 const PROSPECTING_SELECT = {
   id: true,
@@ -34,10 +40,28 @@ const PROSPECTING_SELECT = {
   attachment_name: true,
   attachment_mime_type: true,
   attachment_size_bytes: true,
-  client: { select: { id: true, name: true, company_name: true, fantasy_name: true } },
+  client: { select: CLIENT_SELECT },
 } as const;
 
-const CLIENT_SELECT = { id: true, name: true, company_name: true, fantasy_name: true } as const;
+function prospectingListSelect(organization_id: string) {
+  return {
+    ...PROSPECTING_SELECT,
+    client: {
+      select: {
+        ...CLIENT_SELECT,
+        cpf_cnpj: true,
+        number: true,
+        email: true,
+        indication: true,
+        partners: {
+          where: { organization_id },
+          select: { clientPF: { select: { name: true } } },
+          orderBy: { entry: "asc" },
+        },
+      },
+    },
+  } as const;
+}
 const DUPLICATE_MESSAGE = "Este cliente já possui uma prospecção nesta organização.";
 const PROSPECTING_HISTORY_FIELDS = [
   "status",
@@ -124,6 +148,18 @@ export interface CommercialProspecting {
   client: CommercialProspectingClient;
 }
 
+export interface CommercialProspectingListItem extends Omit<CommercialProspecting, "client"> {
+  client: CommercialProspectingListClient;
+}
+
+export interface CommercialProspectingPage {
+  items: CommercialProspectingListItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
+
 export interface CommercialProspectingHistoryEntry {
   id: string;
   field: string;
@@ -139,6 +175,14 @@ export interface CommercialProspectingClient {
   name: string;
   company_name: string | null;
   fantasy_name: string | null;
+}
+
+export interface CommercialProspectingListClient extends CommercialProspectingClient {
+  cpf_cnpj: string;
+  number: string | null;
+  email: string | null;
+  indication: string | null;
+  partners: Array<{ clientPF: { name: string } }>;
 }
 
 export interface CreateCommercialProspectingRequest {
@@ -326,13 +370,78 @@ export class CommercialProspectingService {
     };
   }
 
-  async list(organization_id: string): Promise<CommercialProspecting[]> {
+  async list(
+    organization_id: string,
+    filters: ProspectingListQuery = { page: 1, page_size: 20 },
+  ): Promise<CommercialProspectingPage> {
     try {
-      return await this.prisma.commercialProspecting.findMany({
-        where: { organization_id, archived_at: null },
-        select: PROSPECTING_SELECT,
-        orderBy: [{ status: "asc" }, { updated_at: "desc" }],
-      });
+      const where: Prisma.CommercialProspectingWhereInput = {
+        organization_id,
+        archived_at: null,
+        client: { is: { organization_id } },
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.search
+          ? {
+              OR: [
+                { client: { is: { name: { contains: filters.search, mode: "insensitive" } } } },
+                {
+                  client: {
+                    is: { company_name: { contains: filters.search, mode: "insensitive" } },
+                  },
+                },
+                {
+                  client: {
+                    is: { fantasy_name: { contains: filters.search, mode: "insensitive" } },
+                  },
+                },
+                { client: { is: { cpf_cnpj: { contains: filters.search } } } },
+                {
+                  client: {
+                    is: { responsible: { contains: filters.search, mode: "insensitive" } },
+                  },
+                },
+                { client: { is: { number: { contains: filters.search } } } },
+                { client: { is: { email: { contains: filters.search, mode: "insensitive" } } } },
+                {
+                  client: { is: { indication: { contains: filters.search, mode: "insensitive" } } },
+                },
+                {
+                  client: {
+                    is: {
+                      partners: {
+                        some: {
+                          organization_id,
+                          clientPF: {
+                            is: { name: { contains: filters.search, mode: "insensitive" } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                { branch: { contains: filters.search, mode: "insensitive" } },
+                { description: { contains: filters.search, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
+      const [items, total] = await Promise.all([
+        this.prisma.commercialProspecting.findMany({
+          where,
+          select: prospectingListSelect(organization_id),
+          orderBy: [{ status: "asc" }, { updated_at: "desc" }, { id: "asc" }],
+          skip: (filters.page - 1) * filters.page_size,
+          take: filters.page_size,
+        }),
+        this.prisma.commercialProspecting.count({ where }),
+      ]);
+      return {
+        items,
+        page: filters.page,
+        page_size: filters.page_size,
+        total,
+        total_pages: Math.ceil(total / filters.page_size),
+      };
     } catch (err: unknown) {
       logError("Erro ao listar prospecções comerciais", { err });
       throw new ServiceError(500, "Não foi possível listar as prospecções comerciais.", err);

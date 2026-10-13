@@ -982,6 +982,39 @@ html.dark .ui-input,
         break-inside: avoid;
     }
 }
+
+@media print {
+    #__next:has(.commercial-prospecting-print) {
+        display: block !important;
+    }
+
+    .commercial-prospecting-print,
+    .commercial-prospecting-print * {
+        visibility: visible !important;
+    }
+
+    .commercial-prospecting-print {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        border: 0 !important;
+    }
+
+    .commercial-prospecting-print [data-print-hide] {
+        display: none !important;
+    }
+
+    .commercial-prospecting-print table {
+        min-width: 0 !important;
+        width: 100%;
+        font-size: 9pt;
+    }
+
+    .commercial-prospecting-print th,
+    .commercial-prospecting-print td {
+        padding: 5pt;
+    }
+}
   
 /* Animação de piscar */
 @keyframes blink {

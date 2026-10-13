@@ -5,12 +5,13 @@ import { useFetch } from "@shared/hooks";
 import { commercialQueryKeys } from "./queryKeys";
 import { commercialService } from "../services/commercialService";
 import type {
+  CommercialProspectingFilters,
   CreateCommercialProspectingPayload,
   UpdateCommercialProspectingPayload,
 } from "../types";
 
-export function useCommercialProspecting() {
-  return useFetch(commercialQueryKeys.prospecting(), () => commercialService.listProspecting());
+export function useCommercialProspecting(filters: CommercialProspectingFilters) {
+  return useFetch(commercialQueryKeys.prospecting(filters), () => commercialService.listProspecting(filters));
 }
 
 export function useCommercialProspectingClients() {

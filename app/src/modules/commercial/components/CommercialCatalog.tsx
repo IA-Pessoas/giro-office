@@ -33,6 +33,7 @@ import {
   type CommercialTaskHiringStatus,
   type CommercialTaskBilling,
   type CommercialProspecting,
+  type CommercialProspectingStatus,
   type CommercialProspectingHistoryEntry,
   type CommercialProposalConfig,
 } from "../types";
@@ -89,7 +90,17 @@ const emptyProspectingDraft: ProspectingDraft = {
 export function CommercialCatalog() {
   const { access, isLoading: accessLoading } = useModuleAccess("comercial");
   const configsQuery = useCommercialProposalConfigs();
-  const prospectingQuery = useCommercialProspecting();
+  const [prospectingStatusFilter, setProspectingStatusFilter] = useState<CommercialProspectingStatus | "Todas">("Todas");
+  const [prospectingSearch, setProspectingSearch] = useState("");
+  const [prospectingPage, setProspectingPage] = useState(1);
+  const [prospectingView, setProspectingView] = useState<"lista" | "kanban">("lista");
+  const prospectingFilters = {
+    page: prospectingPage,
+    page_size: 20,
+    ...(prospectingStatusFilter === "Todas" ? {} : { status: prospectingStatusFilter }),
+    ...(prospectingSearch.trim() ? { search: prospectingSearch.trim() } : {}),
+  };
+  const prospectingQuery = useCommercialProspecting(prospectingFilters);
   // Clientes sem nenhuma prospecção (ativa ou arquivada): o backend recusa os demais.
   const eligibleClientsQuery = useCommercialProspectingClients();
   const createMutation = useCreateCommercialProposalConfig();
@@ -535,8 +546,8 @@ export function CommercialCatalog() {
             <label className="block font-medium">Anexo opcional (PDF, imagem ou texto)
               <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp,text/plain" onChange={(event) => setProspectingFile(event.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" />
             </label>
-            {isEditing && prospectingQuery.data?.find((item) => item.id === prospectingEditingId)?.attachment_name ? (
-              <button type="button" onClick={() => { if (prospectingEditingId) void openProspectingAttachment(prospectingEditingId); }} className="min-h-10 text-blue-700 underline dark:text-blue-300">Abrir anexo atual: {prospectingQuery.data.find((item) => item.id === prospectingEditingId)?.attachment_name}</button>
+            {isEditing && prospectingQuery.data?.items.find((item) => item.id === prospectingEditingId)?.attachment_name ? (
+              <button type="button" onClick={() => { if (prospectingEditingId) void openProspectingAttachment(prospectingEditingId); }} className="min-h-10 text-blue-700 underline dark:text-blue-300">Abrir anexo atual: {prospectingQuery.data.items.find((item) => item.id === prospectingEditingId)?.attachment_name}</button>
             ) : null}
           </div>
         ) : null}
@@ -657,7 +668,7 @@ export function CommercialCatalog() {
         <section className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center dark:border-slate-700"><h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Nenhuma configuração cadastrada</h2><p className="mx-auto mt-2 max-w-[48ch] text-sm leading-6 text-slate-700 dark:text-slate-300">Crie a primeira configuração para disponibilizar um valor base nas propostas comerciais.</p>{canEdit ? <button type="button" onClick={startCreate} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"><Plus className="h-4 w-4" aria-hidden="true" />Criar configuração</button> : null}</section>
       )}
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-labelledby="commercial-prospecting-title">
+      <section className="commercial-prospecting-print overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-labelledby="commercial-prospecting-title">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
           <div>
             <h2 id="commercial-prospecting-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">Prospecção</h2>
@@ -699,7 +710,37 @@ export function CommercialCatalog() {
         </Dialog>
 
 
-        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{getClientDisplayName(item.client)}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Arquivar prospecção ${getClientDisplayName(item.client)}`} onClick={() => requestProspectingArchive(item)} disabled={archiveProspectingMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-amber-200 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-900/60 dark:text-amber-300 dark:hover:bg-amber-950/30"><Archive className="h-4 w-4" aria-hidden="true" />Arquivar prospecção</button></div> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
+        <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-700" data-print-hide>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Situação
+            <select value={prospectingStatusFilter} onChange={(event) => { setProspectingStatusFilter(event.target.value as CommercialProspectingStatus | "Todas"); setProspectingPage(1); }} className="mt-1 block min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white">
+              <option>Todas</option>{COMMERCIAL_PROSPECTING_STATUSES.map((status) => <option key={status}>{status}</option>)}
+            </select>
+          </label>
+          <label className="min-w-56 flex-1 text-sm font-medium text-slate-800 dark:text-slate-100">Buscar
+            <input type="search" value={prospectingSearch} onChange={(event) => { setProspectingSearch(event.target.value); setProspectingPage(1); }} placeholder="Cliente, documento, contato ou observação" className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+          </label>
+          <div className="flex gap-2" role="group" aria-label="Visualização das prospecções">
+            <button type="button" aria-pressed={prospectingView === "lista"} onClick={() => setProspectingView("lista")} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-semibold aria-pressed:bg-blue-50 aria-pressed:text-blue-800 dark:border-slate-600 dark:text-slate-200">Lista</button>
+            <button type="button" aria-pressed={prospectingView === "kanban"} onClick={() => setProspectingView("kanban")} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-semibold aria-pressed:bg-blue-50 aria-pressed:text-blue-800 dark:border-slate-600 dark:text-slate-200">Kanban</button>
+          </div>
+          <button type="button" onClick={() => { setProspectingView("lista"); window.setTimeout(() => window.print(), 0); }} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800" data-print-hide>Imprimir lista</button>
+        </div>
+        <p className="px-5 py-2 text-sm text-slate-500 dark:text-slate-400" aria-live="polite">{prospectingQuery.data ? `${prospectingQuery.data.total} prospecções encontradas` : ""}</p>
+        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções. Tente novamente.</div> : prospectingQuery.data?.items.length ? (
+          <>
+            <p className="hidden px-5 pb-3 text-sm print:block">Filtros: situação {prospectingStatusFilter}; busca {prospectingSearch.trim() || "sem busca"}; página {prospectingPage}.</p>
+            {prospectingView === "lista" ? <div className="overflow-x-auto" data-prospecting-list>
+              <table className="min-w-[1100px] w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"><tr>{["Cliente", "Documento", "Sócio", "Contato", "Ramo", "Indicação", "Situação", "Observação", "Ações"].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr></thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.items.map((item) => <tr key={item.id} className="align-top"><td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{getClientDisplayName(item.client)}</td><td className="px-4 py-3">{item.client.cpf_cnpj || "—"}</td><td className="px-4 py-3">{item.client.partners.map((partner) => partner.clientPF.name).join(", ") || "—"}</td><td className="px-4 py-3">{[item.client.number, item.client.email].filter(Boolean).join(" · ") || "—"}</td><td className="px-4 py-3">{item.branch || "—"}</td><td className="px-4 py-3">{item.client.indication || "—"}</td><td className="px-4 py-3">{item.status}</td><td className="max-w-64 px-4 py-3">{item.description || "—"}</td><td className="px-4 py-3" data-print-hide>{canEdit ? <div className="flex gap-2"><button type="button" onClick={() => startProspectingEdit(item)} className="min-h-9 rounded border border-slate-300 px-2 font-semibold dark:border-slate-600">Editar</button><button type="button" onClick={() => requestProspectingArchive(item)} disabled={archiveProspectingMutation.isPending} className="min-h-9 rounded border border-amber-200 px-2 font-semibold text-amber-800 dark:border-amber-900/60 dark:text-amber-300">Arquivar</button></div> : "—"}</td></tr>)}</tbody>
+              </table>
+            </div> : <div className="grid gap-4 overflow-x-auto p-5 md:grid-cols-3">{COMMERCIAL_PROSPECTING_STATUSES.map((status) => {
+              const items = prospectingQuery.data.items.filter((item) => item.status === status);
+              return <section key={status} className="min-w-64 rounded-lg border border-slate-200 dark:border-slate-700" aria-label={`${status}: ${items.length} prospecções`}><h3 className="border-b border-slate-200 px-4 py-3 font-semibold text-slate-900 dark:border-slate-700 dark:text-white">{status} <span className="text-sm font-normal text-slate-500">({items.length})</span></h3><div className="space-y-3 p-3">{items.map((item) => <article key={item.id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700"><h4 className="font-semibold text-slate-900 dark:text-white">{getClientDisplayName(item.client)}</h4><dl className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-300"><div>Documento: {item.client.cpf_cnpj || "—"}</div><div>Sócio: {item.client.partners.map((partner) => partner.clientPF.name).join(", ") || "—"}</div><div>Contato: {[item.client.number, item.client.email].filter(Boolean).join(" · ") || "—"}</div><div>Ramo: {item.branch || "—"}</div><div>Indicação: {item.client.indication || "—"}</div><div>Observação: {item.description || "—"}</div></dl>{canEdit ? <button type="button" onClick={() => startProspectingEdit(item)} className="mt-3 min-h-9 rounded border border-slate-300 px-2 text-sm font-semibold dark:border-slate-600">Editar</button> : null}</article>)}{items.length === 0 ? <p className="text-sm text-slate-500">Nenhuma prospecção nesta situação.</p> : null}</div></section>;
+            })}</div>}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4 dark:border-slate-700" data-print-hide><p className="text-sm text-slate-500">Página {prospectingQuery.data.page} de {Math.max(prospectingQuery.data.total_pages, 1)}</p><div className="flex gap-2"><button type="button" disabled={prospectingPage <= 1} onClick={() => setProspectingPage((page) => page - 1)} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm disabled:opacity-50 dark:border-slate-600">Anterior</button><button type="button" disabled={prospectingPage >= prospectingQuery.data.total_pages} onClick={() => setProspectingPage((page) => page + 1)} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm disabled:opacity-50 dark:border-slate-600">Próxima</button></div></div>
+          </>
+        ) : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção encontrada para os filtros aplicados.</div>}
       </section>
 
       <section
