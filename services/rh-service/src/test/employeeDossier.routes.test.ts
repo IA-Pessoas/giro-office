@@ -1,7 +1,12 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createTestApp, employeeDossierServiceMock, resetRhRouteMocks } from "./rhTestUtils.js";
+import {
+  createTestApp,
+  employeeDossierServiceMock,
+  employeeMeetingMinuteServiceMock,
+  resetRhRouteMocks,
+} from "./rhTestUtils.js";
 
 const userId = "00000000-0000-4000-8000-000000000001";
 const otherUserId = "00000000-0000-4000-8000-000000000003";
@@ -109,6 +114,67 @@ describe("employee dossier routes", () => {
     expect(employeeDossierServiceMock.deleteContact).toHaveBeenCalledTimes(1);
     expect(employeeDossierServiceMock.listAllergies).toHaveBeenCalledTimes(1);
     expect(employeeDossierServiceMock.replaceAllergies).toHaveBeenCalledTimes(1);
+  });
+
+  it("protege atas com nível RH 2 e valida criação, listagem e edição", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    const listed = await request(app).get(
+      `/rh/profile/colaborator/meeting-minutes?user_id=${otherUserId}`,
+    );
+    expect(listed.status).toBe(200);
+    expect(employeeMeetingMinuteServiceMock.list).toHaveBeenCalledWith(
+      expect.objectContaining({ targetUserId: otherUserId, rhPermission: 2 }),
+    );
+
+    const invalidCreate = await request(app)
+      .post("/rh/profile/colaborator/meeting-minutes")
+      .send({ target_user_id: otherUserId, meeting_date: "2026-04-15" });
+    expect(invalidCreate.status).toBe(400);
+    expect(employeeMeetingMinuteServiceMock.create).not.toHaveBeenCalled();
+
+    const created = await request(app).post("/rh/profile/colaborator/meeting-minutes").send({
+      target_user_id: otherUserId,
+      meeting_date: "2026-04-15",
+      agenda: "Planejamento trimestral",
+      participants: "Ana e Bruno",
+    });
+    expect(created.status).toBe(201);
+    expect(employeeMeetingMinuteServiceMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ rhPermission: 2 }),
+      expect.objectContaining({
+        target_user_id: otherUserId,
+        agenda: "Planejamento trimestral",
+        report: "",
+      }),
+    );
+
+    const invalidUpdate = await request(app)
+      .patch("/rh/profile/colaborator/meeting-minutes/not-a-uuid")
+      .send({ agenda: "Nova pauta" });
+    expect(invalidUpdate.status).toBe(400);
+    expect(employeeMeetingMinuteServiceMock.update).not.toHaveBeenCalled();
+
+    const missingReport = await request(app)
+      .patch("/rh/profile/colaborator/meeting-minutes/00000000-0000-4000-8000-000000000020")
+      .send({ agenda: "Nova pauta" });
+    expect(missingReport.status).toBe(400);
+    expect(employeeMeetingMinuteServiceMock.update).not.toHaveBeenCalled();
+
+    const updated = await request(app)
+      .patch("/rh/profile/colaborator/meeting-minutes/00000000-0000-4000-8000-000000000020")
+      .send({ report: "Acompanhamento realizado." });
+    expect(updated.status).toBe(200);
+    expect(employeeMeetingMinuteServiceMock.update).toHaveBeenCalledWith(
+      expect.objectContaining({ rhPermission: 2 }),
+      "00000000-0000-4000-8000-000000000020",
+      { report: "Acompanhamento realizado." },
+    );
+
+    const denied = await request(createTestApp({ rhPermission: 1 })).get(
+      "/rh/profile/colaborator/meeting-minutes",
+    );
+    expect(denied.status).toBe(403);
+    expect(employeeMeetingMinuteServiceMock.list).toHaveBeenCalledTimes(1);
   });
 
   it("rejeita acesso sem permissão RH", async () => {

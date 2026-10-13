@@ -37,6 +37,50 @@ export interface RhLifeProject {
   progress: number;
 }
 
+export interface RhEmployeeMeetingMinuteRevision {
+  id: string;
+  version: number;
+  action: "Created" | "Updated";
+  meeting_date: string;
+  agenda: string;
+  participants: string;
+  report: string;
+  changed_by_id: string;
+  changed_by_name: string;
+  changed_at: string;
+}
+
+export interface RhEmployeeMeetingMinute {
+  id: string;
+  user_id: string;
+  meeting_date: string;
+  agenda: string;
+  participants: string;
+  report: string;
+  version: number;
+  created_by_id: string;
+  updated_by_id: string;
+  created_at: string;
+  updated_at: string;
+  revisions: RhEmployeeMeetingMinuteRevision[];
+}
+
+export interface CreateRhEmployeeMeetingMinutePayload {
+  target_user_id: string;
+  meeting_date: string;
+  agenda: string;
+  participants?: string;
+  report?: string;
+}
+
+export interface UpdateRhEmployeeMeetingMinutePayload {
+  id: string;
+  meeting_date?: string;
+  agenda?: string;
+  participants?: string;
+  report: string;
+}
+
 export interface CreateRhLifeProjectPayload {
   year: number;
   target_user_id?: string;

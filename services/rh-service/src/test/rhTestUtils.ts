@@ -21,6 +21,7 @@ const rhMocks: {
   timeSheetServiceMock: MockGroup;
   scoreNitroServiceMock: MockGroup;
   employeeDossierServiceMock: MockGroup;
+  employeeMeetingMinuteServiceMock: MockGroup;
   rhNotificationServiceMock: MockGroup;
 } = vi.hoisted(() => ({
   pointConfigServiceMock: {
@@ -118,6 +119,11 @@ const rhMocks: {
     listAllergies: vi.fn(),
     replaceAllergies: vi.fn(),
   },
+  employeeMeetingMinuteServiceMock: {
+    list: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
   rhNotificationServiceMock: {
     list: vi.fn(),
     markRead: vi.fn(),
@@ -141,6 +147,7 @@ const {
   timeSheetServiceMock,
   scoreNitroServiceMock,
   employeeDossierServiceMock,
+  employeeMeetingMinuteServiceMock,
   rhNotificationServiceMock,
 } = rhMocks;
 
@@ -234,6 +241,12 @@ vi.mock("../services/scoreNitroService.js", () => ({
 vi.mock("../services/employeeDossierService.js", () => ({
   EmployeeDossierService: vi.fn(function EmployeeDossierService() {
     return rhMocks.employeeDossierServiceMock;
+  }),
+}));
+
+vi.mock("../services/employeeMeetingMinuteService.js", () => ({
+  EmployeeMeetingMinuteService: vi.fn(function EmployeeMeetingMinuteService() {
+    return rhMocks.employeeMeetingMinuteServiceMock;
   }),
 }));
 
@@ -434,6 +447,9 @@ export function resetRhRouteMocks() {
   });
   employeeDossierServiceMock.listAllergies.mockResolvedValue([]);
   employeeDossierServiceMock.replaceAllergies.mockResolvedValue([]);
+  employeeMeetingMinuteServiceMock.list.mockResolvedValue([]);
+  employeeMeetingMinuteServiceMock.create.mockResolvedValue({ id: "minute-id", version: 1 });
+  employeeMeetingMinuteServiceMock.update.mockResolvedValue({ id: "minute-id", version: 2 });
   rhNotificationServiceMock.list.mockResolvedValue([]);
   rhNotificationServiceMock.markRead.mockResolvedValue({ count: 0 });
   rhNotificationServiceMock.notify.mockResolvedValue(undefined);
@@ -459,5 +475,6 @@ export {
   timeClockRequestServiceMock,
   timeSheetServiceMock,
   employeeDossierServiceMock,
+  employeeMeetingMinuteServiceMock,
   rhNotificationServiceMock,
 };

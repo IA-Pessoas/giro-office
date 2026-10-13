@@ -873,4 +873,19 @@ describe("matriz de regressão das políticas modulares", () => {
       expect(canAccessRoute(authContext({ modules: { rh: 0 } }), policy)).toBe(false);
     }
   });
+
+  it("protege atas de RH com nível de edição e barra autoatendimento", () => {
+    const routes = [
+      ["GET", "/rh/profile/colaborator/meeting-minutes"],
+      ["POST", "/rh/profile/colaborator/meeting-minutes"],
+      ["PATCH", "/rh/profile/colaborator/meeting-minutes/minute-1"],
+    ] as const;
+
+    for (const [method, path] of routes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(authContext({ modules: { rh: 1 } }), policy)).toBe(false);
+      expect(canAccessRoute(authContext({ modules: { rh: 2 } }), policy)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { rh: 3 } }), policy)).toBe(true);
+    }
+  });
 });

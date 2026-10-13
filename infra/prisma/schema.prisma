@@ -251,6 +251,8 @@ model Organization {
   rhExamAnswers                 RhExamAnswer[]
   rhLifeProjects                RhLifeProject[]
   rhLifeProjectObjectives       RhLifeProjectObjective[]
+  rhEmployeeMeetingMinutes      RhEmployeeMeetingMinute[]
+  rhEmployeeMeetingMinuteRevisions RhEmployeeMeetingMinuteRevision[]
   scoreEvaluations              ScoreEvaluation[]
   scoreNitros                   ScoreNitro[]
   cceFloorConfiguration         CceFloorConfiguration?
@@ -422,6 +424,10 @@ model User {
   rhLifeProjectsUpdated          RhLifeProject[]       @relation("RhLifeProjectUpdater")
   rhLifeProjectObjectivesCreated RhLifeProjectObjective[] @relation("RhLifeProjectObjectiveCreator")
   rhLifeProjectObjectivesUpdated RhLifeProjectObjective[] @relation("RhLifeProjectObjectiveUpdater")
+  rhEmployeeMeetingMinutesOwned RhEmployeeMeetingMinute[] @relation("RhEmployeeMeetingMinuteOwner")
+  rhEmployeeMeetingMinutesCreated RhEmployeeMeetingMinute[] @relation("RhEmployeeMeetingMinuteCreator")
+  rhEmployeeMeetingMinutesUpdated RhEmployeeMeetingMinute[] @relation("RhEmployeeMeetingMinuteUpdater")
+  rhEmployeeMeetingMinuteRevisions RhEmployeeMeetingMinuteRevision[] @relation("RhEmployeeMeetingMinuteRevisionAuthor")
   timeBankRealeasesAdded      TimeBankReleases[]     @relation("add")
   timeBankRealeases           TimeBankReleases[]     @relation("user")
   timeClockRequestApproved    TimeClockRequest[]     @relation("approver")
@@ -3201,6 +3207,52 @@ model RhLifeProjectObjective {
 
   @@index([organization_id, project_id, status])
   @@map("rh.life_project_objectives")
+}
+
+model RhEmployeeMeetingMinute {
+  id              String                              @id @default(uuid())
+  organization_id String
+  user_id         String
+  meeting_date    DateTime                            @db.Date
+  agenda          String                              @db.VarChar(500)
+  agenda_key      String                              @db.VarChar(500)
+  participants    String                              @default("")
+  report          String                              @default("")
+  version         Int                                 @default(1)
+  created_by_id   String
+  updated_by_id   String
+  created_at      DateTime                            @default(now())
+  updated_at      DateTime                            @updatedAt
+  organization    Organization                        @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user            User                                @relation("RhEmployeeMeetingMinuteOwner", fields: [user_id], references: [id], onDelete: Restrict)
+  created_by      User                                @relation("RhEmployeeMeetingMinuteCreator", fields: [created_by_id], references: [id], onDelete: Restrict)
+  updated_by      User                                @relation("RhEmployeeMeetingMinuteUpdater", fields: [updated_by_id], references: [id], onDelete: Restrict)
+  revisions       RhEmployeeMeetingMinuteRevision[]
+
+  @@unique([organization_id, user_id, meeting_date, agenda_key], map: "uq_rh_employee_meeting_minutes_org_user_date_agenda")
+  @@index([organization_id, user_id, meeting_date])
+  @@map("rh.employee_meeting_minutes")
+}
+
+model RhEmployeeMeetingMinuteRevision {
+  id              String                 @id @default(uuid())
+  organization_id String
+  minute_id       String
+  version         Int
+  action          String                 @db.VarChar(20)
+  meeting_date    DateTime               @db.Date
+  agenda          String                 @db.VarChar(500)
+  participants    String
+  report          String
+  changed_by_id   String
+  changed_at      DateTime               @default(now())
+  organization    Organization           @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  minute          RhEmployeeMeetingMinute @relation(fields: [minute_id], references: [id], onDelete: Restrict)
+  changed_by      User                   @relation("RhEmployeeMeetingMinuteRevisionAuthor", fields: [changed_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([minute_id, version], map: "uq_rh_employee_meeting_minute_revisions_minute_version")
+  @@index([organization_id, minute_id, changed_at])
+  @@map("rh.employee_meeting_minute_revisions")
 }
 
 model CceFloorConfiguration {

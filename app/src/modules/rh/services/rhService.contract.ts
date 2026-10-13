@@ -19,6 +19,8 @@ export const RH_ENDPOINTS = {
   operationalUsers: "/rh/operational-users",
   dossier: "/rh/profile/colaborator",
   dossierList: "/rh/profile/colaborator/list",
+  employeeMeetingMinutes: "/rh/profile/colaborator/meeting-minutes",
+  employeeMeetingMinute: (id: string) => `/rh/profile/colaborator/meeting-minutes/${id}`,
   contact: "/rh/profile/contact",
   allergy: "/rh/profile/allergy",
   pointConfig: "/rh/point-config",

@@ -1364,6 +1364,81 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/profile/colaborator/meeting-minutes": {
+        get: {
+          tags: ["Dossiê do colaborador"],
+          summary: "Consultar atas de RH do colaborador",
+          security: bearer,
+          parameters: [
+            {
+              name: "user_id",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": { description: "Atas e histórico de alterações", ...successJson },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Colaborador fora do escopo" },
+          },
+        },
+        post: {
+          tags: ["Dossiê do colaborador"],
+          summary: "Registrar ata de RH do colaborador",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: {
+              target_user_id: "9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+              meeting_date: "2026-04-15",
+              agenda: "Planejamento trimestral",
+              participants: "Ana Silva e Bruno Lima",
+              report: "Pontos acompanhados pelo RH",
+            },
+            required: ["meeting_date", "agenda"],
+            properties: {
+              target_user_id: { type: "string", format: "uuid" },
+              meeting_date: { type: "string", format: "date" },
+              agenda: { type: "string", minLength: 1, maxLength: 500 },
+              participants: { type: "string", maxLength: 5000 },
+              report: { type: "string", maxLength: 20000 },
+            },
+          }),
+          responses: {
+            "201": { description: "Ata registrada", ...successJson },
+            "400": { description: "Data ou pauta inválida" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Colaborador fora do escopo" },
+            "409": { description: "Ata duplicada para data e pauta" },
+          },
+        },
+      },
+      "/rh/profile/colaborator/meeting-minutes/{id}": {
+        patch: {
+          tags: ["Dossiê do colaborador"],
+          summary: "Atualizar ata de RH preservando versão anterior",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          ...createObjectRequestBody({
+            example: { report: "Relato atualizado após novo acompanhamento" },
+            required: ["report"],
+            properties: {
+              meeting_date: { type: "string", format: "date" },
+              agenda: { type: "string", minLength: 1, maxLength: 500 },
+              participants: { type: "string", maxLength: 5000 },
+              report: { type: "string", minLength: 1, maxLength: 20000 },
+            },
+          }),
+          responses: {
+            "200": { description: "Ata atualizada com histórico", ...successJson },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Ata fora do escopo" },
+            "409": { description: "Ata duplicada ou alterada em paralelo" },
+          },
+        },
+      },
       "/rh/life-projects": {
         get: {
           tags: ["Projeto de Vida"],

@@ -10,13 +10,16 @@ import { useFetch } from "@shared/hooks";
 import { rhProfileService } from "../services/rhProfileService";
 import type {
   CreateRhEmergencyContactPayload,
+  CreateRhEmployeeMeetingMinutePayload,
   DeleteRhEmergencyContactPayload,
   RhAllergy,
   RhDossier,
   RhDossierListItem,
   RhEmergencyContact,
+  RhEmployeeMeetingMinute,
   UpdateRhDossierPayload,
   UpdateRhEmergencyContactPayload,
+  UpdateRhEmployeeMeetingMinutePayload,
 } from "../types";
 import { RH_QUERY_KEY } from "./useRhRequests";
 
@@ -36,6 +39,21 @@ export function rhContactsQueryKey(userId?: string) {
 
 export function rhAllergiesQueryKey(userId?: string) {
   return [...RH_PROFILE_QUERY_KEY, "allergies", userId ?? "me"] as const;
+}
+
+export function rhMeetingMinutesQueryKey(userId: string) {
+  return [...RH_PROFILE_QUERY_KEY, "meeting-minutes", userId] as const;
+}
+
+export function useRhMeetingMinutes(
+  userId: string | undefined,
+  enabled = true,
+): UseQueryResult<RhEmployeeMeetingMinute[], Error> {
+  return useFetch(
+    rhMeetingMinutesQueryKey(userId ?? "none"),
+    () => rhProfileService.listMeetingMinutes(userId ?? ""),
+    { enabled: enabled && Boolean(userId) },
+  );
 }
 
 export function useRhDossier(userId?: string, enabled = true): UseQueryResult<RhDossier, Error> {
@@ -63,6 +81,32 @@ export function useUpdateRhDossierMutation(): UseMutationResult<RhDossier, Error
   return useMutation({
     mutationFn: (payload) => rhProfileService.updateDossier(payload),
     onSuccess: () => invalidateProfile(queryClient),
+  });
+}
+
+export function useCreateRhMeetingMinuteMutation(): UseMutationResult<
+  RhEmployeeMeetingMinute,
+  Error,
+  CreateRhEmployeeMeetingMinutePayload
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => rhProfileService.createMeetingMinute(payload),
+    onSuccess: (_data, variables) =>
+      queryClient.invalidateQueries({ queryKey: rhMeetingMinutesQueryKey(variables.target_user_id) }),
+  });
+}
+
+export function useUpdateRhMeetingMinuteMutation(): UseMutationResult<
+  RhEmployeeMeetingMinute,
+  Error,
+  UpdateRhEmployeeMeetingMinutePayload
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => rhProfileService.updateMeetingMinute(payload),
+    onSuccess: (data) =>
+      queryClient.invalidateQueries({ queryKey: rhMeetingMinutesQueryKey(data.user_id) }),
   });
 }
 
