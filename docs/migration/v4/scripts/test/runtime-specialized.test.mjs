@@ -222,3 +222,15 @@ test("saída de estoque resolve solicitante como colaborador ligado a usuário",
   assert.equal(decision.status, "prepared");
   assert.equal((await entry.projector(decision, row, state)).requester_id, "user-27");
 });
+
+// #1931: a data sentinela do PHP vira ausência de devolução; o item segue ativo com a pessoa.
+test("inventário migra a data sentinela de devolução como estado sem devolução", () => {
+  const { SPECIALIZED_TRANSFORMERS } = requireImplementation();
+  // Transformação que a regra `technology-inventory-assigned-insert` aplica a data_devolucao.
+  const transform = SPECIALIZED_TRANSFORMERS.normalize_optional_legacy_date;
+
+  for (const sentinel of ["0000-00-00 00:00:00", "0000-00-00", "", null]) {
+    assert.equal(transform({ value: sentinel }), null);
+  }
+  assert.equal(transform({ value: "2024-01-10 00:00:00" }), "2024-01-10T00:00:00.000Z");
+});
