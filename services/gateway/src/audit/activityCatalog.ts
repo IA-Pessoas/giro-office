@@ -183,6 +183,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/commercial\/prospecting\/[^/]+\/history$/,
+    description: { action: "consultou", item: "o histórico de uma prospecção comercial" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/commercial\/prospecting\/[^/]+\/attachment$/,
+    description: { action: "consultou", item: "o anexo de uma prospecção comercial" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/commercial\/prospecting\/[^/]+\/attachment$/,
+    description: { action: "atualizou", item: "o anexo de uma prospecção comercial" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/commercial\/outbox\/status$/,
     description: { action: "consultou", item: "o estado de entrega da outbox comercial" },
   },
