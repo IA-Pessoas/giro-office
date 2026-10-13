@@ -5,6 +5,7 @@ export { RhTimeBankSection } from "./components/RhTimeBankSection";
 export { RhTimesheetsSection } from "./components/RhTimesheetsSection";
 export { RhPointSection } from "./components/RhPointSection";
 export { RhScoreSection } from "./components/score/RhScoreSection";
+export { RhCceSection } from "./components/RhCceSection";
 export { useAssignableUsers } from "./hooks/useAssignableUsers";
 export {
   RH_PENDING_REQUEST_STATUSES,

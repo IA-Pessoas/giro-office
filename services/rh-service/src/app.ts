@@ -16,6 +16,7 @@ import { prismaClient } from "./integrations/prisma.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
+import cceCycleRoutes from "./routes/cceCycle.routes.js";
 import categoryRoutes from "./routes/category.routes.js";
 import employeeDossierRoutes from "./routes/employeeDossier.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
@@ -101,6 +102,7 @@ export function createApp(
   app.use("/rh/point", pointRoutes);
   app.use("/rh/point", createTimeClockRequestRoutes({ attachmentStorage }));
   app.use("/rh/categories", categoryRoutes);
+  app.use("/rh/cce", cceCycleRoutes);
   app.use("/rh/profile", employeeDossierRoutes);
   app.use("/rh/operational-users", operationalUserRoutes);
   app.use("/rh/requests", requestRoutes);

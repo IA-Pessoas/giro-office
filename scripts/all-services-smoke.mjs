@@ -300,6 +300,7 @@ const state = {
   rhScoreQuestionId: "",
   rhScoreId: "",
   rhScoreEvaluationId: "",
+  rhCceWeeklyEvaluationId: "",
   rhHolidayId: "",
   rhTimeBankReleaseId: "",
   rhTimeSheetId: "",
@@ -391,6 +392,10 @@ const actionExecutionRank = {
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
   rhScoreQuestionDelete: 8300,
+  rhCceFloorsPut: 8310,
+  rhCceCycleCreate: 8311,
+  rhCceCycleList: 8312,
+  rhCceWeekPatch: 8313,
   platformSessionLogout: 9900,
   userSessionLogout: 10000,
 };
@@ -7938,6 +7943,56 @@ const handlers = {
       expectedStatus: [200],
       path: "/rh/requests",
       json: { id: requireState("rhRequestId") },
+    });
+  },
+
+  async rhCceFloorsGet(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/rh/cce/floors" });
+  },
+
+  async rhCceFloorsPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/cce/floors",
+      json: { floor_count: 4 },
+    });
+  },
+
+  async rhCceCycleCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201, 409],
+      path: "/rh/cce/cycles",
+      json: { year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
+    });
+  },
+
+  async rhCceCycleList(op) {
+    const response = await httpRequest(op, { expectedStatus: [200], path: "/rh/cce/cycles" });
+    const cycles = response.body?.data;
+    const evaluations = Array.isArray(cycles)
+      ? cycles.flatMap((cycle) => cycle.weekly_evaluations ?? [])
+      : [];
+    const evaluation = evaluations.find((item) => !item.completed_at) ?? evaluations[0];
+    if (evaluation?.id) state.rhCceWeeklyEvaluationId = evaluation.id;
+  },
+
+  async rhCceWeekPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200, 409],
+      path: `/rh/cce/weeks/${requireState("rhCceWeeklyEvaluationId")}`,
+      json: {
+        monitor_user_id: await ensureRhTargetUser(),
+        evaluated_at: new Date().toISOString().slice(0, 10),
+        occurrences: {
+          organization: false,
+          cleanliness: false,
+          delays: false,
+          cellphone: false,
+          conversations: false,
+          demands: false,
+          dress_code: false,
+        },
+      },
     });
   },
 
