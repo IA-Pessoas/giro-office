@@ -109,7 +109,11 @@ export function RH() {
 
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
         <div className="overflow-x-auto u-scrollbar-system">
-          <div className="flex min-w-max items-center justify-center gap-1">
+          <div
+            role="tablist"
+            aria-label="Seções de Recursos Humanos"
+            className="flex min-w-max items-center justify-center gap-1"
+          >
             {canViewRhDashboard ? (
               <RhTabButton
                 active={activeTab === "dashboard"}
@@ -218,6 +222,8 @@ function RhTabButton({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-5 py-2.5 font-medium transition-all ${
         active

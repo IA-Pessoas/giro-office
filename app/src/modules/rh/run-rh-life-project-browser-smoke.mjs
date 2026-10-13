@@ -125,8 +125,8 @@ async function runBrowserProof() {
 
   try {
     await page.goto("/rh", { waitUntil: "domcontentloaded", timeout: 120_000 });
-    await page.getByRole("button", { name: "Projeto de Vida", exact: true }).waitFor({ timeout: 60_000 });
-    await page.getByRole("button", { name: "Projeto de Vida", exact: true }).click();
+    await page.getByRole("tab", { name: "Projeto de Vida", exact: true }).waitFor({ timeout: 60_000 });
+    await page.getByRole("tab", { name: "Projeto de Vida", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Projeto de Vida", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: `Sem projeto para ${currentYear}` })).toBeVisible();
     await page.screenshot({ path: resolve(screenshotDir, "rh-life-project-empty.png"), fullPage: true });

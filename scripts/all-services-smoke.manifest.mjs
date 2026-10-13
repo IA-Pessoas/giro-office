@@ -72,7 +72,7 @@ const GOOD_STATUS_OVERRIDES = new Map([
   ["rhScoreQuarterGenerate", [200, 409]],
   ["rhCceCycleCreate", [201, 409]],
   ["rhExamCreate", [201]],
-  ["rhLifeProjectCreate", [201, 409]],
+  ["rhLifeProjectCreate", [201]],
   ["auditInternalIngest", [201]],
 ]);
 
