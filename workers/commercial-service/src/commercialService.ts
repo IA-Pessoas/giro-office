@@ -7,7 +7,10 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import { REQUEST_ID_HEADER } from "@workspace/shared/http";
-import type { ProspectingStatus } from "../../../services/commercial-service/src/schemas/prospecting.schemas.js";
+import type {
+  ProspectingStatus,
+  ProspectingUpdateStatus,
+} from "../../../services/commercial-service/src/schemas/prospecting.schemas.js";
 import { prospectingStatuses } from "../../../services/commercial-service/src/schemas/prospecting.schemas.js";
 import type { UpdateTaskBillingBody } from "../../../services/commercial-service/src/schemas/taskBilling.schemas.js";
 import type { CommercialWorkerEnv } from "./env.js";
@@ -301,7 +304,7 @@ export type ProspectingInput = {
 };
 export type ProspectingUpdateInput = Omit<ProspectingInput, "client_id" | "status"> & {
   prospecting_id: string;
-  status?: ProspectingStatus;
+  status?: ProspectingUpdateStatus;
 };
 export type ProspectingArchiveInput = Pick<
   ProspectingInput,
@@ -407,6 +410,7 @@ export class CommercialProspectingService implements ProspectingService {
     toStatus: string;
     statusDate: Date | null;
     description: string | null;
+    suppressNotice?: boolean;
     auditCorrelationId: string;
   }) {
     return {
@@ -420,6 +424,7 @@ export class CommercialProspectingService implements ProspectingService {
       to_status: input.toStatus,
       status_date: input.statusDate?.toISOString() ?? null,
       description: input.description,
+      ...(input.suppressNotice ? { suppress_notice: true } : {}),
       audit_correlation_id: input.auditCorrelationId,
       occurred_at: new Date().toISOString(),
     };
@@ -511,10 +516,21 @@ export class CommercialProspectingService implements ProspectingService {
           select: { id: true, client_id: true, status: true, status_date: true, description: true },
         })) as ProspectingRow | null;
         if (!current) throw new ServiceError(404, "Prospecção comercial não encontrada.");
-        const nextStatus = input.status ?? (current.status as ProspectingStatus);
+        const suppressNotice = input.status === "Fechado SE";
+        const nextStatus: ProspectingStatus =
+          input.status === "Fechado SE"
+            ? "Fechado"
+            : (input.status ?? (current.status as ProspectingStatus));
         assertProspectingTransition(current.status, nextStatus);
         const data = {
-          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.status !== undefined
+            ? {
+                status: nextStatus,
+                ...(nextStatus === "Fechado" && current.status !== "Fechado"
+                  ? { closed_at: new Date() }
+                  : {}),
+              }
+            : {}),
           ...(input.status_date !== undefined ? { status_date: input.status_date } : {}),
           ...(input.description !== undefined ? { description: input.description } : {}),
         };
@@ -547,6 +563,7 @@ export class CommercialProspectingService implements ProspectingService {
             toStatus: row.status,
             statusDate: row.status_date,
             description: row.description,
+            suppressNotice,
             auditCorrelationId,
           });
           await tx.commercialOutboxEvent.create({

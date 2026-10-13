@@ -23,6 +23,7 @@ export interface CommercialProspectingTransitionEvent {
   to_status: CommercialProspectingProjectionStatus;
   status_date: string | null;
   description: string | null;
+  suppress_notice?: boolean;
   audit_correlation_id: string;
   occurred_at: string;
 }

@@ -694,6 +694,7 @@ async function run() {
     const prospectingStatusOptions = await prospectingStatus.locator("option").allTextContents();
     assert.ok(prospectingStatusOptions.includes("Baixada"));
     assert.ok(prospectingStatusOptions.includes("Inativo"));
+    assert.ok(!prospectingStatusOptions.includes("Fechado SE"));
     await prospectingStatus.selectOption("Baixada");
     await prospectingDialog.screenshot({ path: `${evidenceDir}/15-commercial-prospecting-baixada-option.png` });
     await prospectingForm.getByLabel("Data da etapa").fill("2026-09-15");
@@ -787,6 +788,12 @@ async function run() {
 
     await page.getByLabel("Prospecção", { exact: true }).getByRole("button", { name: "Editar", exact: true }).first().click();
     const editProspectingForm = page.getByRole("form", { name: "Editar prospecção" });
+    const editProspectingStatus = editProspectingForm.locator("select").first();
+    const editProspectingStatusOptions = await editProspectingStatus.locator("option").allTextContents();
+    assert.ok(editProspectingStatusOptions.includes("Fechado SE"));
+    await editProspectingStatus.selectOption("Fechado SE");
+    await editProspectingForm.screenshot({ path: `${evidenceDir}/17-commercial-prospecting-fechado-se-edit.png` });
+    await editProspectingStatus.selectOption("Baixada");
     const historyResponsePromise = page.waitForResponse(
       (response) => response.request().method() === "GET" && response.url().endsWith(`/commercial/prospecting/${prospecting.id}/history`),
     );

@@ -55,6 +55,7 @@ const EMPTY_FORM_DATA: CreateTaskModelData = {
   billing: "Não Realizar",
   prevision: 0,
   type: "Projeto",
+  unique_charge: false,
 };
 
 const BILLING_OPTIONS = ["Não Realizar", "Realizar"] as const;
@@ -246,6 +247,7 @@ export function TaskModelModal({
           billing: detail.billing || EMPTY_FORM_DATA.billing,
           prevision: Number.isFinite(detail.prevision) ? detail.prevision : 0,
           type: "Projeto",
+          unique_charge: detail.unique_charge === true,
         });
 
         const [dependentsResult, linksResult, regularizeOptionsResult] = await Promise.allSettled([
@@ -746,6 +748,15 @@ export function TaskModelModal({
               </ProjectSelect>
             </label>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={formData.unique_charge}
+              onChange={(event) => updateFormValue("unique_charge", event.target.checked)}
+            />
+            Tarefa de cobrança única (não liberar ao fechar a prospecção)
+          </label>
 
           <label className={TASK_FORM_LABEL_CLASSNAME}>
             <span className="text-sm font-medium text-slate-700 dark:text-white">Observações</span>

@@ -333,6 +333,7 @@ model TaskModel {
   billing          String
   prevision        Int
   type             String?
+  unique_charge    Boolean                      @default(false)
   organization_id  String
   plans            ProjectPlanTasks[]
   tasks            Task[]

@@ -21,6 +21,7 @@ export interface TaskModelDetail {
   billing: string;
   prevision: number;
   type: string | null;
+  unique_charge: boolean;
 }
 
 /** Item de lista enriquecido no cliente (ex.: nome do departamento). */
@@ -31,6 +32,7 @@ export interface TaskModel extends TaskModelListItem {
   billing?: string;
   prevision?: number;
   type?: string | null;
+  unique_charge?: boolean;
 }
 
 export interface CreateTaskModelData {
@@ -43,6 +45,7 @@ export interface CreateTaskModelData {
   billing: string;
   prevision: number;
   type: "Projeto";
+  unique_charge: boolean;
 }
 
 export interface UpdateTaskModelData extends CreateTaskModelData {

@@ -1,0 +1,2 @@
+ALTER TABLE "integracao.tasksModel"
+  ADD COLUMN IF NOT EXISTS "unique_charge" BOOLEAN NOT NULL DEFAULT FALSE;
