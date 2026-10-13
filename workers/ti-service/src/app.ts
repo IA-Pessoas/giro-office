@@ -151,24 +151,15 @@ type TiRequestImageStorage = {
   createSignedAccessUrl(objectPath: string): Promise<string>;
 };
 
+/** As regras de categoria (nome duplicado, categoria canônica Computador) vivem no domínio. */
 function localService(prisma: CategoryPrisma): TiCategoryService {
+  const categories = createTiDomainServices(prisma as unknown as TiDatabase).inventoryCategories;
+  if (!categories) throw new ServiceError(501, "Serviço de TI não implementado: categorias.");
   return {
-    list: (organizationId) =>
-      prisma.inventoryCategoryTecnologia.findMany({
-        where: { organization_id: organizationId },
-        orderBy: { name: "asc" },
-      }),
-    create: (organizationId, input) =>
-      prisma.inventoryCategoryTecnologia.create({
-        data: { ...input, organization_id: organizationId, active: true },
-      }),
-    async update(organizationId, id, input) {
-      const existing = await prisma.inventoryCategoryTecnologia.findFirst({
-        where: { id, organization_id: organizationId },
-      });
-      if (!existing) throw new ServiceError(404, "Categoria de inventário de TI não encontrada.");
-      return prisma.inventoryCategoryTecnologia.update({ where: { id }, data: input });
-    },
+    list: (organizationId) => invoke(categories, "list", [{ organizationId }]),
+    create: (organizationId, input) => invoke(categories, "create", [{ organizationId }, input]),
+    update: (organizationId, id, input) =>
+      invoke(categories, "update", [{ organizationId }, id, input]),
   };
 }
 
@@ -448,6 +439,7 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     callback: (service: TiCategoryService) => Promise<T>,
   ) => {
     if (options.categoryService) return callback(options.categoryService);
+    if (options.prisma) return callback(localService(options.prisma));
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
       callback(localService(client as unknown as CategoryPrisma)),
     );

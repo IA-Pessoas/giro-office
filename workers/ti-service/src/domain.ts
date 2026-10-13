@@ -1,7 +1,13 @@
 import type { ReportingQuery } from "@workspace/shared";
 import {
+  ACTIVE_COMPUTER_CONFLICT_MESSAGE,
+  activeComputerLockKey,
+  COMPUTER_CATEGORY_LOCKED_MESSAGE,
+  COMPUTER_CATEGORY_RENAME_CONFLICT_MESSAGE,
   EncryptionService,
   executeReportingQuery,
+  hasUserWithSeveralActiveAssets,
+  isComputerCategoryName,
   ServiceError,
   tiExtensionsReportingCatalog,
   tiInventoryReportingCatalog,
@@ -151,17 +157,27 @@ function inventoryServices(database: TiDatabase): TiServices {
             "Já existe uma categoria de inventário de TI ativa com este nome.",
           );
         }
+        await ensureSingleComputerCategory(database, auth.organizationId, input.name);
         return categories.create({
           data: { ...input, active: true, organization_id: auth.organizationId },
         });
       },
       update: async (value, id, body) => {
         const auth = context(value);
+        const input = row(body);
         const existing = await categories.findFirst({
           where: { id, organization_id: auth.organizationId },
         });
         if (!existing) throw new ServiceError(404, "Categoria de inventário de TI não encontrada.");
-        return categories.update({ where: { id }, data: row(body) });
+        if (isComputerCategoryName(row(existing).name)) {
+          const renamed = input.name !== undefined && !isComputerCategoryName(input.name);
+          if (renamed || input.active === false) {
+            throw new ServiceError(409, COMPUTER_CATEGORY_LOCKED_MESSAGE);
+          }
+        } else if (input.name !== undefined) {
+          await ensureSingleComputerCategory(database, auth.organizationId, input.name, String(id));
+        }
+        return categories.update({ where: { id }, data: input });
       },
     },
     inventoryLocations: {
@@ -237,10 +253,17 @@ function inventoryServices(database: TiDatabase): TiServices {
         const input = row(body);
         await ensureInventoryReferences(database, auth.organizationId, input);
         try {
-          return await inventory.create({
-            data: { ...input, organization_id: auth.organizationId },
-          });
+          return await writeWithComputerRule(
+            database,
+            auth.organizationId,
+            { category_id: input.category_id, user_id: input.user_id },
+            (writer) =>
+              delegate(writer, "inventoryTecnologia").create({
+                data: { ...input, organization_id: auth.organizationId },
+              }),
+          );
         } catch (error) {
+          if (error instanceof ServiceError) throw error;
           if (uniqueError(error))
             throw new ServiceError(409, "Já existe um ativo de TI com este código patrimonial.");
           throw new ServiceError(500, "Erro ao criar ativo de inventario de TI.", error);
@@ -249,31 +272,59 @@ function inventoryServices(database: TiDatabase): TiServices {
       update: async (value, id, body) => {
         const auth = context(value);
         const input = row(body);
-        await inventory
-          .findFirst({ where: { id, organization_id: auth.organizationId } })
-          .then((found) => {
-            if (!found) throw new ServiceError(404, "Ativo de TI não encontrado.");
-          });
+        const existing = await inventory.findFirst({
+          where: { id, organization_id: auth.organizationId },
+        });
+        if (!existing) throw new ServiceError(404, "Ativo de TI não encontrado.");
         await ensureInventoryReferences(database, auth.organizationId, input, String(id));
-        return inventory.update({ where: { id }, data: input });
+        const current = row(existing);
+        // Informar a pessoa é atribuir: a devolução anterior deixa de valer.
+        const data = input.user_id === undefined ? input : { ...input, return_date: null };
+        const changesHolder =
+          (input.user_id !== undefined && input.user_id !== current.user_id) ||
+          (input.category_id !== undefined && input.category_id !== current.category_id) ||
+          (input.user_id !== undefined && current.return_date != null);
+        // Edição que não troca pessoa nem categoria não reavalia a regra (dado legado).
+        if (!changesHolder) return inventory.update({ where: { id }, data });
+        return writeWithComputerRule(
+          database,
+          auth.organizationId,
+          {
+            id: String(id),
+            category_id: input.category_id ?? current.category_id,
+            user_id: input.user_id ?? current.user_id,
+            return_date: input.user_id === undefined ? current.return_date : null,
+          },
+          (writer) => delegate(writer, "inventoryTecnologia").update({ where: { id }, data }),
+        );
       },
       assignUser: async (value, id, body) => {
         const auth = context(value);
-        await inventory
-          .findFirst({ where: { id, organization_id: auth.organizationId } })
-          .then((found) => {
-            if (!found) throw new ServiceError(404, "Ativo de TI não encontrado.");
-          });
+        const existing = await inventory.findFirst({
+          where: { id, organization_id: auth.organizationId },
+        });
+        if (!existing) throw new ServiceError(404, "Ativo de TI não encontrado.");
         const input = row(body);
         await activeUserInOrganization(database, auth.organizationId, String(input.user_id));
-        return inventory.update({
-          where: { id },
-          data: {
+        return writeWithComputerRule(
+          database,
+          auth.organizationId,
+          {
+            id: String(id),
+            category_id: row(existing).category_id,
             user_id: input.user_id,
-            delivery_date: input.delivery_date ?? new Date(),
             return_date: null,
           },
-        });
+          (writer) =>
+            delegate(writer, "inventoryTecnologia").update({
+              where: { id },
+              data: {
+                user_id: input.user_id,
+                delivery_date: input.delivery_date ?? new Date(),
+                return_date: null,
+              },
+            }),
+        );
       },
       returnAsset: async (value, id, body) => {
         const auth = context(value);
@@ -294,6 +345,86 @@ function inventoryServices(database: TiDatabase): TiServices {
       },
     },
   };
+}
+
+/** A categoria canônica Computador é única na organização, ativa ou não (#1931). */
+async function ensureSingleComputerCategory(
+  database: TiDatabase,
+  organizationId: string,
+  name: unknown,
+  renamedCategoryId?: string,
+): Promise<void> {
+  if (!isComputerCategoryName(name)) return;
+  const categories = await delegate(database, "inventoryCategoryTecnologia").findMany({
+    where: { organization_id: organizationId },
+    select: { name: true },
+  });
+  if (categories.some((category) => isComputerCategoryName(row(category).name))) {
+    throw new ServiceError(409, "Já existe a categoria Computador nesta organização.");
+  }
+  if (!renamedCategoryId) return;
+  // Os itens da categoria renomeada passam a ser computadores.
+  const activeAssets = await delegate(database, "inventoryTecnologia").findMany({
+    where: {
+      organization_id: organizationId,
+      category_id: renamedCategoryId,
+      user_id: { not: null },
+      return_date: null,
+    },
+    select: { user_id: true },
+  });
+  if (hasUserWithSeveralActiveAssets(activeAssets.map(row))) {
+    throw new ServiceError(409, COMPUTER_CATEGORY_RENAME_CONFLICT_MESSAGE);
+  }
+}
+
+/**
+ * Uma pessoa não termina com mais de um computador ativo na organização (#1931). Quando a
+ * escrita deixa um computador com alguém, ela roda numa transação que primeiro toma o
+ * bloqueio dessa pessoa: duas escritas simultâneas se enfileiram e a segunda enxerga a
+ * primeira. Vale para cadastro, edição e atribuição; troca e lote reutilizam este caminho.
+ */
+async function writeWithComputerRule<T>(
+  database: TiDatabase,
+  organizationId: string,
+  target: { id?: string; category_id: unknown; user_id: unknown; return_date?: unknown },
+  write: (writer: TiDatabase) => Promise<T>,
+): Promise<T> {
+  const userId = target.user_id;
+  if (
+    typeof userId !== "string" ||
+    (target.return_date !== null && target.return_date !== undefined)
+  ) {
+    return write(database);
+  }
+  const categories = await delegate(database, "inventoryCategoryTecnologia").findMany({
+    where: { organization_id: organizationId },
+    select: { id: true, name: true },
+  });
+  const computerCategoryIds = categories
+    .filter((category) => isComputerCategoryName(row(category).name))
+    .map((category) => row(category).id);
+  if (!computerCategoryIds.includes(target.category_id)) return write(database);
+
+  return database.$transaction(async (transaction) => {
+    const lock = transaction.$executeRaw as (
+      query: TemplateStringsArray,
+      ...values: unknown[]
+    ) => Promise<unknown>;
+    await lock`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+    const activeComputer = await delegate(transaction, "inventoryTecnologia").findFirst({
+      where: {
+        organization_id: organizationId,
+        user_id: userId,
+        return_date: null,
+        category_id: { in: computerCategoryIds },
+        ...(target.id ? { NOT: { id: target.id } } : {}),
+      },
+      select: { id: true },
+    });
+    if (activeComputer) throw new ServiceError(409, ACTIVE_COMPUTER_CONFLICT_MESSAGE);
+    return write(transaction);
+  });
 }
 
 async function ensureInventoryReferences(

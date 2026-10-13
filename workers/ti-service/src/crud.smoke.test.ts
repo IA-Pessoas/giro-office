@@ -148,6 +148,38 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     await call("PATCH", `/ti/inventory-locations/${locationId}`, { active: false });
   });
 
+  // #1931: o bloqueio consultivo e a transação só são exercitados de verdade no Postgres.
+  it("inventário: atribuições simultâneas deixam um só computador ativo por pessoa", async () => {
+    const { userId } = requireSmokeState();
+    await call("POST", "/ti/inventory-categories", { name: "Computador" }, [201, 409]);
+    const categories = await smokeCall(app(), env(), "GET", "/ti/inventory-categories/list");
+    const computerCategory = (categories.json?.data as Array<{ id: string; name: string }>).find(
+      (category) => category.name.trim().toLowerCase() === "computador",
+    );
+    expect(computerCategory).toBeDefined();
+    const computers = await Promise.all(
+      ["A", "B"].map((label) =>
+        call("POST", "/ti/inventory", {
+          asset_code: `PC-${label}-${suffix()}`,
+          category_id: computerCategory?.id,
+        }),
+      ),
+    );
+
+    const assigned = await Promise.all(
+      computers.map((computer) =>
+        smokeCall(app(), env(), "PATCH", `/ti/inventory/${computer.data.id}/assign-user`, {
+          user_id: userId,
+        }),
+      ),
+    );
+
+    expect(assigned.map((result) => result.status).sort()).toEqual([200, 409]);
+    // Libera a pessoa para as próximas execuções do smoke.
+    const winner = computers[assigned.findIndex((result) => result.status === 200)];
+    await call("PATCH", `/ti/inventory/${winner?.data.id}/return`, {});
+  });
+
   it("ramais", async () => {
     const { userId } = requireSmokeState();
     const number = () => String(Math.floor(Math.random() * 10_000)).padStart(4, "0");

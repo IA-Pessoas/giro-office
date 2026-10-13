@@ -115,6 +115,28 @@ describe("ti Worker", () => {
     expect(categoryService.list).not.toHaveBeenCalled();
   });
 
+  // #1931: as rotas de categoria aplicam as regras do domínio (categoria canônica Computador).
+  it("keeps the Computador category from being renamed or disabled over HTTP", async () => {
+    const update = vi.fn();
+    const prisma = {
+      inventoryCategoryTecnologia: {
+        findFirst: vi.fn(async () => ({ id: CATEGORY_ID, name: "Computador", active: true })),
+        update,
+      },
+    } as unknown as CategoryPrisma;
+    const app = createTiWorkerApp({ env: env(), prisma });
+    const patch = (body: unknown) =>
+      app.request(`https://ti.test/ti/inventory-categories/${CATEGORY_ID}`, {
+        method: "PATCH",
+        headers: { ...headers("3"), "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    expect((await patch({ name: "PC" })).status).toBe(409);
+    expect((await patch({ active: false })).status).toBe(409);
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("requires the TI module claim even when the legacy permission is high", async () => {
     const categoryService = service();
     const app = createTiWorkerApp({ env: env(), categoryService });
