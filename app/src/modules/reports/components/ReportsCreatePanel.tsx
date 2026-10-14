@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "@shared/services/toast";
@@ -11,6 +11,7 @@ import { reportsService } from "../services/reportsService";
 import { getSelectableReportFields } from "../utils/reportBuilder";
 import { getPessoalReportPresets } from "../utils/pessoalReportPresets";
 import { getTaskDepartmentReportPreset } from "../utils/taskDepartmentReportPreset";
+import { getRhUrgentPendingReportPreset } from "../utils/rhUrgentPendingReportPreset";
 import { ReportFieldsStep } from "./ReportFieldsStep";
 import { ReportCriteriaStep } from "./ReportCriteriaStep";
 import { buildReportComposition, buildReportCompositionV3, operatorLabels, summaryLabels } from "../utils/reportCriteria";
@@ -82,9 +83,11 @@ function legacyDefinitionToAreas(model: ReportModel) {
 
 export function ReportsCreatePanel({
   model,
+  initialPresetId,
   onModelLoaded,
 }: {
   model?: ReportModel | null;
+  initialPresetId?: string;
   onModelLoaded?: () => void;
 }) {
   const catalog = useReportsCatalog();
@@ -113,6 +116,7 @@ export function ReportsCreatePanel({
   const [error, setError] = useState("");
   const [loadedModel, setLoadedModel] = useState<ReportModel | null>(null);
   const [loadedModelVersionId, setLoadedModelVersionId] = useState<string | null>(null);
+  const initialPresetApplied = useRef(false);
   const [selectedLetterhead, setSelectedLetterhead] = useState<ReportLetterheadSelection | undefined>();
   const [relationshipMode, setRelationshipMode] = useState(false);
   const configuration = JSON.stringify({ areas: builder.areas, relationshipMode });
@@ -164,7 +168,14 @@ export function ReportsCreatePanel({
   const taskDepartmentPreset = builder.areas.every((area) => area.source === "integracao.tasks")
     ? getTaskDepartmentReportPreset(sources)
     : null;
-  const presets = [...pessoalPresets, ...(taskDepartmentPreset ? [taskDepartmentPreset] : [])];
+  const rhUrgentPendingPreset = builder.areas.every((area) => area.source === "rh.requests")
+    ? getRhUrgentPendingReportPreset(sources)
+    : null;
+  const presets = [
+    ...pessoalPresets,
+    ...(taskDepartmentPreset ? [taskDepartmentPreset] : []),
+    ...(rhUrgentPendingPreset ? [rhUrgentPendingPreset] : []),
+  ];
   const selected = builder.areas.map((area) => ({
     ...area,
     catalog: sources.find((source) => source.key === area.source),
@@ -216,7 +227,7 @@ export function ReportsCreatePanel({
     setError("");
     review.reset();
   }
-  function applyPreset(areas: ReportArea[]) {
+  const applyPreset = useCallback((areas: ReportArea[]) => {
     if (busy) return;
     builder.setAreas(
       areas.map((area) => ({
@@ -231,7 +242,20 @@ export function ReportsCreatePanel({
     review.reset();
     preview.reset();
     setStep(1);
-  }
+  }, [busy, builder.setAreas, createJob.reset, preview.reset, review.reset]);
+  useEffect(() => {
+    if (
+      initialPresetApplied.current ||
+      initialPresetId !== "rh-urgent-pending" ||
+      !catalog.data
+    ) {
+      return;
+    }
+    initialPresetApplied.current = true;
+    const preset = getRhUrgentPendingReportPreset(catalog.data.items);
+    if (!preset) return;
+    applyPreset(preset.areas);
+  }, [applyPreset, catalog.data, initialPresetId]);
   async function generateReport() {
     if (busy || unavailable) return;
     setError("");

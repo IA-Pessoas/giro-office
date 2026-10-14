@@ -164,22 +164,22 @@ async function runBrowserProof() {
   await installApiMocks(page);
 
   try {
-    const timeSheetsRequest = page.waitForRequest(
-      (request) => new URL(request.url()).pathname.endsWith("/rh/timesheets"),
-      { timeout: 30_000 },
-    );
+    await page.goto("/rh", { waitUntil: "domcontentloaded", timeout: 120_000 });
+    await page.getByRole("tab", { name: "Dossiê", exact: true }).waitFor({ timeout: 60_000 });
     const pointConfigRequest = page.waitForRequest(
       (request) => new URL(request.url()).pathname.includes("/rh/point-config"),
       { timeout: 30_000 },
     );
-    await page.goto("/rh", { waitUntil: "domcontentloaded", timeout: 120_000 });
-    await page.getByRole("button", { name: "Dossiê", exact: true }).waitFor({ timeout: 60_000 });
-    await page.getByRole("button", { name: "Ponto", exact: true }).click();
+    await page.getByRole("tab", { name: "Ponto", exact: true }).click();
     await pointConfigRequest;
+    const timeSheetsRequest = page.waitForRequest(
+      (request) => new URL(request.url()).pathname.endsWith("/rh/timesheets"),
+      { timeout: 30_000 },
+    );
     await page.getByRole("button", { name: "Folhas de ponto", exact: true }).click();
     await timeSheetsRequest;
 
-    await page.getByRole("button", { name: "Dossiê", exact: true }).click();
+    await page.getByRole("tab", { name: "Dossiê", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Dossiê do colaborador" })).toBeVisible();
     // #1344: dados sensíveis só depois de escolher o colaborador.
     await expect(page.getByText(selectCollaboratorHint, { exact: true })).toBeVisible();
@@ -228,7 +228,7 @@ async function runBrowserProof() {
     await expect(page.getByLabel("Nome da alergia")).toHaveValue("Poeira");
     await expect(page.getByText(pointConfigMessage, { exact: true })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Ponto" }).click();
+    await page.getByRole("tab", { name: "Ponto" }).click();
     await expect(page.getByText(pointConfigMessage, { exact: true }).first()).toBeVisible();
     if (process.env.RH_DOSSIER_POINT_ISOLATION_SKIP_SCREENSHOTS !== "1") {
       await page.screenshot({

@@ -4,6 +4,7 @@ import {
   error as logError,
   MAX_REPORTING_QUERY_LIMIT,
   REQUEST_ID_HEADER,
+  RH_MANAGEMENT_PERMISSION,
   rhRequestReportingCatalog,
   ServiceError,
 } from "@workspace/shared";
@@ -106,7 +107,7 @@ export class RhRequestAdapter implements ReportSourceAdapter {
   ) {}
 
   isEnabled(scope: { modules: Readonly<Record<string, number>> }): boolean {
-    return (scope.modules.rh ?? 0) >= 1;
+    return (scope.modules.rh ?? 0) >= RH_MANAGEMENT_PERMISSION;
   }
 
   async preview(input: ReportPreviewAdapterInput): Promise<ReportPreviewAdapterResult> {

@@ -1,8 +1,13 @@
 import { createHash, createHmac } from "node:crypto";
 
-import { MAX_REPORTING_QUERY_LIMIT, rhRequestReportingCatalog } from "@workspace/shared";
+import {
+  MAX_REPORTING_QUERY_LIMIT,
+  RH_MANAGEMENT_PERMISSION,
+  rhRequestReportingCatalog,
+} from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
+import { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import { RhRequestAdapter } from "../integrations/rhRequestAdapter.js";
 
 function canonicalJson(value: unknown): string {
@@ -17,6 +22,30 @@ function canonicalJson(value: unknown): string {
 }
 
 describe("RhRequestAdapter", () => {
+  it("exposes organization requests only to RH management permission", () => {
+    const adapter = new RhRequestAdapter({
+      rhServiceUrl: "http://rh.test",
+      reportsInternalToken: "internal-token",
+      reportsGrantSecret: "grant-secret",
+      sourceTimeoutMs: 100,
+    });
+    const catalog = new SourceCatalogService([adapter]);
+
+    expect(adapter.sources[0]?.minimum_permission).toBe(RH_MANAGEMENT_PERMISSION);
+    expect(adapter.isEnabled({ modules: { rh: 1 } })).toBe(false);
+    expect(
+      catalog.getAuthorizedCatalog({ organization_id: "org-1", modules: { rh: 1 } }).sources,
+    ).toEqual([]);
+    expect(
+      catalog
+        .getAuthorizedCatalog({
+          organization_id: "org-1",
+          modules: { rh: RH_MANAGEMENT_PERMISSION },
+        })
+        .sources.map((source) => source.key),
+    ).toEqual(["rh.requests"]);
+  });
+
   it("publica apenas campos seguros e assina o extract interno", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

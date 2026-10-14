@@ -129,6 +129,12 @@
       "import": "./dist/pdf/pdfText.js",
       "default": "./dist/pdf/pdfText.js"
     },
+    "./rh/requests": {
+      "types": "./dist/rh/requests.d.ts",
+      "development": "./src/rh/requests.ts",
+      "import": "./dist/rh/requests.js",
+      "default": "./dist/rh/requests.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

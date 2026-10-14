@@ -30,6 +30,7 @@ import type {
 } from "../types";
 
 export const RH_QUERY_KEY = ["rh"] as const;
+export { RH_PENDING_REQUEST_STATUSES } from "@workspace/shared/rh/requests";
 
 interface RhRequestsReadQueryOptions {
   enabled?: boolean;
@@ -79,7 +80,6 @@ export function useRhRequests(
 }
 
 /** Pendente: aguarda ação do RH. Com solução: Resolvido (aguarda o solicitante) ou Fechado. */
-export const RH_PENDING_REQUEST_STATUSES = ["New", "In_Progress"] as const;
 export const RH_FINISHED_REQUEST_STATUSES = ["Resolved", "Closed"] as const;
 
 /** Soma o `total` do backend por status, e não os itens da página carregada. */
