@@ -32,6 +32,7 @@ import { createTiPasswordRoutes } from "./routes/tiPassword.routes.js";
 import { createTiRequestRoutes } from "./routes/tiRequest.routes.js";
 import { createTiRequestCategoryRoutes } from "./routes/tiRequestCategory.routes.js";
 import { createTiRobotRoutes } from "./routes/tiRobot.routes.js";
+import { createTiSpecificAccessRoutes } from "./routes/tiSpecificAccess.routes.js";
 import { createTiStockRoutes } from "./routes/tiStock.routes.js";
 import { createTiTermRoutes } from "./routes/tiTerm.routes.js";
 import {
@@ -127,6 +128,7 @@ export function createTiApplication({
   app.use("/ti/request-categories", createTiRequestCategoryRoutes(prisma));
   app.use("/ti/access-logs", createTiAccessLogRoutes(prisma));
   app.use("/ti/change-history", createTiChangeHistoryRoutes(prisma));
+  app.use("/ti/specific-accesses", createTiSpecificAccessRoutes(prisma));
 
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {

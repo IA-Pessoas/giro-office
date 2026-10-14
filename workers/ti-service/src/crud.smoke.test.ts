@@ -256,6 +256,25 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     await call("PATCH", `/ti/inventory/${winner?.data.id}/return`, {});
   });
 
+  // #1938: o SQL cru sobre `permissions.specific` e `logs` só é exercitado no Postgres.
+  it("acessos específicos: concede e revoga a conclusão de tarefas", async () => {
+    // O smoke chama como o owner; o alvo é o outro usuário, porque ninguém altera o próprio.
+    const { userId } = requireSmokeState();
+    const accessOf = async () => {
+      const list = await call("GET", "/ti/specific-accesses/list");
+      return (list.data as Array<{ id: string; task_completion: boolean }>).find(
+        (row) => row.id === userId,
+      );
+    };
+    const original = (await accessOf())?.task_completion === true;
+
+    await call("PATCH", `/ti/specific-accesses/${userId}`, { task_completion: !original });
+    expect(await accessOf()).toMatchObject({ task_completion: !original });
+    // Devolve o valor de antes.
+    await call("PATCH", `/ti/specific-accesses/${userId}`, { task_completion: original });
+    expect(await accessOf()).toMatchObject({ task_completion: original });
+  });
+
   it("ramais", async () => {
     const { userId } = requireSmokeState();
     const number = () => String(Math.floor(Math.random() * 10_000)).padStart(4, "0");

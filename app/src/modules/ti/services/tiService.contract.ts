@@ -2,6 +2,10 @@ import type { TiEnvelope, TiId, TiListFilters, TiListResponse } from "../types";
 
 export const TI_ENDPOINTS = {
   dashboard: "/ti/dashboard",
+  specificAccesses: {
+    list: "/ti/specific-accesses/list",
+    detail: "/ti/specific-accesses/{id}",
+  },
   changeHistory: {
     list: "/ti/change-history/list",
   },

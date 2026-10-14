@@ -272,6 +272,22 @@ export const operations = [
   {
     service: "ti-service",
     method: "GET",
+    path: "/ti/specific-accesses/list",
+    action: "tiSpecificAccessList",
+    target: "gateway",
+    auth: "admin-bearer",
+  },
+  {
+    service: "ti-service",
+    method: "PATCH",
+    path: "/ti/specific-accesses/{userId}",
+    action: "tiSpecificAccessPatch",
+    target: "gateway",
+    auth: "admin-bearer",
+  },
+  {
+    service: "ti-service",
+    method: "GET",
     path: "/ti/change-history/list",
     action: "tiChangeHistoryList",
     target: "gateway",

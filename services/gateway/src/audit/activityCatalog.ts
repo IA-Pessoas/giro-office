@@ -898,6 +898,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/ti\/specific-accesses\/list$/,
+    description: { action: "consultou", item: "os acessos específicos de TI" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/ti\/specific-accesses\/[^/]+$/,
+    description: { action: "alterou", item: "um acesso específico de TI" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/ti\/change-history\/list$/,
     description: { action: "consultou", item: "o histórico de alterações de TI" },
   },

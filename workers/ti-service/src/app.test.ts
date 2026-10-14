@@ -256,6 +256,47 @@ describe("ti Worker", () => {
     expect(inventory.getById).not.toHaveBeenCalled();
   });
 
+  // #1938: acessos específicos, só para TI nível 3, mesmo que a tela os esconda.
+  it("routes specific accesses for TI admins only", async () => {
+    const specificAccesses = {
+      list: vi.fn(async () => []),
+      setTaskCompletion: vi.fn(async () => ({ id: USER_ID, task_completion: true })),
+    };
+    const app = createTiWorkerApp({ env: env(), services: { specificAccesses } } as never);
+    const call = (method: string, path: string, permission: string, body?: unknown) =>
+      app.request(`https://ti.test${path}`, {
+        method,
+        headers: { ...headers(permission), "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const path = `/ti/specific-accesses/${USER_ID}`;
+
+    for (const permission of ["0", "1", "2"]) {
+      expect((await call("GET", "/ti/specific-accesses/list", permission)).status).toBe(403);
+      expect((await call("PATCH", path, permission, { task_completion: true })).status).toBe(403);
+    }
+    expect((await call("PATCH", path, "3", { task_completion: "sim" })).status).toBe(400);
+    expect(
+      (await call("PATCH", "/ti/specific-accesses/nao-e-uuid", "3", { task_completion: true }))
+        .status,
+    ).toBe(400);
+    expect(specificAccesses.list).not.toHaveBeenCalled();
+    expect(specificAccesses.setTaskCompletion).not.toHaveBeenCalled();
+
+    expect((await call("GET", "/ti/specific-accesses/list", "3")).status).toBe(200);
+    expect((await call("PATCH", path, "3", { task_completion: true })).status).toBe(200);
+    expect(specificAccesses.setTaskCompletion).toHaveBeenCalledWith(
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        permission: 3,
+        isOrganizationOwner: false,
+      },
+      USER_ID,
+      true,
+    );
+  });
+
   // #1936: histórico de alterações de TI, só para TI nível 3.
   it("routes the TI change history for TI admins only", async () => {
     const changeHistory = { list: vi.fn(async () => ({ items: [], has_more: false })) };

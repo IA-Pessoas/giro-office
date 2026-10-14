@@ -83,6 +83,10 @@ import {
   updateTiRobotBodySchema,
 } from "@workspace/ti-service/src/schemas/tiRobot.schemas.js";
 import {
+  tiSpecificAccessUserIdParamsSchema,
+  updateTiSpecificAccessBodySchema,
+} from "@workspace/ti-service/src/schemas/tiSpecificAccess.schemas.js";
+import {
   createTiStockCategoryBodySchema,
   createTiStockEntryBodySchema,
   createTiStockExitBodySchema,
@@ -490,6 +494,22 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     status: 200 | 201 = 200,
   ) => c.json(createSuccessResponse(await execute<T>(c, name, method, args)), status);
 
+  app.get("/ti/specific-accesses/list", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    return respond(c, "specificAccesses", "list", [requestContext(c)]);
+  });
+  app.patch("/ti/specific-accesses/:userId", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const params = parseWithZod(tiSpecificAccessUserIdParamsSchema, {
+      userId: c.req.param("userId"),
+    });
+    const body = parseWithZod(updateTiSpecificAccessBodySchema, await c.req.json());
+    return respond(c, "specificAccesses", "setTaskCompletion", [
+      requestContext(c),
+      params.userId,
+      body.task_completion,
+    ]);
+  });
   app.get("/ti/change-history/list", async (c) => {
     requireTiPermission(c.get("auth"), 3);
     const query = parseWithZod(listTiChangeHistoryQuerySchema, c.req.query());
