@@ -298,8 +298,8 @@ async function run() {
     await page.waitForFunction(() => window.__printCalls === 1);
     await page.getByRole("button", { name: "Editar valores", exact: true }).click();
     await page.getByLabel("Modelo").selectOption({ label: "Campos livres" });
-    await page.getByLabel("Rótulo do campo livre 1").fill("Prazo de implantação");
-    await page.getByLabel("Campo livre 1").fill("Até 10 dias úteis");
+    await page.getByLabel("Rótulo do campo livre 1", { exact: true }).fill("Prazo de implantação");
+    await page.getByLabel("Campo livre 1", { exact: true }).fill("Até 10 dias úteis");
     await page.getByRole("button", { name: "Prévia", exact: true }).click();
     await page.getByText("PROPOSTA COM CAMPOS LIVRES — SERVIÇOS CONTÁBEIS", { exact: true }).waitFor();
     await page.getByLabel("Campos livres").waitFor();
@@ -329,8 +329,14 @@ async function run() {
     await page.getByRole("button", { name: "Imprimir / Salvar em PDF", exact: true }).click();
     await page.waitForFunction(() => window.__printCalls === 1);
     await page.getByRole("button", { name: "Editar valores", exact: true }).click();
-    assert.equal(await page.getByLabel("Rótulo do campo livre 1").inputValue(), "Prazo de implantação");
-    assert.equal(await page.getByLabel("Campo livre 1").inputValue(), "Até 10 dias úteis");
+    assert.equal(
+      await page.getByLabel("Rótulo do campo livre 1", { exact: true }).inputValue(),
+      "Prazo de implantação",
+    );
+    assert.equal(
+      await page.getByLabel("Campo livre 1", { exact: true }).inputValue(),
+      "Até 10 dias úteis",
+    );
     await page.getByRole("button", { name: "Voltar ao Comercial" }).click();
     await page.getByRole("button", { name: "Kanban", exact: true }).click();
     await page.getByRole("link", { name: "Preparar proposta", exact: true }).waitFor();
