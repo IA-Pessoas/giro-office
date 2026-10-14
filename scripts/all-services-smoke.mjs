@@ -302,6 +302,9 @@ const state = {
   rhScoreEvaluationId: "",
   rhCceWeeklyEvaluationId: "",
   rhLifeProjectId: "",
+  rhEmployeeMeetingMinuteId: "",
+  rhEmployeeMeetingMinuteAgenda: "",
+  rhEmployeeMeetingMinuteDate: "",
   rhLifeProjectYear: "",
   rhLifeObjectiveId: "",
   rhHolidayId: "",
@@ -413,6 +416,10 @@ const actionExecutionRank = {
   rhLifeObjectiveUpdate: 8335,
   rhLifeProjectGetInvalid: 8321,
   rhLifeProjectCreateDuplicate: 8332,
+  rhEmployeeMeetingMinutesList: 8318,
+  rhEmployeeMeetingMinuteCreate: 8319,
+  rhEmployeeMeetingMinuteCreateDuplicate: 8320,
+  rhEmployeeMeetingMinuteUpdate: 8321,
   rhLifeProjectUpdateMissing: 8323,
   rhLifeObjectiveCreateMissingProject: 8324,
   rhLifeObjectiveUpdateMissing: 8325,
@@ -7563,6 +7570,66 @@ const handlers = {
         allergies: [{ name: "Smoke", fonts: "Smoke", action: "Smoke" }],
       },
     });
+  },
+
+  async rhEmployeeMeetingMinutesList(op) {
+    const targetUserId = await ensureRhTargetUser();
+    const sessionCookies = await ensureRhManagerSessionCookies();
+    await withSessionCookies(sessionCookies, () =>
+      httpRequest(op, {
+        auth: "session",
+        path: "/rh/profile/colaborator/meeting-minutes",
+        query: { user_id: targetUserId },
+      }),
+    );
+  },
+
+  async rhEmployeeMeetingMinuteCreate(op) {
+    const targetUserId = await ensureRhTargetUser();
+    const sessionCookies = await ensureRhManagerSessionCookies();
+    if (!isBadExpectation(op) || op.action === "rhEmployeeMeetingMinuteCreateDuplicate") {
+      if (!state.rhEmployeeMeetingMinuteAgenda) {
+        state.rhEmployeeMeetingMinuteAgenda = uniqueText("Smoke RH meeting minutes");
+        state.rhEmployeeMeetingMinuteDate = new Date().toISOString().slice(0, 10);
+      }
+    }
+    const payload = {
+      target_user_id: targetUserId,
+      meeting_date: state.rhEmployeeMeetingMinuteDate,
+      agenda: state.rhEmployeeMeetingMinuteAgenda,
+      participants: "Participante sintético",
+      report: "Relato sintético do smoke RH.",
+    };
+    const response = await withSessionCookies(sessionCookies, () =>
+      httpRequest(op, {
+        auth: "session",
+        path: "/rh/profile/colaborator/meeting-minutes",
+        json: payload,
+        ...(op.action === "rhEmployeeMeetingMinuteCreateDuplicate"
+          ? { expectedStatus: [409] }
+          : {}),
+      }),
+    );
+    if (op.action === "rhEmployeeMeetingMinuteCreate" && !isBadExpectation(op)) {
+      state.rhEmployeeMeetingMinuteId = response.body?.data?.id ?? "";
+      if (!state.rhEmployeeMeetingMinuteId) {
+        throw new Error("A criação da ata de RH não retornou o id.");
+      }
+    }
+  },
+
+  async rhEmployeeMeetingMinuteUpdate(op) {
+    const sessionCookies = await ensureRhManagerSessionCookies();
+    const response = await withSessionCookies(sessionCookies, () =>
+      httpRequest(op, {
+        auth: "session",
+        path: `/rh/profile/colaborator/meeting-minutes/${requireState("rhEmployeeMeetingMinuteId")}`,
+        json: { report: "Relato atualizado pelo smoke RH." },
+      }),
+    );
+    if (!isBadExpectation(op) && (response.body?.data?.version ?? 0) < 2) {
+      throw new Error("A edição não avançou a versão da ata de RH.");
+    }
   },
 
   async rhPointConfigGet(op) {

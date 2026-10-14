@@ -29,6 +29,7 @@
     "test:rh-dossier-fields": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/rh/run-rh-dossier-fields-tests.mjs",
     "test:rh-dossier-contact-labels": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/rh/run-rh-dossier-contact-label-tests.mjs",
     "test:rh-dossier-point-isolation-browser": "node src/modules/rh/run-rh-dossier-point-isolation-browser-smoke.mjs",
+    "test:rh-meeting-minutes-browser": "node src/modules/rh/run-rh-meeting-minutes-browser-smoke.mjs",
     "test:rh-life-project-browser": "node src/modules/rh/run-rh-life-project-browser-smoke.mjs",
     "test:departments": "node --experimental-strip-types src/modules/departments/run-departments-tests.mjs",
     "test:contabil": "node --experimental-strip-types src/modules/contabil/run-contabil-tests.mjs",

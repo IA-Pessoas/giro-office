@@ -264,6 +264,11 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/marketing(?:\/|$)/, policy: marketingEditPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
+  {
+    method: "ANY",
+    path: /^\/rh\/profile\/colaborator\/meeting-minutes(?:\/|$)/,
+    policy: rhEditPolicy,
+  },
   { method: "ANY", path: /^\/rh\/profile(?:\/|$)/, policy: rhModulePolicy },
   { method: "ANY", path: /^\/rh\/life-projects(?:\/|$)/, policy: rhModulePolicy },
   {

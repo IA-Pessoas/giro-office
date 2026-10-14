@@ -853,6 +853,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/rh\/profile\/colaborator\/meeting-minutes$/,
+    description: { action: "consultou", item: "as atas internas de RH de um colaborador" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/profile\/colaborator\/meeting-minutes$/,
+    description: { action: "registrou", item: "uma ata interna de RH" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/rh\/profile\/colaborator\/meeting-minutes\/[^/]+$/,
+    description: { action: "atualizou", item: "uma ata interna de RH" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/rh\/profile\/colaborator\/list$/,
     description: { action: "consultou", item: "a lista de dossiês de colaboradores" },
   },

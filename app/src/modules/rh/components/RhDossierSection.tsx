@@ -7,6 +7,7 @@ import { departmentService, type DepItem } from "@modules/departments";
 import { useFetch } from "@shared/hooks";
 
 import { useRhPermissions } from "../hooks/useRhPermissions";
+import { RhEmployeeMeetingMinutesPanel } from "./RhEmployeeMeetingMinutesPanel";
 import {
   useCreateRhContactMutation,
   useDeleteRhContactMutation,
@@ -154,8 +155,11 @@ export function RhDossierSection() {
   const canEdit = canManageRh || permission === 1;
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>();
   const listQuery = useRhDossierList(canList);
-  const targetUserId = canManageRh ? selectedUserId : undefined;
-  const dossierQuery = useRhDossier(targetUserId, canAccessRhPortal && (!canManageRh || Boolean(selectedUserId)));
+  const targetUserId = canList ? selectedUserId : undefined;
+  const dossierQuery = useRhDossier(
+    targetUserId,
+    canAccessRhPortal && permission !== RH_DOSSIER_MANAGER_PERMISSION && (!canManageRh || Boolean(selectedUserId)),
+  );
   const contactsQuery = useRhContacts(targetUserId, canEdit && (!canManageRh || Boolean(selectedUserId)));
   const allergiesQuery = useRhAllergies(targetUserId, canEdit && (!canManageRh || Boolean(selectedUserId)));
   const updateDossierMutation = useUpdateRhDossierMutation();
@@ -176,7 +180,7 @@ export function RhDossierSection() {
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">Dossiê do colaborador</h2>
           <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-            Consulte dados cadastrais, alergias e contatos de emergência conforme seu nível de acesso.
+            Consulte o dossiê ou as atas de RH de cada colaborador dentro do seu escopo de acesso.
           </p>
         </div>
         {canManageRh ? <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">RH administrativo</span> : null}
@@ -188,12 +192,16 @@ export function RhDossierSection() {
           isLoading={listQuery.isLoading}
           error={listQuery.error}
           selectedUserId={selectedUserId}
-          onSelect={canManageRh ? setSelectedUserId : undefined}
+          onSelect={setSelectedUserId}
         />
       ) : null}
 
       {canManageRh && !selectedUserId && (listQuery.data?.length ?? 0) > 0 ? (
         <StatusPanel text="Selecione um colaborador para consultar o dossiê." />
+      ) : null}
+
+      {permission === RH_DOSSIER_MANAGER_PERMISSION && !selectedUserId ? (
+        <StatusPanel text="Selecione um colaborador para consultar as atas de RH do departamento." />
       ) : null}
 
       {(!canManageRh || selectedUserId) && permission !== RH_DOSSIER_MANAGER_PERMISSION ? (
@@ -213,6 +221,13 @@ export function RhDossierSection() {
           deleteContactMutation={deleteContactMutation}
           replaceAllergiesMutation={replaceAllergiesMutation}
           targetUserId={targetUserId}
+        />
+      ) : null}
+
+      {canList && selectedUserId ? (
+        <RhEmployeeMeetingMinutesPanel
+          userId={selectedUserId}
+          canEdit={canManageRh || permission >= 2}
         />
       ) : null}
     </div>

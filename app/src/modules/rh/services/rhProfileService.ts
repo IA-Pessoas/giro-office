@@ -2,12 +2,15 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   CreateRhEmergencyContactPayload,
+  CreateRhEmployeeMeetingMinutePayload,
   DeleteRhEmergencyContactPayload,
   RhAllergy,
   RhDossier,
   RhDossierListItem,
+  RhEmployeeMeetingMinute,
   RhEmergencyContact,
   UpdateRhDossierPayload,
+  UpdateRhEmployeeMeetingMinutePayload,
   UpdateRhEmergencyContactPayload,
 } from "../types";
 import { buildRhDossierTargetParams, RH_ENDPOINTS, unwrapRhEnvelope } from "./rhService.contract";
@@ -23,6 +26,28 @@ export const rhProfileService = {
   async listDossiers(): Promise<RhDossierListItem[]> {
     const response = await setupAPIClient().get(RH_ENDPOINTS.dossierList);
     return unwrapRhEnvelope<RhDossierListItem[]>(response.data);
+  },
+
+  async listMeetingMinutes(userId: string): Promise<RhEmployeeMeetingMinute[]> {
+    const response = await setupAPIClient().get(RH_ENDPOINTS.employeeMeetingMinutes, {
+      params: buildRhDossierTargetParams(userId),
+    });
+    return unwrapRhEnvelope<RhEmployeeMeetingMinute[]>(response.data);
+  },
+
+  async createMeetingMinute(
+    payload: CreateRhEmployeeMeetingMinutePayload,
+  ): Promise<RhEmployeeMeetingMinute> {
+    const response = await setupAPIClient().post(RH_ENDPOINTS.employeeMeetingMinutes, payload);
+    return unwrapRhEnvelope<RhEmployeeMeetingMinute>(response.data);
+  },
+
+  async updateMeetingMinute(
+    payload: UpdateRhEmployeeMeetingMinutePayload,
+  ): Promise<RhEmployeeMeetingMinute> {
+    const { id, ...changes } = payload;
+    const response = await setupAPIClient().patch(RH_ENDPOINTS.employeeMeetingMinute(id), changes);
+    return unwrapRhEnvelope<RhEmployeeMeetingMinute>(response.data);
   },
 
   async updateDossier(payload: UpdateRhDossierPayload): Promise<RhDossier> {

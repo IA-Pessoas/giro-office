@@ -22,10 +22,18 @@ import {
   dossierUpdateBodySchema,
   replaceAllergiesBodySchema,
 } from "../schemas/employeeDossier.schemas.js";
+import {
+  createEmployeeMeetingMinuteBodySchema,
+  employeeMeetingMinuteIdParamSchema,
+  employeeMeetingMinuteQuerySchema,
+  updateEmployeeMeetingMinuteBodySchema,
+} from "../schemas/employeeMeetingMinute.schemas.js";
 import { EmployeeDossierService } from "../services/employeeDossierService.js";
+import { EmployeeMeetingMinuteService } from "../services/employeeMeetingMinuteService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const employeeDossierService = new EmployeeDossierService();
+const employeeMeetingMinuteService = new EmployeeMeetingMinuteService();
 
 function getContext(request: Request) {
   const context = requireAuthenticatedRequestContext(request, { statusCode: 400 });
@@ -35,6 +43,61 @@ function getContext(request: Request) {
     rhPermission: getRhPermissionLevel(request),
   };
 }
+
+const RH_DOSSIER_MANAGER_PERMISSION = 2;
+
+router.get(
+  "/colaborator/meeting-minutes",
+  isAuthenticated,
+  requireRhPermission(RH_DOSSIER_MANAGER_PERMISSION),
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const query = parseWithZod(employeeMeetingMinuteQuerySchema, request.query);
+      const context = getContext(request);
+      const data = await employeeMeetingMinuteService.list({
+        ...context,
+        targetUserId: query.user_id ?? context.actorUserId,
+      });
+      response.status(200).json(createSuccessResponse(data));
+    } catch (err) {
+      logError("Erro ao listar atas de reunião do colaborador", { err });
+      next(err);
+    }
+  },
+);
+
+router.post(
+  "/colaborator/meeting-minutes",
+  isAuthenticated,
+  requireRhPermission(RH_DOSSIER_MANAGER_PERMISSION),
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const body = parseWithZod(createEmployeeMeetingMinuteBodySchema, request.body);
+      const data = await employeeMeetingMinuteService.create(getContext(request), body);
+      response.status(201).json(createSuccessResponse(data));
+    } catch (err) {
+      logError("Erro ao criar ata de reunião do colaborador", { err });
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  "/colaborator/meeting-minutes/:id",
+  isAuthenticated,
+  requireRhPermission(RH_DOSSIER_MANAGER_PERMISSION),
+  async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const { id } = parseWithZod(employeeMeetingMinuteIdParamSchema, request.params);
+      const body = parseWithZod(updateEmployeeMeetingMinuteBodySchema, request.body);
+      const data = await employeeMeetingMinuteService.update(getContext(request), id, body);
+      response.status(200).json(createSuccessResponse(data));
+    } catch (err) {
+      logError("Erro ao atualizar ata de reunião do colaborador", { err });
+      next(err);
+    }
+  },
+);
 
 router.get(
   "/colaborator",

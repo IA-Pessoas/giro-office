@@ -88,3 +88,9 @@ _Avoid_: tarefa (quando não houver responsável e participação do catálogo d
 **Progresso do Projeto de Vida**:
 Objetivos Realizados divididos pelo total de objetivos; sem objetivos, o progresso é zero.
 _Avoid_: média de progresso
+
+## Registros de RH
+
+**Ata do colaborador**:
+Registro interno do RH ligado ao perfil de um colaborador, com data, pauta, participantes e relato. Pessoas do RH consultam e alteram atas dentro do próprio escopo; cada alteração preserva autoria e versão anterior.
+_Avoid_: ata comercial
