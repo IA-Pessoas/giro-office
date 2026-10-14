@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "@shared/services/toast";
@@ -227,7 +227,7 @@ export function ReportsCreatePanel({
     setError("");
     review.reset();
   }
-  function applyPreset(areas: ReportArea[]) {
+  const applyPreset = useCallback((areas: ReportArea[]) => {
     if (busy) return;
     builder.setAreas(
       areas.map((area) => ({
@@ -242,7 +242,7 @@ export function ReportsCreatePanel({
     review.reset();
     preview.reset();
     setStep(1);
-  }
+  }, [busy, builder.setAreas, createJob.reset, preview.reset, review.reset]);
   useEffect(() => {
     if (
       initialPresetApplied.current ||
@@ -254,9 +254,8 @@ export function ReportsCreatePanel({
     initialPresetApplied.current = true;
     const preset = getRhUrgentPendingReportPreset(catalog.data.items);
     if (!preset) return;
-    builder.setAreas(preset.areas);
-    setStep(1);
-  }, [builder.setAreas, catalog.data, initialPresetId]);
+    applyPreset(preset.areas);
+  }, [applyPreset, catalog.data, initialPresetId]);
   async function generateReport() {
     if (busy || unavailable) return;
     setError("");

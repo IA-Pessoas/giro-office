@@ -35,6 +35,7 @@ const { buildReportComposition, buildReportCompositionV3 } = await import("./uti
 const { getPessoalReportPresets } = await import("./utils/pessoalReportPresets.ts");
 const { getTaskDepartmentReportPreset } = await import("./utils/taskDepartmentReportPreset.ts");
 const { getRhUrgentPendingReportPreset } = await import("./utils/rhUrgentPendingReportPreset.ts");
+const { RH_PENDING_REQUEST_STATUSES } = await import("@workspace/shared");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
 const { getReportAuthorLabel, getReportForbiddenMessage, isReportCsrfError } = await import(
   "./components/reportUi.ts"
@@ -422,11 +423,11 @@ runTest("offers an RH urgent pending preset using only authorized request fields
   assert.deepEqual(preset.areas[0].fields, ["title", "category", "urgency", "status", "created_at"]);
   assert.deepEqual(preset.areas[0].filters, [
     { field: "urgency", operator: "eq", value: "High" },
-    { field: "status", operator: "in", value: ["New", "In_Progress"] },
+    { field: "status", operator: "in", value: [...RH_PENDING_REQUEST_STATUSES] },
   ]);
   assert.deepEqual(buildReportComposition(preset.areas, [source]).areas[0].filters, [
     { field: "urgency", operator: "eq", value: "High" },
-    { field: "status", operator: "in", value: ["New", "In_Progress"] },
+    { field: "status", operator: "in", value: [...RH_PENDING_REQUEST_STATUSES] },
   ]);
   assert.equal(getRhUrgentPendingReportPreset([]), null);
   assert.equal(getRhUrgentPendingReportPreset([{ ...source, fields: [] }]), null);
@@ -434,6 +435,7 @@ runTest("offers an RH urgent pending preset using only authorized request fields
 
 runTest("opens the RH urgent pending preset from the RH portal", () => {
   assert.match(rhShellSource, /router\.push\("\/relatorios\?preset=rh-urgent-pending"\)/);
+  assert.match(rhShellSource, /canManageRhRequests \? \([\s\S]*Relatório de urgentes pendentes/);
   assert.match(reportsPageSource, /initialPresetId=\{typeof router\.query\.preset === "string"/);
   assert.match(reportsCreateSource, /initialPresetId !== "rh-urgent-pending"/);
   assert.match(reportsCreateSource, /getRhUrgentPendingReportPreset\(catalog\.data\.items\)/);

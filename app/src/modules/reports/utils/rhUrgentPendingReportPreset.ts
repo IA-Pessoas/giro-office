@@ -1,4 +1,5 @@
 import type { ReportArea, ReportsCatalogSource } from "../types/report.types";
+import { RH_PENDING_REQUEST_STATUSES } from "@workspace/shared/rh/requests";
 import { getReportFieldOperators, getSelectableReportFields } from "./reportBuilder.ts";
 
 const reportFields = ["title", "category", "urgency", "status", "created_at"];
@@ -30,7 +31,7 @@ export function getRhUrgentPendingReportPreset(
         fields: reportFields,
         filters: [
           { field: "urgency", operator: "eq", value: "High" },
-          { field: "status", operator: "in", value: ["New", "In_Progress"] },
+          { field: "status", operator: "in", value: [...RH_PENDING_REQUEST_STATUSES] },
         ],
       },
     ],

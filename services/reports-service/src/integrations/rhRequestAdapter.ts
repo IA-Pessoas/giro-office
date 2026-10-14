@@ -3,6 +3,7 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
   MAX_REPORTING_QUERY_LIMIT,
+  RH_MANAGEMENT_PERMISSION,
   REQUEST_ID_HEADER,
   rhRequestReportingCatalog,
   ServiceError,
@@ -106,7 +107,7 @@ export class RhRequestAdapter implements ReportSourceAdapter {
   ) {}
 
   isEnabled(scope: { modules: Readonly<Record<string, number>> }): boolean {
-    return (scope.modules.rh ?? 0) >= 1;
+    return (scope.modules.rh ?? 0) >= RH_MANAGEMENT_PERMISSION;
   }
 
   async preview(input: ReportPreviewAdapterInput): Promise<ReportPreviewAdapterResult> {

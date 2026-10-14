@@ -18,7 +18,7 @@ const user = {
   permission: 1,
   organization_id: "reports-fixture-org",
   department_id: "reports-fixture-department",
-  modules: { integracao: 1, fiscal: 1, pessoal: 1 },
+  modules: { integracao: 1, fiscal: 1, pessoal: 1, rh: 3 },
 };
 const field = (key, label) => ({
   key,
@@ -191,6 +191,7 @@ async function run() {
   const pageErrors = [];
   const consoleErrors = [];
   const definitions = [];
+  const generatedDefinitions = [];
   let reviewFailure = false;
   let catalogRequests = 0;
   let catalogMode = "ready";
@@ -222,6 +223,7 @@ async function run() {
     if (path === "/reports/jobs" && route.request().method() === "POST") {
       const payload = route.request().postDataJSON();
       assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      if (payload.definition) generatedDefinitions.push(payload.definition);
       if (staleSavedModel) {
         assert.ok(
           payload.definition,
@@ -759,6 +761,57 @@ async function run() {
     await relationships.getByText("Colunas visíveis", { exact: true }).locator("..").getByRole("checkbox", { name: "Nome" }).uncheck();
     await expect(relationships).toContainText("grupos diferentes podem parecer linhas iguais");
     await screenshotRegion("03-relacoes-resumo", relationships);
+    items.push({
+      key: "rh.requests",
+      label: "Solicitações de RH",
+      module: "rh",
+      fields: [
+        field("title", "Título"),
+        field("category", "Categoria"),
+        field("urgency", "Urgência"),
+        field("status", "Status"),
+        field("created_at", "Data de criação"),
+      ],
+    });
+    await page.goto("/relatorios?preset=rh-urgent-pending", { waitUntil: "domcontentloaded" });
+    const rhPanel = page.getByRole("tabpanel");
+    await expect(rhPanel.getByRole("button", { name: "2. Escolher campos" })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+    await expect(
+      rhPanel.getByRole("group", { name: "Campos de Solicitações de RH" }).getByRole("checkbox", {
+        name: "Título",
+        exact: true,
+      }),
+    ).toBeChecked();
+    await rhPanel.getByRole("button", { name: "3. Definir critérios" }).click();
+    const rhCriteria = rhPanel.getByRole("group", { name: "Solicitações de RH", exact: true });
+    await expect(rhCriteria.getByLabel("Campo do critério 1")).toHaveValue("urgency");
+    await expect(rhCriteria.getByLabel("Valor do critério 1")).toHaveValue("High");
+    await expect(rhCriteria.getByLabel("Campo do critério 2")).toHaveValue("status");
+    await expect(rhCriteria.getByLabel("Valor do critério 2")).toHaveValue("New; In_Progress");
+    await rhPanel.getByRole("button", { name: "4. Revisar relatório" }).click();
+    await expect(rhPanel.getByRole("heading", { name: "Revisar relatório" })).toBeVisible();
+    const expectedRhFilters = [
+      { field: "urgency", operator: "eq", value: "High" },
+      { field: "status", operator: "in", value: ["New", "In_Progress"] },
+    ];
+    assert.deepEqual(definitions.at(-1).areas[0].filters, expectedRhFilters);
+    await rhPanel.getByRole("button", { name: "Visualizar prévia" }).click();
+    await expect(
+      rhPanel.getByText("Prévia pronta. Cada área aparece em um bloco independente."),
+    ).toBeVisible();
+    assert.deepEqual(previews.at(-1).areas[0].filters, expectedRhFilters);
+    await rhPanel.getByRole("button", { name: "Gerar relatório" }).click();
+    await expect(rhPanel.getByRole("heading", { name: "Relatório pronto" })).toBeVisible({
+      timeout: 10000,
+    });
+    assert.deepEqual(generatedDefinitions.at(-1).areas[0].filters, expectedRhFilters);
+    assert.deepEqual(pageErrors, []);
+    console.log(
+      "PASS deep link RH: autorização, preset urgente/pendente, prévia e geração usam os filtros corretos",
+    );
     const unexpectedConsoleErrors = consoleErrors.filter(
       (message) =>
         !message.includes("403 (Forbidden)") && !message.includes("422 (Unprocessable Entity)"),

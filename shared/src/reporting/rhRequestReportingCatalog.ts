@@ -1,4 +1,5 @@
 import { reportingAggregations } from "./reportingCapabilities.js";
+import { RH_MANAGEMENT_PERMISSION } from "../rh/permissions.js";
 
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const dateOperators = ["eq", "neq", "gt", "gte", "lt", "lte", "between"] as const;
@@ -29,7 +30,7 @@ export const rhRequestReportingCatalog = {
       key: "rh.requests",
       label: "Solicitações de RH",
       module: "rh",
-      minimum_permission: 1,
+      minimum_permission: RH_MANAGEMENT_PERMISSION,
       keys: [
         field("requester_user_id", "Solicitante", "string", ["eq", "in"]),
         field("assigned_to_user_id", "Responsável", "string", ["eq", "in"]),
