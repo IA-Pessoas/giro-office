@@ -38,7 +38,7 @@ const upload = createPhotoUploadMiddleware({
 
 export function createNitroHoursRoutes(
   options: { certificateStorage?: NitroHoursCertificateStorage } = {},
-) {
+): Router {
   const router: ReturnType<typeof Router> = Router();
   const service = new NitroHoursService(undefined, options.certificateStorage);
 
