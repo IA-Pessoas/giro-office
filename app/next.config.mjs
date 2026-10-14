@@ -44,6 +44,13 @@ const nextConfig = {
   transpilePackages: ["@workspace/api"],
   // Os logos ja sao webp pequenos; servir direto evita depender de /_next/image no Worker.
   images: { unoptimized: true },
+  webpack(config) {
+    config.module.rules.push({
+      test: /commercial-contract-template\.html$/i,
+      type: "asset/source",
+    });
+    return config;
+  },
   async headers() {
     return [
       {

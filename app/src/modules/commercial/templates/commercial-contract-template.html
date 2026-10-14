@@ -1,0 +1,1701 @@
+<style>
+    #carde p,
+    #carde li {
+        margin-left: 70px;
+        margin-right: 70px;
+    }
+    .row {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+    .col-md-12 { flex: 0 0 100%; max-width: 100%; }
+    .col-md-10 { flex: 0 0 83.333333%; max-width: 83.333333%; }
+    .col-md-2 { flex: 0 0 16.666667%; max-width: 16.666667%; }
+    .d-flex { display: flex; }
+    .justify-content-center { justify-content: center; }
+    .justify-content-start { justify-content: flex-start; }
+    .align-items-center { align-items: center; }
+    .title-contrato {
+        width: 100%;
+        text-transform: uppercase;
+        text-align: center;
+        font-size: 25px !important;
+        font-weight: 900;
+        margin-top: 125px;
+    }
+    .menu {
+        display: none;
+    }
+    .topbar {
+        display: none !important;
+    }
+    p {
+        font-size: 20px !important;
+        text-align: justify;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+    th, td {
+        border: 1px solid black;
+        padding: 10px;
+        text-align: left;
+    }
+    th {
+        text-align: center;
+    }
+    hr {
+        border: none;
+        border-top: 1px solid #000 !important;
+        margin: 10px 0;
+    }
+
+    .quadradinho {
+        width: 25px;
+        height: 25px;
+        border-radius: 50;
+        margin: 5px 15px;
+        border: #000 solid 1px;
+    }
+    .quadradinho.check {
+        background-color: #000;
+    }
+    .contract-letterhead {
+        display: none;
+    }
+    @media print {
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        .page {
+            padding: 0 !important;
+        }
+        #carde {
+            position: relative;
+            page-break-after: always;
+            padding-left: 0 !important;
+            margin-left: 0 !important;
+            height: 100vh;
+        }
+        .contract-letterhead {
+            display: block;
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: top left;
+            pointer-events: none;
+        }
+        #carde > :not(.contract-letterhead) {
+            position: relative;
+            z-index: 1;
+        }
+        #carde:last-of-type {
+            page-break-after: auto;
+        }
+        #carde {
+            zoom: 0.65;
+            height: auto !important;
+            min-height: 153.846vh;
+            overflow: visible !important;
+        }
+        #carde [style*="height"] {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+
+        @page {
+          margin: 0;
+        }
+
+        *::-webkit-scrollbar-thumb {
+            background: #fff;
+        }
+    }
+</style>
+
+<!-- Page 1 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: auto !important;">
+        <div class="col-md-12 row">
+            <h1 class="title-contrato d-flex justify-content-center">
+                CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE <br> CONTABILIDADE
+            </h1>
+        </div>
+        <div class="col-md-12">
+            <p style="text-align: end; padding-bottom: 40px;">
+                Feira de Santana - BA, {{contractDate}}
+            </p>
+            <p style="padding-bottom: 10px;">
+                <b>{{clientName}}</b>
+            </p>
+            <p style="padding-bottom: 30px;">
+                <b>CNPJ: {{document}}</b>
+            </p>
+            <p style="padding-bottom: 30px">
+                Prezado (a) Senhor (a),
+            </p>
+            <p style="padding-bottom: 5px;">
+                Queremos agradecer pela oportunidade de apresentar este contrato de prestações de
+                serviços e poder contribuir para o desenvolvimento do seu negócio.
+            </p>
+            <p style="padding-bottom: 5px;">
+                Nosso contrato contempla as informações referentes ao escopo de serviços e
+                condições comerciais previstas.
+            </p>
+            <p style="padding-bottom: 5px;">
+                Nossos valores estão pautados no excelente atendimento aos clientes, no
+                comprometimento de prazos e das regulamentações contábeis, respeitando sempre
+                as normas do conselho de contabilidade. Nossa visão de negócio nos leva também a
+                investir constantemente em atualização tecnológica, sempre no intuito de levar ao
+                nosso cliente mais agilidade, organização e transparência nos processos.
+                Nossa empresa tem muita satisfação em atendê-lo e colaborar para o pleno
+                desenvolvimento do seu negócio.
+            </p>
+            <p style="padding-bottom: 5px;">
+                Esperamos que o conteúdo aqui exposto atenda suas expectativas e necessidades.
+                Conte conosco para apoiá-lo e ajudá-lo nos diversos processos da sua empresa.
+            </p>
+        </div>
+        <div class="col-md-12" style="margin-bottom: 60px;">
+            <p style="padding-bottom: 30px;">
+                Castelo Branco Contabilidade Avançada Ltda <br>
+                CRC BA 006316/O-0
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Page 2 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 91vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;">
+            <h1 class="title-contrato d-flex justify-content-center">
+                CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE ASSESSORIA
+            </h1>
+        </div>
+        <div class="col-md-12" style="margin-bottom: 10px;">
+            <p style="padding-bottom: 5px;">
+                Pelo presente instrumento particular, em que são partes, de um lado CASTELO BRANCO CONTABILIDADE AVANÇADA LTDA, sob
+                CNPJ: 17.063.340/0001-64, situada na Avenida Professor Fernando São Paulo, nº 410, CEP: 44.075-045 sob e-mail:  financeiro@castelobrancocontabilidade.com.br,
+                neste ato por seu representante legal Adílio Henrick Alves Castelo Branco Souza, registrado no conselho de classe contábil sob o CRC BA-034444/O-4, portador do CPF: 798.194.605-06,
+                RG: 965921760 SSP-BA, doravante denominada CONTRATADA, e de outro lado CONTRATANTE, devidamente qualificado neste contrato, tem entre si, justo e avençado o presente contrato de prestação
+                de serviços de contabilidade e soluções empresariais, que reger-se-á pelas seguintes cláusulas e condições abaixo descritas:
+            </p>
+        </div>
+        <div class="row" style="margin-bottom: 15px !important;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    <b>1.</b>
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DO OBJETO</b>
+                </h2>
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    O presente contrato tem por objeto regulamentar os serviços profissionais a serem
+                    prestados pelo CONTRATADO à CONTRATANTE, como a delimitação das obrigações e
+                    responsabilidades de cada uma das partes, conforme segue:
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    1.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DEPARTAMENTO CONTÁBIL</b>
+                </h2>
+                <p style="padding-bottom: 5px; margin: 0 !important;"></p>
+            </div>
+            <div class="col-md-12 row">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.1.1.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Reuniões semestrais ou anuais para apresentação de Balanço, DRE, Fluxo de Caixa,
+                        Faturamento e índices econômicos; a combinar com a contratante
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.1.2.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Análise da documentação financeira;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.1.3.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Importação ou escrituração do extrato bancário e documentos;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.1.4.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Análise das conciliações dos lançamentos contábeis (apontando correção quando necessário);
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.1.5.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração de balancetes mensais e balanço Patrimonial Anual;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.1.6.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Estudo das influências de cada Balanço e sua representatividade;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.1.7.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Calculo mensal dos tributos com base no regime em andamento;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.1.8.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Auxilio para elaboração de cálculos de índices econômicos.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    1.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DEPARTAMENTO FISCAL</b>
+                </h2>
+                <p style="padding-bottom: 5px; margin: 0 !important;"></p>
+            </div>
+            <div class="col-md-12 row">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.1.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Escrituração fiscal de todas as NF-s de serviços tomados, bem como referente
+                        compra e venda de produtos;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.2.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Validação e conferência das notas fiscais;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.3.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Análise para auxílio na definição quanto as retenções realizadas pelo financeiro sobre
+                        NF-s de Terceiros e sobre serviços tomados pessoa física;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.4.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Apuração dos tributos fiscais;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.5.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Escrituração dos livros fiscais;
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page 3 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 90vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;"></div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-12 row">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.6.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração e entrega das obrigações acessórias;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.7.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Realização de treinamentos e orientação da equipe operacional relativo a empresa
+                        na atuação fiscal;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.8.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Acompanhamento em fiscalizações da área tributária;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.9.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Orientação e controle da aplicação das legislações e demais Regulamentos fiscais
+                        vigentes, no âmbito Federal, Estadual e/ou Municipal;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.10.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Análise e adequação quanto aos benefícios fiscais;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.11.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Acompanhamento de débitos voltados análise quanto aos benefícios fiscais.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    1.3.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DEPARTAMENTO PESSOAL</b>
+                </h2>
+                <p style="padding-bottom: 5px; margin: 0 !important;"></p>
+            </div>
+            <div class="col-md-12 row">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.1.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Calculo da folha de Pagamento;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.2.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração de admissão e rescisão;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.3.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração de férias;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.4.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Acompanhamento e elaboração da programação de férias;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.5.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Entrega de SEFIP/GFIP;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.6.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração dos cálculos INSS, FGTS e IRRF;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.7.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração e entrega da declaração do E-SOCIAL mensalmente;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.8.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração e entrega do DIRF, Anualmente;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.9.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração e entrega da RAIS, Anualmente;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.3.10.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Orientação do E-SOCIAL.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    1.4.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DEPARTAMENTO REGULARIZE</b>
+                </h2>
+                <p style="padding-bottom: 5px; margin: 0 !important;"></p>
+            </div>
+            <div class="col-md-12 row">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.4.1.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Acompanhamento e liberação de certidões negativas;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.2.2.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Auxilio para controle de vencimento dos alvarás;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.4.3.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Auxilio para renovação dos certificados digitais;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.4.4.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração de declaração de faturamento;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.4.5.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Envio de taxas municipais – TFF, TLP; TLL
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    1.5.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DEPARTAMENTO TECNOLOGIA</b>
+                </h2>
+                <p style="padding-bottom: 5px; margin: 0 !important;"></p>
+            </div>
+            <div class="col-md-12 row">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.5.1.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Orientações sobre armazenamento em nuvem e organização das pastas;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.5.2.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Orientações Básicas sobre LGPD;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.5.3.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Comunicação Técnica sobre sistemas que serão utilizados entre a contratada e a
+                        contratante;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.5.4.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Treinamento de Usuários referentes aos sistemas que serão utilizados entre a
+                        contratada e a contratante;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.5.5.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Qualidade na Importação dos dados;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.5.6.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Disponibilidade dos Documentos e Reclassificação de dados
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page 4 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 90vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;"></div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    1.6.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DA ÁREA DO IMPOSTO DE RENDA PESSOA JURÍDICA:</b>
+                </h2>
+                <p style="padding-bottom: 5px; margin: 0 !important;"></p>
+            </div>
+            <div class="col-md-12 row">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.6.1.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Orientação e controle de aplicação dos dispositivos legais vigentes;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.6.2.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Elaboração da declaração anual de rendimentos e documentos correlatos;
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        1.6.3.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        Atendimento das demais exigências previstas em atos normativos, bem como de
+                        eventuais procedimentos de fiscalização a partir da assinatura deste Contrato.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="row" style="margin-bottom: 15px !important;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    <b>2.</b>
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DAS CONDIÇÕES DE EXECUÇÃO DOS SERVIÇOS</b>
+                </h2>
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Os serviços serão executados nas dependências da CONTRATADA, em obediência às
+                    seguintes condições:
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    2.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Para a realização dos serviços elencados na Cláusula 1, a CONTRATANTE deverá fornecer
+                    à CONTRATADA os arquivos magnéticos e a documentação de forma completa, em boa
+                    ordem e digitalizada, conforme orientação passada pela CONTRATADA nos seguintes
+                    prazos:
+                </p>
+            </div>
+        </div>
+        <div class="col-md-10 row" style="margin-bottom: 30px;">
+            <table border="1" cellspacing="0" cellpadding="10">
+                <tr>
+                    <th><b>ARQUIVOS MAGNÉTICOS E DOCUMENTAÇÃO</b></th>
+                    <th><b>PRAZOS PARA ENTREGA</b></th>
+                </tr>
+                <tr>
+                    <td>Boletim de caixa e documentos nele constantes; <br> Extratos de todas as contas correntes bancárias, inclusive aplicações no formato OFX e PDF; e documentos relativos aos lançamentos, tais como depósitos, cópias de cheques junto a duplicatas pagas, borderôs de cobrança, descontos, contratos de crédito, avisos de créditos, débitos, extrato de cartão de créditos da pessoa jurídica com detalhamento de compras, entre outros necessários à conciliação; <br> Arquivos com os relatórios de controles internos de contas a receber e contas a pagar, relatórios de controles de pagamentos a sócios, relatório de controle e saldos de caixa e fundo fixo mensal, relatório de conciliações bancárias mensal, duplicatas referentes a notas fiscais, cópias de duplicatas paga em favor de terceiros, relatório de inventários de estoques mensais a preço de custo; relatório de pagamentos de impostos de Folha, relatório de pagamentos de impostos (Federais, Estaduais e Municipais), cópias de contratos de empréstimos, financiamentos, cópias de contratos de empréstimos e ou mútuos junto a terceiros, novos alugueis, apólices de seguros; <br>Notas Fiscais de compra (entradas) e de venda (saídas), bem como comunicação deeventual cancelamento das mesmas, Notas Fiscais de despesas, duplicatas dosfornecedores, tomados dentro e fora do município; <br> Orientação a eventual comunicação para concessão de férias, admissão ou rescisão contratual, bem como correções salariais, alterações de cargos, atualização CTPS; <br>  SPED FISCAL; SPED CONTRIBUIÇÃO SOCIAL; E-SOCIAL;</td>
+                    <td>Até o dia 30 (trinta) do mês antecedente ao da apuração.</td>
+                </tr>
+                <tr>
+                    <td>Comunicação referente a férias, aviso prévio de rescisão contratual e registro de empregados.</td>
+                    <td>Em até 48h. antes da comunicação.</td>
+                </tr>
+            </table>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    2.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA compromete-se a cumprir com os prazos para a entrega dos serviços
+                    contratados, indicados abaixo, em cumprimento à legislação correspondente, desde que
+                    a CONTRATANTE apresente os documentos correspondentes nos prazos indicados na
+                    Cláusula 2.1.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page 5 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 95vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;"></div>
+        <div class="col-md-12 row" style="margin-bottom: 5px;">
+            <div class="col-md-12 row">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.1.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        A entrega das guias de recolhimento de tributos e encargos trabalhistas à CONTRATANTE
+                        se fará via e-mail e com antecedência de 2 (dois) dias do vencimento da obrigação.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.2.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        A entrega da Folha de Pagamento, recibos de pagamento salarial, de férias e demais
+                        obrigações trabalhistas far-se-á até 72 (setenta e duas) horas após o recebimento dos
+                        documentos na Cláusula 2.1.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.3.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        A entrega de Balancete, quando parte do escopo do presente, se fará até o dia 20 (vinte)
+                        do 2° (segundo) mês subsequente ao período a que se referir.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.4.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        A entrega do Balanço Anual se fará até 90 (noventa) dias após a entrega de todos os
+                        dados necessários à sua elaboração, principalmente o Inventário Anual de Estoques, por
+                        escrito, cuja execução é de responsabilidade da CONTRATANTE.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.5.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        A remessa de documentos entre os contratantes deverá ser feita exclusivamente via email.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.6.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        As admissões e demissões serão aceitas mediante envio de documentação completa,
+                        conforme ficha admissional e demissional entregue pela contabilidade.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.7.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        As admissões não poderão ser realizadas de forma retroativas, caso a transmissão da
+                        data de admissão ocorra posteriormente ao início das atividades pelo empregado a
+                        empresa estará sujeita a pagar uma multa no valor de R$ 800,00 chegando até R$
+                        3.000,00 por empregado de acordo com a legislação atual vigente no país, sendo assim,
+                        as informações pertinentes as admissões deverão ser enviadas a contabilidade em até
+                        24H do início da prestação de serviço.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.8.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        As demissões não poderão ser realizadas de forma retroativas e a comunicação do
+                        aviso deverá ocorre em até 48h antecedentes ao processo demissional, levando em
+                        consideração que o prazo para pagamento das verbas rescisórias deverá ocorrer em
+                        até 10 dias a contar na data do desligamento, e que a transmissão para o eSocial são
+                        realizadas em tempo real.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.9.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        A CONTRATANTE compromete-se a fornecer à CONTRATADA, anualmente, o Certificado
+                        Digital, objetivando facilitar o desenvolvimento dos serviços contábeis ora contratados.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.10.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                       Qualquer violação da cláusula 2.2.9 constituirá uma quebra de contrato, e o CONTRATADO terá o direito de rescindir este contrato de imediato, sem quaisquer obrigações de reembolsar ou indenizar o CONTRATANTE por taxas ou pagamentos já efetuados.
+                    </p>
+                </div>
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        2.2.11.
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <p style="padding-bottom: 5px; margin: 0 !important;">
+                        2.2.11.	A CONTRATANTE compromete-se a fornecer à CONTRATADA, anualmente, o Certificado Digital, objetivando facilitar o desenvolvimento dos serviços contábeis ora contratados.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="row" style="margin-bottom: 05px !important;">
+                <div class="col-md-2">
+                    <p style="padding-bottom: 5px;">
+                        <b>3.</b>
+                    </p>
+                </div>
+                <div class="col-md-10" style="max-width: 76%;">
+                    <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                        <b>DOS DEVERES DA CONTRATADA: </b>
+                    </h2>
+                    <p style="padding-bottom: 5px; margin: 0 !important;"></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    3.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA desempenhará os serviços enumerados na Cláusula 1 com todo zelo,
+                    diligência e transparência, observada a legislação vigente, resguardando os interesses
+                    da CONTRATANTE, em observância aos princípios da dignidade, sigilo empresarial,
+                    independência profissional, sujeitando-se, ainda, às normas do Código de Ética
+                    Profissional do Contabilista, aprovado pela Resolução N° 803/96 do Conselho Federal
+                    de Contabilidade.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    3.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA responsabiliza-se por todos atos praticados pelos seus prepostos no
+                    exercício de suas funções, seja por culpa ou dolo, que eventualmente possam resultar
+                    em danos financeiros à CONTRATANTE.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page 6 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 85vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;"></div>
+        <div class="col-md-12 row">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    3.2.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA assume total responsabilidade por eventuais multas fiscais aplicadas à
+                    CONTRATANTE, - desde que não relacionadas ao atraso na entrega, pela CONTRATANTE,
+                    dos documentos necessários à execução dos serviços contábeis, bem como, não
+                    relacionadas a motivos de força maior ou caso fortuito, assim definidos em lei - que
+                    tenham sido causadas por imperfeições ou atrasos nos serviços ora contratados, depois
+                    de esgotados os procedimentos de defesa administrativa.
+                </p>
+            </div>
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    3.2.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA não se responsabilizará pelo pagamento de juros e a correção monetária
+                    de qualquer natureza, visto que não se tratam de apenamento pela mora, mas sim
+                    recomposição e remuneração do valor não recolhido.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    3.3.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Responsabilizar-se-á a CONTRATADA por todos os documentos a ela entregues pela
+                    CONTRATANTE, enquanto permanecerem sob sua guarda para a consecução dos
+                    serviços pactuados, respondendo pelo seu mau uso, perda, extravio ou inutilização, salvo
+                    comprovado caso fortuito ou força maior, mesmo se tal ocorrer por ação ou omissão de
+                    seus prepostos ou quaisquer pessoas que a eles tenham acesso.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    3.4.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA não será responsabilizada por quaisquer danos e/ou sanções que
+                    tenham origem em informações e/ou declarações contidas em documentos fornecidos
+                    pela CONTRATANTE, cujo teor não seja verdadeiro ou inconsistente, ou que tenham sido
+                    originadas por omissões ou desconformidades da própria CONTRATANTE.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    3.5.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA enviará à CONTRATANTE todas as guias via e-mail oficial informado pela
+                    mesma, a fim de que fique registrado entre as partes o envio dos documentos.
+                </p>
+            </div>
+        </div>
+        <div class="row" style="margin-bottom: 15px !important;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    <b>4.</b>
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DOS DEVERES DA CONTRATANTE</b>
+                </h2>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Obriga-se a CONTRATANTE a fornecer à CONTRATADA todos os dados, arquivos,
+                    documentos e informações mencionados no item 2.1 que se façam necessários ao bom
+                    desempenho dos serviços ora contratados, em tempo hábil, nenhuma responsabilidade
+                    cabendo a segunda acaso recebidos intempestivamente.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Para a execução dos serviços constantes da Cláusula 1ª a CONTRATANTE pagará à
+                    CONTRATADA os honorários profissionais consignados no Anexo 1 do presente Contrato,
+                    em data também consignada no Anexo 1, podendo a cobrança ser veiculada através de
+                    duplicata de serviços mantida em carteira.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.2.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    O valor dos honorários previstos no Anexo 1 é estabelecido e reajustado segundo o salário mínimo.
+                </p>
+            </div>
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.2.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    O valor dos honorários poderá ser renegociado, mediante comum acordo, com base em
+                    aumento substancial da demanda inicialmente contratada e em inclusão de demandas
+                    necessárias e não presentes neste contrato.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page 7 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 85vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;"></div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.3.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Além da parcela dos Honorários pactuados, a CONTRATANTE pagará à CONTRATADA uma
+                    ADICIONAL ANUAL correspondente ao valor de UMA PARCELA MENSAL, a título de
+                    COMPENSAÇÃO pelo acréscimo de serviços típicos de final do exercício de cada ano, tais
+                    como o encerramento das demonstrações contábeis anuais, Declaração de
+                    Rendimentos da Pessoa Jurídica, Declaração de Movimento Fiscal Estadual, elaboração
+                    de informes de rendimento, "RAIS", Folhas de Pagamento do 13° (décimo terceiro)
+                    Salário, "DIRF" e demais obrigações acessórias, GRRF (Guia de Recolhimento Rescisório
+                    do FGTS) - geração de arquivo para validação, DCN (Documento de Cadastramento do
+                    NIS), em substituição ao antigo DCT, GRCS (Guia de Recolhimento da Contribuição
+                    Sindical), - geração de arquivo para validação, ECD (Escrituração Contábil Digital), ECF
+                    (Escrituração Contábil Fiscal).
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.3.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A mensalidade adicional mencionada no subitem anterior será paga em parcela única
+                    vencível no dia <u>20 de novembro</u> de cada exercício, sendo que o valor dos honorários será
+                    aquele vigente no mês de pagamento.
+                </p>
+            </div>
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.3.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Mesmo no caso de início do contrato em qualquer mês do exercício, a parcela adicional
+                    será devida integralmente.
+                </p>
+            </div>
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.3.3.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Caso o presente envolva a recuperação de serviços não realizados – atrasados, a
+                    mensalidade adicional será integralmente devida desde o primeiro mês de atualização.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-top: 5px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.4.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    O eventual pagamento dos honorários pela CONTRATANTE – inclusive, da parcela adicional
+                    ajustada no subitem 4.3 - após as datas ajustadas neste Contrato serão acrescidos da
+                    multa de 2% (dois por cento) e juros de mora de 1% (um por cento) ao mês, além da
+                    correção monetária calculada com base na variação do IGP-M.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.5.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Após 90 (noventa) dias de atraso no pagamento dos honorários profissionais, a
+                    CONTRATADA estará autorizada a requerer a inclusão da CONTRATANTE nos cadastros
+                    mantidos pelos órgãos de proteção ao crédito (SPC, SERASA, CDL etc.), sem prejuízo das
+                    demais ferramentas de cobrança previstas em lei.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.6.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Nenhuma das PARTES, antes de cumprida a sua obrigação, pode exigir o implemento do outro.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.7.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Os honorários serão reajustados anualmente e automaticamente segundo a variação do
+                    salário mínimo vigente no período, considerando-se como mês a fração igual ou superior a
+                    15 (quinze) dias.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.8.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Se houver deslocamento, hospedagem, alimentação, se fora da região de Feira de Santana
+                    -BA, bem como outras despesas que promova a CONTRATADA, no desempenho da
+                    execução deste Contrato, devidamente comprovada, serão ressarcidas pela
+                    CONTRATANTE.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page 8 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 90vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;"></div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.9.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Os serviços solicitados pela CONTRATANTE não especificados na Clausula 1 serão cobrados pela CONTRATADA em apartado, como extraordinários, segundo valor especifico constante de orçamento previamente aprovado pela primeira, englobando nessa previsão toda e qualquer inovação da legislação relativamente ao regime tributário, trabalhista ou previdenciário.São considerados serviços extraordinários, exemplificamente: 1) Alteração Contratual; 2) abertura de empresa ou filial; 3) Distrato Social 4) Declaração de ajuste do imposto de renda pessoa física; 5) serviços retroativos (Ex: Malha Fiscal, serviços anteriores ao início do contrato; 6) Recálculos de guias já entregues.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.10.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Em caso de recuperação de créditos ou obtenção de descontos previamente concedidos, será aplicada uma taxa de 20% sobre o valor total recuperado ou obtido como ganho.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    4.11.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Ao termino de cada exercício da empresa, em 31 de dezembro, proceder-se-á a elaboração
+                    do inventário, do balanço de resultado econômico, cabendo ao titular, os lucros ou perdas
+                    apuradas.
+                </p>
+            </div>
+        </div>
+        <div class="row" style="margin-bottom: 15px !important;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    <b>5.</b>
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>PROTEÇÃO DE DADOS</b>
+                </h2>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    5.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRANTE declara-se ciente e concorda, bem como adotará todas as medidas para
+                    deixa seus parceiros, colaboradores e clientes também ciente, e que a CONTRATADA em
+                    decorrência do presente Contrato poderá ter acesso a coleta, produção, recepção,
+                    classificação, utilização, acesso, reprodução, transmissão, distribuição, processamento,
+                    arquivamento, armazenamento, eliminação, avaliação ou controle da informação,
+                    modificação, comunicação, transferência difusão ou extração, conforme inciso X – da
+                    Lei 13.709/2019 – Lei Geral de Proteção de Dados (LGPD).
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    5.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA fica autorizado a compartilhar os dados do Titular com outros agentes de
+                    tratamento de dados, caso seja necessário para as finalidades listadas neste termo,
+                    observados os princípios e as garantias estabelecidas pela Lei nº 13.709.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    5.3.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA responsabiliza-se pela manutenção de medidas de segurança, técnicas e
+                    administrativas aptas a proteger a proteger os dados pessoais de acessos não
+                    autorizados e de situações acidentais ou ilícitas de destruição, perda alteração,
+                    comunicação ou qualquer forma de tratamento inadequado ou ilícito. Em conformidade
+                    ao art. 48 da lei nº 13.709, a CONTRATADA comunicará ao TITULAR e à Autoridade
+                    Nacional de Proteção de Dados (ANPD) a ocorrência de incidente de segurança que
+                    possa acarretar risco ou dano relevante ao TITULAR.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    5.4.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRANTE tem direito de obter da CONTRATADA, em relação aos dados por ela
+                    tratados, a qualquer momento e mediante requisição: I- confirmação da existência de
+                    tratamento; II – acesso aos dados; III – correção de dados incompletos, inexatos ou
+                    desatualizados; IV – anonimização, bloqueio ou eliminação de dados desnecessários,
+                    excessivos ou tratados em desconformidade com o disposto na Lei nº 13.709; V -
+                    portabilidade dos dados a outro fornecedor de serviço ou produto, mediante requisição
+                    expressa, de acordo com a regulamentação da autoridade nacional, observados os
+                    segredos comercial e industrial; VI – eliminação dos dados pessoais tratados com o
+                    consentimento do titular, exceto nas hipóteses previstas no art. 16 da Lei nº 13.709; VII
+                    - informação das entidades públicas e privadas com as quais o controlador realizou uso
+                    compartilhado de dados; VIII - informação sobre a possibilidade de não fornecer consentimento e sobre as consequências da negativa; IX - revogação do consentimento,
+                    nos termos do § 5º do art. 8º da Lei nº 13.709.
+
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page 9 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 85vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;"></div>
+        <div class="row" style="margin-bottom: 15px !important;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    <b>6.</b>
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DA VIGÊNCIA E RESCISÃO:</b>
+                </h2>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    O presente contrato se inicia na competência {{competence}}, após o aceite, passará a viger
+                    por prazo indeterminado. Todavia, poderá ser rescindido a qualquer tempo, desde que o
+                    interessado notifique a outra parte por escrito, e com antecedência mínima de 30 (trinta)
+                    dias.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.1.1.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Apesar da rescisão contratual, será devido à CONTRATADA o ADICIONAL ANUAL referido
+                    no subitem 4.3, cujo valor que deverá ser pago em parcela única ao final do prazo do
+                    pré-aviso referido no subitem anterior, sendo proporcional ao número de meses de
+                    serviços prestados.
+                </p>
+            </div>
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.1.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    No caso de rescisão, a dispensa pela CONTRATANTE da execução de quaisquer serviços,
+                    seja qual for a razão, durante o prazo do pré-aviso referido no subitem 6.1, acima, deverá
+                    ser feita por escrito, porém não haverá qualquer compensação/abatimento no valor dos
+                    honorários, que serão devidos a CONTRATADA até o termo final do prazo de rescisão.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.2.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Ocorrendo a transferência dos serviços para outra Empresa Contábil, a CONTRATANTE deverá informar à CONTRATADA, no e-mail financeiro@castelobrancocontabilidade.com.br, seu nome, endereço, nome do responsável e número da inscrição junto ao Conselho Regional de Contabilidade, sem o que não será possível à CONTRATADA cumprir as formalidades ético-profissionais, inclusive a transmissão de dados e informações necessárias à continuidade dos serviços, em relação às quais, diante da eventual inércia da CONTRATANTE, estará desobrigada de cumprimento.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.3.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Entre os dados e informações a serem fornecidos não se incluem detalhes técnicos dos
+                    sistemas de informática da CONTRATADA, os quais são de sua exclusiva propriedade.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.4.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    O inadimplemento de DUAS parcelas de honorários pela CONTRATANTE autoriza a
+                    CONTRATADA suspender a execução dos serviços ora pactuados, bem como justifica a
+                    rescisão do presente compromisso, independentemente de notificação judicial ou
+                    extrajudicial, sem prejuízo da parcela prevista no subitem 4.3.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.5.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A ocorrência de falência, recuperação judicial ou extrajudicial da CONTRATANTE, nos
+                    moldes da Lei 11.101 de 09/02/2005, importará na rescisão do presente contrato pela
+                    CONTRATADA, independentemente de notificação judicial ou extrajudicial, não estando
+                    incluídos nos serviços ora pactuados a elaboração das peças contábeis arroladas no
+                    artigo 159 do Decreto-Lei 7.661/45 e demais decorrentes.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.6.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Considerar-se-á rescindido o presente contrato, mediante notificação judicial ou
+                    extrajudicial, caso qualquer das partes CONTRATANTES venha infringir cláusula (s) quetenha (m) resultado em prejuízo (s) financeiros à outra parte, devendo o infrator pagar à
+                    parte lesada o valor equivalente a uma parcela de honorários, sem prejuízo da parcela
+                    prevista no subitem 4.3.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.7.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A assistência da CONTRATADA à CONTRATANTE, após a denúncia do contrato, ocorrerá
+                    no prazo de 30 (trinta) dias.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 0px;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    6.8.
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    A CONTRATADA pode citar o nome e marca da CONTRATANTE, como fonte de referência
+                    e/ou cliente de seus serviços contábeis inclusive em sua publicidade,
+                    independentemente de qualquer pagamento adicional, com o que consente a
+                    CONTRATANTE.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page 10 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 50vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row" style="margin: 60px;"></div>
+        <div class="row" style="margin-bottom: 15px !important;">
+            <div class="col-md-2">
+                <p style="padding-bottom: 5px;">
+                    <b>7.</b>
+                </p>
+            </div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <h2 style="font-size: 16px !important; padding-bottom: 5px;">
+                    <b>DO FORO</b>
+                </h2>
+            </div>
+        </div>
+        <div class="col-md-12 row" style="margin-bottom: 30px;">
+            <div class="col-md-2"><p style="padding-bottom: 5px;"></p></div>
+            <div class="col-md-10" style="max-width: 76%;">
+                <p style="padding-bottom: 5px; margin: 0 !important;">
+                    Fica eleito o Foro da Cidade de Feira de Santana - Bahia, com expressa renúncia a qualquer
+                    outro, por mais privilegiado que seja, para dirimir as questões oriundas da interpretação e
+                    execução do presente contrato.
+                    E, por estarem justos e contratados, assinam o presente, em 2 (duas) vias de igual teor e
+                    para um só efeito, na presença de 02 (duas) testemunhas.
+                </p>
+                <p style="text-align: end; padding-bottom: 40px;">
+                    Feira de Santana - BA, {{contractDate}}
+                </p>
+            </div>
+        </div>
+        <div class="col-md-10 row">
+            <p>CONTRATANTES:</p>
+            <table border="1" cellspacing="0" cellpadding="10">
+                <tr>
+                    <th style="padding: 80px 10px 10px 10px;"><hr></th>
+                    <th style="padding: 80px 10px 10px 10px;"><hr></th>
+                </tr>
+                <tr>
+                    <td><b>{{signatureClient}}</b></td>
+                    <td><b>CASTELO BRANCO SOLUÇÕES EMPRESARIAIS LTDA <br>CNPJ nº 17.063.340/0001-64</b></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Page 11 -->
+<div class="col-md-12 row" id="carde">
+    <img class="contract-letterhead" src="/commercial-letterhead.png" alt="" aria-hidden="true" />
+    <div class="col-md-12 row justify-content-center" style="height: 90vh; overflow-y: auto; /* Defina a altura desejada aqui */">
+        <div class="col-md-12 row">
+            <h1 class="title-contrato d-flex justify-content-center">
+                ANEXO I – TERMO DE ADESÃO
+            </h1>
+        </div>
+        <div class="col-md-10 row">
+            <table>
+                <tr>
+                    <td colspan="6" style="text-align: center;"><b>DADOS DA CONTRATANTE</b></td>
+                </tr>
+                <tr>
+                    <td colspan="5">RAZÃO SOCIAL: <br> {{clientName}}</td>
+                    <td>CNPJ: <br> {{document}}</td>
+                </tr>
+                <tr>
+                    <td colspan="2">ENDEREÇO: <br> {{address}}</td>
+                    <td colspan="2">BAIRRO/DISTRITO: <br> {{neighborhood}}</td>
+                    <td colspan="1">UF: <br> {{state}}</td>
+                    <td colspan="1">CEP: <br> {{postalCode}}</td>
+                </tr>
+                <tr>
+                    <td colspan="2">CIDADE: <br> {{city}}</td>
+                    <td colspan="2">TELEFONE / CELULAR: <br> {{phone}}</td>
+                    <td colspan="2">E-MAIL: <br> {{email}}</td>
+                </tr>
+                <tr>
+                    <td colspan="6" style="text-align: center;"><b>DADOS DO REPRESENTATNE LEGAL</b></td>
+                </tr>
+                <tr>
+                    <td colspan="4">NOME: <br> {{representativeName}}</td>
+                    <td colspan="2">CPF: <br> {{representativeDocument}}</td>
+                </tr>
+                <tr>
+                    <td colspan="6" style="text-align: center;"><b>SERVIÇOS CONTRATADOS</b></td>
+                </tr>
+                <tr>
+                    <td colspan="2">DEPARTAMENTO CONTÁBIL: <br> <div class="row justify-content-start align-items-center"> <div class="quadradinho {{check:contabil:1}}"></div> SIM <div class="quadradinho {{check:contabil:0}}"></div> NÃO </div></td>
+                    <td colspan="2">DEPARTAMENTO FISCAL: <br> <div class="row justify-content-start align-items-center"> <div class="quadradinho {{check:fiscal:1}}"></div> SIM <div class="quadradinho {{check:fiscal:0}}"></div> NÃO </div></td>
+                    <td colspan="2">DEPARTAMENTO PESSOAL: <br> <div class="row justify-content-start align-items-center"> <div class="quadradinho {{check:pessoal:1}}"></div> SIM <div class="quadradinho {{check:pessoal:0}}"></div> NÃO </div></td>
+                </tr>
+                <tr>
+                    <td colspan="2">DEPARTAMENTO REGULARIZE: <br> <div class="row justify-content-start align-items-center"> <div class="quadradinho {{check:regularize:1}}"></div> SIM <div class="quadradinho {{check:regularize:0}}"></div> NÃO </div></td>
+                    <td colspan="2">DEPARTAMENTO O IMPOSTO DE RENDA PJ: <br> <div class="row justify-content-start align-items-center"> <div class="quadradinho {{check:irpj:1}}"></div> SIM <div class="quadradinho {{check:irpj:0}}"></div> NÃO </div></td>
+                    <td colspan="2">DEPARTAMENTO TECNOLOGIA: <br> <div class="row justify-content-start align-items-center"> <div class="quadradinho {{check:tecnologia:1}}"></div> SIM <div class="quadradinho {{check:tecnologia:0}}"></div> NÃO </div></td>
+                </tr>
+                <tr>
+                    <td colspan="6">Estou ciente da solicitação, arquivamento e uso dos dados supracitados neste termo de adesão, durante o período que durar a prestação de serviços de minha parte à CONTRATADA, conforme as leis governamentais, seguindo os preceitos da Lei 13.709/2018 - LGPD</td>
+                </tr>
+                <tr>
+                    <td colspan="6" style="text-align: center;"><b>HONORÁRIOS PROFISSIONAIS</b></td>
+                </tr>
+                <tr>
+                    <td colspan="4">VALOR ORIGINAL DOS HONORÁRIOS PROFISSIONAIS: <br><br><b>ASSESSORIA POR REGIME TRIBUTÁRIO</b><br>{{percentages}}<br><b>Dados:</b><br>Faturamento médio mensal: R$ {{averageRevenue}} / mês;<br>Quant. média de colaboradores: {{averageEmployees}};<br>Quant. de bancos: {{banks}}<br>Regime tributário: {{taxRegime}}</td>
+                    <td colspan="2"><b>DATA DE PAGAMENTO: </b><br>{{paymentDate}}<br><br><b>Primeiro vencimento: </b><br>{{firstDueDate}}<br><br>• Inicio da prestação dos serviços: {{serviceStart}}</td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: center; padding: 80px 10px 10px 10px;"><hr><br>LOCAL/DATA</td>
+                    <td colspan="3" style="text-align: center; padding: 80px 10px 10px 10px;"><hr><br>ACEITE DO CONTRATANTE</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
