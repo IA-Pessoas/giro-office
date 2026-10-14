@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  calculateProposalRecurringAmount,
+  calculateProposalSingleTotal,
+  calculateProposalDiscountedTotal,
+} from "./proposalCalculations.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url));
 
@@ -17,6 +22,14 @@ function runTest(name, fn) {
     throw error;
   }
 }
+
+runTest("proposal calculations use explicit decimal inputs and discount units", () => {
+  assert.equal(calculateProposalRecurringAmount(150_000, 2.5), 3_750);
+  assert.equal(calculateProposalSingleTotal(3, 12_345), 37_035);
+  assert.equal(calculateProposalDiscountedTotal(10_000, 1_500, "BRL"), 8_500);
+  assert.equal(calculateProposalDiscountedTotal(10_000, 10, "PERCENT"), 9_000);
+  assert.equal(calculateProposalDiscountedTotal(10_000, 10, "UNSPECIFIED"), null);
+});
 
 runTest("commercial dashboard uses the public commercial surface", () => {
   const component = read("./components/CommercialCatalog.tsx");
