@@ -1,5 +1,5 @@
+import { canUpdateScoreNitro } from "@workspace/rh-service/src/services/scoreFormulaVersion.js";
 import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
-
 import {
   Prisma,
   type PrismaClient,
@@ -268,7 +268,7 @@ class ScoreQuarterService {
 
       const nitro = await this.db.scoreNitro.findUnique({
         where: { score_id: scoreId },
-        include: { scoreQuarter: true },
+        include: { scoreQuarter: { include: { evaluations: true } } },
       });
 
       if (!nitro) {
@@ -279,6 +279,14 @@ class ScoreQuarterService {
         nitro.scoreQuarter.organization_id !== organizationId
       ) {
         throw new ServiceError(403, "Score Nitro não pertence à organização.");
+      }
+      if (
+        !canUpdateScoreNitro(nitro.scoreQuarter.formula_version, nitro.scoreQuarter.evaluations)
+      ) {
+        throw new ServiceError(
+          409,
+          "O Nitro deste trimestre não pode ser alterado sem recálculo compatível e auditável.",
+        );
       }
 
       let updateData: Prisma.ScoreNitroUpdateInput = {};

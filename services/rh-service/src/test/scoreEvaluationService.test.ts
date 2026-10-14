@@ -65,6 +65,37 @@ describe("ScoreEvaluationService", () => {
     });
   });
 
+  it("recalculateScoreQuarterAggregates mantém trimestres OfficeV1 em coleta", async () => {
+    prismaMock.scoreQuarter.findFirst.mockResolvedValue({
+      id: "score-1",
+      formula_version: "OfficeV1",
+      evaluations: [
+        { status: "Completed", type: "behavioral", average_score: 8 },
+        { status: "Pending", type: "technical", average_score: 0 },
+      ],
+      nitro: { projects_score: 0, hours_score: 0, errors_score: 0, folders_score: 0 },
+    });
+
+    await new ScoreEvaluationService().recalculateScoreQuarterAggregates("score-1", "org-1");
+
+    expect(prismaMock.scoreQuarter.update).toHaveBeenCalled();
+  });
+
+  it("recalculateScoreQuarterAggregates fecha trimestre OfficeV1 ao concluir a coleta", async () => {
+    prismaMock.scoreQuarter.findFirst.mockResolvedValue({
+      id: "score-1",
+      formula_version: "OfficeV1",
+      evaluations: [{ status: "Completed", type: "behavioral", average_score: 8 }],
+      nitro: { projects_score: 0, hours_score: 0, errors_score: 0, folders_score: 0 },
+    });
+
+    await new ScoreEvaluationService().recalculateScoreQuarterAggregates("score-1", "org-1", {
+      allowCompletingOfficeQuarter: true,
+    });
+
+    expect(prismaMock.scoreQuarter.update).toHaveBeenCalled();
+  });
+
   it("listPendingEvaluations lanca 404 quando usuario nao existe", async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
     const service = new ScoreEvaluationService();
