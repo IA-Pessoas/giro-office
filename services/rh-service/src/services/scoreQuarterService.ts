@@ -9,9 +9,11 @@ import {
 } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 import { ScoreEvaluationService } from "./scoreEvaluationService.js";
+import { canUpdateScoreNitro } from "./scoreFormulaVersion.js";
 
 const PERMISSION_LEADER = 1;
 const PERMISSION_COLLABORATOR = 0;
+const LEGACY_SCORE_FORMULA_VERSION = "LegacyV1";
 
 type OrgPermission = { rh: number | null };
 
@@ -153,6 +155,7 @@ class ScoreQuarterService {
           data: {
             user_id: targetUserId,
             quarter,
+            formula_version: LEGACY_SCORE_FORMULA_VERSION,
             organization_id: organizationId,
             nitro: { create: { organization_id: organizationId } },
           },
@@ -269,7 +272,7 @@ class ScoreQuarterService {
 
       const nitro = await this.db.scoreNitro.findUnique({
         where: { score_id: scoreId },
-        include: { scoreQuarter: true },
+        include: { scoreQuarter: { include: { evaluations: true } } },
       });
 
       if (!nitro) {
@@ -280,6 +283,14 @@ class ScoreQuarterService {
         nitro.scoreQuarter.organization_id !== organizationId
       ) {
         throw new ServiceError(403, "Score Nitro não pertence à organização.");
+      }
+      if (
+        !canUpdateScoreNitro(nitro.scoreQuarter.formula_version, nitro.scoreQuarter.evaluations)
+      ) {
+        throw new ServiceError(
+          409,
+          "O Nitro deste trimestre não pode ser alterado sem recálculo compatível e auditável.",
+        );
       }
 
       let updateData: Prisma.ScoreNitroUpdateInput = {};

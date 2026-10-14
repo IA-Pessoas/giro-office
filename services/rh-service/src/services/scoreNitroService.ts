@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { ScoreEvaluationStatus } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 import type { UpdateScoreNitroBody } from "../schemas/scoreNitro.schemas.js";
+import { canRecalculateScoreQuarter, canUpdateScoreNitro } from "./scoreFormulaVersion.js";
 
 const SCORE_NITRO_SELECT = {
   id: true,
@@ -31,7 +32,7 @@ export class ScoreNitroService {
       include: { evaluations: true, nitro: true },
     });
 
-    if (!score?.nitro) {
+    if (!score?.nitro || !canRecalculateScoreQuarter(score.formula_version, score.evaluations)) {
       return;
     }
 
@@ -149,6 +150,20 @@ export class ScoreNitroService {
 
       if (nitro.organization_id !== orgId) {
         throw new ServiceError(404, "Registro Nitro não encontrado para este score.");
+      }
+
+      const score = await this.db.scoreQuarter.findUnique({
+        where: { id: scoreId },
+        include: { evaluations: true },
+      });
+      if (!score || score.organization_id !== orgId) {
+        throw new ServiceError(404, "Registro Nitro não encontrado para este score.");
+      }
+      if (!canUpdateScoreNitro(score.formula_version, score.evaluations)) {
+        throw new ServiceError(
+          409,
+          "O Nitro deste trimestre não pode ser alterado sem recálculo compatível e auditável.",
+        );
       }
 
       const data = this.buildNitroUpdateData(input.type, input.value);

@@ -42,4 +42,42 @@ describe("ScoreNitroService", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 400 });
   });
+
+  it("updateMetric bloqueia alteração Nitro em OfficeV1 concluído sem trilha auditável", async () => {
+    prismaMock.scoreNitro.findUnique.mockResolvedValue({ organization_id: "org-1" });
+    prismaMock.scoreQuarter.findUnique.mockResolvedValue({
+      organization_id: "org-1",
+      formula_version: "OfficeV1",
+      evaluations: [{ status: "Completed" }],
+    });
+
+    await expect(
+      new ScoreNitroService().updateMetric("org-1", "user-1", {
+        score_id: "550e8400-e29b-41d4-a716-446655440099",
+        type: "projects",
+        value: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prismaMock.scoreNitro.update).not.toHaveBeenCalled();
+  });
+
+  it("updateMetric bloqueia alteração Nitro para fórmula desconhecida", async () => {
+    prismaMock.scoreNitro.findUnique.mockResolvedValue({ organization_id: "org-1" });
+    prismaMock.scoreQuarter.findUnique.mockResolvedValue({
+      organization_id: "org-1",
+      formula_version: "FutureV2",
+      evaluations: [{ status: "Pending" }],
+    });
+
+    await expect(
+      new ScoreNitroService().updateMetric("org-1", "user-1", {
+        score_id: "550e8400-e29b-41d4-a716-446655440099",
+        type: "projects",
+        value: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prismaMock.scoreNitro.update).not.toHaveBeenCalled();
+  });
 });

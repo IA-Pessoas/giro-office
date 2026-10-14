@@ -7,6 +7,7 @@ import {
   ScoreEvaluatorRole,
 } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
+import { canRecalculateScoreQuarter } from "./scoreFormulaVersion.js";
 
 /** Heurística herdada do legado (`ScoreController.listPendingEvaluations`). */
 const RH_PERMISSION_ADMIN_LEVEL = 3;
@@ -113,7 +114,11 @@ export class ScoreEvaluationService {
    * Recalcula médias por eixo e `final_score` do trimestre (avaliações concluídas + Nitro).
    * Usado após submeter uma avaliação ou quando o trimestre é alterado por Nitro.
    */
-  async recalculateScoreQuarterAggregates(scoreId: string, organizationId: string): Promise<void> {
+  async recalculateScoreQuarterAggregates(
+    scoreId: string,
+    organizationId: string,
+    options: { allowCompletingOfficeQuarter?: boolean } = {},
+  ): Promise<void> {
     const orgId = assertNonEmptyString(organizationId, "organization_id");
     const sid = assertNonEmptyString(scoreId, "score_id");
 
@@ -122,7 +127,14 @@ export class ScoreEvaluationService {
       include: { evaluations: true, nitro: true },
     });
 
-    if (!score?.nitro) {
+    if (
+      !score?.nitro ||
+      !canRecalculateScoreQuarter(
+        score.formula_version,
+        score.evaluations,
+        options.allowCompletingOfficeQuarter,
+      )
+    ) {
       return;
     }
 
@@ -302,7 +314,9 @@ export class ScoreEvaluationService {
         },
       });
 
-      await this.recalculateScoreQuarterAggregates(evaluation.score_id, orgId);
+      await this.recalculateScoreQuarterAggregates(evaluation.score_id, orgId, {
+        allowCompletingOfficeQuarter: true,
+      });
 
       return { message: "Avaliação enviada com sucesso" };
     } catch (err: unknown) {

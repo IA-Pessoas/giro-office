@@ -7,6 +7,7 @@ import type { RhNitroMetricType, RhScoreQuestionType } from "../../types";
 import {
   formatRhEvaluationCountLabel,
   formatRhQuarterLabel,
+  getRhScoreFormulaVersionLabel,
   formatRhScoreValue,
   getRhScoreDetailCategoryRows,
   getRhScoreEvaluatorRoleLabel,
@@ -162,6 +163,10 @@ export function RhScoreDetailDialog({
                       {formatRhEvaluationCountLabel(score.evaluations?.length)}
                     </span>
                   </div>
+
+                  <p className="mt-2 text-xs font-medium text-blue-100">
+                    {getRhScoreFormulaVersionLabel(score.formula_version)}
+                  </p>
 
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
                     Visualize a composição do trimestre, consulte as respostas enviadas e ajuste

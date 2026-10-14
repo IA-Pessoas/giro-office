@@ -681,6 +681,7 @@ export interface RhScoreQuarter {
   id: string;
   user_id: string;
   quarter: string;
+  formula_version: RhScoreFormulaVersion;
   behavioral?: number | null;
   technical?: number | null;
   technology?: number | null;
@@ -693,6 +694,8 @@ export interface RhScoreQuarter {
     name: string;
   } | null;
 }
+
+export type RhScoreFormulaVersion = "OfficeV1" | "LegacyV1";
 
 export interface CreateRhScoreQuarterPayload {
   target_user_id: string;

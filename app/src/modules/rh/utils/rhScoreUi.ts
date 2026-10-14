@@ -40,6 +40,18 @@ export function getRhScoreTypeLabel(type: RhScoreQuestionType | string | null | 
   return SCORE_TYPE_LABELS[type as RhScoreQuestionType] ?? type;
 }
 
+export function getRhScoreFormulaVersionLabel(version: string | null | undefined) {
+  if (version === "LegacyV1") {
+    return "Fórmula do legado";
+  }
+
+  if (version === "OfficeV1") {
+    return "Fórmula original do Office";
+  }
+
+  return "Versão não identificada";
+}
+
 export function formatRhQuarterLabel(value: string | null | undefined) {
   if (!value) {
     return "-";

@@ -43,6 +43,38 @@ describe("ScoreQuarterService", () => {
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
+  it("generateQuarterlyScore identifica novos trimestres com a formula legada", async () => {
+    prismaMock.scoreQuarter.findUnique.mockResolvedValue(null);
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      organization_id: "org-1",
+      department_id: null,
+      permissions: [{ organization_id: "org-1", rh: 0 }],
+      permissionRef: { organization_id: "org-1", rh: 0 },
+    });
+
+    const tx = {
+      scoreQuarter: {
+        create: vi.fn().mockResolvedValue({ id: "score-1", formula_version: "LegacyV1" }),
+      },
+      scoreQuestion: { findMany: vi.fn().mockResolvedValue([]) },
+      scoreEvaluation: { create: vi.fn() },
+    };
+    prismaMock.$transaction.mockImplementation(async (callback) =>
+      (callback as (transaction: typeof tx) => Promise<unknown>)(tx),
+    );
+
+    await new ScoreQuarterService().generateQuarterlyScore({
+      organization_id: "org-1",
+      target_user_id: "user-1",
+      quarter: "2026-Q4",
+    });
+
+    expect(tx.scoreQuarter.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ formula_version: "LegacyV1" }),
+    });
+  });
+
   it("getDetail lanca 404 quando score nao existe", async () => {
     prismaMock.scoreQuarter.findUnique.mockResolvedValue(null);
     const service = new ScoreQuarterService();
@@ -61,6 +93,7 @@ describe("ScoreQuarterService", () => {
       id: "score-1",
       user_id: "user-1",
       organization_id: "org-1",
+      formula_version: "OfficeV1",
       user: { id: "user-1", name: "Ana Silva" },
       nitro: null,
       evaluations: [],
@@ -76,6 +109,7 @@ describe("ScoreQuarterService", () => {
       }),
     ).resolves.toMatchObject({
       id: "score-1",
+      formula_version: "OfficeV1",
       user: { id: "user-1", name: "Ana Silva" },
     });
     expect(prismaMock.scoreQuarter.findUnique).toHaveBeenCalledWith(
@@ -127,5 +161,17 @@ describe("ScoreQuarterService", () => {
         can_manage: true,
       }),
     ).resolves.toMatchObject({ id: "score-1", user_id: "other-user" });
+  });
+
+  it("listForUser mantem scores isolados pela organizacao", async () => {
+    prismaMock.scoreQuarter.findMany.mockResolvedValue([]);
+
+    await expect(new ScoreQuarterService().listForUser("org-1", "user-1")).resolves.toEqual([]);
+
+    expect(prismaMock.scoreQuarter.findMany).toHaveBeenCalledWith({
+      where: { user_id: "user-1", organization_id: "org-1" },
+      include: { nitro: true },
+      orderBy: { quarter: "desc" },
+    });
   });
 });

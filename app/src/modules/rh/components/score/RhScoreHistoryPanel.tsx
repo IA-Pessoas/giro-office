@@ -4,6 +4,7 @@ import { useRhMyScores } from "../../hooks/useRhScore";
 import {
   formatRhEvaluationCountLabel,
   formatRhQuarterLabel,
+  getRhScoreFormulaVersionLabel,
   formatRhScoreValue,
   getRhScoreDetailCategoryRows,
 } from "../../utils/rhScoreUi";
@@ -71,6 +72,10 @@ export function RhScoreHistoryPanel({ canManageScore }: { canManageScore: boolea
                   <h3 className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
                     Score final {formatRhScoreValue(score.final_score)}
                   </h3>
+
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    {getRhScoreFormulaVersionLabel(score.formula_version)}
+                  </p>
 
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     {score.evaluations?.length ?? 0}{" "}

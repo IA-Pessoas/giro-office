@@ -33,7 +33,7 @@ function db() {
     },
     scoreQuarter: {
       findUnique: vi.fn(async () => null as unknown),
-      findFirst: vi.fn(async () => null),
+      findFirst: vi.fn(async () => null as unknown),
       findMany: vi.fn(async () => [{ id: SCORE_ID, quarter: "2026-Q3" }]),
       create: vi.fn(async () => ({ id: SCORE_ID, quarter: "2026-Q3" })),
       update: vi.fn(async () => ({})),
@@ -104,6 +104,34 @@ describe("/rh/score/evaluations", () => {
     expect(fake.scoreEvaluation.update).toHaveBeenCalled();
   });
 
+  it("recalculates an OfficeV1 quarter when its final evaluation is submitted", async () => {
+    const fake = db();
+    fake.scoreEvaluation.findFirst.mockResolvedValue({
+      id: EVALUATION_ID,
+      score_id: SCORE_ID,
+      status: "Pending",
+      organization_id: TEST_ORGANIZATION_ID,
+      evaluator_id: TEST_USER_ID,
+      evaluator_role: "SELF",
+      answers: [],
+      scoreQuarter: { user_id: TEST_USER_ID },
+    });
+    fake.scoreQuarter.findFirst.mockResolvedValue({
+      id: SCORE_ID,
+      formula_version: "OfficeV1",
+      evaluations: [{ status: "Completed", type: "behavioral", average_score: 8 }],
+      nitro: { projects_score: 0, hours_score: 0, errors_score: 0, folders_score: 0 },
+    });
+
+    const response = await call(testApp(fake), "POST", "/rh/score/evaluations/submit", {
+      permission: 1,
+      body: { evaluation_id: EVALUATION_ID, answers: [{ question_id: "q1", answer: 8 }] },
+    });
+
+    expect(response.status).toBe(200);
+    expect(fake.scoreQuarter.update).toHaveBeenCalled();
+  });
+
   it("returns 404 when submitting an unknown evaluation", async () => {
     const response = await call(testApp(db()), "POST", "/rh/score/evaluations/submit", {
       permission: 1,
@@ -143,7 +171,11 @@ describe("/rh/score/quarters", () => {
     const fake = db();
     fake.scoreNitro.findUnique.mockResolvedValue({
       ...nitroRow,
-      scoreQuarter: { organization_id: TEST_ORGANIZATION_ID },
+      scoreQuarter: {
+        organization_id: TEST_ORGANIZATION_ID,
+        formula_version: "LegacyV1",
+        evaluations: [],
+      },
     });
     const response = await call(testApp(fake), "PATCH", "/rh/score/quarters/nitro", {
       body: { score_id: SCORE_ID, type: "hours", value: 1 },
@@ -214,6 +246,11 @@ describe("/rh/score/nitro", () => {
   it("updates a nitro metric and recalculates the final score", async () => {
     const fake = db();
     fake.scoreNitro.findUnique.mockResolvedValue(nitroRow);
+    fake.scoreQuarter.findUnique.mockResolvedValue({
+      organization_id: TEST_ORGANIZATION_ID,
+      formula_version: "LegacyV1",
+      evaluations: [],
+    });
     const response = await call(testApp(fake), "PUT", "/rh/score/nitro/update", {
       body: { score_id: SCORE_ID, type: "projects", value: "2" },
     });
@@ -222,6 +259,40 @@ describe("/rh/score/nitro", () => {
     expect(fake.scoreNitro.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { projects_score: 2 } }),
     );
+  });
+
+  it("blocks Nitro changes for a completed OfficeV1 quarter", async () => {
+    const fake = db();
+    fake.scoreNitro.findUnique.mockResolvedValue(nitroRow);
+    fake.scoreQuarter.findUnique.mockResolvedValue({
+      organization_id: TEST_ORGANIZATION_ID,
+      formula_version: "OfficeV1",
+      evaluations: [{ status: "Completed" }],
+    });
+
+    const response = await call(testApp(fake), "PUT", "/rh/score/nitro/update", {
+      body: { score_id: SCORE_ID, type: "projects", value: 2 },
+    });
+
+    expect(response.status).toBe(409);
+    expect(fake.scoreNitro.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks Nitro changes for an unknown score formula version", async () => {
+    const fake = db();
+    fake.scoreNitro.findUnique.mockResolvedValue(nitroRow);
+    fake.scoreQuarter.findUnique.mockResolvedValue({
+      organization_id: TEST_ORGANIZATION_ID,
+      formula_version: "FutureV2",
+      evaluations: [{ status: "Pending" }],
+    });
+
+    const response = await call(testApp(fake), "PUT", "/rh/score/nitro/update", {
+      body: { score_id: SCORE_ID, type: "projects", value: 2 },
+    });
+
+    expect(response.status).toBe(409);
+    expect(fake.scoreNitro.update).not.toHaveBeenCalled();
   });
 
   it("requires RH management", async () => {
