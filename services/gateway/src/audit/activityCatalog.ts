@@ -957,6 +957,31 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "atualizou", item: "a pontuação Nitro" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/rh\/score\/nitro\/hours\/submissions$/,
+    description: { action: "consultou", item: "a lista de solicitações de horas Nitro" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/score\/nitro\/hours\/submissions$/,
+    description: { action: "enviou", item: "uma solicitação de horas Nitro" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/score\/nitro\/hours\/summary$/,
+    description: { action: "consultou", item: "o resumo de horas Nitro" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/score\/nitro\/hours\/submissions\/[^/]+\/certificate$/,
+    description: { action: "baixou", item: "um certificado de horas Nitro" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/rh\/score\/nitro\/hours\/submissions\/[^/]+\/decision$/,
+    description: { action: "avaliou", item: "uma solicitação de horas Nitro" },
+  },
+  {
     methods: ["POST", "PATCH"],
     pattern: /^\/rh\/time-bank-releases\/approve$/,
     description: { action: "aprovou", item: "um lançamento do banco de horas" },
