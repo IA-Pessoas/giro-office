@@ -80,7 +80,9 @@ describe("CommercialProspectingTransitionService", () => {
   it("inclui tarefas de cobrança única, pois o legado não as exclui nessas transições", async () => {
     const prisma = createPrismaMock();
 
-    await new CommercialProspectingTransitionService(prisma as never, audit).apply(event("Baixada"));
+    await new CommercialProspectingTransitionService(prisma as never, audit).apply(
+      event("Baixada"),
+    );
 
     expect(prisma.task.updateMany.mock.calls[0]?.[0]).not.toHaveProperty("where.billing");
   });
