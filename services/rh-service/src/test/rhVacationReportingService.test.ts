@@ -5,14 +5,15 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 
 describe("InternalReportingService para histórico de férias", () => {
   it("filtra pela organização, colaborador e projeta períodos e usos sem anexos", async () => {
-    const findMany = vi.fn().mockResolvedValue([
+    const periods = [
       {
         id: "period-1",
+        organization_id: organizationId,
         period_start: new Date("2024-01-01T00:00:00.000Z"),
         period_end: new Date("2024-12-31T00:00:00.000Z"),
         acquisition_start: new Date("2024-01-01T00:00:00.000Z"),
         acquisition_end: new Date("2024-12-31T00:00:00.000Z"),
-        employee: { name: "Ana Souza" },
+        employee: { organization_id: organizationId, name: "Ana Souza" },
         usages: [
           {
             start_date: new Date("2025-02-01T00:00:00.000Z"),
@@ -23,11 +24,33 @@ describe("InternalReportingService para histórico de férias", () => {
       },
       {
         id: "period-foreign",
+        organization_id: "20000000-0000-4000-8000-000000000002",
         period_start: new Date("2024-01-01T00:00:00.000Z"),
-        employee: { name: "Outra organização" },
+        employee: {
+          organization_id: "20000000-0000-4000-8000-000000000002",
+          name: "Ana Souza",
+        },
         usages: [],
       },
-    ]);
+      {
+        id: "period-same-organization-other-employee",
+        organization_id: organizationId,
+        period_start: new Date("2023-01-01T00:00:00.000Z"),
+        employee: { organization_id: organizationId, name: "Bruno Lima" },
+        usages: [],
+      },
+    ];
+    const findMany = vi.fn(async (args: { where: Record<string, unknown> }) => {
+      const where = args.where as {
+        organization_id: string;
+        employee: { organization_id: string };
+      };
+      return periods.filter(
+        (period) =>
+          period.organization_id === where.organization_id &&
+          period.employee.organization_id === where.employee.organization_id,
+      );
+    });
     const service = new InternalReportingService(
       {
         rhVacationPeriod: { findMany },

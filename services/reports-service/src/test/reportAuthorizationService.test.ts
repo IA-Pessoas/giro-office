@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import type { ReportSourceAdapter } from "../catalog/types.js";
+import { RhVacationAdapter } from "../integrations/rhVacationAdapter.js";
 import { ReportAuthorizationService } from "../services/reportAuthorizationService.js";
 import { ReportDefinitionService } from "../services/reportDefinitionService.js";
 
@@ -11,6 +12,22 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const definition = {
   sources: ["finance.ledger"],
   columns: [{ source: "finance.ledger", field: "balance", alias: "balance" }],
+  joins: [],
+  parameters: [],
+  filters: [],
+  filter_groups: [],
+  aggregations: [],
+  order_by: [],
+};
+const vacationDefinition = {
+  sources: ["rh.vacationHistory"],
+  columns: [
+    {
+      source: "rh.vacationHistory",
+      field: "employee_name",
+      alias: "employee_name",
+    },
+  ],
   joins: [],
   parameters: [],
   filters: [],
@@ -43,6 +60,43 @@ const adapter: ReportSourceAdapter = {
 };
 
 describe("ReportAuthorizationService", () => {
+  it("exige nível RH 3 para consultar histórico de férias", async () => {
+    const vacationAdapter = new RhVacationAdapter({
+      rhServiceUrl: "http://rh-service.test",
+      reportsInternalToken: "internal-token",
+      reportsGrantSecret: "grant-secret",
+      sourceTimeoutMs: 1000,
+    });
+    const createService = (rhLevel: number) =>
+      new ReportAuthorizationService(
+        {
+          getAccessContext: vi.fn().mockResolvedValue({
+            organization: { id: organizationId },
+            modules: { rh: rhLevel },
+          }),
+        },
+        new ReportDefinitionService(new SourceCatalogService([vacationAdapter])),
+      );
+
+    await expect(
+      createService(2).validateDefinition({
+        userId,
+        organizationId,
+        requestId: "vacation-history-level-2",
+        definition: vacationDefinition,
+      }),
+    ).rejects.toEqual(expect.objectContaining<ServiceError>({ statusCode: 403 }));
+
+    await expect(
+      createService(3).validateDefinition({
+        userId,
+        organizationId,
+        requestId: "vacation-history-level-3",
+        definition: vacationDefinition,
+      }),
+    ).resolves.toMatchObject({ definition: vacationDefinition });
+  });
+
   it("bloqueia acervo compartilhado sem departamento atual", async () => {
     const service = new ReportAuthorizationService(
       {
