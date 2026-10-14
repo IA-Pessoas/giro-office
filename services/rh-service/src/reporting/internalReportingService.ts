@@ -11,6 +11,7 @@ import {
   REPORTING_QUERY_ROW_LIMIT_MESSAGE,
   type ReportingQuery,
   type RhEmployeeReportingSource,
+  type RhVacationReportingSource,
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
@@ -26,16 +27,24 @@ import {
   getRhRequestReportingFields,
   type RhRequestReportingSource,
 } from "./rhRequestReportingCatalog.js";
+import {
+  getRhVacationReportingFields,
+  type RhVacationReportingSource as LocalRhVacationReportingSource,
+} from "./rhVacationReportingCatalog.js";
 
 type RhReportingSource =
   | RhRequestReportingSource
   | RhAttendanceReportingSource
   | RhEmployeeReportingSource
-  | RhHolidayReportingSource;
+  | RhHolidayReportingSource
+  | RhVacationReportingSource;
 
 type ReportingDelegate = {
   findMany(input: {
-    where: { organization_id: string };
+    where: {
+      organization_id: string;
+      employee?: { organization_id: string };
+    };
     select: Record<string, unknown>;
     take: number;
     cursor?: { id: string };
@@ -63,6 +72,7 @@ type AttendanceReportingPrisma = {
   };
   rhRequest?: ReportingDelegate;
   holidays?: ReportingDelegate;
+  rhVacationPeriod?: ReportingDelegate;
   point?: ReportingDelegate;
   timeSheets?: ReportingDelegate;
   timeBankReleases?: ReportingDelegate;
@@ -112,6 +122,13 @@ const employeeReportingSelect = {
   status: true,
   birth_date: true,
   department: { select: { name: true } },
+} as const;
+const vacationReportingSelect = {
+  period_start: true,
+  period_end: true,
+  acquisition_start: true,
+  acquisition_end: true,
+  employee: { select: { name: true } },
 } as const;
 const attendanceSelects = {
   point: {
@@ -165,6 +182,44 @@ function projectRows(
 
 function numericValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function formatVacationDate(value: unknown): string {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "—";
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(value);
+}
+
+function mapVacationPeriod(row: Record<string, unknown>): Record<string, unknown> {
+  const employee = row.employee;
+  const name =
+    employee && typeof employee === "object" && "name" in employee
+      ? (employee as { name: unknown }).name
+      : null;
+  const usages = Array.isArray(row.usages) ? row.usages : [];
+  const uses = usages
+    .map((value) => {
+      if (!value || typeof value !== "object") return "";
+      const usage = value as Record<string, unknown>;
+      const dates = `${formatVacationDate(usage.start_date)} a ${formatVacationDate(usage.end_date)}`;
+      const observation = typeof usage.observation === "string" ? usage.observation.trim() : "";
+      return observation ? `${dates} — ${observation}` : dates;
+    })
+    .filter(Boolean)
+    .join("; ");
+
+  return {
+    employee_name: name,
+    period_start: row.period_start,
+    period_end: row.period_end,
+    acquisition_start: row.acquisition_start,
+    acquisition_end: row.acquisition_end,
+    uses: uses || null,
+  };
 }
 
 function throwSnapshotByteLimit(): never {
@@ -319,7 +374,9 @@ export class InternalReportingService {
           ? getRhRequestReportingFields(input.source)
           : input.source === "rh.attendance"
             ? getRhAttendanceReportingFields(input.source)
-            : getRhEmployeeReportingFields(input.source);
+            : input.source === "rh.vacationHistory"
+              ? getRhVacationReportingFields(input.source as LocalRhVacationReportingSource)
+              : getRhEmployeeReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
@@ -341,6 +398,9 @@ export class InternalReportingService {
   ): Promise<ReportingPage> {
     if (source === "rh.attendance") {
       return this.loadAttendancePage(organizationId, limit, cursor);
+    }
+    if (source === "rh.vacationHistory") {
+      return this.loadVacationPage(organizationId, limit, cursor);
     }
     if (source === "rh.employees" || source === "rh.birthdays") {
       return this.loadEmployeePage(source, organizationId, limit, cursor);
@@ -398,6 +458,41 @@ export class InternalReportingService {
     const reachedLimit = rows.length > limit;
     return {
       rows: visibleRows.map((row) => this.mapEmployeeRow(row)),
+      reachedLimit,
+      ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
+    };
+  }
+
+  private async loadVacationPage(
+    organizationId: string,
+    limit: number,
+    cursor?: string,
+  ): Promise<ReportingPage> {
+    const delegate = this.prisma.rhVacationPeriod;
+    if (!delegate) throw new ServiceError(503, "Fonte de histórico de férias indisponível.");
+
+    const rows = await delegate.findMany({
+      where: {
+        organization_id: organizationId,
+        employee: { organization_id: organizationId },
+      },
+      select: {
+        ...vacationReportingSelect,
+        id: true,
+        usages: {
+          where: { organization_id: organizationId },
+          orderBy: [{ start_date: "asc" }, { id: "asc" }],
+          select: { start_date: true, end_date: true, observation: true },
+        },
+      },
+      ...cursorOptions(cursor),
+      take: limit + 1,
+    });
+    const visibleRows = rows.slice(0, limit);
+    const lastId = visibleRows[visibleRows.length - 1]?.id;
+    const reachedLimit = rows.length > limit;
+    return {
+      rows: visibleRows.map(mapVacationPeriod),
       reachedLimit,
       ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
     };

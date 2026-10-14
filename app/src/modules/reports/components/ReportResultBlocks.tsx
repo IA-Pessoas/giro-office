@@ -46,7 +46,9 @@ export function ReportResultBlocks({
             ) : null}
             {block.rows.length === 0 ? (
               <p className="text-sm text-gray-600 dark:text-slate-300">
-                Nenhum registro encontrado nesta área. Ajuste os critérios se necessário.
+                {block.source === "rh.vacationHistory"
+                  ? "Nenhum histórico de férias estruturado foi importado. A consulta será preenchida quando o export histórico estiver disponível; uploads pessoais não são usados."
+                  : "Nenhum registro encontrado nesta área. Ajuste os critérios se necessário."}
               </p>
             ) : (
               <div

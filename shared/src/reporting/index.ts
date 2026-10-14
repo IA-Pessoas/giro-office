@@ -30,6 +30,7 @@ export * from "./rhAttendanceReportingCatalog.js";
 export * from "./rhEmployeeReportingCatalog.js";
 export * from "./rhHolidayReportingCatalog.js";
 export * from "./rhRequestReportingCatalog.js";
+export * from "./rhVacationReportingCatalog.js";
 export * from "./taskReportingCatalog.js";
 export * from "./tiExtensionsReportingCatalog.js";
 export * from "./tiInventoryReportingCatalog.js";

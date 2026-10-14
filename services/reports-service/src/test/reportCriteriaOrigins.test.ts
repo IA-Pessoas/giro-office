@@ -107,11 +107,17 @@ for (const source of reportingSources.filter(
       const rows = Array.from({ length: 150 }, (_, index) => ({
         ...(hasCursor ? { id: `row-${String(index).padStart(3, "0")}` } : {}),
         [field.key]: value(index),
+        ...(source.key === "rh.vacationHistory"
+          ? { employee: { name: value(index) }, usages: [] }
+          : {}),
         organization_id: organizationId,
       }));
       rows.push({
         ...(hasCursor ? { id: "row-foreign" } : {}),
         [field.key]: "ZZZ foreign",
+        ...(source.key === "rh.vacationHistory"
+          ? { employee: { name: "ZZZ foreign" }, usages: [] }
+          : {}),
         organization_id: "foreign",
       });
       const delegate = {

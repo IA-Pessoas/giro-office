@@ -21,6 +21,23 @@ describe("createWorkerSourceCatalog", () => {
     ).toBeDefined();
   });
 
+  it("registra o histórico de férias para gestores de RH", () => {
+    const catalog = createWorkerSourceCatalog(
+      parseReportsServiceEnv({
+        DATABASE_URL: "postgresql://reports:reports@localhost:5432/reports",
+        JWT_SECRET: "test-jwt-secret",
+      }),
+    );
+
+    expect(
+      catalog.findAdapterForSources(["rh.vacationHistory"], {
+        organization_id: "10000000-0000-0000-0000-000000000001",
+        modules: { rh: 3 },
+        grant: { sources: { "rh.vacationHistory": ["employee_name"] }, relations: [] },
+      }),
+    ).toBeDefined();
+  });
+
   it("registra ramais de TI para execução assíncrona", () => {
     const catalog = createWorkerSourceCatalog(
       parseReportsServiceEnv({
