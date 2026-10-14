@@ -87,6 +87,8 @@ artefatos versionados.
 As senhas persistidas usam AES-256-GCM no envelope JSON `{ v, iv, tag, data }`. JSON invalido ou
 que nao represente esse envelope falha fechado. Texto legado nao-JSON e recriptografado na primeira
 leitura autorizada.
+Valores com prefixo de objeto, array ou string JSON tambem falham fechados quando
+truncados: nunca sao devolvidos nem regravados como uma senha legada em texto.
 
 ## Rotas internas
 

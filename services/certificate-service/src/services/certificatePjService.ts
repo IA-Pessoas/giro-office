@@ -170,12 +170,13 @@ function removeFilePrivateMetadata(record: CertificatePjPrivateRecord): Certific
   return safeRecord;
 }
 
-function isJsonValue(value: string): boolean {
+function looksLikeJson(value: string): boolean {
   try {
     JSON.parse(value.trim());
     return true;
   } catch {
-    return false;
+    // Um envelope truncado não pode ser migrado como senha em texto.
+    return /^[{["]/.test(value.trimStart());
   }
 }
 
@@ -247,7 +248,7 @@ export class CertificatePjService {
     }
 
     const passwordCrypto = this.requirePasswordCrypto();
-    if (isJsonValue(record.password)) {
+    if (looksLikeJson(record.password)) {
       return removeFilePrivateMetadata({
         ...record,
         password: passwordCrypto.decrypt(record.password),
