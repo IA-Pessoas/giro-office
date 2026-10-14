@@ -67,7 +67,7 @@ describe("relatórios de colaboradores RH", () => {
     const { prisma, findMany } = createUserPrisma(rows);
     const result = await new InternalReportingService(prisma as never).extract({
       organizationId,
-      source: "rh.employees" as never,
+      source: "rh.employees",
       fields: ["name", "status", "department", "birth_month"],
       limit: 150,
       query: {
@@ -110,7 +110,7 @@ describe("relatórios de colaboradores RH", () => {
     const { prisma, findMany } = createUserPrisma(inactiveOnly);
     const result = await new InternalReportingService(prisma as never).extract({
       organizationId,
-      source: "rh.birthdays" as never,
+      source: "rh.birthdays",
       fields: ["name", "department", "birth_day", "birth_month"],
       limit: 50,
       query: {

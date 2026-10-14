@@ -1,3 +1,4 @@
+import { RH_MANAGEMENT_PERMISSION } from "../rh/permissions.js";
 import { reportingAggregations } from "./reportingCapabilities.js";
 
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
@@ -23,10 +24,13 @@ function field(
 export const RH_EMPLOYEE_REPORTING_SOURCES = ["rh.employees", "rh.birthdays"] as const;
 export type RhEmployeeReportingSource = (typeof RH_EMPLOYEE_REPORTING_SOURCES)[number];
 
+const employeeNameField = field("name", "Colaborador", "string", stringOperators);
+const departmentField = field("department", "Departamento", "string", stringOperators);
+
 const employeeFields = [
-  field("name", "Colaborador", "string", stringOperators),
+  employeeNameField,
   field("status", "Status", "string", stringOperators),
-  field("department", "Departamento", "string", stringOperators),
+  departmentField,
   field("birth_month", "Mês de aniversário", "number", numberOperators),
 ] as const;
 
@@ -36,7 +40,7 @@ export const rhEmployeeReportingCatalog = {
       key: "rh.employees",
       label: "Colaboradores por departamento",
       module: "rh",
-      minimum_permission: 3,
+      minimum_permission: RH_MANAGEMENT_PERMISSION,
       keys: [],
       fields: employeeFields,
     },
@@ -44,11 +48,11 @@ export const rhEmployeeReportingCatalog = {
       key: "rh.birthdays",
       label: "Aniversariantes por mês",
       module: "rh",
-      minimum_permission: 3,
+      minimum_permission: RH_MANAGEMENT_PERMISSION,
       keys: [],
       fields: [
-        field("name", "Colaborador", "string", stringOperators),
-        field("department", "Departamento", "string", stringOperators),
+        employeeNameField,
+        departmentField,
         field("birth_day", "Dia do aniversário", "number", numberOperators),
         field("birth_month", "Mês de aniversário", "number", numberOperators),
       ],

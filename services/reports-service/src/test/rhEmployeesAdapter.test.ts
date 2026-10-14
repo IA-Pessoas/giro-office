@@ -1,11 +1,13 @@
 import { createHmac } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import { RhEmployeesAdapter } from "../integrations/rhEmployeesAdapter.js";
 import { ReportCsvService } from "../services/reportCsvService.js";
 import { ReportExportService } from "../services/reportExportService.js";
 
 const organizationId = "10000000-0000-0000-0000-000000000001";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("RhEmployeesAdapter", () => {
   it("restringe dados pessoais ao RH autorizado e não publica campos sensíveis", () => {
