@@ -92,7 +92,7 @@ export function createTaskServices(prisma: unknown, env: TaskWorkerEnv) {
     reporting: () => new TaskReportingService(db),
     commercialTaskBilling: () => new CommercialTaskBillingProjectionService(db),
     commercialProspectingClose: () => new CommercialProspectingCloseService(db),
-    commercialProspectingTransition: () => new CommercialProspectingTransitionService(db),
+    commercialProspectingTransition: () => new CommercialProspectingTransitionService(db, audit),
   };
 }
 
