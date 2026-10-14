@@ -31,6 +31,16 @@ runTest("proposal calculations use explicit decimal inputs and discount units", 
   assert.equal(calculateProposalDiscountedTotal(10_000, 10, "UNSPECIFIED"), null);
 });
 
+runTest("proposal exposes the two reachable alternative legacy models", () => {
+  const component = read("./components/CommercialProposal.tsx");
+
+  assert.match(component, /value: "preco-direto", label: "Preço direto"/);
+  assert.match(component, /value: "campos-livres", label: "Campos livres"/);
+  assert.match(component, /template === "campos-livres"/);
+  assert.match(component, /function updateTemplate\(value: Template\) \{\s*setTemplate\(value\);\s*\}/);
+  assert.doesNotMatch(component, /value: "proposta-med"|value: "medica"/i);
+});
+
 runTest("commercial dashboard uses the public commercial surface", () => {
   const component = read("./components/CommercialCatalog.tsx");
   const contract = read("./services/commercialService.contract.ts");

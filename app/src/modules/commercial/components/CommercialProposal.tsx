@@ -27,7 +27,7 @@ import {
   calculateProposalSingleTotal,
 } from "../proposalCalculations.mjs";
 
-type Template = "padrao" | "detalhada" | "informativa";
+type Template = "padrao" | "preco-direto" | "campos-livres";
 type ProposalItem = {
   id: string;
   sourceTaskId: string | null;
@@ -40,7 +40,7 @@ type ProposalItem = {
   included: boolean;
 };
 
-type InformativeField = { label: string; value: string };
+type FreeField = { label: string; value: string };
 
 function ProposalInput({ className, ...props }: ComponentProps<typeof Input>) {
   return (
@@ -72,8 +72,8 @@ function ProposalSelect({ className, ...props }: ComponentProps<"select">) {
 
 const templates: Array<{ value: Template; label: string }> = [
   { value: "padrao", label: "Proposta padrão" },
-  { value: "detalhada", label: "Proposta detalhada" },
-  { value: "informativa", label: "Proposta informativa" },
+  { value: "preco-direto", label: "Preço direto" },
+  { value: "campos-livres", label: "Campos livres" },
 ];
 
 const recurringDescriptionOptions = [
@@ -159,7 +159,7 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
   const [recurringItems, setRecurringItems] = useState<ProposalItem[]>([]);
   const [singleItems, setSingleItems] = useState<ProposalItem[]>([]);
   const [notes, setNotes] = useState("");
-  const [informativeFields, setInformativeFields] = useState<InformativeField[]>(
+  const [freeFields, setFreeFields] = useState<FreeField[]>(
     Array.from({ length: 5 }, (_, index) => ({ label: "", value: "" })),
   );
 
@@ -220,7 +220,7 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
       if (item.id !== itemId) return item;
       const next = { ...item, [field]: value };
       if (field === "percentage" || field === "unitPrice" || field === "quantity") {
-        if (setter === setRecurringItems && field === "percentage" && template !== "detalhada") {
+        if (setter === setRecurringItems && field === "percentage" && template !== "preco-direto") {
           const result = calculateProposalRecurringAmount(
             Math.round((Number(referenceSalary.replace(",", ".")) || 0) * 100),
             Number(String(value).replace(",", ".")) || 0,
@@ -228,7 +228,7 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
           next.amount = result === null ? "" : (result / 100).toFixed(2);
         } else if (
           setter === setRecurringItems
-          && template === "detalhada"
+          && template === "preco-direto"
           && field !== "percentage"
         ) {
           const quantity = parseDecimal(next.quantity);
@@ -274,7 +274,7 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
     const salary = Math.round((Number(value.replace(",", ".")) || 0) * 100);
     setRecurringItems((items) => items.map((item) => {
       const percentage = Number(item.percentage.replace(",", ".")) || 0;
-      if (template === "detalhada") return item;
+      if (template === "preco-direto") return item;
       const amount = calculateProposalRecurringAmount(salary, percentage);
       return { ...item, amount: amount === null ? "" : (amount / 100).toFixed(2) };
     }));
@@ -282,23 +282,6 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
 
   function updateTemplate(value: Template) {
     setTemplate(value);
-    if (value !== "detalhada") {
-      const salary = Math.round((Number(referenceSalary.replace(",", ".")) || 0) * 100);
-      setRecurringItems((items) => items.map((item) => {
-        const percentage = Number(item.percentage.replace(",", ".")) || 0;
-        const amount = calculateProposalRecurringAmount(salary, percentage);
-        return { ...item, amount: amount === null ? "" : (amount / 100).toFixed(2) };
-      }));
-      return;
-    }
-    setRecurringItems((items) => items.map((item) => {
-      const quantity = parseDecimal(item.quantity);
-      const unitPrice = amountInCents(item.unitPrice);
-      const amount = quantity === null || unitPrice === null
-        ? null
-        : calculateProposalSingleTotal(quantity, unitPrice);
-      return { ...item, amount: amount === null ? "" : (amount / 100).toFixed(2) };
-    }));
   }
 
   function printProposal() {
@@ -339,16 +322,16 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
 
   const documentTitle = {
     padrao: "ORÇAMENTO — PRESTAÇÃO DE SERVIÇOS CONTÁBEIS",
-    detalhada: "ORÇAMENTO DETALHADO — SERVIÇOS CONTÁBEIS",
-    informativa: "PROPOSTA DE SERVIÇOS CONTÁBEIS",
+    "preco-direto": "PROPOSTA DE PREÇO DIRETO — SERVIÇOS CONTÁBEIS",
+    "campos-livres": "PROPOSTA COM CAMPOS LIVRES — SERVIÇOS CONTÁBEIS",
   }[template];
   const documentDescription = {
     padrao: "Serviços recorrentes e únicos para conferência do contratante.",
-    detalhada: "Composição dos valores por quantidade, percentual e unidade.",
-    informativa: "Escopo, informações complementares e condições para avaliação.",
+    "preco-direto": "Itens de serviço com quantidade, preço unitário e total editável.",
+    "campos-livres": "Campos complementares e condições para preenchimento livre.",
   }[template];
-  function updateInformativeField(index: number, key: keyof InformativeField, value: string) {
-    setInformativeFields((fields) => fields.map((field, fieldIndex) =>
+  function updateFreeField(index: number, key: keyof FreeField, value: string) {
+    setFreeFields((fields) => fields.map((field, fieldIndex) =>
       fieldIndex === index ? { ...field, [key]: value } : field,
     ));
   }
@@ -521,7 +504,7 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
                   <th className="py-2 pr-3">Serviço</th>
                   <th className="px-2 py-2">Qtd.</th>
                   <th className="px-2 py-2">% faturamento</th>
-                  {template === "detalhada" ? <th className="px-2 py-2">Valor unitário</th> : null}
+                  {template === "preco-direto" ? <th className="px-2 py-2">Valor unitário</th> : null}
                   <th className="px-2 py-2">Valor mensal</th>
                   <th className={preview ? "hidden" : "hide-on-print px-2 py-2"}>Incluir</th>
                   <th className={preview ? "hidden" : "hide-on-print px-2 py-2"} />
@@ -578,7 +561,7 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
                         onChange={updateItemFromInput(setRecurringItems, item.id, "percentage")}
                       />}
                     </td>
-                    {template === "detalhada" ? <td className="px-2 py-2">
+                    {template === "preco-direto" ? <td className="px-2 py-2">
                       {preview ? formatCurrency(amountInCents(item.unitPrice)) : <ProposalInput
                         aria-label={`Valor unitário recorrente ${index + 1}`}
                         inputMode="decimal"
@@ -781,28 +764,29 @@ export function CommercialProposal({ clientId }: { clientId: string }) {
           </div>
         </section>
 
-        {template === "informativa" ? <section
+        {template === "campos-livres" ? <section
           className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-700"
+          aria-label="Campos livres"
         >
-          <h3 className="font-semibold">Informações complementares</h3>
+          <h3 className="font-semibold">Campos livres</h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {informativeFields.map((field, index) => (
+            {freeFields.map((field, index) => (
               <div key={index} className="grid gap-2 sm:grid-cols-2">
                 {preview ? <>
                   <p className="text-sm">{field.label || "—"}</p>
                   <p className="whitespace-pre-wrap text-sm">{field.value || "—"}</p>
                 </> : <>
                   <ProposalInput
-                    aria-label={`Rótulo informativo ${index + 1}`}
+                    aria-label={`Rótulo do campo livre ${index + 1}`}
                     placeholder={`Rótulo ${index + 1}`}
                     value={field.label}
-                    onChange={(event) => updateInformativeField(index, "label", event.target.value)}
+                    onChange={(event) => updateFreeField(index, "label", event.target.value)}
                   />
                   <ProposalInput
-                    aria-label={`Informação complementar ${index + 1}`}
+                    aria-label={`Campo livre ${index + 1}`}
                     placeholder={`Informação ${index + 1}`}
                     value={field.value}
-                    onChange={(event) => updateInformativeField(index, "value", event.target.value)}
+                    onChange={(event) => updateFreeField(index, "value", event.target.value)}
                   />
                 </>}
               </div>

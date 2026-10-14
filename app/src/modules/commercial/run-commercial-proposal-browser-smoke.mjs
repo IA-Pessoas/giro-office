@@ -6,7 +6,7 @@ import { chromium } from "@playwright/test";
 const baseUrl = (
   process.env.COMMERCIAL_SMOKE_BASE_URL || "http://localhost:3174"
 ).replace(/\/$/u, "");
-const evidenceDir = process.env.COMMERCIAL_SMOKE_EVIDENCE_DIR || "output/playwright/issue-1889";
+const evidenceDir = process.env.COMMERCIAL_SMOKE_EVIDENCE_DIR || "output/playwright/issue-1890";
 const csrf = "A".repeat(43);
 const jwtSecret = "commercial-smoke-jwt-secret";
 const user = {
@@ -229,34 +229,49 @@ async function run() {
     await page.getByText("ORÇAMENTO — PRESTAÇÃO DE SERVIÇOS CONTÁBEIS", { exact: true }).waitFor();
     await page.getByText("Consultoria personalizada", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Editar valores", exact: true }).click();
-    await page.getByLabel("Modelo").selectOption("detalhada");
+    await page.getByLabel("Modelo").selectOption({ label: "Preço direto" });
     await page.getByLabel("Quantidade do serviço recorrente 1").fill("3");
     await page.getByLabel("Valor unitário recorrente 1").fill("20");
     assert.equal(
       await page.getByLabel("Valor mensal do serviço recorrente 1").inputValue(),
       "60.00",
     );
-    await page.getByLabel("Percentual do serviço recorrente 1").fill("5");
+    await page.getByLabel("Valor mensal do serviço recorrente 1").fill("61.25");
     assert.equal(
       await page.getByLabel("Valor mensal do serviço recorrente 1").inputValue(),
-      "60.00",
+      "61.25",
     );
     await page.getByLabel("Modelo").selectOption("padrao");
     assert.equal(
       await page.getByLabel("Valor mensal do serviço recorrente 1").inputValue(),
-      "90.01",
+      "61.25",
     );
-    await page.getByLabel("Modelo").selectOption("detalhada");
+    await page.getByLabel("Modelo").selectOption({ label: "Preço direto" });
     assert.equal(
       await page.getByLabel("Valor mensal do serviço recorrente 1").inputValue(),
-      "60.00",
+      "61.25",
+    );
+    await page.getByLabel("Percentual do serviço recorrente 1").fill("5");
+    assert.equal(
+      await page.getByLabel("Valor mensal do serviço recorrente 1").inputValue(),
+      "61.25",
+    );
+    await page.getByLabel("Modelo").selectOption("padrao");
+    assert.equal(
+      await page.getByLabel("Valor mensal do serviço recorrente 1").inputValue(),
+      "61.25",
+    );
+    await page.getByLabel("Modelo").selectOption({ label: "Preço direto" });
+    assert.equal(
+      await page.getByLabel("Valor mensal do serviço recorrente 1").inputValue(),
+      "61.25",
     );
     await page.getByRole("button", { name: "Prévia", exact: true }).click();
-    await page.getByText("ORÇAMENTO DETALHADO — SERVIÇOS CONTÁBEIS", { exact: true }).waitFor();
+    await page.getByText("PROPOSTA DE PREÇO DIRETO — SERVIÇOS CONTÁBEIS", { exact: true }).waitFor();
     await page.getByLabel("Serviços recorrentes")
       .getByRole("columnheader", { name: "Valor unitário" })
       .waitFor();
-    await page.getByText("Total mensal: R$ 60,00", { exact: true }).waitFor();
+    await page.getByText("Total mensal: R$ 61,25", { exact: true }).waitFor();
     await page.getByText("Total com desconto: R$ 135,00", { exact: true }).waitFor();
     await page.getByText("Desconto: 10 %", { exact: true }).waitFor();
     await page.getByText("Validade: 10 dias a partir da emissão.", { exact: true }).waitFor();
@@ -282,13 +297,46 @@ async function run() {
     await page.getByRole("button", { name: "Imprimir / Salvar em PDF", exact: true }).click();
     await page.waitForFunction(() => window.__printCalls === 1);
     await page.getByRole("button", { name: "Editar valores", exact: true }).click();
-    await page.getByLabel("Modelo").selectOption("informativa");
-    await page.getByLabel("Rótulo informativo 1").fill("Prazo de implantação");
-    await page.getByLabel("Informação complementar 1").fill("Até 10 dias úteis");
+    await page.getByLabel("Modelo").selectOption({ label: "Campos livres" });
+    await page.getByLabel("Rótulo do campo livre 1", { exact: true }).fill("Prazo de implantação");
+    await page.getByLabel("Campo livre 1", { exact: true }).fill("Até 10 dias úteis");
     await page.getByRole("button", { name: "Prévia", exact: true }).click();
-    await page.getByText("PROPOSTA DE SERVIÇOS CONTÁBEIS", { exact: true }).waitFor();
+    await page.getByText("PROPOSTA COM CAMPOS LIVRES — SERVIÇOS CONTÁBEIS", { exact: true }).waitFor();
+    await page.getByLabel("Campos livres").waitFor();
     await page.getByText("Prazo de implantação", { exact: true }).waitFor();
     await page.getByText("Até 10 dias úteis", { exact: true }).waitFor();
+    await page.screenshot({ path: `${evidenceDir}/free-fields-preview.png`, fullPage: true });
+    await page.emulateMedia({ media: "print" });
+    const freeFieldsPrintState = await page.evaluate(() => ({
+      documentVisibility: getComputedStyle(
+        document.querySelector(".commercial-proposal-print"),
+      ).visibility,
+      freeFields: document.querySelector(".commercial-proposal-print [aria-label=\"Campos livres\"]")
+        ?.textContent?.includes("Até 10 dias úteis") ?? false,
+    }));
+    assert.deepEqual(freeFieldsPrintState, { documentVisibility: "visible", freeFields: true });
+    await page.screenshot({ path: `${evidenceDir}/free-fields-print.png`, fullPage: true });
+    await page.pdf({
+      path: `${evidenceDir}/free-fields-proposal.pdf`,
+      format: "A4",
+      printBackground: true,
+    });
+    await page.emulateMedia({ media: "screen" });
+    await page.evaluate(() => {
+      window.__printCalls = 0;
+      window.print = () => { window.__printCalls += 1; };
+    });
+    await page.getByRole("button", { name: "Imprimir / Salvar em PDF", exact: true }).click();
+    await page.waitForFunction(() => window.__printCalls === 1);
+    await page.getByRole("button", { name: "Editar valores", exact: true }).click();
+    assert.equal(
+      await page.getByLabel("Rótulo do campo livre 1", { exact: true }).inputValue(),
+      "Prazo de implantação",
+    );
+    assert.equal(
+      await page.getByLabel("Campo livre 1", { exact: true }).inputValue(),
+      "Até 10 dias úteis",
+    );
     await page.getByRole("button", { name: "Voltar ao Comercial" }).click();
     await page.getByRole("button", { name: "Kanban", exact: true }).click();
     await page.getByRole("link", { name: "Preparar proposta", exact: true }).waitFor();
