@@ -798,6 +798,7 @@ async function run() {
       { field: "status", operator: "in", value: ["New", "In_Progress"] },
     ];
     assert.deepEqual(definitions.at(-1).areas[0].filters, expectedRhFilters);
+    await screenshotRegion("06-rh-urgent-pending", rhPanel);
     await rhPanel.getByRole("button", { name: "Visualizar prévia" }).click();
     await expect(
       rhPanel.getByText("Prévia pronta. Cada área aparece em um bloco independente."),
