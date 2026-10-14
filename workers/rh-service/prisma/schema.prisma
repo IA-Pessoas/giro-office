@@ -49,6 +49,7 @@ model User {
   rhNotifications          RhNotification[]
   rhRequestReads           RhRequestRead[]
   rhMessageReads           RhMessageRead[]
+  rhVacationPeriods        RhVacationPeriod[]
   scores                   ScoreQuarter[]
   scoresEvaluaion          ScoreEvaluation[]
   timeBankRealeasesAdded   TimeBankReleases[] @relation("add")
@@ -362,6 +363,41 @@ model TimeClockRequest {
   user             User      @relation("user", fields: [user_id], references: [id])
 
   @@map("rh.timeClockRequest")
+}
+
+model RhVacationPeriod {
+  id                String            @id @default(uuid())
+  organization_id   String
+  employee_id       String
+  period_start      DateTime?         @db.Date
+  period_end        DateTime?         @db.Date
+  acquisition_start DateTime?         @db.Date
+  acquisition_end   DateTime?         @db.Date
+  legacy_period_id  String?
+  created_at        DateTime          @default(now())
+  employee          User              @relation(fields: [employee_id], references: [id], onDelete: Restrict)
+  usages            RhVacationUsage[]
+
+  @@unique([organization_id, legacy_period_id], map: "uq_rh_vacation_period_org_legacy_id")
+  @@unique([id, organization_id], map: "uq_rh_vacation_period_id_org")
+  @@index([organization_id, employee_id, acquisition_start], map: "idx_rh_vacation_period_org_employee_acquisition")
+  @@map("rh.vacation_periods")
+}
+
+model RhVacationUsage {
+  id              String           @id @default(uuid())
+  organization_id String
+  period_id       String
+  start_date      DateTime?        @db.Date
+  end_date        DateTime?        @db.Date
+  observation     String?
+  legacy_usage_id String?
+  created_at      DateTime         @default(now())
+  period          RhVacationPeriod @relation(fields: [period_id, organization_id], references: [id, organization_id], onDelete: Cascade)
+
+  @@unique([organization_id, legacy_usage_id], map: "uq_rh_vacation_usage_org_legacy_id")
+  @@index([organization_id, period_id, start_date], map: "idx_rh_vacation_usage_org_period_start")
+  @@map("rh.vacation_usages")
 }
 
 model TimeSheets {

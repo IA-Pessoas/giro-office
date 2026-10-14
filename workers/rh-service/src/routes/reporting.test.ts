@@ -69,6 +69,16 @@ function fakeDb() {
     holidays: {
       findMany: vi.fn(async () => [{ name: "Natal", date: new Date("2026-12-25T00:00:00Z") }]),
     },
+    rhVacationPeriod: {
+      findMany: vi.fn(async () => [
+        {
+          id: "vacation-period-1",
+          period_start: new Date("2024-01-01T00:00:00Z"),
+          employee: { name: "Ana Souza" },
+          usages: [],
+        },
+      ]),
+    },
     reportGrantUse: {
       deleteMany: vi.fn(async () => ({ count: 0 })),
       create: vi.fn(async ({ data }: { data: { grant_hash: string } }) => {
@@ -86,6 +96,11 @@ function createApp(workerEnv = env()) {
 }
 
 const holidaysBody = { source: "rh.holidays", fields: ["name", "date"], limit: 5 };
+const vacationBody = {
+  source: "rh.vacationHistory",
+  fields: ["employee_name", "period_start"],
+  limit: 5,
+};
 
 function extract(app: ReturnType<typeof createApp>["app"], body: unknown, headers: HeadersInit) {
   return app.request("https://rh.test/internal/reporting/extract", {
@@ -114,7 +129,30 @@ describe("rh Worker /internal/reporting", () => {
       "rh.employees",
       "rh.birthdays",
       "rh.holidays",
+      "rh.vacationHistory",
     ]);
+  });
+
+  it("extrai histórico de férias pela fonte publicada e mantém escopo da organização", async () => {
+    const { app, db } = createApp();
+    const response = await extract(app, vacationBody, grantHeaders(signedGrant(vacationBody)));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true,
+      data: {
+        rows: [{ employee_name: "Ana Souza", period_start: "2024-01-01T00:00:00.000Z" }],
+        reachedLimit: false,
+      },
+    });
+    expect(db.rhVacationPeriod.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: ORGANIZATION_ID,
+          employee: { organization_id: ORGANIZATION_ID },
+        },
+      }),
+    );
   });
 
   it("extrai feriados só da organização assinada e consome o grant uma vez", async () => {
