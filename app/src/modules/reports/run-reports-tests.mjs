@@ -35,6 +35,7 @@ const { buildReportComposition, buildReportCompositionV3 } = await import("./uti
 const { getPessoalReportPresets } = await import("./utils/pessoalReportPresets.ts");
 const { getTaskDepartmentReportPreset } = await import("./utils/taskDepartmentReportPreset.ts");
 const { getRhUrgentPendingReportPreset } = await import("./utils/rhUrgentPendingReportPreset.ts");
+const { getRhVacationHistoryReportPreset } = await import("./utils/rhVacationHistoryReportPreset.ts");
 const { RH_PENDING_REQUEST_STATUSES } = await import("@workspace/shared");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
 const { getReportAuthorLabel, getReportForbiddenMessage, isReportCsrfError } = await import(
@@ -437,8 +438,45 @@ runTest("opens the RH urgent pending preset from the RH portal", () => {
   assert.match(rhShellSource, /router\.push\("\/relatorios\?preset=rh-urgent-pending"\)/);
   assert.match(rhShellSource, /canManageRhRequests \? \([\s\S]*Relatório de urgentes pendentes/);
   assert.match(reportsPageSource, /initialPresetId=\{typeof router\.query\.preset === "string"/);
-  assert.match(reportsCreateSource, /initialPresetId !== "rh-urgent-pending"/);
+  assert.match(reportsCreateSource, /\["rh-urgent-pending", "rh-vacation-history"\]/);
   assert.match(reportsCreateSource, /getRhUrgentPendingReportPreset\(catalog\.data\.items\)/);
+});
+
+runTest("offers a complete RH vacation history preset with employee filtering", () => {
+  const source = {
+    key: "rh.vacationHistory",
+    label: "Histórico de férias por colaborador",
+    module: "rh",
+    fields: [
+      ["employee_name", "Colaborador", "string"],
+      ["acquisition_start", "Início do período aquisitivo", "date"],
+      ["acquisition_end", "Fim do período aquisitivo", "date"],
+      ["period_start", "Período inicial", "date"],
+      ["period_end", "Período final", "date"],
+      ["uses", "Usos de férias", "string"],
+    ].map(([key, label, type]) => ({
+      key,
+      label,
+      type,
+      selectable: true,
+      filterable: key === "employee_name",
+      operators: key === "employee_name" ? ["contains"] : [],
+    })),
+  };
+  const preset = getRhVacationHistoryReportPreset([source]);
+  assert.equal(preset?.id, "rh-vacation-history");
+  assert.deepEqual(preset?.areas[0]?.fields, [
+    "employee_name",
+    "acquisition_start",
+    "acquisition_end",
+    "period_start",
+    "period_end",
+    "uses",
+  ]);
+  assert.equal(getRhVacationHistoryReportPreset([]), null);
+  assert.equal(getRhVacationHistoryReportPreset([{ ...source, fields: [] }]), null);
+  assert.match(reportsCreateSource, /getRhVacationHistoryReportPreset\(catalog\.data\.items\)/);
+  assert.match(rhShellSource, /preset=rh-vacation-history/);
 });
 
 runTest("unwraps the shared success envelope", () => {

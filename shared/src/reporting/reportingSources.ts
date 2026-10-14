@@ -27,6 +27,7 @@ import { rhAttendanceReportingCatalog } from "./rhAttendanceReportingCatalog.js"
 import { rhEmployeeReportingCatalog } from "./rhEmployeeReportingCatalog.js";
 import { rhHolidayReportingCatalog } from "./rhHolidayReportingCatalog.js";
 import { rhRequestReportingCatalog } from "./rhRequestReportingCatalog.js";
+import { rhVacationReportingCatalog } from "./rhVacationReportingCatalog.js";
 import { taskReportingCatalog } from "./taskReportingCatalog.js";
 import { tiExtensionsReportingCatalog } from "./tiExtensionsReportingCatalog.js";
 import { tiInventoryReportingCatalog } from "./tiInventoryReportingCatalog.js";
@@ -61,6 +62,7 @@ export const reportingSources = [
   ...rhEmployeeReportingCatalog.sources,
   ...rhHolidayReportingCatalog.sources,
   ...rhRequestReportingCatalog.sources,
+  ...rhVacationReportingCatalog.sources,
   ...taskReportingCatalog.sources,
   ...tiExtensionsReportingCatalog.sources,
   ...tiInventoryReportingCatalog.sources,

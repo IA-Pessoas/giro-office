@@ -27,6 +27,7 @@ import { RhAttendanceAdapter } from "./integrations/rhAttendanceAdapter.js";
 import { RhEmployeesAdapter } from "./integrations/rhEmployeesAdapter.js";
 import { RhHolidayAdapter } from "./integrations/rhHolidayAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
+import { RhVacationAdapter } from "./integrations/rhVacationAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { TiExtensionsAdapter } from "./integrations/tiExtensionsAdapter.js";
 import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
@@ -61,6 +62,7 @@ export function createEnvSourceAdapters(env: ReportsServiceEnv): ReportSourceAda
     new RhAttendanceAdapter(env),
     new RhEmployeesAdapter(env),
     new RhHolidayAdapter(env),
+    new RhVacationAdapter(env),
     new TiExtensionsAdapter(env),
     new TiInventoryAdapter(env),
     new TiRequestsAdapter(env),

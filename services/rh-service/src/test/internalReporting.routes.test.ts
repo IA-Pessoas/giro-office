@@ -143,6 +143,9 @@ describe("rh internal reporting routes", () => {
     const birthdaySource = response.body.data.sources.find(
       (source: { key: string }) => source.key === "rh.birthdays",
     );
+    const vacationSource = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "rh.vacationHistory",
+    );
     expect(requestSource.keys.map((field: { key: string }) => field.key)).toEqual([
       "requester_user_id",
       "assigned_to_user_id",
@@ -186,6 +189,22 @@ describe("rh internal reporting routes", () => {
       "birth_month",
     ]);
     expect(birthdaySource).toMatchObject({ key: "rh.birthdays", minimum_permission: 3, keys: [] });
+    expect(vacationSource).toMatchObject({
+      key: "rh.vacationHistory",
+      minimum_permission: 3,
+      keys: [],
+    });
+    expect(vacationSource.fields.map((field: { key: string }) => field.key)).toEqual([
+      "employee_name",
+      "period_start",
+      "period_end",
+      "acquisition_start",
+      "acquisition_end",
+      "uses",
+    ]);
+    expect(vacationSource.fields.map((field: { key: string }) => field.key)).not.toContain(
+      "attachment",
+    );
     expect(birthdaySource.fields.map((field: { key: string }) => field.key)).toEqual([
       "name",
       "department",

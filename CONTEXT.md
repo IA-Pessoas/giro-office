@@ -94,3 +94,11 @@ _Avoid_: média de progresso
 **Ata do colaborador**:
 Registro interno do RH ligado ao perfil de um colaborador, com data, pauta, participantes e relato. Pessoas do RH consultam e alteram atas dentro do próprio escopo; cada alteração preserva autoria e versão anterior.
 _Avoid_: ata comercial
+
+**Período aquisitivo de férias**:
+Intervalo de trabalho que gera o direito a férias de um colaborador, associado ao período de concessão registrado no legado.
+_Avoid_: uso de férias.
+
+**Uso de férias**:
+Intervalo em que as férias foram usufruídas, associado a um período aquisitivo e ao colaborador da mesma organização.
+_Avoid_: período aquisitivo.

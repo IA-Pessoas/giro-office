@@ -12,6 +12,7 @@ import { getSelectableReportFields } from "../utils/reportBuilder";
 import { getPessoalReportPresets } from "../utils/pessoalReportPresets";
 import { getTaskDepartmentReportPreset } from "../utils/taskDepartmentReportPreset";
 import { getRhUrgentPendingReportPreset } from "../utils/rhUrgentPendingReportPreset";
+import { getRhVacationHistoryReportPreset } from "../utils/rhVacationHistoryReportPreset";
 import { ReportFieldsStep } from "./ReportFieldsStep";
 import { ReportCriteriaStep } from "./ReportCriteriaStep";
 import { buildReportComposition, buildReportCompositionV3, operatorLabels, summaryLabels } from "../utils/reportCriteria";
@@ -171,10 +172,16 @@ export function ReportsCreatePanel({
   const rhUrgentPendingPreset = builder.areas.every((area) => area.source === "rh.requests")
     ? getRhUrgentPendingReportPreset(sources)
     : null;
+  const rhVacationHistoryPreset = builder.areas.every(
+    (area) => area.source === "rh.vacationHistory",
+  )
+    ? getRhVacationHistoryReportPreset(sources)
+    : null;
   const presets = [
     ...pessoalPresets,
     ...(taskDepartmentPreset ? [taskDepartmentPreset] : []),
     ...(rhUrgentPendingPreset ? [rhUrgentPendingPreset] : []),
+    ...(rhVacationHistoryPreset ? [rhVacationHistoryPreset] : []),
   ];
   const selected = builder.areas.map((area) => ({
     ...area,
@@ -246,13 +253,16 @@ export function ReportsCreatePanel({
   useEffect(() => {
     if (
       initialPresetApplied.current ||
-      initialPresetId !== "rh-urgent-pending" ||
+      !["rh-urgent-pending", "rh-vacation-history"].includes(initialPresetId ?? "") ||
       !catalog.data
     ) {
       return;
     }
     initialPresetApplied.current = true;
-    const preset = getRhUrgentPendingReportPreset(catalog.data.items);
+    const preset =
+      initialPresetId === "rh-vacation-history"
+        ? getRhVacationHistoryReportPreset(catalog.data.items)
+        : getRhUrgentPendingReportPreset(catalog.data.items);
     if (!preset) return;
     applyPreset(preset.areas);
   }, [applyPreset, catalog.data, initialPresetId]);

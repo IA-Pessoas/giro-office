@@ -285,6 +285,30 @@ async function run() {
       return route.fulfill({ status: 204, body: "" });
     }
     if (path === "/reports/jobs/reports-fixture-job/snapshot" && route.request().method() === "GET") {
+      const generatedSource = generatedDefinitions.at(-1)?.areas?.[0]?.source;
+      if (generatedSource === "rh.vacationHistory") {
+        const selectedFields = generatedDefinitions.at(-1).areas[0].fields;
+        return route.fulfill({
+          json: {
+            success: true,
+            data: {
+              snapshot: { id: "reports-fixture-snapshot", created_at: "2026-09-09T12:00:00.000Z" },
+              rows: [],
+              nextCursor: null,
+              blocks: [
+                {
+                  source: generatedSource,
+                  label: "Histórico de férias por colaborador",
+                  columns: selectedFields.map((key) => ({ key, label: key })),
+                  rowCount: 0,
+                  rows: [],
+                  nextCursor: null,
+                },
+              ],
+            },
+          },
+        });
+      }
       return route.fulfill({
         json: {
           success: true,
@@ -773,6 +797,19 @@ async function run() {
         field("created_at", "Data de criação"),
       ],
     });
+    items.push({
+      key: "rh.vacationHistory",
+      label: "Histórico de férias por colaborador",
+      module: "rh",
+      fields: [
+        { ...field("employee_name", "Colaborador"), type: "string", selectable: true, filterable: true, operators: ["eq", "contains"] },
+        { ...field("acquisition_start", "Início do período aquisitivo"), type: "date", selectable: true },
+        { ...field("acquisition_end", "Fim do período aquisitivo"), type: "date", selectable: true },
+        { ...field("period_start", "Período inicial"), type: "date", selectable: true },
+        { ...field("period_end", "Período final"), type: "date", selectable: true },
+        { ...field("uses", "Usos de férias"), type: "string", selectable: true },
+      ],
+    });
     await page.goto("/relatorios?preset=rh-urgent-pending", { waitUntil: "domcontentloaded" });
     const rhPanel = page.getByRole("tabpanel");
     await expect(rhPanel.getByRole("button", { name: "2. Escolher campos" })).toHaveAttribute(
@@ -813,6 +850,46 @@ async function run() {
     console.log(
       "PASS deep link RH: autorização, preset urgente/pendente, prévia e geração usam os filtros corretos",
     );
+    await page.goto("/relatorios?preset=rh-vacation-history", { waitUntil: "domcontentloaded" });
+    const vacationPanel = page.getByRole("tabpanel");
+    await expect(vacationPanel.getByRole("button", { name: "2. Escolher campos" })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+    await expect(
+      vacationPanel.getByRole("group", { name: "Campos de Histórico de férias por colaborador" }).getByRole(
+        "checkbox",
+        { name: "Colaborador", exact: true },
+      ),
+    ).toBeChecked();
+    await vacationPanel.getByRole("button", { name: "3. Definir critérios" }).click();
+    const vacationCriteria = vacationPanel.getByRole("group", {
+      name: "Histórico de férias por colaborador",
+      exact: true,
+    });
+    await vacationCriteria.getByRole("button", { name: "Adicionar critério" }).click();
+    await expect(vacationCriteria.getByLabel("Campo do critério 1")).toHaveValue("employee_name");
+    await vacationCriteria.getByLabel("Valor do critério 1").fill("Ana Souza");
+    await vacationPanel.getByRole("button", { name: "4. Revisar relatório" }).click();
+    await vacationPanel.getByRole("button", { name: "Gerar relatório" }).click();
+    await expect(vacationPanel.getByRole("heading", { name: "Relatório pronto" })).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(
+      vacationPanel.getByText(
+        "Nenhum histórico de férias estruturado foi importado. A consulta será preenchida quando o export histórico estiver disponível; uploads pessoais não são usados.",
+      ),
+    ).toBeVisible();
+    assert.deepEqual(generatedDefinitions.at(-1).areas[0].filters, [
+      { field: "employee_name", operator: "eq", value: "Ana Souza" },
+    ]);
+    const pdfDownload = page.waitForEvent("download");
+    await vacationPanel.getByRole("button", { name: "Baixar resultado em PDF" }).click();
+    await expect(page.getByText("PDF pronto para download.", { exact: true })).toBeVisible();
+    await pdfDownload;
+    assert.equal(exportRequests.at(-1), "pdf");
+    await screenshotRegion("07-rh-vacation-history-empty", vacationPanel);
+    console.log("PASS histórico de férias: preset, filtro por colaborador, estado vazio e PDF");
     const unexpectedConsoleErrors = consoleErrors.filter(
       (message) =>
         !message.includes("403 (Forbidden)") && !message.includes("422 (Unprocessable Entity)"),
