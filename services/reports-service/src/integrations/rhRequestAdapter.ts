@@ -3,8 +3,8 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
   MAX_REPORTING_QUERY_LIMIT,
-  RH_MANAGEMENT_PERMISSION,
   REQUEST_ID_HEADER,
+  RH_MANAGEMENT_PERMISSION,
   rhRequestReportingCatalog,
   ServiceError,
 } from "@workspace/shared";

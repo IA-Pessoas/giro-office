@@ -1,5 +1,5 @@
-import { reportingAggregations } from "./reportingCapabilities.js";
 import { RH_MANAGEMENT_PERMISSION } from "../rh/permissions.js";
+import { reportingAggregations } from "./reportingCapabilities.js";
 
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const dateOperators = ["eq", "neq", "gt", "gte", "lt", "lte", "between"] as const;

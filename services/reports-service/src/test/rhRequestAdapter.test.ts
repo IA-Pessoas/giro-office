@@ -37,10 +37,12 @@ describe("RhRequestAdapter", () => {
       catalog.getAuthorizedCatalog({ organization_id: "org-1", modules: { rh: 1 } }).sources,
     ).toEqual([]);
     expect(
-      catalog.getAuthorizedCatalog({
-        organization_id: "org-1",
-        modules: { rh: RH_MANAGEMENT_PERMISSION },
-      }).sources.map((source) => source.key),
+      catalog
+        .getAuthorizedCatalog({
+          organization_id: "org-1",
+          modules: { rh: RH_MANAGEMENT_PERMISSION },
+        })
+        .sources.map((source) => source.key),
     ).toEqual(["rh.requests"]);
   });
 
