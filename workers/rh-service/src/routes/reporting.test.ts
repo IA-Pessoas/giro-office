@@ -111,6 +111,8 @@ describe("rh Worker /internal/reporting", () => {
     expect(body.data.sources.map((source) => source.key)).toEqual([
       "rh.requests",
       "rh.attendance",
+      "rh.employees",
+      "rh.birthdays",
       "rh.holidays",
     ]);
   });

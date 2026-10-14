@@ -1,9 +1,9 @@
-import { ServiceError } from "@workspace/shared";
+import { RH_MANAGEMENT_PERMISSION, ServiceError } from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 export const RH_SELF_SERVICE_PERMISSION = 1;
 export const RH_WORKFLOW_MESSAGE_PERMISSION = 2;
-export const RH_MANAGEMENT_PERMISSION = 3;
+export { RH_MANAGEMENT_PERMISSION };
 
 export function getRhPermissionLevel(request: Request): number {
   return typeof request.rh_permission === "number" ? request.rh_permission : 0;

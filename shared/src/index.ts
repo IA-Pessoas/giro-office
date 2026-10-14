@@ -8,6 +8,7 @@ export * from "./http/index.js";
 export * from "./logger/index.js";
 export * from "./regularize/guidance.js";
 export * from "./reporting/index.js";
+export * from "./rh/permissions.js";
 export * from "./routes/services.js";
 export * from "./schemas/index.js";
 export * from "./security/index.js";

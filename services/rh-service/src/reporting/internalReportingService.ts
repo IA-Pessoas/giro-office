@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import {
   executeReportingQuery,
+  getRhEmployeeReportingFields,
   MAX_REPORTING_QUERY_BYTES,
   MAX_REPORTING_QUERY_ROWS,
   REPORTING_QUERY_BYTE_LIMIT_CODE,
@@ -9,6 +10,7 @@ import {
   REPORTING_QUERY_ROW_LIMIT_CODE,
   REPORTING_QUERY_ROW_LIMIT_MESSAGE,
   type ReportingQuery,
+  type RhEmployeeReportingSource,
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
@@ -28,6 +30,7 @@ import {
 type RhReportingSource =
   | RhRequestReportingSource
   | RhAttendanceReportingSource
+  | RhEmployeeReportingSource
   | RhHolidayReportingSource;
 
 type ReportingDelegate = {
@@ -48,6 +51,16 @@ type ReportGrantUseDelegate = {
 
 type AttendanceReportingPrisma = {
   $transaction?: unknown;
+  user?: {
+    findMany(input: {
+      where: { organization_id: string; status?: string; birth_date?: { not: null } };
+      select: typeof employeeReportingSelect;
+      take: number;
+      cursor?: { id: string };
+      skip?: number;
+      orderBy?: { id: "asc" };
+    }): Promise<readonly Record<string, unknown>[]>;
+  };
   rhRequest?: ReportingDelegate;
   holidays?: ReportingDelegate;
   point?: ReportingDelegate;
@@ -93,6 +106,13 @@ const reportingSelect: ReportingSelect = {
 };
 
 const holidayReportingSelect = { name: true, date: true } as const;
+const employeeReportingSelect = {
+  id: true,
+  name: true,
+  status: true,
+  birth_date: true,
+  department: { select: { name: true } },
+} as const;
 const attendanceSelects = {
   point: {
     clock_in: true,
@@ -297,7 +317,9 @@ export class InternalReportingService {
         ? getRhHolidayReportingFields(input.source)
         : input.source === "rh.requests"
           ? getRhRequestReportingFields(input.source)
-          : getRhAttendanceReportingFields(input.source);
+          : input.source === "rh.attendance"
+            ? getRhAttendanceReportingFields(input.source)
+            : getRhEmployeeReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
@@ -319,6 +341,9 @@ export class InternalReportingService {
   ): Promise<ReportingPage> {
     if (source === "rh.attendance") {
       return this.loadAttendancePage(organizationId, limit, cursor);
+    }
+    if (source === "rh.employees" || source === "rh.birthdays") {
+      return this.loadEmployeePage(source, organizationId, limit, cursor);
     }
 
     const delegate = source === "rh.holidays" ? this.prisma.holidays : this.prisma.rhRequest;
@@ -347,6 +372,50 @@ export class InternalReportingService {
       rows: visibleRows.map(({ id: _id, ...row }) => row),
       reachedLimit,
       ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
+    };
+  }
+
+  private async loadEmployeePage(
+    source: RhEmployeeReportingSource,
+    organizationId: string,
+    limit: number,
+    cursor?: string,
+  ): Promise<ReportingPage> {
+    const delegate = this.prisma.user;
+    if (!delegate) throw new ServiceError(503, "Fonte de colaboradores indisponível.");
+
+    const rows = await delegate.findMany({
+      where: {
+        organization_id: organizationId,
+        ...(source === "rh.birthdays" ? { status: "active", birth_date: { not: null } } : {}),
+      },
+      select: employeeReportingSelect,
+      ...cursorOptions(cursor),
+      take: limit + 1,
+    });
+    const visibleRows = rows.slice(0, limit);
+    const lastId = visibleRows[visibleRows.length - 1]?.id;
+    const reachedLimit = rows.length > limit;
+    return {
+      rows: visibleRows.map((row) => this.mapEmployeeRow(row)),
+      reachedLimit,
+      ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
+    };
+  }
+
+  private mapEmployeeRow(row: Record<string, unknown>): Record<string, unknown> {
+    const department = row.department;
+    const departmentName =
+      department && typeof department === "object" && "name" in department
+        ? (department as { name: unknown }).name
+        : null;
+    const birthDate = row.birth_date instanceof Date ? row.birth_date : undefined;
+    return {
+      name: row.name,
+      status: row.status,
+      department: departmentName,
+      birth_day: birthDate?.getUTCDate() ?? null,
+      birth_month: birthDate ? birthDate.getUTCMonth() + 1 : null,
     };
   }
 

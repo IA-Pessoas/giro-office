@@ -1,0 +1,1 @@
+export const RH_MANAGEMENT_PERMISSION = 3;

@@ -24,6 +24,7 @@ import { RegularizeMunicipalTaxesAdapter } from "./integrations/regularizeMunici
 import { RegularizePortfolioAdapter } from "./integrations/regularizePortfolioAdapter.js";
 import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
 import { RhAttendanceAdapter } from "./integrations/rhAttendanceAdapter.js";
+import { RhEmployeesAdapter } from "./integrations/rhEmployeesAdapter.js";
 import { RhHolidayAdapter } from "./integrations/rhHolidayAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
@@ -58,6 +59,7 @@ export function createEnvSourceAdapters(env: ReportsServiceEnv): ReportSourceAda
     new RegularizeProcessAdapter(env),
     new RhRequestAdapter(env),
     new RhAttendanceAdapter(env),
+    new RhEmployeesAdapter(env),
     new RhHolidayAdapter(env),
     new TiExtensionsAdapter(env),
     new TiInventoryAdapter(env),

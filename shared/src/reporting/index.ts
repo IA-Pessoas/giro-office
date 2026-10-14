@@ -27,6 +27,7 @@ export * from "./reportingQuery.js";
 export * from "./reportingQueryOpenApi.js";
 export { withReportingSnapshot } from "./reportingSnapshot.js";
 export * from "./rhAttendanceReportingCatalog.js";
+export * from "./rhEmployeeReportingCatalog.js";
 export * from "./rhHolidayReportingCatalog.js";
 export * from "./rhRequestReportingCatalog.js";
 export * from "./taskReportingCatalog.js";

@@ -2,6 +2,7 @@ import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspa
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { RhEnv } from "../config/env.js";
+import { RH_REPORTING_SOURCES } from "../reporting/rhReportingCatalog.js";
 
 const successJson = {
   content: {
@@ -34,7 +35,7 @@ const internalReportingExtractRequestBody = createObjectRequestBody({
   example: { source: "rh.holidays", fields: ["name", "date"], limit: 100 },
   required: ["source", "fields", "limit"],
   properties: {
-    source: { type: "string", enum: ["rh.requests", "rh.attendance", "rh.holidays"] },
+    source: { type: "string", enum: [...RH_REPORTING_SOURCES] },
     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
     limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
     query: reportingQueryOpenApiSchema,
