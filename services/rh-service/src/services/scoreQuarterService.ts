@@ -12,6 +12,7 @@ import { ScoreEvaluationService } from "./scoreEvaluationService.js";
 
 const PERMISSION_LEADER = 1;
 const PERMISSION_COLLABORATOR = 0;
+const LEGACY_SCORE_FORMULA_VERSION = "LegacyV1";
 
 type OrgPermission = { rh: number | null };
 
@@ -153,6 +154,7 @@ class ScoreQuarterService {
           data: {
             user_id: targetUserId,
             quarter,
+            formula_version: LEGACY_SCORE_FORMULA_VERSION,
             organization_id: organizationId,
             nitro: { create: { organization_id: organizationId } },
           },
