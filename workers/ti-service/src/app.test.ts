@@ -299,7 +299,7 @@ describe("ti Worker", () => {
 
   // #1936: histórico de alterações de TI, só para TI nível 3.
   it("routes the TI change history for TI admins only", async () => {
-    const changeHistory = { list: vi.fn(async () => ({ items: [], has_more: false })) };
+    const changeHistory = { list: vi.fn(async () => ({ items: [], hasMore: false })) };
     const app = createTiWorkerApp({ env: env(), services: { changeHistory } } as never);
     const get = (path: string, permission: string) =>
       app.request(`https://ti.test${path}`, { headers: headers(permission) });
@@ -327,7 +327,7 @@ describe("ti Worker", () => {
 
   // #1935: logs de acesso por usuário, só para TI nível 3.
   it("routes the user access logs for TI admins only", async () => {
-    const accessLogs = { list: vi.fn(async () => ({ items: [], has_more: false })) };
+    const accessLogs = { list: vi.fn(async () => ({ items: [], hasMore: false })) };
     const passwords = { list: vi.fn() };
     const app = createTiWorkerApp({ env: env(), services: { accessLogs, passwords } } as never);
     const get = (path: string, permission: string) =>

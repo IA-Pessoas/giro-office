@@ -2017,7 +2017,7 @@ await runTest("ti change history tab lists field changes with masked credentials
   );
   // Valor de credencial não aparece, mesmo que viesse na resposta.
   assert.match(source, /if \(item\.masked\) \{\s+return "Oculto";/);
-  assert.match(source, /disabled=\{!changeHistory\.has_more \|\| changeHistoryQuery\.isFetching\}/);
+  assert.match(source, /disabled=\{!changeHistory\.hasMore \|\| changeHistoryQuery\.isFetching\}/);
   // Não mistura estoque nem log de acesso: os tipos são só os de alteração de item.
   assert.match(source, /inventory: "Inventário"/);
   assert.doesNotMatch(source, /\bstock\b|Estoque|Acesso/);
@@ -2040,7 +2040,7 @@ await runTest("ti access logs tab lists logins and accesses per user for TI admi
     /headers=\{\["Tipo", "Referente", "Usuário", "Data", "Local\/origem"\]\}/,
   );
   // Paginação pelo servidor, do mais recente para o mais antigo.
-  assert.match(source, /disabled=\{!accessLogs\.has_more \|\| accessLogsQuery\.isFetching\}/);
+  assert.match(source, /disabled=\{!accessLogs\.hasMore \|\| accessLogsQuery\.isFetching\}/);
   assert.match(source, /Mais antigos/);
   // Origem ausente não é inventada.
   assert.match(source, /item\.origin \?\? "Não migrado"/);

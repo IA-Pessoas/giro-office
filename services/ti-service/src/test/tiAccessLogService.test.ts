@@ -55,7 +55,9 @@ describe("listTiAccessLogs", () => {
 
     expect(result).toEqual({
       user,
-      has_more: false,
+      page: 1,
+      page_size: 50,
+      hasMore: false,
       items: [
         {
           id: "l2",
@@ -96,7 +98,7 @@ describe("listTiAccessLogs", () => {
     const result = await listTiAccessLogs(db, context, userId, { page: 3, page_size: 2 });
 
     expect(result.items.map((item) => item.id)).toEqual(["a", "b"]);
-    expect(result.has_more).toBe(true);
+    expect(result.hasMore).toBe(true);
     expect(db.calls[1]?.values.slice(-2)).toEqual([3, 4]);
   });
 

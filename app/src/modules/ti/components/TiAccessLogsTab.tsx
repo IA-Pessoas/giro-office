@@ -128,7 +128,7 @@ export function TiAccessLogsTab() {
           <button
             type="button"
             className={tiSecondaryButtonClassName}
-            disabled={!accessLogs.has_more || accessLogsQuery.isFetching}
+            disabled={!accessLogs.hasMore || accessLogsQuery.isFetching}
             onClick={() => setPage((current) => current + 1)}
           >
             <span>Mais antigos</span>

@@ -82,7 +82,7 @@ describe("ti change history routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toMatchObject({
-      has_more: false,
+      hasMore: false,
       items: [
         {
           id: "h1",

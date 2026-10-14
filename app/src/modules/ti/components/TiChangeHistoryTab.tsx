@@ -133,7 +133,7 @@ export function TiChangeHistoryTab() {
           <button
             type="button"
             className={tiSecondaryButtonClassName}
-            disabled={!changeHistory.has_more || changeHistoryQuery.isFetching}
+            disabled={!changeHistory.hasMore || changeHistoryQuery.isFetching}
             onClick={() => setPage((current) => current + 1)}
           >
             <span>Mais antigas</span>
