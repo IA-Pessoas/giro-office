@@ -275,6 +275,7 @@ model ScoreQuarter {
   id              String            @id @default(uuid())
   user_id         String
   quarter         String
+  formula_version String            @default("LegacyV1")
   behavioral      Float             @default(0)
   technical       Float             @default(0)
   technology      Float             @default(0)
