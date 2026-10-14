@@ -49,6 +49,14 @@ function db() {
       findUnique: vi.fn(async () => null as unknown),
       update: vi.fn(async () => nitroRow),
     },
+    rhNitroHoursSubmission: {
+      aggregate: vi.fn(async () => ({ _sum: { hours: 0 } })),
+      create: vi.fn(async () => ({ id: "a1000000-0000-4000-8000-000000000001" })),
+      findMany: vi.fn(async () => []),
+      updateMany: vi.fn(async () => ({ count: 0 })),
+      findFirst: vi.fn(async () => null),
+      findFirstOrThrow: vi.fn(async () => ({})),
+    },
     $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(fake)),
   };
   return fake;
@@ -144,6 +152,7 @@ describe("/rh/score/evaluations", () => {
 describe("/rh/score/quarters", () => {
   it("generates a quarterly score in a transaction", async () => {
     const fake = db();
+    fake.rhNitroHoursSubmission.aggregate.mockResolvedValue({ _sum: { hours: 10 } } as never);
     const response = await call(testApp(fake), "POST", "/rh/score/quarters/generate", {
       body: { target_user_id: OTHER_USER_ID, quarter: "2026-Q3" },
     });
@@ -152,7 +161,12 @@ describe("/rh/score/quarters", () => {
     expect(fake.$transaction).toHaveBeenCalled();
     expect(fake.scoreQuarter.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ organization_id: TEST_ORGANIZATION_ID }),
+        data: expect.objectContaining({
+          organization_id: TEST_ORGANIZATION_ID,
+          nitro: {
+            create: { organization_id: TEST_ORGANIZATION_ID, total_hours: 10, hours_score: 1 },
+          },
+        }),
       }),
     );
   });
@@ -239,6 +253,49 @@ describe("/rh/score/quarters", () => {
       permission: 1,
     });
     expect(response.status).toBe(403);
+  });
+});
+
+describe("/rh/score/nitro/hours", () => {
+  it("soma apenas horas aceitas e ignora user_id forjado por usuário comum", async () => {
+    const fake = db();
+    fake.rhNitroHoursSubmission.aggregate.mockResolvedValue({ _sum: { hours: 10 } } as never);
+    const response = await call(
+      testApp(fake),
+      "GET",
+      `/rh/score/nitro/hours/summary?quarter=2026-Q3&user_id=${OTHER_USER_ID}`,
+      {
+        permission: 1,
+      },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { quarter: "2026-Q3", user_id: TEST_USER_ID, accepted_hours: 10, nitro_bonus: 1 },
+    });
+    expect(fake.rhNitroHoursSubmission.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: TEST_ORGANIZATION_ID,
+          user_id: TEST_USER_ID,
+          status: "Accepted",
+        }),
+      }),
+    );
+  });
+
+  it("exige permissão de gestão para decidir uma submissão", async () => {
+    const fake = db();
+    const response = await call(
+      testApp(fake),
+      "PATCH",
+      "/rh/score/nitro/hours/submissions/a1000000-0000-4000-8000-000000000001/decision",
+      {
+        permission: 1,
+        body: { status: "Accepted" },
+      },
+    );
+    expect(response.status).toBe(403);
+    expect(fake.rhNitroHoursSubmission.updateMany).not.toHaveBeenCalled();
   });
 });
 

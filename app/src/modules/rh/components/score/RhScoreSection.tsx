@@ -4,6 +4,7 @@ import { useRhPermissions } from "../../hooks/useRhPermissions";
 import { RhScoreHistoryPanel } from "./RhScoreHistoryPanel";
 import { RhScorePendingPanel } from "./RhScorePendingPanel";
 import { RhScoreQuestionsPanel } from "./RhScoreQuestionsPanel";
+import { RhNitroHoursPanel } from "./RhNitroHoursPanel";
 import { SCORE_TAB_META, getErrorMessage, type RhScoreTab } from "./rhScoreShared";
 
 export function RhScoreSection() {
@@ -35,8 +36,8 @@ export function RhScoreSection() {
   }, [canManageScore]);
 
   const availableTabs = canManageScore
-    ? (["questions", "pending", "history"] as RhScoreTab[])
-    : (["pending", "history"] as RhScoreTab[]);
+    ? (["questions", "pending", "history", "hours"] as RhScoreTab[])
+    : (["pending", "history", "hours"] as RhScoreTab[]);
 
   return (
     <div className="space-y-6">
@@ -86,6 +87,8 @@ export function RhScoreSection() {
       {activeTab === "pending" ? <RhScorePendingPanel /> : null}
 
       {activeTab === "history" ? <RhScoreHistoryPanel canManageScore={canManageScore} /> : null}
+
+      {activeTab === "hours" ? <RhNitroHoursPanel canManageScore={canManageScore} /> : null}
 
       {!canManageScore && activeTab === "questions" ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">

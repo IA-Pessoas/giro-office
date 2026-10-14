@@ -60,6 +60,7 @@ const rhEnvSchema = z
       .trim()
       .min(1, "RH_REQUEST_MESSAGE_BUCKET inválido.")
       .optional(),
+    rhNitroHoursBucket: z.string().trim().min(1, "RH_NITRO_HOURS_BUCKET inválido.").optional(),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -130,6 +131,7 @@ export function getRhEnv(): RhEnv {
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     rhPointAdjustmentBucket: process.env.RH_POINT_ADJUSTMENT_BUCKET,
     rhRequestMessageBucket: process.env.RH_REQUEST_MESSAGE_BUCKET,
+    rhNitroHoursBucket: process.env.RH_NITRO_HOURS_BUCKET,
     nodeEnv: process.env.NODE_ENV,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

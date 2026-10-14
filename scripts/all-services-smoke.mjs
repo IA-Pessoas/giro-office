@@ -166,6 +166,9 @@ const env = {
   marketingStockSmokeEnabled:
     process.env.MARKETING_STOCK_SMOKE_ENABLED === "true" ||
     process.env.MARKETING_STOCK_SMOKE_ENABLED === "1",
+  nitroHoursSmokeEnabled:
+    process.env.RH_NITRO_HOURS_SMOKE_ENABLED === "true" ||
+    process.env.RH_NITRO_HOURS_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -8575,6 +8578,58 @@ const handlers = {
     });
   },
 
+  async rhNitroHoursSubmit(op) {
+    const date = new Date();
+    const quarter = `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/rh/score/nitro/hours/submissions",
+      form: {
+        fields: { quarter, hours: 10 },
+        file: {
+          path: env.fixturePath,
+          fieldName: "certificate",
+          filename: "smoke-certificate.png",
+          contentType: "image/png",
+        },
+      },
+    });
+    state.rhNitroHoursSubmissionId = response.body?.data?.id ?? "";
+    state.rhNitroHoursQuarter = quarter;
+  },
+
+  async rhNitroHoursList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/score/nitro/hours/submissions",
+      query: { quarter: requireState("rhNitroHoursQuarter") },
+    });
+  },
+
+  async rhNitroHoursSummary(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/score/nitro/hours/summary",
+      query: { quarter: requireState("rhNitroHoursQuarter") },
+    });
+  },
+
+  async rhNitroHoursCertificate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/score/nitro/hours/submissions/${requireState("rhNitroHoursSubmissionId")}/certificate`,
+    });
+  },
+
+  async rhNitroHoursDecision(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      method: "PATCH",
+      path: `/rh/score/nitro/hours/submissions/${requireState("rhNitroHoursSubmissionId")}/decision`,
+      json: { status: "Accepted" },
+    });
+  },
+
   async auditInternalIngest(op) {
     const requestId = crypto.randomUUID();
     await httpRequest(op, {
@@ -9064,6 +9119,9 @@ function matchesFilter(op) {
 }
 
 function disabledConditionReason(condition) {
+  if (condition === "nitroHoursSmokeEnabled" && !env.nitroHoursSmokeEnabled) {
+    return "RH_NITRO_HOURS_SMOKE_ENABLED is false";
+  }
   if (condition === "marketingEventsSmokeEnabled" && !env.marketingEventsSmokeEnabled) {
     return "MARKETING_EVENTS_SMOKE_ENABLED is false";
   }

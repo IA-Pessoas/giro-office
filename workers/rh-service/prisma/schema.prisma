@@ -56,6 +56,8 @@ model User {
   timeClockRequestApproved TimeClockRequest[] @relation("approver")
   timeClockRequest         TimeClockRequest[] @relation("user")
   timeSheets               TimeSheets[]
+  rhNitroHoursSubmissions  RhNitroHoursSubmission[] @relation("RhNitroHoursSubmitter")
+  rhNitroHoursDecisions    RhNitroHoursSubmission[] @relation("RhNitroHoursDecider")
   department               Department         @relation(fields: [department_id], references: [id])
 
   @@unique([login], map: "users_login_key")
@@ -271,6 +273,28 @@ model ScoreNitro {
   @@map("rh.score_nitro")
 }
 
+model RhNitroHoursSubmission {
+  id                  String               @id @default(uuid())
+  organization_id     String
+  user_id             String
+  quarter             String
+  hours               Int
+  status              RhNitroHoursStatus   @default(Pending)
+  certificate_path    String
+  certificate_mime    String
+  decided_by_id       String?
+  decided_at          DateTime?
+  rejection_reason    String?
+  created_at          DateTime             @default(now())
+  updated_at          DateTime             @updatedAt
+  user                User                 @relation("RhNitroHoursSubmitter", fields: [user_id], references: [id], onDelete: Restrict)
+  decidedBy           User?                @relation("RhNitroHoursDecider", fields: [decided_by_id], references: [id], onDelete: SetNull)
+
+  @@index([organization_id, quarter, status], map: "rh.nitro_hours_organization_quarter_status_idx")
+  @@index([organization_id, user_id, quarter], map: "rh.nitro_hours_organization_user_quarter_idx")
+  @@map("rh.nitro_hours_submissions")
+}
+
 model ScoreQuarter {
   id              String            @id @default(uuid())
   user_id         String
@@ -395,6 +419,12 @@ enum ScoreQuestionType {
 enum ScoreEvaluationStatus {
   Pending
   Completed
+}
+
+enum RhNitroHoursStatus {
+  Pending
+  Accepted
+  Rejected
 }
 
 enum ScoreEvaluatorRole {

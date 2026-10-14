@@ -22,6 +22,7 @@ import employeeDossierRoutes from "./routes/employeeDossier.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createMessageRoutes } from "./routes/message.routes.js";
+import { createNitroHoursRoutes } from "./routes/nitroHours.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import operationalUserRoutes from "./routes/operationalUser.routes.js";
 import pointRoutes from "./routes/point.routes.js";
@@ -36,6 +37,10 @@ import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
 import timeBankReleaseRoutes from "./routes/timeBankRelease.routes.js";
 import { createTimeClockRequestRoutes } from "./routes/timeClockRequest.routes.js";
 import timeSheetRoutes from "./routes/timeSheet.routes.js";
+import {
+  createSupabaseNitroHoursCertificateStorage,
+  UnavailableNitroHoursCertificateStorage,
+} from "./services/nitroHoursStorage.js";
 import {
   createSupabaseRhPointAdjustmentStorage,
   UnavailableRhPointAdjustmentStorage,
@@ -80,6 +85,14 @@ export function createApp(
           env.rhRequestMessageBucket ?? "rh-request-messages",
         )
       : new UnavailableRhRequestMessageStorage();
+  const nitroHoursStorage =
+    env.supabaseUrl && env.supabaseServiceRoleKey
+      ? createSupabaseNitroHoursCertificateStorage(
+          env.supabaseUrl,
+          env.supabaseServiceRoleKey,
+          env.rhNitroHoursBucket ?? "rh-nitro-hours",
+        )
+      : new UnavailableNitroHoursCertificateStorage();
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -120,6 +133,10 @@ export function createApp(
   app.use("/rh/notifications", notificationRoutes);
   app.use("/rh/timesheets", timeSheetRoutes);
   app.use("/rh/score/nitro", scoreNitroRoutes);
+  app.use(
+    "/rh/score/nitro/hours",
+    createNitroHoursRoutes({ certificateStorage: nitroHoursStorage }),
+  );
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {
       spec: buildRhServiceOpenApiSpec(env),

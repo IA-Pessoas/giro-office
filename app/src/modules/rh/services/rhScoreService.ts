@@ -5,6 +5,8 @@ import type {
   CreateRhScoreQuarterPayload,
   DeleteRhScoreQuestionPayload,
   RhMutationMessage,
+  RhNitroHoursSubmission,
+  RhNitroHoursSummary,
   RhPendingScoreEvaluation,
   RhScoreNitro,
   RhScoreQuestion,
@@ -101,5 +103,37 @@ export const rhScoreService = {
     const response = await api.put(RH_ENDPOINTS.scoreNitroUpdate, payload);
 
     return unwrapRhEnvelope<RhScoreNitro>(response.data);
+  },
+
+  async listNitroHoursSubmissions(filters: { quarter?: string; user_id?: string } = {}): Promise<RhNitroHoursSubmission[]> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.nitroHoursSubmissions, { params: filters });
+    return unwrapRhEnvelope<RhNitroHoursSubmission[]>(response.data);
+  },
+
+  async getNitroHoursSummary(quarter: string, user_id?: string): Promise<RhNitroHoursSummary> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.nitroHoursSummary, { params: { quarter, user_id } });
+    return unwrapRhEnvelope<RhNitroHoursSummary>(response.data);
+  },
+
+  async submitNitroHours(payload: FormData): Promise<RhNitroHoursSubmission> {
+    const api = setupAPIClient();
+    const response = await api.post(RH_ENDPOINTS.nitroHoursSubmissions, payload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return unwrapRhEnvelope<RhNitroHoursSubmission>(response.data);
+  },
+
+  async decideNitroHours(id: string, payload: { status: "Accepted" | "Rejected"; rejection_reason?: string }): Promise<RhNitroHoursSubmission> {
+    const api = setupAPIClient();
+    const response = await api.patch(RH_ENDPOINTS.nitroHoursDecision(id), payload);
+    return unwrapRhEnvelope<RhNitroHoursSubmission>(response.data);
+  },
+
+  async getNitroHoursCertificateUrl(id: string): Promise<string> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.nitroHoursCertificate(id));
+    return unwrapRhEnvelope<{ url: string }>(response.data).url;
   },
 };
