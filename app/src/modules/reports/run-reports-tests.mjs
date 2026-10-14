@@ -34,6 +34,7 @@ const appPackage = JSON.parse(await readFile(new URL("../../../package.json", im
 const { buildReportComposition, buildReportCompositionV3 } = await import("./utils/reportCriteria.ts");
 const { getPessoalReportPresets } = await import("./utils/pessoalReportPresets.ts");
 const { getTaskDepartmentReportPreset } = await import("./utils/taskDepartmentReportPreset.ts");
+const { getRhUrgentPendingReportPreset } = await import("./utils/rhUrgentPendingReportPreset.ts");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
 const { getReportAuthorLabel, getReportForbiddenMessage, isReportCsrfError } = await import(
   "./components/reportUi.ts"
@@ -44,6 +45,10 @@ const reportsPageSource = await readFile(
 );
 const reportsCreateSource = await readFile(
   new URL("./components/ReportsCreatePanel.tsx", import.meta.url),
+  "utf8",
+);
+const rhShellSource = await readFile(
+  new URL("../../shared/components/newLayout/RH.tsx", import.meta.url),
   "utf8",
 );
 const reportsModelsSource = await readFile(
@@ -396,6 +401,42 @@ runTest("offers a task count by current department only for an authorized report
       capabilities: { groupable: true, aggregationFunctions: ["count"] },
     }],
   }])?.id, "integracao-tarefas-por-departamento");
+});
+
+runTest("offers an RH urgent pending preset using only authorized request fields", () => {
+  const source = {
+    key: "rh.requests",
+    label: "Solicitações de RH",
+    module: "rh",
+    fields: ["title", "category", "urgency", "status", "created_at"].map((key) => ({
+      key,
+      label: key,
+      type: key === "created_at" ? "date" : "string",
+      selectable: true,
+      filterable: ["urgency", "status"].includes(key),
+      operators: key === "status" ? ["in"] : ["eq"],
+    })),
+  };
+  const preset = getRhUrgentPendingReportPreset([source]);
+  assert.equal(preset?.id, "rh-urgent-pending");
+  assert.deepEqual(preset.areas[0].fields, ["title", "category", "urgency", "status", "created_at"]);
+  assert.deepEqual(preset.areas[0].filters, [
+    { field: "urgency", operator: "eq", value: "High" },
+    { field: "status", operator: "in", value: ["New", "In_Progress"] },
+  ]);
+  assert.deepEqual(buildReportComposition(preset.areas, [source]).areas[0].filters, [
+    { field: "urgency", operator: "eq", value: "High" },
+    { field: "status", operator: "in", value: ["New", "In_Progress"] },
+  ]);
+  assert.equal(getRhUrgentPendingReportPreset([]), null);
+  assert.equal(getRhUrgentPendingReportPreset([{ ...source, fields: [] }]), null);
+});
+
+runTest("opens the RH urgent pending preset from the RH portal", () => {
+  assert.match(rhShellSource, /router\.push\("\/relatorios\?preset=rh-urgent-pending"\)/);
+  assert.match(reportsPageSource, /initialPresetId=\{typeof router\.query\.preset === "string"/);
+  assert.match(reportsCreateSource, /initialPresetId !== "rh-urgent-pending"/);
+  assert.match(reportsCreateSource, /getRhUrgentPendingReportPreset\(catalog\.data\.items\)/);
 });
 
 runTest("unwraps the shared success envelope", () => {

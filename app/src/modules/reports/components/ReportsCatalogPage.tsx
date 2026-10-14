@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Archive, FileText, Layers3, ListChecks, Plus } from "lucide-react";
+import { useRouter } from "next/router";
 import { toast } from "@shared/services/toast";
 
 import { useModuleAccessMap } from "@modules/auth/hooks/useModuleAccess";
@@ -11,6 +12,7 @@ import type { ReportModel } from "../types/report.types";
 type ReportsTab = "create" | "models" | "history" | "library";
 
 export function ReportsCatalogPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ReportsTab>("create");
   const [openedModel, setOpenedModel] = useState<ReportModel | null>(null);
   const { accessMap, departmentModule, user } = useModuleAccessMap();
@@ -88,6 +90,7 @@ export function ReportsCatalogPage() {
         >
           <ReportsCreatePanel
             model={openedModel}
+            initialPresetId={typeof router.query.preset === "string" ? router.query.preset : undefined}
             onModelLoaded={() => setOpenedModel(null)}
           />
         </section>

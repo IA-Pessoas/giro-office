@@ -93,8 +93,16 @@ export function RH() {
           </p>
         </div>
 
-        {canManageRh ? (
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void router.push("/relatorios?preset=rh-urgent-pending")}
+            className="flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
+          >
+            <FileText className="h-4 w-4" />
+            <span>Relatório de urgentes pendentes</span>
+          </button>
+          {canManageRh ? (
             <button
               type="button"
               onClick={() => setIsHolidaysManagerOpen(true)}
@@ -103,8 +111,8 @@ export function RH() {
               <Calendar className="h-4 w-4" />
               <span>Gerenciar feriados</span>
             </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
