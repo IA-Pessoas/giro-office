@@ -9,6 +9,9 @@ const DEFAULT_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 export interface PhotoUploadOptions {
   maxSizeBytes?: number;
   allowedMimeTypes?: string[];
+  maxFields?: number;
+  maxFieldSizeBytes?: number;
+  maxParts?: number;
 }
 
 export interface MemoryUploadOptions extends PhotoUploadOptions {
@@ -64,7 +67,12 @@ export function createMemoryUploadMiddleware(
 
   const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: maxSizeBytes },
+    limits: {
+      fileSize: maxSizeBytes,
+      fields: options.maxFields,
+      fieldSize: options.maxFieldSizeBytes,
+      parts: options.maxParts,
+    },
     fileFilter(_req, file, cb) {
       if (!allowedMimeTypes.includes(file.mimetype)) {
         return cb(new ServiceError(400, options.mimeTypeErrorMessage));

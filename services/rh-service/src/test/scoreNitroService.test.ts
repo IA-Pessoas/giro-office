@@ -10,6 +10,7 @@ const { prismaMock } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    rhNitroHoursSubmission: { aggregate: vi.fn() },
   },
 }));
 
@@ -79,5 +80,38 @@ describe("ScoreNitroService", () => {
     ).rejects.toMatchObject({ statusCode: 409 });
 
     expect(prismaMock.scoreNitro.update).not.toHaveBeenCalled();
+  });
+
+  it("deriva o bônus manual de horas somente do total de certificados aceitos", async () => {
+    prismaMock.scoreNitro.findUnique.mockResolvedValue({ organization_id: "org-1" });
+    prismaMock.scoreQuarter.findUnique.mockResolvedValue({
+      id: "score-1",
+      organization_id: "org-1",
+      user_id: "user-1",
+      quarter: "2026-Q3",
+      formula_version: "LegacyV1",
+      evaluations: [],
+    });
+    prismaMock.rhNitroHoursSubmission.aggregate.mockResolvedValue({ _sum: { hours: 10 } });
+    prismaMock.scoreNitro.update.mockResolvedValue({ id: "nitro-1" });
+
+    await new ScoreNitroService().updateMetric("org-1", "rh-1", {
+      score_id: "score-1",
+      type: "hours",
+      value: 0,
+    });
+
+    expect(prismaMock.rhNitroHoursSubmission.aggregate).toHaveBeenCalledWith({
+      where: {
+        organization_id: "org-1",
+        user_id: "user-1",
+        quarter: "2026-Q3",
+        status: "Accepted",
+      },
+      _sum: { hours: true },
+    });
+    expect(prismaMock.scoreNitro.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { hours_score: 1, total_hours: 10 } }),
+    );
   });
 });

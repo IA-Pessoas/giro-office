@@ -3,6 +3,7 @@ import { assertNonEmptyString, error as logError, ServiceError } from "@workspac
 import {
   Prisma,
   type PrismaClient,
+  RhNitroHoursStatus,
   ScoreEvaluationStatus,
   ScoreEvaluatorRole,
   ScoreQuestionType,
@@ -148,12 +149,28 @@ class ScoreQuarterService {
       const userDept = targetUser.department_id;
 
       return await this.db.$transaction(async (tx: Prisma.TransactionClient) => {
+        const acceptedNitroHours = await tx.rhNitroHoursSubmission.aggregate({
+          where: {
+            organization_id: organizationId,
+            user_id: targetUserId,
+            quarter,
+            status: "Accepted",
+          },
+          _sum: { hours: true },
+        });
+        const totalAcceptedHours = acceptedNitroHours._sum.hours ?? 0;
         const score = await tx.scoreQuarter.create({
           data: {
             user_id: targetUserId,
             quarter,
             organization_id: organizationId,
-            nitro: { create: { organization_id: organizationId } },
+            nitro: {
+              create: {
+                organization_id: organizationId,
+                total_hours: totalAcceptedHours,
+                hours_score: totalAcceptedHours >= 10 ? 1 : 0,
+              },
+            },
           },
         });
 
@@ -296,7 +313,19 @@ class ScoreQuarterService {
           updateData = { projects_score: input.value };
           break;
         case "hours":
-          updateData = { hours_score: input.value };
+          {
+            const acceptedHours = await this.db.rhNitroHoursSubmission.aggregate({
+              where: {
+                organization_id: organizationId,
+                user_id: nitro.scoreQuarter.user_id,
+                quarter: nitro.scoreQuarter.quarter,
+                status: RhNitroHoursStatus.Accepted,
+              },
+              _sum: { hours: true },
+            });
+            const totalHours = acceptedHours._sum.hours ?? 0;
+            updateData = { hours_score: totalHours >= 10 ? 1 : 0, total_hours: totalHours };
+          }
           break;
         case "errors":
           updateData = { errors_score: input.value };

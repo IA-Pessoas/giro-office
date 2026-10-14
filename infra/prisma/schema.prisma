@@ -428,6 +428,8 @@ model User {
   rhEmployeeMeetingMinutesCreated RhEmployeeMeetingMinute[] @relation("RhEmployeeMeetingMinuteCreator")
   rhEmployeeMeetingMinutesUpdated RhEmployeeMeetingMinute[] @relation("RhEmployeeMeetingMinuteUpdater")
   rhEmployeeMeetingMinuteRevisions RhEmployeeMeetingMinuteRevision[] @relation("RhEmployeeMeetingMinuteRevisionAuthor")
+  rhNitroHoursSubmissions RhNitroHoursSubmission[] @relation("RhNitroHoursSubmitter")
+  rhNitroHoursDecisions RhNitroHoursSubmission[] @relation("RhNitroHoursDecider")
   timeBankRealeasesAdded      TimeBankReleases[]     @relation("add")
   timeBankRealeases           TimeBankReleases[]     @relation("user")
   timeClockRequestApproved    TimeClockRequest[]     @relation("approver")
@@ -3058,6 +3060,28 @@ model ScoreNitro {
   @@map("rh.score_nitro")
 }
 
+model RhNitroHoursSubmission {
+  id                  String               @id @default(uuid())
+  organization_id     String
+  user_id             String
+  quarter             String
+  hours               Int
+  status              RhNitroHoursStatus   @default(Pending)
+  certificate_path    String
+  certificate_mime    String
+  decided_by_id       String?
+  decided_at          DateTime?
+  rejection_reason    String?
+  created_at          DateTime             @default(now())
+  updated_at          DateTime             @updatedAt
+  user                User                 @relation("RhNitroHoursSubmitter", fields: [user_id], references: [id], onDelete: Restrict)
+  decidedBy           User?                @relation("RhNitroHoursDecider", fields: [decided_by_id], references: [id], onDelete: SetNull)
+
+  @@index([organization_id, quarter, status], map: "rh.nitro_hours_organization_quarter_status_idx")
+  @@index([organization_id, user_id, quarter], map: "rh.nitro_hours_organization_user_quarter_idx")
+  @@map("rh.nitro_hours_submissions")
+}
+
 model ScoreQuestion {
   id              String             @id @default(uuid())
   question        String
@@ -4101,6 +4125,12 @@ enum ScoreQuestionType {
 enum ScoreEvaluationStatus {
   Pending
   Completed
+}
+
+enum RhNitroHoursStatus {
+  Pending
+  Accepted
+  Rejected
 }
 
 enum ScoreEvaluatorRole {

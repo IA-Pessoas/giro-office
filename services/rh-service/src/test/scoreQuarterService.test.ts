@@ -20,6 +20,7 @@ const { prismaMock } = vi.hoisted(() => ({
       create: vi.fn(),
     },
     scoreNitro: {},
+    rhNitroHoursSubmission: { aggregate: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -54,6 +55,9 @@ describe("ScoreQuarterService", () => {
     });
 
     const tx = {
+      rhNitroHoursSubmission: {
+        aggregate: vi.fn().mockResolvedValue({ _sum: { hours: 12 } }),
+      },
       scoreQuarter: {
         create: vi.fn().mockResolvedValue({ id: "score-1", formula_version: "LegacyV1" }),
       },
@@ -71,7 +75,10 @@ describe("ScoreQuarterService", () => {
     });
 
     expect(tx.scoreQuarter.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ formula_version: "LegacyV1" }),
+      data: expect.objectContaining({
+        formula_version: "LegacyV1",
+        nitro: { create: { organization_id: "org-1", total_hours: 12, hours_score: 1 } },
+      }),
     });
   });
 

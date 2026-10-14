@@ -1919,6 +1919,123 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/score/nitro/hours/submissions": {
+        post: {
+          tags: ["ScoreNitro"],
+          summary: "Enviar horas e certificado para análise Nitro",
+          security: bearer,
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["quarter", "hours", "certificate"],
+                  properties: {
+                    quarter: { type: "string", pattern: "^\\d{4}-Q[1-4]$" },
+                    hours: { type: "integer", minimum: 1, maximum: 1000 },
+                    certificate: {
+                      type: "string",
+                      format: "binary",
+                      description: "PDF, JPEG ou PNG; até 5 MB.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Solicitação criada", ...successJson },
+          },
+        },
+        get: {
+          tags: ["ScoreNitro"],
+          summary: "Listar solicitações de horas do trimestre",
+          security: bearer,
+          parameters: [
+            {
+              name: "quarter",
+              in: "query",
+              required: false,
+              schema: { type: "string", pattern: "^\\d{4}-Q[1-4]$" },
+            },
+            {
+              name: "user_id",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+              description: "Ignorado para usuários sem permissão de gestão RH.",
+            },
+          ],
+          responses: {
+            "200": { description: "Solicitações do usuário ou da organização", ...successJson },
+          },
+        },
+      },
+      "/rh/score/nitro/hours/summary": {
+        get: {
+          tags: ["ScoreNitro"],
+          summary: "Consultar horas aceitas e bônus Nitro de um trimestre",
+          security: bearer,
+          parameters: [
+            {
+              name: "quarter",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-Q[1-4]$" },
+            },
+            {
+              name: "user_id",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+              description: "Ignorado para usuários sem permissão de gestão RH.",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Soma de horas aceitas; bônus +1 a partir de 10 horas",
+              ...successJson,
+            },
+          },
+        },
+      },
+      "/rh/score/nitro/hours/submissions/{id}/certificate": {
+        get: {
+          tags: ["ScoreNitro"],
+          summary: "Gerar link temporário para certificado autorizado",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Link assinado de curta duração", ...successJson },
+            "404": { description: "Solicitação não encontrada" },
+          },
+        },
+      },
+      "/rh/score/nitro/hours/submissions/{id}/decision": {
+        patch: {
+          tags: ["ScoreNitro"],
+          summary: "Aceitar ou rejeitar solicitação de horas Nitro",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          ...createObjectRequestBody({
+            example: { status: "Accepted" },
+            required: ["status"],
+            properties: {
+              status: { type: "string", enum: ["Accepted", "Rejected"] },
+              rejection_reason: { type: "string", maxLength: 500 },
+            },
+          }),
+          responses: {
+            "200": { description: "Decisão registrada", ...successJson },
+            "409": { description: "Solicitação já decidida" },
+          },
+        },
+      },
     },
   };
 }

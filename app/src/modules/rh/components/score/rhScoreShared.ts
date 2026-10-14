@@ -7,7 +7,7 @@ import type {
   RhScoreQuarter,
 } from "../../types";
 
-type RhScoreTab = "questions" | "pending" | "history";
+type RhScoreTab = "questions" | "pending" | "history" | "hours";
 
 type RhScoreQuestionFilter = RhScoreQuestionType | "all";
 
@@ -39,6 +39,11 @@ const SCORE_TAB_META: Record<RhScoreTab, { label: string; description: string }>
   pending: {
     label: "Pendentes",
     description: "Responda as avaliações atribuídas ao seu perfil.",
+  },
+
+  hours: {
+    label: "Horas Nitro",
+    description: "Envie certificados e acompanhe a análise de horas complementares.",
   },
 
   questions: {

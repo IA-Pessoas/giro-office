@@ -655,6 +655,31 @@ export interface RhScoreNitro {
   organization_id: string;
 }
 
+export type RhNitroHoursStatus = "Pending" | "Accepted" | "Rejected";
+
+export interface RhNitroHoursSubmission {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  quarter: string;
+  hours: number;
+  status: RhNitroHoursStatus;
+  certificate_mime: string;
+  decided_by_id: string | null;
+  decided_at: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  user: { id: string; name: string };
+}
+
+export interface RhNitroHoursSummary {
+  quarter: string;
+  user_id: string;
+  accepted_hours: number;
+  nitro_bonus: number;
+}
+
 export interface RhScoreEvaluationAnswer {
   question_id: string;
   question_text?: string;
