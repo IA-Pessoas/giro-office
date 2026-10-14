@@ -1,5 +1,7 @@
 import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 
+import { TI_CHANGE_HISTORY_ITEM_TYPES } from "../schemas/tiChangeHistory.schemas.js";
+
 type OpenApiDocument = Record<string, unknown> & {
   openapi: string;
   info: { title: string; version: string; description?: string };
@@ -398,6 +400,14 @@ const schemas: Record<string, OpenApiSchema> = {
     required: ["name"],
     properties: {
       name: { type: "string", minLength: 1 },
+    },
+    additionalProperties: false,
+  },
+  TiSpecificAccessUpdateInput: {
+    type: "object",
+    required: ["task_completion"],
+    properties: {
+      task_completion: { type: "boolean" },
     },
     additionalProperties: false,
   },
@@ -871,6 +881,9 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
       { name: "TI Stock", description: "Estoque de TI filtrado pelo departamento Tecnologia" },
       { name: "TI Robots", description: "Robos e historico de execucao de TI" },
       { name: "TI Dashboard", description: "Resumo consolidado do modulo de TI" },
+      { name: "TI Access Logs", description: "Logs de acesso por usuario" },
+      { name: "TI Change History", description: "Historico de alteracoes de TI" },
+      { name: "TI Specific Accesses", description: "Acessos especificos concedidos pela TI" },
       { name: "Internal", description: "Contratos internos entre serviços" },
     ],
     components: {
@@ -1007,6 +1020,80 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           ],
           successDescription: "Estoque de TI listado",
           errors: [400, 401, 403],
+        }),
+      },
+      "/ti/access-logs/{userId}": {
+        get: publicTiOperation({
+          operationId: "listTiAccessLogs",
+          tags: ["TI Access Logs"],
+          summary:
+            "Lista logins e acessos de um usuario migrados do Workspace legado, do mais recente para o mais antigo (nao inclui credenciais)",
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              description: "Usuario consultado",
+              schema: { type: "string", format: "uuid" },
+            },
+            ...paginationParameters(),
+          ],
+          successDescription: "Logs de acesso listados",
+          errors: [400, 401, 403, 404],
+        }),
+      },
+      "/ti/change-history/list": {
+        get: publicTiOperation({
+          operationId: "listTiChangeHistory",
+          tags: ["TI Change History"],
+          summary:
+            "Lista alteracoes de itens de TI (campo, antes e depois), da mais recente para a mais antiga; valores de credencial vem mascarados",
+          parameters: [
+            ...paginationParameters(),
+            {
+              in: "query",
+              name: "item_type",
+              description: "Tipo do item alterado",
+              schema: { type: "string", enum: [...TI_CHANGE_HISTORY_ITEM_TYPES] },
+            },
+            {
+              in: "query",
+              name: "item_id",
+              description: "Item alterado",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          successDescription: "Alteracoes listadas",
+          errors: [400, 401, 403],
+        }),
+      },
+      "/ti/specific-accesses/list": {
+        get: publicTiOperation({
+          operationId: "listTiSpecificAccesses",
+          tags: ["TI Specific Accesses"],
+          summary:
+            "Lista os usuarios ativos da organizacao e se cada um pode concluir tarefas diretamente",
+          successDescription: "Acessos especificos listados",
+          errors: [401, 403],
+        }),
+      },
+      "/ti/specific-accesses/{userId}": {
+        patch: publicTiOperation({
+          operationId: "updateTiSpecificAccess",
+          tags: ["TI Specific Accesses"],
+          summary: "Concede ou revoga a conclusao direta de tarefas de um usuario (TI nivel 3)",
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              description: "Usuario que recebe ou perde o acesso",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: jsonRequestBody("#/components/schemas/TiSpecificAccessUpdateInput"),
+          successDescription: "Acesso atualizado",
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/dashboard": {

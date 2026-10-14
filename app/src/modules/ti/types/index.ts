@@ -7,3 +7,6 @@ export * from "./terms";
 export * from "./stock";
 export * from "./passwords";
 export * from "./extensions";
+export * from "./accessLogs";
+export * from "./changeHistory";
+export * from "./specificAccesses";

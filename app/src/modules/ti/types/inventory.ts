@@ -54,6 +54,7 @@ export interface TiInventoryCategory {
 export interface TiInventoryLocation {
   id: TiId;
   name?: string;
+  active?: boolean;
   description?: string | null;
   status?: TiStatus | boolean;
   is_active?: boolean | null;
@@ -150,6 +151,7 @@ export interface TiInventoryCategoryPayload {
 
 export interface TiInventoryLocationPayload {
   name?: string;
+  active?: boolean;
   description?: string;
   status?: string | boolean;
   is_active?: boolean;

@@ -18,6 +18,11 @@ import {
   internalReportingGrantSchema,
 } from "@workspace/ti-service/src/schemas/internalReporting.schemas.js";
 import {
+  listTiAccessLogsQuerySchema,
+  tiAccessLogUserIdParamsSchema,
+} from "@workspace/ti-service/src/schemas/tiAccessLog.schemas.js";
+import { listTiChangeHistoryQuerySchema } from "@workspace/ti-service/src/schemas/tiChangeHistory.schemas.js";
+import {
   createTiExtensionBodySchema,
   listTiExtensionsQuerySchema,
   tiExtensionIdParamsSchema,
@@ -77,6 +82,10 @@ import {
   tiRobotIdParamsSchema,
   updateTiRobotBodySchema,
 } from "@workspace/ti-service/src/schemas/tiRobot.schemas.js";
+import {
+  tiSpecificAccessUserIdParamsSchema,
+  updateTiSpecificAccessBodySchema,
+} from "@workspace/ti-service/src/schemas/tiSpecificAccess.schemas.js";
 import {
   createTiStockCategoryBodySchema,
   createTiStockEntryBodySchema,
@@ -484,6 +493,34 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     args: unknown[],
     status: 200 | 201 = 200,
   ) => c.json(createSuccessResponse(await execute<T>(c, name, method, args)), status);
+
+  app.get("/ti/specific-accesses/list", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    return respond(c, "specificAccesses", "list", [requestContext(c)]);
+  });
+  app.patch("/ti/specific-accesses/:userId", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const params = parseWithZod(tiSpecificAccessUserIdParamsSchema, {
+      userId: c.req.param("userId"),
+    });
+    const body = parseWithZod(updateTiSpecificAccessBodySchema, await c.req.json());
+    return respond(c, "specificAccesses", "setTaskCompletion", [
+      requestContext(c),
+      params.userId,
+      body.task_completion,
+    ]);
+  });
+  app.get("/ti/change-history/list", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const query = parseWithZod(listTiChangeHistoryQuerySchema, c.req.query());
+    return respond(c, "changeHistory", "list", [requestContext(c), query]);
+  });
+  app.get("/ti/access-logs/:userId", async (c) => {
+    requireTiPermission(c.get("auth"), 3);
+    const params = parseWithZod(tiAccessLogUserIdParamsSchema, { userId: c.req.param("userId") });
+    const query = parseWithZod(listTiAccessLogsQuerySchema, c.req.query());
+    return respond(c, "accessLogs", "list", [requestContext(c), params.userId, query]);
+  });
 
   app.get("/ti/inventory/list", async (c) => {
     requireTiPermission(c.get("auth"), 2);

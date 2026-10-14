@@ -107,10 +107,23 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     const location = await call("POST", "/ti/inventory-locations", { name: `Sala ${suffix()}` });
     const locationId = location.data.id as string;
     await call("GET", "/ti/inventory-locations/list");
+    const locationName = `Sala editada ${suffix()}`;
     await call("PATCH", `/ti/inventory-locations/${locationId}`, {
-      name: `Sala editada ${suffix()}`,
+      name: locationName,
       active: true,
     });
+    // #1937: outro local não pode ser renomeado para um nome já em uso, nem com outra caixa.
+    const otherLocation = await call("POST", "/ti/inventory-locations", {
+      name: `Depósito ${suffix()}`,
+    });
+    const renamed = await smokeCall(
+      app(),
+      env(),
+      "PATCH",
+      `/ti/inventory-locations/${otherLocation.data.id}`,
+      { name: locationName.toUpperCase() },
+    );
+    expect(renamed.status).toBe(409);
 
     const asset = await call("POST", "/ti/inventory", {
       asset_code: `PAT-${suffix()}`,
@@ -161,6 +174,26 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
         (item) => item.id,
       ),
     ).toContain(assetId);
+    // #1936: a edição acima gravou os campos alterados em `tecnologia.changeHistory`.
+    const changeHistory = await smokeCall(
+      app(),
+      env(),
+      "GET",
+      `/ti/change-history/list?item_type=inventory&item_id=${assetId}`,
+    );
+    expect(changeHistory.status).toBe(200);
+    expect(
+      (changeHistory.json?.data as { items: Array<{ field: string; after: string }> }).items,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: "notes", after: "Editado pelo smoke" }),
+        expect.objectContaining({ field: "delivery_date", after: "2026-09-02" }),
+      ]),
+    );
+    // #1935: o SQL cru sobre `logs` só é exercitado de verdade no Postgres.
+    const accessLogs = await smokeCall(app(), env(), "GET", `/ti/access-logs/${userId}`);
+    expect(accessLogs.status).toBe(200);
+    expect(Array.isArray((accessLogs.json?.data as { items: unknown[] }).items)).toBe(true);
     // #1933: lote para o local e troca com um segundo item que está com outra pessoa.
     const other = await call("POST", "/ti/inventory", {
       asset_code: `PAT-TROCA-${suffix()}`,
@@ -223,6 +256,25 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     await call("PATCH", `/ti/inventory/${winner?.data.id}/return`, {});
   });
 
+  // #1938: o SQL cru sobre `permissions.specific` e `logs` só é exercitado no Postgres.
+  it("acessos específicos: concede e revoga a conclusão de tarefas", async () => {
+    // O smoke chama como o owner; o alvo é o outro usuário, porque ninguém altera o próprio.
+    const { userId } = requireSmokeState();
+    const accessOf = async () => {
+      const list = await call("GET", "/ti/specific-accesses/list");
+      return (list.data as Array<{ id: string; task_completion: boolean }>).find(
+        (row) => row.id === userId,
+      );
+    };
+    const original = (await accessOf())?.task_completion === true;
+
+    await call("PATCH", `/ti/specific-accesses/${userId}`, { task_completion: !original });
+    expect(await accessOf()).toMatchObject({ task_completion: !original });
+    // Devolve o valor de antes.
+    await call("PATCH", `/ti/specific-accesses/${userId}`, { task_completion: original });
+    expect(await accessOf()).toMatchObject({ task_completion: original });
+  });
+
   it("ramais", async () => {
     const { userId } = requireSmokeState();
     const number = () => String(Math.floor(Math.random() * 10_000)).padStart(4, "0");
@@ -279,6 +331,7 @@ describe.skipIf(!smokeState)("ti-service CRUD smoke (banco real)", () => {
     const created = await call("POST", "/ti/requests", {
       title: "Notebook não liga",
       description: "Aberto pelo smoke",
+      anydesk_code: "123456789",
       category_id: categoryId,
       requester_id: userId,
       assigned_to_id: ownerId,

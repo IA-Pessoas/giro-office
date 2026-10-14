@@ -3,6 +3,8 @@ import {
   Bot,
   Boxes,
   FileCheck2,
+  FileClock,
+  History,
   KeyRound,
   LayoutDashboard,
   Loader2,
@@ -10,6 +12,7 @@ import {
   PackageSearch,
   Phone,
   ShieldAlert,
+  ShieldCheck,
   Ticket,
   type LucideIcon,
 } from "lucide-react";
@@ -17,12 +20,15 @@ import {
 import { useModuleAccess } from "@modules/auth";
 import { cn } from "@shared/ui/newLayout/utils";
 
+import { TiAccessLogsTab } from "./TiAccessLogsTab";
+import { TiChangeHistoryTab } from "./TiChangeHistoryTab";
 import { TiDashboardTab } from "./TiDashboardTab";
 import { TiExtensionsTab } from "./TiExtensionsTab";
 import { TiInventoryTab } from "./TiInventoryTab";
 import { TiPasswordsTab } from "./TiPasswordsTab";
 import { TiRequestsTab } from "./TiRequestsTab";
 import { TiRobotsTab } from "./TiRobotsTab";
+import { TiSpecificAccessesTab } from "./TiSpecificAccessesTab";
 import { TiStockTab } from "./TiStockTab";
 import { TiTermsTab } from "./TiTermsTab";
 import { tiPanelClassName, tiThinScrollbarClassName, tiWorkspaceShellClassName } from "./tiWorkspaceUi";
@@ -35,7 +41,10 @@ type TiTabId =
   | "terms"
   | "passwords"
   | "extensions"
-  | "robots";
+  | "robots"
+  | "changeHistory"
+  | "accessLogs"
+  | "specificAccesses";
 
 type TiTabConfig = {
   id: TiTabId;
@@ -92,6 +101,24 @@ const TI_TABS: TiTabConfig[] = [
     label: "Robôs",
     icon: Bot,
     panel: TiRobotsTab,
+  },
+  {
+    id: "changeHistory",
+    label: "Alterações",
+    icon: FileClock,
+    panel: TiChangeHistoryTab,
+  },
+  {
+    id: "accessLogs",
+    label: "Logs de acesso",
+    icon: History,
+    panel: TiAccessLogsTab,
+  },
+  {
+    id: "specificAccesses",
+    label: "Acessos específicos",
+    icon: ShieldCheck,
+    panel: TiSpecificAccessesTab,
   },
 ];
 

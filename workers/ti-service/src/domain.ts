@@ -7,15 +7,28 @@ import {
   COMPUTER_CATEGORY_RENAME_CONFLICT_MESSAGE,
   EncryptionService,
   executeReportingQuery,
+  hasTiCatalogNameConflict,
   hasUserWithSeveralActiveAssets,
   isComputerCategoryName,
   ServiceError,
+  tiCatalogNameToCheck,
   tiExtensionsReportingCatalog,
   tiInventoryReportingCatalog,
   tiRequestsReportingCatalog,
   tiStockReportingCatalog,
   withReportingSnapshot,
 } from "@workspace/shared";
+import { listTiAccessLogs } from "@workspace/ti-service/src/services/tiAccessLogService.js";
+import {
+  inventoryFieldChanges,
+  listTiChangeHistory,
+  type TiChangeHistoryDatabase,
+} from "@workspace/ti-service/src/services/tiChangeHistoryService.js";
+import {
+  listTiSpecificAccesses,
+  setTiTaskCompletionAccess,
+  type TiSpecificAccessDatabase,
+} from "@workspace/ti-service/src/services/tiSpecificAccessService.js";
 
 export type TiAuthContext = {
   organizationId: string;
@@ -37,6 +50,8 @@ type Delegate = {
 
 export type TiDatabase = {
   [model: string]: unknown;
+  $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
+  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
   $transaction<T>(
     callback: (database: TiDatabase) => Promise<T>,
     options?: { isolationLevel?: "RepeatableRead"; maxWait?: number; timeout?: number },
@@ -48,6 +63,9 @@ export type TiService = {
 };
 
 export type TiServices = {
+  accessLogs?: TiService;
+  specificAccesses?: TiService;
+  changeHistory?: TiService;
   inventory?: TiService;
   inventoryCategories?: TiService;
   inventoryLocations?: TiService;
@@ -80,6 +98,21 @@ function pageQuery(value: unknown): { page: number; take: number; skip: number }
   const page = typeof query.page === "number" ? query.page : 1;
   const take = typeof query.page_size === "number" ? query.page_size : 50;
   return { page, take, skip: (page - 1) * take };
+}
+
+/** Nome único entre os registros ativos de um catálogo de TI, sem caixa nem acento (#1937). */
+async function ensureUniqueCatalogName(
+  catalog: Delegate,
+  activeWhere: Row,
+  name: unknown,
+  message: string,
+  exceptId?: unknown,
+): Promise<void> {
+  const active = (await catalog.findMany({
+    where: activeWhere,
+    select: { id: true, name: true },
+  })) as Row[];
+  if (hasTiCatalogNameConflict(active, name, exceptId)) throw new ServiceError(409, message);
 }
 
 function uniqueError(error: unknown): boolean {
@@ -150,16 +183,13 @@ function inventoryServices(database: TiDatabase): TiServices {
       create: async (value, body) => {
         const auth = context(value);
         const input = row(body);
-        const existing = await categories.findFirst({
-          where: { organization_id: auth.organizationId, name: input.name, active: true },
-        });
-        if (existing) {
-          throw new ServiceError(
-            409,
-            "Já existe uma categoria de inventário de TI ativa com este nome.",
-          );
-        }
         await ensureSingleComputerCategory(database, auth.organizationId, input.name);
+        await ensureUniqueCatalogName(
+          categories,
+          { organization_id: auth.organizationId, active: true },
+          input.name,
+          "Já existe uma categoria de inventário de TI ativa com este nome.",
+        );
         return categories.create({
           data: { ...input, active: true, organization_id: auth.organizationId },
         });
@@ -179,6 +209,19 @@ function inventoryServices(database: TiDatabase): TiServices {
         } else if (input.name !== undefined) {
           await ensureSingleComputerCategory(database, auth.organizationId, input.name, String(id));
         }
+        const nameToCheck = tiCatalogNameToCheck(
+          { name: row(existing).name, active: row(existing).active },
+          input,
+        );
+        if (nameToCheck !== null) {
+          await ensureUniqueCatalogName(
+            categories,
+            { organization_id: auth.organizationId, active: true },
+            nameToCheck,
+            "Já existe uma categoria de inventário de TI ativa com este nome.",
+            id,
+          );
+        }
         return categories.update({ where: { id }, data: input });
       },
     },
@@ -191,14 +234,12 @@ function inventoryServices(database: TiDatabase): TiServices {
       create: async (value, body) => {
         const auth = context(value);
         const input = row(body);
-        const existing = await locations.findFirst({
-          where: { organization_id: auth.organizationId, name: input.name, active: true },
-        });
-        if (existing)
-          throw new ServiceError(
-            409,
-            "Já existe um local de inventário de TI ativo com este nome.",
-          );
+        await ensureUniqueCatalogName(
+          locations,
+          { organization_id: auth.organizationId, active: true },
+          input.name,
+          "Já existe um local de inventário de TI ativo com este nome.",
+        );
         return locations.create({
           data: { ...input, active: true, organization_id: auth.organizationId },
         });
@@ -209,7 +250,21 @@ function inventoryServices(database: TiDatabase): TiServices {
           where: { id, organization_id: auth.organizationId },
         });
         if (!existing) throw new ServiceError(404, "Local de inventário de TI não encontrado.");
-        return locations.update({ where: { id }, data: row(body) });
+        const input = row(body);
+        const nameToCheck = tiCatalogNameToCheck(
+          { name: row(existing).name, active: row(existing).active },
+          input,
+        );
+        if (nameToCheck !== null) {
+          await ensureUniqueCatalogName(
+            locations,
+            { organization_id: auth.organizationId, active: true },
+            nameToCheck,
+            "Já existe um local de inventário de TI ativo com este nome.",
+            id,
+          );
+        }
+        return locations.update({ where: { id }, data: input });
       },
     },
     inventory: {
@@ -306,9 +361,25 @@ function inventoryServices(database: TiDatabase): TiServices {
         const toLocationId = input.location_id ?? current.location_id ?? null;
         const movesAsset =
           toUserId !== activeHolderId(current) || toLocationId !== (current.location_id ?? null);
+        // Campos editados entram no histórico de alterações (#1936), na mesma transação.
+        const changes = await inventoryFieldChanges(
+          database as unknown as TiChangeHistoryDatabase,
+          auth,
+          String(id),
+          current,
+          input,
+        );
         try {
           if (!changesHolder && !movesAsset) {
-            return await inventory.update({ where: { id }, data });
+            if (changes.length === 0) return await inventory.update({ where: { id }, data });
+            return await database.$transaction(async (transaction) => {
+              const updated = await delegate(transaction, "inventoryTecnologia").update({
+                where: { id },
+                data,
+              });
+              await delegate(transaction, "changeHistoryTecnologia").createMany({ data: changes });
+              return updated;
+            });
           }
           return await writeWithComputerRule(
             database,
@@ -337,6 +408,9 @@ function inventoryServices(database: TiDatabase): TiServices {
                   409,
                   "O item foi movimentado por outra operação. Atualize a tela e tente novamente.",
                 );
+              }
+              if (changes.length > 0) {
+                await delegate(writer, "changeHistoryTecnologia").createMany({ data: changes });
               }
               if (movesAsset) {
                 await delegate(writer, "inventoryEventTecnologia").create({
@@ -868,11 +942,8 @@ async function lockActiveComputer(
   organizationId: string,
   userId: string,
 ): Promise<void> {
-  const lock = transaction.$executeRaw as (
-    query: TemplateStringsArray,
-    ...values: unknown[]
-  ) => Promise<unknown>;
-  await lock`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
+  // Chamado no próprio cliente: o Prisma real perde o `this` se o método for destacado.
+  await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${activeComputerLockKey(organizationId, userId)}, 0))`;
 }
 
 /** Toma o bloqueio da pessoa e recusa se ela já tem outro computador ativo. */
@@ -2022,29 +2093,18 @@ function stockServices(database: TiDatabase): TiServices {
         const auth = context(value);
         const departmentId = await technologyDepartment(database, auth.organizationId);
         const input = row(body);
-        const activeLocations = await locations.findMany({
-          where: {
+        await ensureUniqueCatalogName(
+          locations,
+          {
             organization_id: auth.organizationId,
             department_id: departmentId,
             status: true,
+            // Como no legado, o nome é único por andar: "Armário" pode existir em dois andares.
+            floor: input.floor ?? null,
           },
-          select: { name: true },
-        });
-        const normalizeLocation = (name: string) =>
-          name
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/gu, "")
-            .trim()
-            .replace(/\s+/gu, " ")
-            .toLowerCase();
-        if (
-          activeLocations.some(
-            (location) =>
-              normalizeLocation(String(row(location).name)) ===
-              normalizeLocation(String(input.name)),
-          )
-        )
-          throw new ServiceError(409, "Já existe um local de estoque de TI ativo com este nome.");
+          input.name,
+          "Já existe um local de estoque de TI ativo com este nome neste andar.",
+        );
         return locations.create({
           data: {
             ...input,
@@ -2057,13 +2117,36 @@ function stockServices(database: TiDatabase): TiServices {
       updateLocation: async (value, id, body) => {
         const auth = context(value);
         const departmentId = await technologyDepartment(database, auth.organizationId);
-        if (
-          !(await locations.findFirst({
-            where: { id, organization_id: auth.organizationId, department_id: departmentId },
-          }))
-        )
-          throw new ServiceError(404, "Local de estoque não encontrado.");
-        return locations.update({ where: { id }, data: row(body) });
+        const existing = await locations.findFirst({
+          where: { id, organization_id: auth.organizationId, department_id: departmentId },
+        });
+        if (!existing) throw new ServiceError(404, "Local de estoque não encontrado.");
+        const input = row(body);
+        const current = row(existing);
+        // Renomear, reativar ou trocar de andar não pode repetir o nome de outro local ativo
+        // do mesmo andar.
+        const floor = input.floor === undefined ? current.floor : input.floor;
+        const movedFloor = (input.status ?? current.status) === true && floor !== current.floor;
+        const nameToCheck =
+          tiCatalogNameToCheck(
+            { name: current.name, active: current.status },
+            { name: input.name, active: input.status },
+          ) ?? (movedFloor ? (input.name ?? current.name) : null);
+        if (nameToCheck !== null) {
+          await ensureUniqueCatalogName(
+            locations,
+            {
+              organization_id: auth.organizationId,
+              department_id: departmentId,
+              status: true,
+              floor: floor ?? null,
+            },
+            nameToCheck,
+            "Já existe um local de estoque de TI ativo com este nome neste andar.",
+            id,
+          );
+        }
+        return locations.update({ where: { id }, data: input });
       },
     },
   };
@@ -2293,6 +2376,32 @@ function reportingServices(database: TiDatabase, inSnapshot = false): TiServices
 
 export function createTiDomainServices(database: TiDatabase, encryptionKey?: string): TiServices {
   return {
+    // #1935: mesma consulta do serviço Node; `logs` fica fora do recorte Prisma.
+    accessLogs: {
+      list: (value, userId, query) =>
+        listTiAccessLogs(database, context(value), String(userId), row(query)),
+    },
+    // #1938: mesmos acessos específicos do serviço Node.
+    specificAccesses: {
+      list: (value) =>
+        listTiSpecificAccesses(database as unknown as TiSpecificAccessDatabase, context(value)),
+      setTaskCompletion: (value, userId, taskCompletion) =>
+        setTiTaskCompletionAccess(
+          database as unknown as TiSpecificAccessDatabase,
+          context(value),
+          String(userId),
+          taskCompletion === true,
+        ),
+    },
+    // #1936: mesma consulta do serviço Node.
+    changeHistory: {
+      list: (value, query) =>
+        listTiChangeHistory(
+          database as unknown as TiChangeHistoryDatabase,
+          context(value),
+          row(query),
+        ),
+    },
     ...inventoryServices(database),
     ...extensionServices(database),
     ...passwordServices(database, encryptionKey),

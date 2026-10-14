@@ -2751,6 +2751,59 @@ const handlers = {
     }
   },
 
+  // #1938: acessos específicos (conclusão de tarefas). O smoke regrava o valor atual do
+  // usuário-alvo, sem conceder nem revogar nada.
+  async tiSpecificAccessList(op) {
+    const response = await httpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (!Array.isArray(response.body?.data)) {
+      throw new Error(`${op.id} did not return the specific access list.`);
+    }
+    state.tiSpecificAccesses = response.body.data;
+  },
+
+  async tiSpecificAccessPatch(op) {
+    const targetId = await ensureRhTargetUser();
+    const current = (state.tiSpecificAccesses ?? []).find((row) => row.id === targetId);
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/specific-accesses/${targetId}`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: { task_completion: current?.task_completion === true },
+    });
+  },
+
+  // #1936: histórico de alterações de TI (campo, antes e depois).
+  async tiChangeHistoryList(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/ti/change-history/list?item_type=inventory",
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (!Array.isArray(response.body?.data?.items)) {
+      throw new Error(`${op.id} did not return the change history list.`);
+    }
+  },
+
+  // #1935: logs de acesso por usuário.
+  async tiAccessLogs(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/access-logs/${await ensureRhTargetUser()}`,
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (!Array.isArray(response.body?.data?.items)) {
+      throw new Error(`${op.id} did not return the access log list.`);
+    }
+  },
+
   async tiInventoryHistory(op) {
     const response = await httpRequest(op, {
       expectedStatus: [200],

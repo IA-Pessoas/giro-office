@@ -717,7 +717,15 @@ await runTest("ti stock locations filter progressively and identify normalized a
   );
   assert.equal(hasActiveTiStockLocation(locations, "ALMOXARIFADO SAO"), true);
   assert.equal(hasActiveTiStockLocation(locations, "Sala"), false);
-  assert.match(tabSource, /hasActiveTiStockLocation\(stockLocations, name\)/);
+  // #1937: o nome é único por andar, como no legado.
+  const byFloor = [{ id: 4, name: "Armário", floor: 1, status: true }];
+  assert.equal(hasActiveTiStockLocation(byFloor, "armario", 1), true);
+  assert.equal(hasActiveTiStockLocation(byFloor, "armario", 2), false);
+  assert.equal(hasActiveTiStockLocation(byFloor, "armario"), false);
+  assert.match(
+    tabSource,
+    /hasActiveTiStockLocation\(stockLocations, name, toOptionalFloor\(locationFloor\)\)/,
+  );
   assert.match(tabSource, /rows=\{filteredStockLocations\}/);
 });
 
@@ -1947,6 +1955,102 @@ await runTest("ti inventory write actions follow the level the service requires"
   assert.doesNotMatch(source, /const canManage = access\.canEdit/);
   // Quando só o departamento muda, o histórico mostra os departamentos, não "A → A".
   assert.match(source, /event\.from_user\?\.id === event\.to_user\?\.id/);
+});
+
+await runTest("ti inventory manages its own locations, apart from stock locations", async () => {
+  const tab = await readModuleSource("components/TiInventoryTab.tsx");
+  const dialog = await readModuleSource("components/TiInventoryLocationsDialog.tsx");
+  const stock = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(tab, /label="Departamentos e locais"/);
+  assert.match(tab, /<TiInventoryLocationsDialog/);
+  assert.match(tab, /title="Categorias de inventário"/);
+  // Dois cadastros, dois títulos: inventário sem andar, estoque com andar.
+  assert.match(dialog, /title="Departamentos e locais de inventário"/);
+  assert.match(stock, /title="Locais de estoque"/);
+  assert.match(stock, /label="Andar"/);
+  assert.doesNotMatch(dialog, /label="Andar"|floor/);
+  assert.match(dialog, /useCreateTiInventoryLocationMutation/);
+  assert.match(dialog, /useUpdateTiInventoryLocationMutation/);
+  // Desativar e reativar, sem exclusão: o item histórico continua apontando para o local.
+  assert.match(dialog, /label=\{isActive\(location\) \? "Desativar" : "Reativar"\}/);
+  assert.match(dialog, /payload: \{ active: !isActive\(location\) \}/);
+  assert.doesNotMatch(dialog, /Trash2|Excluir/);
+  // Erro do serviço (nome repetido) aparece no diálogo.
+  assert.match(dialog, /setError\(getTiInventoryMutationErrorMessage\(mutationError\)\)/);
+  assert.match(dialog, /disabled=\{!canManage \|\| isSubmitting\}/);
+});
+
+await runTest("ti specific accesses tab grants and revokes task completion for TI admins", async () => {
+  const source = await readModuleSource("components/TiSpecificAccessesTab.tsx");
+  const page = await readModuleSource("components/TiPage.tsx");
+  const service = await readModuleSource("services/tiSpecificAccessesService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /detail: "\/ti\/specific-accesses\/\{id\}"/);
+  assert.match(service, /\{ task_completion: taskCompletion \}/);
+  assert.match(source, /headers=\{\["Usuário", "Departamento", "Conclusão de tarefas", ""\]\}/);
+  assert.match(source, /toggle\(row\.id, !row\.task_completion\)/);
+  // Erro do serviço aparece na tela; o botão fica preso enquanto salva.
+  assert.match(source, /setError\(getTiInventoryMutationErrorMessage\(mutationError\)\)/);
+  assert.match(source, /disabled=\{mutation\.isPending\}/);
+  // Só a conclusão de tarefas: nada de permissão por módulo nem alteração de regime.
+  assert.doesNotMatch(source, /modules|regime/i);
+  // Só TI nível 3 vê a aba; o autoatendimento não.
+  const selfService = page.slice(page.indexOf("const SELF_SERVICE_TI_TABS"));
+  assert.match(page, /panel: TiSpecificAccessesTab/);
+  assert.doesNotMatch(selfService.slice(0, selfService.indexOf("];")), /TiSpecificAccessesTab/);
+});
+
+await runTest("ti change history tab lists field changes with masked credentials", async () => {
+  const source = await readModuleSource("components/TiChangeHistoryTab.tsx");
+  const page = await readModuleSource("components/TiPage.tsx");
+  const service = await readModuleSource("services/tiChangeHistoryService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /list: "\/ti\/change-history\/list"/);
+  assert.match(service, /page_size: TI_CHANGE_HISTORY_PAGE_SIZE/);
+  // Item, ação, campo, antes, depois, autor e momento.
+  assert.match(
+    source,
+    /headers=\{\["Data", "Item", "Ação", "Campo", "Antes", "Depois", "Autor"\]\}/,
+  );
+  // Valor de credencial não aparece, mesmo que viesse na resposta.
+  assert.match(source, /if \(item\.masked\) \{\s+return "Oculto";/);
+  assert.match(source, /disabled=\{!changeHistory\.hasMore \|\| changeHistoryQuery\.isFetching\}/);
+  // Não mistura estoque nem log de acesso: os tipos são só os de alteração de item.
+  assert.match(source, /inventory: "Inventário"/);
+  assert.doesNotMatch(source, /\bstock\b|Estoque|Acesso/);
+  // Só TI nível 3 vê a aba; o autoatendimento não.
+  const selfService = page.slice(page.indexOf("const SELF_SERVICE_TI_TABS"));
+  assert.match(page, /panel: TiChangeHistoryTab/);
+  assert.doesNotMatch(selfService.slice(0, selfService.indexOf("];")), /TiChangeHistoryTab/);
+});
+
+await runTest("ti access logs tab lists logins and accesses per user for TI admins", async () => {
+  const source = await readModuleSource("components/TiAccessLogsTab.tsx");
+  const page = await readModuleSource("components/TiPage.tsx");
+  const service = await readModuleSource("services/tiAccessLogsService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /byUser: "\/ti\/access-logs\/\{id\}"/);
+  assert.match(service, /params: \{ page, page_size: TI_ACCESS_LOGS_PAGE_SIZE \}/);
+  assert.match(
+    source,
+    /headers=\{\["Tipo", "Referente", "Usuário", "Data", "Local\/origem"\]\}/,
+  );
+  // Paginação pelo servidor, do mais recente para o mais antigo.
+  assert.match(source, /disabled=\{!accessLogs\.hasMore \|\| accessLogsQuery\.isFetching\}/);
+  assert.match(source, /Mais antigos/);
+  // Origem ausente não é inventada.
+  assert.match(source, /item\.origin \?\? "Não migrado"/);
+  // Só TI nível 3 vê a aba; o autoatendimento não.
+  const selfService = page.slice(page.indexOf("const SELF_SERVICE_TI_TABS"));
+  assert.match(page, /panel: TiAccessLogsTab/);
+  assert.doesNotMatch(selfService.slice(0, selfService.indexOf("];")), /TiAccessLogsTab/);
+  // Separado do relatório de credenciais “Logins”: não toca senhas.
+  assert.doesNotMatch(source, /password|Password|senha/i);
+  assert.doesNotMatch(service, /passwords/);
 });
 
 await runTest("ti terms tab exposes term create, edit, detail and signing actions", async () => {

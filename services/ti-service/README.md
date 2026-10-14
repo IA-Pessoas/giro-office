@@ -52,6 +52,20 @@ servico/VPS, junto com `SUPABASE_URL`.
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
 - Exemplo: `GET /ti/stock`
+- Exemplo: `GET /ti/specific-accesses/list` e `PATCH /ti/specific-accesses/{userId}` com
+  `{ "task_completion": true }` (TI nível 3): quem pode concluir tarefas diretamente, o
+  acesso "Conclusão de tarefas" da tela Acessos Admin do legado. Grava em
+  `permissions.specific`, que o serviço de tarefas confere, e registra a mudança em `logs`.
+  Ninguém altera o próprio acesso. Matriz dos acessos legados:
+  `docs/security/ti-acessos-especificos.md`.
+- Exemplo: `GET /ti/change-history/list?item_type=inventory&page=1` (TI nível 3): alterações de
+  itens de TI (`tecnologia.changeHistory`), uma linha por campo, com antes e depois. Hoje a
+  edição de item de inventário grava aqui; movimentação patrimonial fica em
+  `/ti/inventory/{id}/history`. Valor de credencial nunca é devolvido (`masked`).
+- Exemplo: `GET /ti/access-logs/{userId}?page=1&page_size=20` (TI nível 3): logins e acessos do
+  usuário migrados de `tb_admin.logs` (`logs.action` 0/1), do mais recente para o mais antigo.
+  `origin` vem nulo porque o `local` legado não foi migrado. Login atual não entra
+  (`auth_sessions` é apagada ao expirar). Não lê credenciais.
 
 As rotas diretas `/internal/reporting/catalog` e `/internal/reporting/extract` são consumidas
 exclusivamente pelo reports-service e não passam pelo gateway. O catálogo combinado publica

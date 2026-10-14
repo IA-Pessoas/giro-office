@@ -40,6 +40,39 @@ export function hasUserWithSeveralActiveAssets(assets: Array<{ user_id?: unknown
   });
 }
 
+/** Nome de catálogo de TI para comparação: sem caixa, acento, pontas nem espaços repetidos. */
+export function normalizeTiCatalogName(name: unknown): string {
+  return normalizeTiName(name).replace(/\s+/gu, " ");
+}
+
+/** Há outro registro com este nome? `rows` são os registros ativos do mesmo catálogo. */
+export function hasTiCatalogNameConflict(
+  rows: Array<{ id?: unknown; name?: unknown }>,
+  name: unknown,
+  exceptId?: unknown,
+): boolean {
+  const normalized = normalizeTiCatalogName(name);
+  return rows.some((row) => row.id !== exceptId && normalizeTiCatalogName(row.name) === normalized);
+}
+
+/**
+ * Nome a conferir numa edição de catálogo de TI (categoria ou local, #1937): o nome final,
+ * quando o registro termina ativo e foi renomeado ou reativado. `null` quando não há o que
+ * conferir — desativar ou mexer em outro campo nunca esbarra em nome duplicado.
+ */
+export function tiCatalogNameToCheck(
+  current: { name: unknown; active: unknown },
+  next: { name?: unknown; active?: unknown },
+): string | null {
+  const endsActive = next.active === undefined ? current.active === true : next.active === true;
+  if (!endsActive) return null;
+  const renamed =
+    next.name !== undefined &&
+    normalizeTiCatalogName(next.name) !== normalizeTiCatalogName(current.name);
+  const reactivated = current.active !== true;
+  return renamed || reactivated ? String(next.name ?? current.name) : null;
+}
+
 /** Chave do bloqueio transacional que serializa as escritas de computador de uma pessoa. */
 export function activeComputerLockKey(organizationId: string, userId: string): string {
   return `ti.inventory.active-computer:${organizationId}:${userId}`;

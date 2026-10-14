@@ -57,6 +57,97 @@ const auth = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("TI domain", () => {
+  // #1937: nome único ao cadastrar, renomear e reativar, nos três catálogos.
+  it("keeps catalog names unique on create, rename and reactivation", async () => {
+    const actives = [
+      { id: "a", name: "Sala A", active: true, status: true },
+      { id: "b", name: "Depósito", active: true, status: true },
+    ];
+    const inactive = { id: "c", name: "Depósito", active: false, status: false };
+    const catalog = (existing: unknown) => ({
+      findMany: vi.fn(async () => actives),
+      findFirst: vi.fn(async () => existing),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+    });
+    const services = (existing: unknown) => {
+      const models = {
+        inventoryCategoryTecnologia: catalog(existing),
+        inventoryLocationTecnologia: catalog(existing),
+        locationStock: catalog(existing),
+        inventoryTecnologia: { findMany: vi.fn(async () => []) },
+      };
+      return { models, domain: createTiDomainServices(database(models)) };
+    };
+    const conflict = { statusCode: 409 };
+
+    const renaming = services(actives[0]);
+    await expect(
+      renaming.domain.inventoryLocations?.create?.(auth(), { name: " deposito " }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      renaming.domain.inventoryCategories?.create?.(auth(), { name: "DEPÓSITO" }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      renaming.domain.inventoryLocations?.update?.(auth(), "a", { name: "Deposito" }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      renaming.domain.inventoryCategories?.update?.(auth(), "a", { name: "Deposito" }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      renaming.domain.stock?.updateLocation?.(auth(), "a", { name: "Deposito" }),
+    ).rejects.toMatchObject(conflict);
+
+    const reactivating = services(inactive);
+    await expect(
+      reactivating.domain.inventoryLocations?.update?.(auth(), "c", { active: true }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      reactivating.domain.stock?.updateLocation?.(auth(), "c", { status: true }),
+    ).rejects.toMatchObject(conflict);
+
+    for (const { models } of [renaming, reactivating]) {
+      for (const model of [
+        models.inventoryCategoryTecnologia,
+        models.inventoryLocationTecnologia,
+        models.locationStock,
+      ]) {
+        expect(model.create).not.toHaveBeenCalled();
+        expect(model.update).not.toHaveBeenCalled();
+      }
+    }
+
+    // Ajustar a própria grafia, mudar outro campo ou desativar segue permitido.
+    const editing = services(actives[0]);
+    await editing.domain.inventoryLocations?.update?.(auth(), "a", { name: "SALA A" });
+    await editing.domain.inventoryLocations?.update?.(auth(), "a", { active: false });
+    editing.models.locationStock.findMany.mockResolvedValueOnce([]);
+    await editing.domain.stock?.updateLocation?.(auth(), "a", { floor: 2 });
+    expect(editing.models.inventoryLocationTecnologia.update).toHaveBeenCalledTimes(2);
+    // Mudar de andar confere o nome entre os ativos do andar de destino.
+    expect(editing.models.locationStock.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ floor: 2 }) }),
+    );
+    expect(editing.models.locationStock.update).toHaveBeenCalledWith({
+      where: { id: "a" },
+      data: { floor: 2 },
+    });
+    // A busca de ativos é sempre da organização (e, no estoque, do departamento de TI).
+    expect(renaming.models.inventoryLocationTecnologia.findMany).toHaveBeenCalledWith({
+      where: { organization_id: ORGANIZATION_ID, active: true },
+      select: { id: true, name: true },
+    });
+    expect(renaming.models.locationStock.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: ORGANIZATION_ID,
+        department_id: DEPARTMENT_ID,
+        status: true,
+        floor: null,
+      },
+      select: { id: true, name: true },
+    });
+  });
+
   it("uses uuid defaults for stock categories and locations", () => {
     const schema = readFileSync(new URL("../prisma/schema.prisma", import.meta.url), "utf8");
     const locationModel = schema.split("model LocationStock {")[1]?.split("\nmodel ")[0];
@@ -309,6 +400,7 @@ describe("TI domain: regra do computador ativo", () => {
     const queues = new Map<string, Promise<void>>();
     const lockedKeys: string[] = [];
     const events: Array<Record<string, unknown>> = [];
+    const changes: Array<Record<string, unknown>> = [];
     const matches = (item: Asset, where: Record<string, unknown>): boolean =>
       Object.entries(where).every(([key, expected]) => {
         if (key === "NOT") return item.id !== (expected as { id: string }).id;
@@ -367,6 +459,12 @@ describe("TI domain: regra do computador ativo", () => {
           status: "active",
         })),
       },
+      changeHistoryTecnologia: {
+        createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+          changes.push(...data);
+          return { count: data.length };
+        }),
+      },
       inventoryEventTecnologia: {
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
           events.push(data);
@@ -408,7 +506,7 @@ describe("TI domain: regra do computador ativo", () => {
         (item) =>
           item.user_id === user && item.category_id === COMPUTER_CATEGORY_ID && !item.return_date,
       );
-    return { db, models, transaction, assets, activeComputers, lockedKeys, events };
+    return { db, models, transaction, assets, activeComputers, lockedKeys, events, changes };
   }
 
   it("recusa um segundo computador ativo em cadastro, edição e atribuição", async () => {
@@ -489,7 +587,7 @@ describe("TI domain: regra do computador ativo", () => {
 
   // Legado: a troca do PHP não validava, então há quem tenha migrado com dois computadores.
   it("edição que não troca pessoa nem categoria não reavalia a regra", async () => {
-    const { db, transaction, models } = inMemoryDatabase([
+    const { db, lockedKeys, models, changes, events } = inMemoryDatabase([
       asset("pc-1", { user_id: USER_ID }),
       asset("pc-2", { user_id: USER_ID }),
     ]);
@@ -497,11 +595,23 @@ describe("TI domain: regra do computador ativo", () => {
 
     await service?.update?.(auth(), "pc-2", { notes: "Revisado", user_id: USER_ID });
 
-    expect(transaction).not.toHaveBeenCalled();
+    expect(lockedKeys).toEqual([]);
     expect(models.inventoryTecnologia.update).toHaveBeenCalledWith({
       where: { id: "pc-2" },
       data: { notes: "Revisado", user_id: USER_ID },
     });
+    // #1936: o campo editado entra no histórico de alterações, não no patrimonial.
+    expect(changes).toEqual([
+      expect.objectContaining({
+        item_type: "inventory",
+        item_id: "pc-2",
+        field: "notes",
+        after: "Revisado",
+        actor_user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+      }),
+    ]);
+    expect(events).toEqual([]);
   });
 
   it("só renomeia uma categoria para Computador se ninguém tiver dois itens ativos dela", async () => {
@@ -635,6 +745,7 @@ describe("TI domain: transferências e histórico patrimonial", () => {
   function store(seed: Asset[]) {
     const assets = seed.map((item) => ({ ...item }));
     const events: Array<Record<string, unknown>> = [];
+    const changes: Array<Record<string, unknown>> = [];
     const lockedKeys: unknown[] = [];
     const queues = new Map<string, Promise<void>>();
     const matches = (item: Asset, where: Record<string, unknown>): boolean =>
@@ -677,6 +788,12 @@ describe("TI domain: transferências e histórico patrimonial", () => {
       inventoryLocationTecnologia: {
         findFirst: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id })),
         findMany: vi.fn(async () => [{ id: ROOM_A, name: "Sala A" }]),
+      },
+      changeHistoryTecnologia: {
+        createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+          changes.push(...data);
+          return { count: data.length };
+        }),
       },
       inventoryEventTecnologia: {
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -745,7 +862,7 @@ describe("TI domain: transferências e histórico patrimonial", () => {
         }
       }),
     } as unknown as TiDatabase;
-    return { db, models, assets, events, lockedKeys };
+    return { db, models, assets, events, lockedKeys, changes };
   }
 
   it("move entre pessoas e locais e registra origem, destino, autor e ação", async () => {

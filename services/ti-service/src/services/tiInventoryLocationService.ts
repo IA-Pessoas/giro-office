@@ -1,4 +1,9 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  hasTiCatalogNameConflict,
+  error as logError,
+  ServiceError,
+  tiCatalogNameToCheck,
+} from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
@@ -22,17 +27,7 @@ export class TiInventoryLocationService {
     body: CreateTiInventoryLocationBody,
   ): Promise<unknown> {
     try {
-      const existing = await this.prisma.inventoryLocationTecnologia.findFirst({
-        where: {
-          organization_id: context.organizationId,
-          name: body.name,
-          active: true,
-        },
-      });
-
-      if (existing) {
-        throw new ServiceError(409, "Já existe um local de inventário de TI ativo com este nome.");
-      }
+      await this.ensureUniqueName(context.organizationId, body.name);
 
       return this.prisma.inventoryLocationTecnologia.create({
         data: {
@@ -61,6 +56,8 @@ export class TiInventoryLocationService {
       if (!existing) {
         throw new ServiceError(404, "Local de inventário de TI não encontrado.");
       }
+      const name = tiCatalogNameToCheck(existing, body);
+      if (name !== null) await this.ensureUniqueName(context.organizationId, name, id);
 
       return this.prisma.inventoryLocationTecnologia.update({
         where: { id },
@@ -70,6 +67,21 @@ export class TiInventoryLocationService {
       logError("Erro ao atualizar local de inventario de TI", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao atualizar local de inventario de TI.", err);
+    }
+  }
+
+  /** Nome único entre os locais ativos da organização, sem caixa nem acento (#1937). */
+  private async ensureUniqueName(
+    organizationId: string,
+    name: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const active = await this.prisma.inventoryLocationTecnologia.findMany({
+      where: { organization_id: organizationId, active: true },
+      select: { id: true, name: true },
+    });
+    if (hasTiCatalogNameConflict(active, name, exceptId)) {
+      throw new ServiceError(409, "Já existe um local de inventário de TI ativo com este nome.");
     }
   }
 }

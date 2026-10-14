@@ -21,6 +21,8 @@ import {
 import { buildTiServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
+import { createTiAccessLogRoutes } from "./routes/tiAccessLog.routes.js";
+import { createTiChangeHistoryRoutes } from "./routes/tiChangeHistory.routes.js";
 import { createTiDashboardRoutes } from "./routes/tiDashboard.routes.js";
 import { createTiExtensionRoutes } from "./routes/tiExtension.routes.js";
 import { createTiInventoryRoutes } from "./routes/tiInventory.routes.js";
@@ -30,6 +32,7 @@ import { createTiPasswordRoutes } from "./routes/tiPassword.routes.js";
 import { createTiRequestRoutes } from "./routes/tiRequest.routes.js";
 import { createTiRequestCategoryRoutes } from "./routes/tiRequestCategory.routes.js";
 import { createTiRobotRoutes } from "./routes/tiRobot.routes.js";
+import { createTiSpecificAccessRoutes } from "./routes/tiSpecificAccess.routes.js";
 import { createTiStockRoutes } from "./routes/tiStock.routes.js";
 import { createTiTermRoutes } from "./routes/tiTerm.routes.js";
 import {
@@ -123,6 +126,9 @@ export function createTiApplication({
   app.use("/ti/dashboard", createTiDashboardRoutes(prisma));
   app.use("/ti/requests", createTiRequestRoutes(prisma, tiRequestImageStorage));
   app.use("/ti/request-categories", createTiRequestCategoryRoutes(prisma));
+  app.use("/ti/access-logs", createTiAccessLogRoutes(prisma));
+  app.use("/ti/change-history", createTiChangeHistoryRoutes(prisma));
+  app.use("/ti/specific-accesses", createTiSpecificAccessRoutes(prisma));
 
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {

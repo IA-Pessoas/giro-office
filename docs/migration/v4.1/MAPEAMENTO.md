@@ -623,6 +623,49 @@ transação somente leitura. `SEM_IMPEDIMENTO_IDENTIFICADO_NESTA_VALIDACAO` sign
 as checagens deste recorte passaram, não que já exista payload, ensaio ou autorização de carga.
 Detalhes e limites ficam em [VALIDACAO-RH-2026-09-12.md](./VALIDACAO-RH-2026-09-12.md).
 
+## T01 — histórico de alterações de TI (proposta, carga não executada)
+
+Registrado em 13/10/2026 (#1936). `tb_historico.tecnologia` continua **pendente** no pacote V4
+(`LEGACY_HISTORY_NO_REPLAY_CONTRACT`; 384 registros no relatório de quarentena de 13/09/2026).
+O que faltava era o destino: `tecnologia.changeHistory` (`item_type`, `item_id`, `field`,
+`before`, `after`, `note`, `actor_user_id`, `created_at`) agora existe e é lido por
+`GET /ti/change-history/list`. Este mapeamento é a proposta para a regra; promovê-la a
+`confirmed`, executar a carga e contar os não associados exigem a decisão P08 e o dump, que
+não estão neste recorte. Fonte: `classes/Historico.php:806` (`Historico::ti`) e os pontos de
+chamada citados abaixo.
+
+Colunas: `data` → `created_at`, `user_id` → `actor_user_id` (ator corroborado como em G01/U01),
+`campo` → `field`, `antes`/`depois` → `before`/`after`, `obs` → `note`, `tipo` → `item_type`,
+`item_id` → `item_id` (UUID v5 da tabela de origem do item, como no V4 especializado).
+
+| `tipo` legado | Origem do `item_id` | Tratamento proposto |
+| --- | --- | --- |
+| 1 Inventário | `tb_tecnologia.inventario` | Preservar só `campo` ∈ {Código, Tipo, Observação, Data de Entrega, Termo} (`classes/Usuario.php:336-353`): valores textuais, sem tradução de ID. |
+| 1 Inventário, `campo` TI Responsável | `tb_tecnologia.inventario` | Quarentena até haver tradução dos IDs: `antes`/`depois` são IDs de `tb_admin.usuarios` (`classes/Usuario.php:351`). O serviço atual grava esse campo pelo nome. |
+| 6 Inventário por localização | `tb_tecnologia.inventario_itens` | Preservar `campo` ∈ {Cadastro de item, Código, Tipo, Observação} (`classes/Usuario.php:552-568`). |
+| 13 Categoria de inventário | `tb_cbs.estoque_inventario` | Quarentena: a origem do item é uma tabela de estoque sem destino confirmado como categoria de inventário (`classes/Estoque.php:415-434`). |
+| 2 Termo | `tb_tecnologia.termos` | Quarentena até revisar `campo` (dados pessoais do termo em `antes`/`depois`). |
+| 5 Senhas | `tb_tecnologia.senhas` | Preservar `campo`, autor e data; **nunca** `antes`/`depois` — `classes/Senhas.php:72` grava login, senha e observação em claro. O serviço também mascara na leitura. |
+| 7 Robô / 8 Controle | `tb_tecnologia.robos`, `tb_tecnologia.robos_controles` | Quarentena até haver destino confirmado do item e tradução de `departamento_id`/`responsavel_id` (`classes/Robo.php:8-29,64-112`). |
+| 3 Tarefa | tarefas de TI | Fora deste destino: a trilha de alteração das tarefas de TI pertence ao fluxo de Desenvolvimento de TI (#1923 §4; `classes/Tarefa.php:1639`). |
+| 9 Anydesk, 10/11 Orçamentos | — | Quarentena: sem entidade atual equivalente (`classes/Usuario.php:366`, `classes/Solicitacao.php:380-441`, `workspace/ajax/orcamentos.php:11-19`). |
+| 4 Estoque | `tb_cbs.estoque_saidas` | Fora: é o aceite ou a recusa de uma saída de estoque (`classes/Estoque.php:78-95`); pertence ao histórico de estoque, não a este. |
+| 12 Transferência para local | `tb_tecnologia.inventario` | Fora deste destino: é movimentação patrimonial (`tecnologia.inventoryEvents`); `antes`/`depois` são IDs de usuário e de local. |
+
+`campo` legado é texto livre de tela ("Código", "Observação"); a regra deve convertê-lo para a
+chave que o serviço grava (`asset_code`, `category`, `notes`, `delivery_date`) quando houver
+equivalente, para rótulos e filtros não ficarem mistos.
+
+Vão para quarentena, contados por motivo e sem atribuição inventada:
+
+- `tipo` 1 com `campo` ∈ {Usuário, Data de Devolução, Item Descartado}: `antes`/`depois` são IDs
+  legados ou a data sentinela, e são movimentação, não edição de campo;
+- `tipo` 6 com `campo` ∈ {Local, TI Responsável} (`classes/Usuario.php:443,570`): IDs de local e de
+  usuário; "Local" é movimentação;
+- `tipo` 1 com `campo` "Transferencia de item para inventario" (`classes/Usuario.php:461`): o
+  `item_id` é de `tb_tecnologia.inventario_itens`, não de `tb_tecnologia.inventario`;
+- autor não corroborado, item não resolvido ou resolvido para mais de um registro, data inválida.
+
 ## Q01 / P01 — quarentena e decisões de domínio
 
 | Domínio/origem | Tratamento a preservar ou revisar |

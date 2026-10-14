@@ -1,10 +1,12 @@
 import {
   COMPUTER_CATEGORY_LOCKED_MESSAGE,
   COMPUTER_CATEGORY_RENAME_CONFLICT_MESSAGE,
+  hasTiCatalogNameConflict,
   hasUserWithSeveralActiveAssets,
   isComputerCategoryName,
   error as logError,
   ServiceError,
+  tiCatalogNameToCheck,
 } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
@@ -29,21 +31,8 @@ export class TiInventoryCategoryService {
     body: CreateTiInventoryCategoryBody,
   ): Promise<unknown> {
     try {
-      const existing = await this.prisma.inventoryCategoryTecnologia.findFirst({
-        where: {
-          organization_id: context.organizationId,
-          name: body.name,
-          active: true,
-        },
-      });
-
-      if (existing) {
-        throw new ServiceError(
-          409,
-          "Já existe uma categoria de inventário de TI ativa com este nome.",
-        );
-      }
       await this.ensureSingleComputerCategory(context.organizationId, body.name);
+      await this.ensureUniqueName(context.organizationId, body.name);
 
       return this.prisma.inventoryCategoryTecnologia.create({
         data: {
@@ -81,6 +70,8 @@ export class TiInventoryCategoryService {
       } else if (body.name !== undefined) {
         await this.ensureSingleComputerCategory(context.organizationId, body.name, id);
       }
+      const name = tiCatalogNameToCheck(existing, body);
+      if (name !== null) await this.ensureUniqueName(context.organizationId, name, id);
 
       return this.prisma.inventoryCategoryTecnologia.update({
         where: { id },
@@ -90,6 +81,24 @@ export class TiInventoryCategoryService {
       logError("Erro ao atualizar categoria de inventario de TI", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao atualizar categoria de inventario de TI.", err);
+    }
+  }
+
+  /** Nome único entre as categorias ativas da organização, sem caixa nem acento (#1937). */
+  private async ensureUniqueName(
+    organizationId: string,
+    name: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const active = await this.prisma.inventoryCategoryTecnologia.findMany({
+      where: { organization_id: organizationId, active: true },
+      select: { id: true, name: true },
+    });
+    if (hasTiCatalogNameConflict(active, name, exceptId)) {
+      throw new ServiceError(
+        409,
+        "Já existe uma categoria de inventário de TI ativa com este nome.",
+      );
     }
   }
 

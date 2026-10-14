@@ -256,6 +256,104 @@ describe("ti Worker", () => {
     expect(inventory.getById).not.toHaveBeenCalled();
   });
 
+  // #1938: acessos específicos, só para TI nível 3, mesmo que a tela os esconda.
+  it("routes specific accesses for TI admins only", async () => {
+    const specificAccesses = {
+      list: vi.fn(async () => []),
+      setTaskCompletion: vi.fn(async () => ({ id: USER_ID, task_completion: true })),
+    };
+    const app = createTiWorkerApp({ env: env(), services: { specificAccesses } } as never);
+    const call = (method: string, path: string, permission: string, body?: unknown) =>
+      app.request(`https://ti.test${path}`, {
+        method,
+        headers: { ...headers(permission), "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const path = `/ti/specific-accesses/${USER_ID}`;
+
+    for (const permission of ["0", "1", "2"]) {
+      expect((await call("GET", "/ti/specific-accesses/list", permission)).status).toBe(403);
+      expect((await call("PATCH", path, permission, { task_completion: true })).status).toBe(403);
+    }
+    expect((await call("PATCH", path, "3", { task_completion: "sim" })).status).toBe(400);
+    expect(
+      (await call("PATCH", "/ti/specific-accesses/nao-e-uuid", "3", { task_completion: true }))
+        .status,
+    ).toBe(400);
+    expect(specificAccesses.list).not.toHaveBeenCalled();
+    expect(specificAccesses.setTaskCompletion).not.toHaveBeenCalled();
+
+    expect((await call("GET", "/ti/specific-accesses/list", "3")).status).toBe(200);
+    expect((await call("PATCH", path, "3", { task_completion: true })).status).toBe(200);
+    expect(specificAccesses.setTaskCompletion).toHaveBeenCalledWith(
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        permission: 3,
+        isOrganizationOwner: false,
+      },
+      USER_ID,
+      true,
+    );
+  });
+
+  // #1936: histórico de alterações de TI, só para TI nível 3.
+  it("routes the TI change history for TI admins only", async () => {
+    const changeHistory = { list: vi.fn(async () => ({ items: [], hasMore: false })) };
+    const app = createTiWorkerApp({ env: env(), services: { changeHistory } } as never);
+    const get = (path: string, permission: string) =>
+      app.request(`https://ti.test${path}`, { headers: headers(permission) });
+
+    expect((await get("/ti/change-history/list", "2")).status).toBe(403);
+    expect((await get("/ti/change-history/list?item_type=estoque", "3")).status).toBe(400);
+    expect((await get("/ti/change-history/list?item_id=nao-e-uuid", "3")).status).toBe(400);
+    expect(changeHistory.list).not.toHaveBeenCalled();
+
+    const response = await get(
+      `/ti/change-history/list?item_type=inventory&item_id=${CATEGORY_ID}&page=2`,
+      "3",
+    );
+    expect(response.status).toBe(200);
+    expect(changeHistory.list).toHaveBeenCalledWith(
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        permission: 3,
+        isOrganizationOwner: false,
+      },
+      { item_type: "inventory", item_id: CATEGORY_ID, page: 2 },
+    );
+  });
+
+  // #1935: logs de acesso por usuário, só para TI nível 3.
+  it("routes the user access logs for TI admins only", async () => {
+    const accessLogs = { list: vi.fn(async () => ({ items: [], hasMore: false })) };
+    const passwords = { list: vi.fn() };
+    const app = createTiWorkerApp({ env: env(), services: { accessLogs, passwords } } as never);
+    const get = (path: string, permission: string) =>
+      app.request(`https://ti.test${path}`, { headers: headers(permission) });
+
+    expect((await get(`/ti/access-logs/${USER_ID}`, "2")).status).toBe(403);
+    expect((await get("/ti/access-logs/nao-e-uuid", "3")).status).toBe(400);
+    expect((await get(`/ti/access-logs/${USER_ID}?page_size=101`, "3")).status).toBe(400);
+    expect(accessLogs.list).not.toHaveBeenCalled();
+
+    const response = await get(`/ti/access-logs/${USER_ID}?page=2&page_size=20`, "3");
+    expect(response.status).toBe(200);
+    expect(accessLogs.list).toHaveBeenCalledWith(
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        permission: 3,
+        isOrganizationOwner: false,
+      },
+      USER_ID,
+      { page: 2, page_size: 20 },
+    );
+    // Não passa pelo relatório de credenciais “Logins”.
+    expect(passwords.list).not.toHaveBeenCalled();
+  });
+
   it("requires the TI module claim even when the legacy permission is high", async () => {
     const categoryService = service();
     const app = createTiWorkerApp({ env: env(), categoryService });
