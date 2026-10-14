@@ -3,6 +3,7 @@ import type { TiId, TiListFilters } from "../types";
 export const tiQueryKeys = {
   all: ["ti"] as const,
   dashboard: () => [...tiQueryKeys.all, "dashboard"] as const,
+  specificAccesses: () => [...tiQueryKeys.all, "specific-accesses"] as const,
   changeHistory: (itemType?: string, page?: number) =>
     [...tiQueryKeys.all, "change-history", itemType, page] as const,
   accessLogUsers: () => [...tiQueryKeys.all, "access-log-users"] as const,

@@ -403,6 +403,14 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiSpecificAccessUpdateInput: {
+    type: "object",
+    required: ["task_completion"],
+    properties: {
+      task_completion: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
   TiInventoryLocationUpdateInput: {
     type: "object",
     minProperties: 1,
@@ -875,6 +883,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
       { name: "TI Dashboard", description: "Resumo consolidado do modulo de TI" },
       { name: "TI Access Logs", description: "Logs de acesso por usuario" },
       { name: "TI Change History", description: "Historico de alteracoes de TI" },
+      { name: "TI Specific Accesses", description: "Acessos especificos concedidos pela TI" },
       { name: "Internal", description: "Contratos internos entre serviços" },
     ],
     components: {
@@ -1056,6 +1065,35 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           ],
           successDescription: "Alteracoes listadas",
           errors: [400, 401, 403],
+        }),
+      },
+      "/ti/specific-accesses/list": {
+        get: publicTiOperation({
+          operationId: "listTiSpecificAccesses",
+          tags: ["TI Specific Accesses"],
+          summary:
+            "Lista os usuarios ativos da organizacao e se cada um pode concluir tarefas diretamente",
+          successDescription: "Acessos especificos listados",
+          errors: [401, 403],
+        }),
+      },
+      "/ti/specific-accesses/{userId}": {
+        patch: publicTiOperation({
+          operationId: "updateTiSpecificAccess",
+          tags: ["TI Specific Accesses"],
+          summary: "Concede ou revoga a conclusao direta de tarefas de um usuario (TI nivel 3)",
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              description: "Usuario que recebe ou perde o acesso",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: jsonRequestBody("#/components/schemas/TiSpecificAccessUpdateInput"),
+          successDescription: "Acesso atualizado",
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/dashboard": {

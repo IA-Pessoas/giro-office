@@ -1981,6 +1981,27 @@ await runTest("ti inventory manages its own locations, apart from stock location
   assert.match(dialog, /disabled=\{!canManage \|\| isSubmitting\}/);
 });
 
+await runTest("ti specific accesses tab grants and revokes task completion for TI admins", async () => {
+  const source = await readModuleSource("components/TiSpecificAccessesTab.tsx");
+  const page = await readModuleSource("components/TiPage.tsx");
+  const service = await readModuleSource("services/tiSpecificAccessesService.ts");
+  const contract = await readModuleSource("services/tiService.contract.ts");
+
+  assert.match(contract, /detail: "\/ti\/specific-accesses\/\{id\}"/);
+  assert.match(service, /\{ task_completion: taskCompletion \}/);
+  assert.match(source, /headers=\{\["Usuário", "Departamento", "Conclusão de tarefas", ""\]\}/);
+  assert.match(source, /toggle\(row\.id, !row\.task_completion\)/);
+  // Erro do serviço aparece na tela; o botão fica preso enquanto salva.
+  assert.match(source, /setError\(getTiInventoryMutationErrorMessage\(mutationError\)\)/);
+  assert.match(source, /disabled=\{mutation\.isPending\}/);
+  // Só a conclusão de tarefas: nada de permissão por módulo nem alteração de regime.
+  assert.doesNotMatch(source, /modules|regime/i);
+  // Só TI nível 3 vê a aba; o autoatendimento não.
+  const selfService = page.slice(page.indexOf("const SELF_SERVICE_TI_TABS"));
+  assert.match(page, /panel: TiSpecificAccessesTab/);
+  assert.doesNotMatch(selfService.slice(0, selfService.indexOf("];")), /TiSpecificAccessesTab/);
+});
+
 await runTest("ti change history tab lists field changes with masked credentials", async () => {
   const source = await readModuleSource("components/TiChangeHistoryTab.tsx");
   const page = await readModuleSource("components/TiPage.tsx");

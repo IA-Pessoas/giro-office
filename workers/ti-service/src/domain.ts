@@ -24,6 +24,11 @@ import {
   listTiChangeHistory,
   type TiChangeHistoryDatabase,
 } from "@workspace/ti-service/src/services/tiChangeHistoryService.js";
+import {
+  listTiSpecificAccesses,
+  setTiTaskCompletionAccess,
+  type TiSpecificAccessDatabase,
+} from "@workspace/ti-service/src/services/tiSpecificAccessService.js";
 
 export type TiAuthContext = {
   organizationId: string;
@@ -59,6 +64,7 @@ export type TiService = {
 
 export type TiServices = {
   accessLogs?: TiService;
+  specificAccesses?: TiService;
   changeHistory?: TiService;
   inventory?: TiService;
   inventoryCategories?: TiService;
@@ -2374,6 +2380,18 @@ export function createTiDomainServices(database: TiDatabase, encryptionKey?: str
     accessLogs: {
       list: (value, userId, query) =>
         listTiAccessLogs(database, context(value), String(userId), row(query)),
+    },
+    // #1938: mesmos acessos específicos do serviço Node.
+    specificAccesses: {
+      list: (value) =>
+        listTiSpecificAccesses(database as unknown as TiSpecificAccessDatabase, context(value)),
+      setTaskCompletion: (value, userId, taskCompletion) =>
+        setTiTaskCompletionAccess(
+          database as unknown as TiSpecificAccessDatabase,
+          context(value),
+          String(userId),
+          taskCompletion === true,
+        ),
     },
     // #1936: mesma consulta do serviço Node.
     changeHistory: {

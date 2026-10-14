@@ -12,6 +12,7 @@ import {
   PackageSearch,
   Phone,
   ShieldAlert,
+  ShieldCheck,
   Ticket,
   type LucideIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { TiInventoryTab } from "./TiInventoryTab";
 import { TiPasswordsTab } from "./TiPasswordsTab";
 import { TiRequestsTab } from "./TiRequestsTab";
 import { TiRobotsTab } from "./TiRobotsTab";
+import { TiSpecificAccessesTab } from "./TiSpecificAccessesTab";
 import { TiStockTab } from "./TiStockTab";
 import { TiTermsTab } from "./TiTermsTab";
 import { tiPanelClassName, tiThinScrollbarClassName, tiWorkspaceShellClassName } from "./tiWorkspaceUi";
@@ -41,7 +43,8 @@ type TiTabId =
   | "extensions"
   | "robots"
   | "changeHistory"
-  | "accessLogs";
+  | "accessLogs"
+  | "specificAccesses";
 
 type TiTabConfig = {
   id: TiTabId;
@@ -110,6 +113,12 @@ const TI_TABS: TiTabConfig[] = [
     label: "Logs de acesso",
     icon: History,
     panel: TiAccessLogsTab,
+  },
+  {
+    id: "specificAccesses",
+    label: "Acessos específicos",
+    icon: ShieldCheck,
+    panel: TiSpecificAccessesTab,
   },
 ];
 

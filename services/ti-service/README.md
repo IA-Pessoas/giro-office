@@ -52,6 +52,12 @@ servico/VPS, junto com `SUPABASE_URL`.
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
 - Exemplo: `GET /ti/stock`
+- Exemplo: `GET /ti/specific-accesses/list` e `PATCH /ti/specific-accesses/{userId}` com
+  `{ "task_completion": true }` (TI nível 3): quem pode concluir tarefas diretamente, o
+  acesso "Conclusão de tarefas" da tela Acessos Admin do legado. Grava em
+  `permissions.specific`, que o serviço de tarefas confere, e registra a mudança em `logs`.
+  Ninguém altera o próprio acesso. Matriz dos acessos legados:
+  `docs/security/ti-acessos-especificos.md`.
 - Exemplo: `GET /ti/change-history/list?item_type=inventory&page=1` (TI nível 3): alterações de
   itens de TI (`tecnologia.changeHistory`), uma linha por campo, com antes e depois. Hoje a
   edição de item de inventário grava aqui; movimentação patrimonial fica em
