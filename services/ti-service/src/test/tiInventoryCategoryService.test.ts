@@ -28,7 +28,7 @@ describe("TiInventoryCategoryService", () => {
   it("creates active category for organization", async () => {
     const prisma = {
       inventoryCategoryTecnologia: {
-        findFirst: vi.fn(async () => null),
+        findMany: vi.fn(async () => []),
         create: vi.fn(async ({ data }) => ({ id: "cat-1", ...data })),
       },
     };
@@ -48,15 +48,54 @@ describe("TiInventoryCategoryService", () => {
   it("throws 409 for duplicated active category in organization", async () => {
     const prisma = {
       inventoryCategoryTecnologia: {
-        findFirst: vi.fn(async () => ({ id: "cat-1" })),
+        findMany: vi.fn(async () => [{ id: "cat-1", name: "Notebook" }]),
       },
     };
     const service = new TiInventoryCategoryService(prisma as never);
 
-    await expect(service.create(context, { name: "Notebook" })).rejects.toMatchObject({
-      statusCode: 409,
-      message: "Já existe uma categoria de inventário de TI ativa com este nome.",
+    for (const name of ["Notebook", " NOTEBOOK "]) {
+      await expect(service.create(context, { name })).rejects.toMatchObject({
+        statusCode: 409,
+        message: "Já existe uma categoria de inventário de TI ativa com este nome.",
+      });
+    }
+  });
+
+  // #1937: renomear ou reativar também respeita o nome único.
+  it("refuses to rename or reactivate a category into a name already in use", async () => {
+    const monitor = { id: "cat-2", name: "Monitor", active: true };
+    const oldNotebook = { id: "cat-3", name: "Notebook", active: false };
+    const update = vi.fn(async ({ data }) => data);
+    const prismaWith = (existing: unknown) => ({
+      inventoryCategoryTecnologia: {
+        findFirst: vi.fn(async () => existing),
+        findMany: vi.fn(async () => [{ id: "cat-1", name: "Notebook" }, monitor]),
+        update,
+      },
     });
+
+    await expect(
+      new TiInventoryCategoryService(prismaWith(monitor) as never).update(context, monitor.id, {
+        name: "notebook",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      new TiInventoryCategoryService(prismaWith(oldNotebook) as never).update(
+        context,
+        oldNotebook.id,
+        { active: true },
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(update).not.toHaveBeenCalled();
+
+    // Só a tag, ou desativar, não esbarra em nome.
+    await new TiInventoryCategoryService(prismaWith(monitor) as never).update(context, monitor.id, {
+      tag: "MON",
+    });
+    await new TiInventoryCategoryService(prismaWith(monitor) as never).update(context, monitor.id, {
+      active: false,
+    });
+    expect(update).toHaveBeenCalledTimes(2);
   });
   // #1931: Computador é a categoria canônica da regra do computador ativo.
   describe("categoria canônica Computador", () => {

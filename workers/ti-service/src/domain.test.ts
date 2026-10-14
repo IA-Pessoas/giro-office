@@ -57,6 +57,97 @@ const auth = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("TI domain", () => {
+  // #1937: nome único ao cadastrar, renomear e reativar, nos três catálogos.
+  it("keeps catalog names unique on create, rename and reactivation", async () => {
+    const actives = [
+      { id: "a", name: "Sala A", active: true, status: true },
+      { id: "b", name: "Depósito", active: true, status: true },
+    ];
+    const inactive = { id: "c", name: "Depósito", active: false, status: false };
+    const catalog = (existing: unknown) => ({
+      findMany: vi.fn(async () => actives),
+      findFirst: vi.fn(async () => existing),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+    });
+    const services = (existing: unknown) => {
+      const models = {
+        inventoryCategoryTecnologia: catalog(existing),
+        inventoryLocationTecnologia: catalog(existing),
+        locationStock: catalog(existing),
+        inventoryTecnologia: { findMany: vi.fn(async () => []) },
+      };
+      return { models, domain: createTiDomainServices(database(models)) };
+    };
+    const conflict = { statusCode: 409 };
+
+    const renaming = services(actives[0]);
+    await expect(
+      renaming.domain.inventoryLocations?.create?.(auth(), { name: " deposito " }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      renaming.domain.inventoryCategories?.create?.(auth(), { name: "DEPÓSITO" }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      renaming.domain.inventoryLocations?.update?.(auth(), "a", { name: "Deposito" }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      renaming.domain.inventoryCategories?.update?.(auth(), "a", { name: "Deposito" }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      renaming.domain.stock?.updateLocation?.(auth(), "a", { name: "Deposito" }),
+    ).rejects.toMatchObject(conflict);
+
+    const reactivating = services(inactive);
+    await expect(
+      reactivating.domain.inventoryLocations?.update?.(auth(), "c", { active: true }),
+    ).rejects.toMatchObject(conflict);
+    await expect(
+      reactivating.domain.stock?.updateLocation?.(auth(), "c", { status: true }),
+    ).rejects.toMatchObject(conflict);
+
+    for (const { models } of [renaming, reactivating]) {
+      for (const model of [
+        models.inventoryCategoryTecnologia,
+        models.inventoryLocationTecnologia,
+        models.locationStock,
+      ]) {
+        expect(model.create).not.toHaveBeenCalled();
+        expect(model.update).not.toHaveBeenCalled();
+      }
+    }
+
+    // Ajustar a própria grafia, mudar outro campo ou desativar segue permitido.
+    const editing = services(actives[0]);
+    await editing.domain.inventoryLocations?.update?.(auth(), "a", { name: "SALA A" });
+    await editing.domain.inventoryLocations?.update?.(auth(), "a", { active: false });
+    editing.models.locationStock.findMany.mockResolvedValueOnce([]);
+    await editing.domain.stock?.updateLocation?.(auth(), "a", { floor: 2 });
+    expect(editing.models.inventoryLocationTecnologia.update).toHaveBeenCalledTimes(2);
+    // Mudar de andar confere o nome entre os ativos do andar de destino.
+    expect(editing.models.locationStock.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ floor: 2 }) }),
+    );
+    expect(editing.models.locationStock.update).toHaveBeenCalledWith({
+      where: { id: "a" },
+      data: { floor: 2 },
+    });
+    // A busca de ativos é sempre da organização (e, no estoque, do departamento de TI).
+    expect(renaming.models.inventoryLocationTecnologia.findMany).toHaveBeenCalledWith({
+      where: { organization_id: ORGANIZATION_ID, active: true },
+      select: { id: true, name: true },
+    });
+    expect(renaming.models.locationStock.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: ORGANIZATION_ID,
+        department_id: DEPARTMENT_ID,
+        status: true,
+        floor: null,
+      },
+      select: { id: true, name: true },
+    });
+  });
+
   it("uses uuid defaults for stock categories and locations", () => {
     const schema = readFileSync(new URL("../prisma/schema.prisma", import.meta.url), "utf8");
     const locationModel = schema.split("model LocationStock {")[1]?.split("\nmodel ")[0];

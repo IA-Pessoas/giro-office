@@ -7,9 +7,11 @@ import {
   COMPUTER_CATEGORY_RENAME_CONFLICT_MESSAGE,
   EncryptionService,
   executeReportingQuery,
+  hasTiCatalogNameConflict,
   hasUserWithSeveralActiveAssets,
   isComputerCategoryName,
   ServiceError,
+  tiCatalogNameToCheck,
   tiExtensionsReportingCatalog,
   tiInventoryReportingCatalog,
   tiRequestsReportingCatalog,
@@ -92,6 +94,21 @@ function pageQuery(value: unknown): { page: number; take: number; skip: number }
   return { page, take, skip: (page - 1) * take };
 }
 
+/** Nome único entre os registros ativos de um catálogo de TI, sem caixa nem acento (#1937). */
+async function ensureUniqueCatalogName(
+  catalog: Delegate,
+  activeWhere: Row,
+  name: unknown,
+  message: string,
+  exceptId?: unknown,
+): Promise<void> {
+  const active = (await catalog.findMany({
+    where: activeWhere,
+    select: { id: true, name: true },
+  })) as Row[];
+  if (hasTiCatalogNameConflict(active, name, exceptId)) throw new ServiceError(409, message);
+}
+
 function uniqueError(error: unknown): boolean {
   return row(error).code === "P2002";
 }
@@ -160,16 +177,13 @@ function inventoryServices(database: TiDatabase): TiServices {
       create: async (value, body) => {
         const auth = context(value);
         const input = row(body);
-        const existing = await categories.findFirst({
-          where: { organization_id: auth.organizationId, name: input.name, active: true },
-        });
-        if (existing) {
-          throw new ServiceError(
-            409,
-            "Já existe uma categoria de inventário de TI ativa com este nome.",
-          );
-        }
         await ensureSingleComputerCategory(database, auth.organizationId, input.name);
+        await ensureUniqueCatalogName(
+          categories,
+          { organization_id: auth.organizationId, active: true },
+          input.name,
+          "Já existe uma categoria de inventário de TI ativa com este nome.",
+        );
         return categories.create({
           data: { ...input, active: true, organization_id: auth.organizationId },
         });
@@ -189,6 +203,19 @@ function inventoryServices(database: TiDatabase): TiServices {
         } else if (input.name !== undefined) {
           await ensureSingleComputerCategory(database, auth.organizationId, input.name, String(id));
         }
+        const nameToCheck = tiCatalogNameToCheck(
+          { name: row(existing).name, active: row(existing).active },
+          input,
+        );
+        if (nameToCheck !== null) {
+          await ensureUniqueCatalogName(
+            categories,
+            { organization_id: auth.organizationId, active: true },
+            nameToCheck,
+            "Já existe uma categoria de inventário de TI ativa com este nome.",
+            id,
+          );
+        }
         return categories.update({ where: { id }, data: input });
       },
     },
@@ -201,14 +228,12 @@ function inventoryServices(database: TiDatabase): TiServices {
       create: async (value, body) => {
         const auth = context(value);
         const input = row(body);
-        const existing = await locations.findFirst({
-          where: { organization_id: auth.organizationId, name: input.name, active: true },
-        });
-        if (existing)
-          throw new ServiceError(
-            409,
-            "Já existe um local de inventário de TI ativo com este nome.",
-          );
+        await ensureUniqueCatalogName(
+          locations,
+          { organization_id: auth.organizationId, active: true },
+          input.name,
+          "Já existe um local de inventário de TI ativo com este nome.",
+        );
         return locations.create({
           data: { ...input, active: true, organization_id: auth.organizationId },
         });
@@ -219,7 +244,21 @@ function inventoryServices(database: TiDatabase): TiServices {
           where: { id, organization_id: auth.organizationId },
         });
         if (!existing) throw new ServiceError(404, "Local de inventário de TI não encontrado.");
-        return locations.update({ where: { id }, data: row(body) });
+        const input = row(body);
+        const nameToCheck = tiCatalogNameToCheck(
+          { name: row(existing).name, active: row(existing).active },
+          input,
+        );
+        if (nameToCheck !== null) {
+          await ensureUniqueCatalogName(
+            locations,
+            { organization_id: auth.organizationId, active: true },
+            nameToCheck,
+            "Já existe um local de inventário de TI ativo com este nome.",
+            id,
+          );
+        }
+        return locations.update({ where: { id }, data: input });
       },
     },
     inventory: {
@@ -2048,29 +2087,18 @@ function stockServices(database: TiDatabase): TiServices {
         const auth = context(value);
         const departmentId = await technologyDepartment(database, auth.organizationId);
         const input = row(body);
-        const activeLocations = await locations.findMany({
-          where: {
+        await ensureUniqueCatalogName(
+          locations,
+          {
             organization_id: auth.organizationId,
             department_id: departmentId,
             status: true,
+            // Como no legado, o nome é único por andar: "Armário" pode existir em dois andares.
+            floor: input.floor ?? null,
           },
-          select: { name: true },
-        });
-        const normalizeLocation = (name: string) =>
-          name
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/gu, "")
-            .trim()
-            .replace(/\s+/gu, " ")
-            .toLowerCase();
-        if (
-          activeLocations.some(
-            (location) =>
-              normalizeLocation(String(row(location).name)) ===
-              normalizeLocation(String(input.name)),
-          )
-        )
-          throw new ServiceError(409, "Já existe um local de estoque de TI ativo com este nome.");
+          input.name,
+          "Já existe um local de estoque de TI ativo com este nome neste andar.",
+        );
         return locations.create({
           data: {
             ...input,
@@ -2083,13 +2111,36 @@ function stockServices(database: TiDatabase): TiServices {
       updateLocation: async (value, id, body) => {
         const auth = context(value);
         const departmentId = await technologyDepartment(database, auth.organizationId);
-        if (
-          !(await locations.findFirst({
-            where: { id, organization_id: auth.organizationId, department_id: departmentId },
-          }))
-        )
-          throw new ServiceError(404, "Local de estoque não encontrado.");
-        return locations.update({ where: { id }, data: row(body) });
+        const existing = await locations.findFirst({
+          where: { id, organization_id: auth.organizationId, department_id: departmentId },
+        });
+        if (!existing) throw new ServiceError(404, "Local de estoque não encontrado.");
+        const input = row(body);
+        const current = row(existing);
+        // Renomear, reativar ou trocar de andar não pode repetir o nome de outro local ativo
+        // do mesmo andar.
+        const floor = input.floor === undefined ? current.floor : input.floor;
+        const movedFloor = (input.status ?? current.status) === true && floor !== current.floor;
+        const nameToCheck =
+          tiCatalogNameToCheck(
+            { name: current.name, active: current.status },
+            { name: input.name, active: input.status },
+          ) ?? (movedFloor ? (input.name ?? current.name) : null);
+        if (nameToCheck !== null) {
+          await ensureUniqueCatalogName(
+            locations,
+            {
+              organization_id: auth.organizationId,
+              department_id: departmentId,
+              status: true,
+              floor: floor ?? null,
+            },
+            nameToCheck,
+            "Já existe um local de estoque de TI ativo com este nome neste andar.",
+            id,
+          );
+        }
+        return locations.update({ where: { id }, data: input });
       },
     },
   };

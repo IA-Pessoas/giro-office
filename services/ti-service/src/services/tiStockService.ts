@@ -1,4 +1,9 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  hasTiCatalogNameConflict,
+  error as logError,
+  ServiceError,
+  tiCatalogNameToCheck,
+} from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
@@ -59,15 +64,6 @@ function isPrismaUniqueConstraintError(err: unknown): boolean {
     "code" in err &&
     (err as { code?: unknown }).code === "P2002"
   );
-}
-
-function normalizeStockLocationName(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase();
 }
 
 export class TiStockService {
@@ -525,16 +521,17 @@ export class TiStockService {
           organization_id: context.organizationId,
           department_id: departmentId,
           status: true,
+          // Como no legado, o nome é único por andar: "Armário" pode existir em dois andares.
+          floor: body.floor ?? null,
         },
         select: { name: true },
       });
-      const normalizedName = normalizeStockLocationName(body.name);
-      const existing = activeLocations.some(
-        (location) => normalizeStockLocationName(location.name) === normalizedName,
-      );
 
-      if (existing) {
-        throw new ServiceError(409, "Já existe um local de estoque de TI ativo com este nome.");
+      if (hasTiCatalogNameConflict(activeLocations, body.name)) {
+        throw new ServiceError(
+          409,
+          "Já existe um local de estoque de TI ativo com este nome neste andar.",
+        );
       }
 
       return this.prisma.locationStock.create({
@@ -566,6 +563,32 @@ export class TiStockService {
 
       if (!location) {
         throw new ServiceError(404, "Local de estoque de TI não encontrado.");
+      }
+      // Renomear, reativar ou trocar de andar não pode repetir o nome de outro local ativo
+      // do mesmo andar (#1937).
+      const floor = body.floor === undefined ? location.floor : body.floor;
+      const movedFloor = (body.status ?? location.status) && floor !== location.floor;
+      const name =
+        tiCatalogNameToCheck(
+          { name: location.name, active: location.status },
+          { name: body.name, active: body.status },
+        ) ?? (movedFloor ? (body.name ?? location.name) : null);
+      if (name !== null) {
+        const activeLocations = await this.prisma.locationStock.findMany({
+          where: {
+            organization_id: context.organizationId,
+            department_id: departmentId,
+            status: true,
+            floor,
+          },
+          select: { id: true, name: true },
+        });
+        if (hasTiCatalogNameConflict(activeLocations, name, id)) {
+          throw new ServiceError(
+            409,
+            "Já existe um local de estoque de TI ativo com este nome neste andar.",
+          );
+        }
       }
 
       return this.prisma.locationStock.update({

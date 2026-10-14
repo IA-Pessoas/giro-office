@@ -4,6 +4,7 @@ import {
   Boxes,
   Eye,
   ListChecks,
+  MapPin,
   Network,
   Pencil,
   Plus,
@@ -50,6 +51,7 @@ import type {
   TiInventoryReturnPayload,
 } from "../types";
 import { getTiInventoryMutationErrorMessage } from "../utils/inventoryMutationError";
+import { TiInventoryLocationsDialog } from "./TiInventoryLocationsDialog";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -81,7 +83,8 @@ type InventoryDialogState =
   | { type: "transferBatch" }
   | { type: "swap"; asset: TiInventoryAsset }
   | { type: "equipmentMap" }
-  | { type: "categories" };
+  | { type: "categories" }
+  | { type: "locations" };
 
 type TransferTarget = "user" | "location";
 
@@ -806,6 +809,11 @@ export function TiInventoryTab() {
                 icon={Tags}
                 label="Categorias"
                 onClick={() => openDialog({ type: "categories" })}
+              />
+              <TiIconAction
+                icon={MapPin}
+                label="Departamentos e locais"
+                onClick={() => openDialog({ type: "locations" })}
               />
               <TiIconAction
                 icon={Network}
@@ -1548,8 +1556,8 @@ export function TiInventoryTab() {
             closeDialog();
           }
         }}
-        title="Categorias"
-        description="Gestão de categorias de inventário."
+        title="Categorias de inventário"
+        description="Classificam os itens do inventário. As categorias de estoque são cadastradas na aba Estoque."
         contentClassName="w-[min(92vw,1040px)]"
       >
         <div className="space-y-4">
@@ -1692,6 +1700,16 @@ export function TiInventoryTab() {
           </TiQueryStatePanel>
         </div>
       </Dialog>
+
+      <TiInventoryLocationsDialog
+        canManage={canManage}
+        open={dialogState?.type === "locations"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDialog();
+          }
+        }}
+      />
     </TiPanel>
   );
 }
