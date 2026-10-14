@@ -17,7 +17,7 @@ import {
 import { isAxiosError } from "axios";
 import { toast } from "@shared/services/toast";
 
-import { canSSRAuth, useModuleAccess } from "@modules/auth";
+import { canSSRAuth, isOrganizationOwner, useModuleAccess } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";
 import { ClientPartnersSection } from "@modules/clients/components/ClientPartnersSection";
 import { getContabilCardState, useContabilPermissions } from "@modules/contabil";
@@ -40,6 +40,8 @@ import {
 } from "@modules/clients/utils/statusMapper";
 import { ConfirmationDialog } from "@shared/components";
 import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
+import { isCommercialContractEligible } from "@modules/commercial/utils/commercialContract";
+import { useAuth } from "@/context/AuthContext";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -67,6 +69,7 @@ function formatCpfCnpj(value: string): string {
 
 export default function ClientDetailPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const clientId = typeof router.query.id === "string" ? router.query.id : undefined;
   const clientQuery = useClient(clientId);
   const updateClientMutation = useUpdateClientMutation(clientId ?? "");
@@ -74,6 +77,7 @@ export default function ClientDetailPage() {
   const deactivateClientMutation = useDeactivateClientMutation(clientId ?? "");
   const { canViewContabil, isLoading: isContabilAccessLoading } = useContabilPermissions();
   const { access: integracaoAccess } = useModuleAccess("integracao");
+  const { access: commercialAccess } = useModuleAccess("comercial");
   const [formValues, setFormValues] = useState<ClientFormValues>(createClientFormInitialValues());
 
   const canEditClient = integracaoAccess.canEdit;
@@ -341,6 +345,17 @@ export default function ClientDetailPage() {
               </div>
 
               <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {commercialAccess.canView &&
+                isCommercialContractEligible(client, isOrganizationOwner(user)) ? (
+                  <ClientAccessCard
+                    title="Contrato"
+                    description="Revise os dados e gere o contrato comercial para impressão ou PDF."
+                    href={`/clients/${client.id}/contract`}
+                    actionLabel="Gerar contrato"
+                    icon={FileText}
+                  />
+                ) : null}
+
                 <ClientAccessCard
                   title="PA"
                   description="Gerencie os dados de PA do cliente."
