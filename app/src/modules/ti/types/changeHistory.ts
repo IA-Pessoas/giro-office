@@ -23,5 +23,7 @@ export interface TiChangeHistoryItem {
 
 export interface TiChangeHistoryList {
   items: TiChangeHistoryItem[];
-  has_more: boolean;
+  page: number;
+  page_size: number;
+  hasMore: boolean;
 }

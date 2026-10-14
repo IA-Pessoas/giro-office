@@ -143,7 +143,9 @@ describe("listTiChangeHistory", () => {
       take: 51,
     });
     expect(result).toEqual({
-      has_more: false,
+      page: 1,
+      page_size: 50,
+      hasMore: false,
       items: [
         {
           id: "h1",
@@ -176,7 +178,7 @@ describe("listTiChangeHistory", () => {
     const result = await listTiChangeHistory(db, context, { page: 2, page_size: 2 });
 
     expect(result.items.map((item) => item.id)).toEqual(["a", "b"]);
-    expect(result.has_more).toBe(true);
+    expect(result.hasMore).toBe(true);
     expect(db.changeHistoryTecnologia.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ skip: 2, take: 3 }),
     );

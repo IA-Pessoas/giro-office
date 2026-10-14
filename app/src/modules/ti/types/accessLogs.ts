@@ -14,5 +14,7 @@ export interface TiAccessLogItem {
 export interface TiAccessLogList {
   user: { id: string; name: string; full_name: string | null };
   items: TiAccessLogItem[];
-  has_more: boolean;
+  page: number;
+  page_size: number;
+  hasMore: boolean;
 }

@@ -81,7 +81,7 @@ describe("ti access log routes", () => {
       success: true,
       data: {
         user,
-        has_more: false,
+        hasMore: false,
         items: [
           {
             id: "l1",

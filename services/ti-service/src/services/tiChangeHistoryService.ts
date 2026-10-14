@@ -185,6 +185,8 @@ export async function listTiChangeHistory(
         created_at: row.created_at,
       };
     }),
-    has_more: rows.length > take,
+    page: query.page ?? 1,
+    page_size: take,
+    hasMore: rows.length > take,
   };
 }

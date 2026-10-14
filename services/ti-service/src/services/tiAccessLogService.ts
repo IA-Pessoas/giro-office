@@ -29,7 +29,9 @@ export type TiAccessLogItem = Omit<AccessLogRow, "type"> & {
 export type TiAccessLogList = {
   user: { id: string; name: string; full_name: string | null };
   items: TiAccessLogItem[];
-  has_more: boolean;
+  page: number;
+  page_size: number;
+  hasMore: boolean;
 };
 
 /**
@@ -70,6 +72,8 @@ export async function listTiAccessLogs(
       type: row.type === LEGACY_LOGIN_ACTION ? "login" : "access",
       origin: null,
     })),
-    has_more: rows.length > take,
+    page: query.page ?? 1,
+    page_size: take,
+    hasMore: rows.length > take,
   };
 }
