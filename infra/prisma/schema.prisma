@@ -1252,6 +1252,10 @@ model CommercialProspecting {
   participants    String?
   meeting_mode    String?
   branch          String?
+  reset_date           DateTime? @db.Date
+  reset_scheduled_by   String?
+  reset_registered_at  DateTime? @db.Timestamptz(3)
+  reset_processed_at   DateTime? @db.Timestamptz(3)
   pause_reason    String?
   attachment_path String?
   attachment_name String?
@@ -1267,6 +1271,7 @@ model CommercialProspecting {
   @@unique([organization_id, client_id], map: "uq_commercial_prospecting_org_client")
   @@index([organization_id, status], map: "idx_commercial_prospecting_org_status")
   @@index([organization_id, archived_at, updated_at], map: "idx_commercial_prospecting_org_archived_updated")
+  @@index([reset_date, reset_processed_at], map: "idx_commercial_prospecting_reset_due")
   @@map("commercial.prospecting")
 }
 

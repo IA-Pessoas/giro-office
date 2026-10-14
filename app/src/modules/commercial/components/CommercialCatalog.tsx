@@ -62,6 +62,11 @@ type ProspectingDraft = {
   client: ClientPickerOption | null;
   status: CommercialProspectingStatus | "Fechado SE";
   status_date: string;
+  reset_date: string;
+  reset_scheduled_by?: string | null;
+  reset_scheduled_by_name?: string | null;
+  reset_registered_at?: string | null;
+  reset_processed_at?: string | null;
   solution: "CASTELO" | "KALANGO" | "META" | "NIT" | "";
   reference_month: string;
   service: string;
@@ -77,6 +82,7 @@ const emptyProspectingDraft: ProspectingDraft = {
   client: null,
   status: COMMERCIAL_PROSPECTING_STATUSES[0],
   status_date: "",
+  reset_date: "",
   solution: "",
   reference_month: "",
   service: "",
@@ -366,6 +372,11 @@ export function CommercialCatalog() {
       client: { id: item.client_id, name: getClientDisplayName(item.client) },
       status: item.status,
       status_date: item.status_date ? item.status_date.slice(0, 10) : "",
+      reset_date: item.reset_date?.slice(0, 10) ?? "",
+      reset_scheduled_by: item.reset_scheduled_by ?? null,
+      reset_scheduled_by_name: item.reset_scheduled_by_name ?? null,
+      reset_registered_at: item.reset_registered_at ?? null,
+      reset_processed_at: item.reset_processed_at ?? null,
       solution: item.solution ?? "",
       reference_month: item.reference_month ?? "",
       service: item.service ?? "",
@@ -411,12 +422,21 @@ export function CommercialCatalog() {
       meeting_mode: prospectingDraft.meeting_mode.trim() || null,
       branch: prospectingDraft.branch.trim() || null,
       pause_reason: prospectingDraft.pause_reason.trim() || null,
+      ...(prospectingEditingId ? { reset_date: prospectingDraft.reset_date || null } : {}),
     };
     let savedProspectingId = prospectingEditingId;
     try {
       if (prospectingEditingId) {
         const saved = await updateProspectingMutation.mutateAsync({ id: prospectingEditingId, payload });
         savedProspectingId = saved.id;
+        setProspectingDraft((current) => ({
+          ...current,
+          reset_date: saved.reset_date?.slice(0, 10) ?? "",
+          reset_scheduled_by: saved.reset_scheduled_by ?? null,
+          reset_scheduled_by_name: saved.reset_scheduled_by_name ?? null,
+          reset_registered_at: saved.reset_registered_at ?? null,
+          reset_processed_at: saved.reset_processed_at ?? null,
+        }));
       } else {
         const { status, ...createPayload } = payload;
         if (status === "Fechado SE") {
@@ -508,6 +528,43 @@ export function CommercialCatalog() {
               className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </label>
+          {isEditing ? (
+            <label className="text-sm font-medium text-slate-800 dark:text-slate-100">
+              Data do reset agendado
+              <input
+                type="date"
+                value={prospectingDraft.reset_date}
+                onChange={(event) =>
+                  setProspectingDraft((current) => ({ ...current, reset_date: event.target.value }))
+                }
+                className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              />
+              <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
+                Em branco, o agendamento é cancelado. A execução considera o dia no horário de Brasília.
+              </span>
+              {prospectingDraft.reset_date && prospectingDraft.reset_scheduled_by ? (
+                <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
+                  Responsável: {prospectingDraft.reset_scheduled_by_name ??
+                    prospectingDraft.reset_scheduled_by}
+                  {prospectingDraft.reset_registered_at
+                    ? ` · registrado em ${new Intl.DateTimeFormat("pt-BR", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      }).format(new Date(prospectingDraft.reset_registered_at))}`
+                    : ""}
+                </span>
+              ) : null}
+              {prospectingDraft.reset_processed_at ? (
+                <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
+                  Executado em{" "}
+                  {new Intl.DateTimeFormat("pt-BR", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  }).format(new Date(prospectingDraft.reset_processed_at))}
+                </span>
+              ) : null}
+            </label>
+          ) : null}
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Solução *

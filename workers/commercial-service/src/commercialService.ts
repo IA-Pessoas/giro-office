@@ -305,6 +305,7 @@ export type ProspectingInput = {
 export type ProspectingUpdateInput = Omit<ProspectingInput, "client_id" | "status"> & {
   prospecting_id: string;
   status?: ProspectingUpdateStatus;
+  reset_date?: string | null;
 };
 export type ProspectingArchiveInput = Pick<
   ProspectingInput,
@@ -337,6 +338,10 @@ type ProspectingRow = {
   status: string;
   status_date: Date | null;
   description: string | null;
+  reset_date?: Date | null;
+  reset_scheduled_by?: string | null;
+  reset_registered_at?: Date | null;
+  reset_processed_at?: Date | null;
   client?: Record<string, unknown>;
   organization_id?: string;
 };
@@ -354,6 +359,10 @@ export class CommercialProspectingService implements ProspectingService {
       status: row.status,
       status_date: row.status_date,
       description: row.description,
+      reset_date: row.reset_date ?? null,
+      reset_scheduled_by: row.reset_scheduled_by ?? null,
+      reset_registered_at: row.reset_registered_at ?? null,
+      reset_processed_at: row.reset_processed_at ?? null,
     };
     if (row.client) return { ...publicRow, client: row.client };
     const client = await this.prisma.client.findFirst({
@@ -367,7 +376,17 @@ export class CommercialProspectingService implements ProspectingService {
     const rows = (await this.prisma.commercialProspecting.findMany({
       where: { organization_id: organizationId, archived_at: null },
       orderBy: [{ status: "asc" }, { updated_at: "desc" }],
-      select: { id: true, client_id: true, status: true, status_date: true, description: true },
+      select: {
+        id: true,
+        client_id: true,
+        status: true,
+        status_date: true,
+        description: true,
+        reset_date: true,
+        reset_scheduled_by: true,
+        reset_registered_at: true,
+        reset_processed_at: true,
+      },
     })) as ProspectingRow[];
     return Promise.all(
       rows.map((row) => this.withClient({ ...row, organization_id: organizationId })),
@@ -395,7 +414,17 @@ export class CommercialProspectingService implements ProspectingService {
   async detail(id: string, organizationId: string): Promise<unknown> {
     const row = (await this.prisma.commercialProspecting.findFirst({
       where: { id, organization_id: organizationId, archived_at: null },
-      select: { id: true, client_id: true, status: true, status_date: true, description: true },
+      select: {
+        id: true,
+        client_id: true,
+        status: true,
+        status_date: true,
+        description: true,
+        reset_date: true,
+        reset_scheduled_by: true,
+        reset_registered_at: true,
+        reset_processed_at: true,
+      },
     })) as ProspectingRow | null;
     if (!row) throw new ServiceError(404, "Prospecção comercial não encontrada.");
     return this.withClient({ ...row, organization_id: organizationId });
@@ -454,7 +483,17 @@ export class CommercialProspectingService implements ProspectingService {
             status_date: input.status_date ?? new Date(),
             description: input.description ?? null,
           },
-          select: { id: true, client_id: true, status: true, status_date: true, description: true },
+          select: {
+            id: true,
+            client_id: true,
+            status: true,
+            status_date: true,
+            description: true,
+            reset_date: true,
+            reset_scheduled_by: true,
+            reset_registered_at: true,
+            reset_processed_at: true,
+          },
         })) as ProspectingRow;
         const payload = this.event({
           eventId,
@@ -513,7 +552,17 @@ export class CommercialProspectingService implements ProspectingService {
             organization_id: input.organization_id,
             archived_at: null,
           },
-          select: { id: true, client_id: true, status: true, status_date: true, description: true },
+          select: {
+            id: true,
+            client_id: true,
+            status: true,
+            status_date: true,
+            description: true,
+            reset_date: true,
+            reset_scheduled_by: true,
+            reset_registered_at: true,
+            reset_processed_at: true,
+          },
         })) as ProspectingRow | null;
         if (!current) throw new ServiceError(404, "Prospecção comercial não encontrada.");
         const suppressNotice = input.status === "Fechado SE";
@@ -533,6 +582,15 @@ export class CommercialProspectingService implements ProspectingService {
             : {}),
           ...(input.status_date !== undefined ? { status_date: input.status_date } : {}),
           ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.reset_date !== undefined &&
+          (current.reset_date?.toISOString().slice(0, 10) ?? null) !== input.reset_date
+            ? {
+                reset_date: input.reset_date ? new Date(`${input.reset_date}T00:00:00.000Z`) : null,
+                reset_scheduled_by: input.reset_date ? input.user_id : null,
+                reset_registered_at: input.reset_date ? new Date() : null,
+                reset_processed_at: null,
+              }
+            : {}),
         };
         const updated = await tx.commercialProspecting.updateMany({
           where: {
@@ -550,7 +608,17 @@ export class CommercialProspectingService implements ProspectingService {
             organization_id: input.organization_id,
             archived_at: null,
           },
-          select: { id: true, client_id: true, status: true, status_date: true, description: true },
+          select: {
+            id: true,
+            client_id: true,
+            status: true,
+            status_date: true,
+            description: true,
+            reset_date: true,
+            reset_scheduled_by: true,
+            reset_registered_at: true,
+            reset_processed_at: true,
+          },
         })) as ProspectingRow | null;
         if (!row) throw new ServiceError(404, "Prospecção comercial não encontrada.");
         if (input.status !== undefined && current.status !== row.status) {

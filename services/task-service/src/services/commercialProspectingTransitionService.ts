@@ -29,7 +29,11 @@ const WAITING = "Em Espera";
 
 function getTaskTransitionEffect(
   status: CommercialProspectingProjectionStatus,
+  scheduledReset = false,
 ): TaskTransitionEffect | null {
+  if (scheduledReset && status === "Análise/Agendamento") {
+    return { status: "A Realizar", excludedStatuses: [COMPLETED, NOT_CONTRACTED] };
+  }
   switch (status) {
     case "Paralisado":
       return { status, excludedStatuses: [COMPLETED, NOT_CONTRACTED, WAITING] };
@@ -53,7 +57,7 @@ export class CommercialProspectingTransitionService {
   async apply(
     event: CommercialProspectingTransitionEvent,
   ): Promise<CommercialProspectingTransitionResult> {
-    const effect = getTaskTransitionEffect(event.to_status);
+    const effect = getTaskTransitionEffect(event.to_status, event.scheduled_reset === true);
     if (!effect) {
       throw new ServiceError(400, "Esta transição comercial não altera tarefas por este fluxo.");
     }

@@ -24,6 +24,7 @@ export interface CommercialProspectingTransitionEvent {
   status_date: string | null;
   description: string | null;
   suppress_notice?: boolean;
+  scheduled_reset?: boolean;
   audit_correlation_id: string;
   occurred_at: string;
 }

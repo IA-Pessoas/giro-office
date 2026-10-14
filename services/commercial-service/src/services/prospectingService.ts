@@ -38,6 +38,10 @@ const PROSPECTING_SELECT = {
   participants: true,
   meeting_mode: true,
   branch: true,
+  reset_date: true,
+  reset_scheduled_by: true,
+  reset_registered_at: true,
+  reset_processed_at: true,
   pause_reason: true,
   attachment_name: true,
   attachment_mime_type: true,
@@ -76,6 +80,9 @@ const PROSPECTING_HISTORY_FIELDS = [
   "participants",
   "meeting_mode",
   "branch",
+  "reset_date",
+  "reset_scheduled_by",
+  "reset_registered_at",
   "pause_reason",
 ] as const;
 
@@ -148,6 +155,11 @@ export interface CommercialProspecting {
   participants: string | null;
   meeting_mode: string | null;
   branch: string | null;
+  reset_date?: Date | null;
+  reset_scheduled_by?: string | null;
+  reset_scheduled_by_name?: string | null;
+  reset_registered_at?: Date | null;
+  reset_processed_at?: Date | null;
   pause_reason: string | null;
   attachment_name: string | null;
   attachment_mime_type: string | null;
@@ -223,6 +235,7 @@ export interface UpdateCommercialProspectingRequest {
   meeting_mode?: string | null;
   branch?: string | null;
   pause_reason?: string | null;
+  reset_date?: string | null;
   audit_correlation_id?: string;
 }
 
@@ -260,6 +273,30 @@ export class CommercialProspectingService {
     private readonly audit: CommercialProspectingAuditDeps = defaultAuditDeps,
     private readonly attachmentStorage?: ProspectingAttachmentStorage,
   ) {}
+
+  private async withResetSchedulerNames<T extends { reset_scheduled_by?: string | null }>(
+    items: T[],
+    organization_id: string,
+  ): Promise<Array<T & { reset_scheduled_by_name: string | null }>> {
+    const userIds = [
+      ...new Set(
+        items.flatMap((item) => (item.reset_scheduled_by ? [item.reset_scheduled_by] : [])),
+      ),
+    ];
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds }, organization_id },
+          select: { id: true, full_name: true, name: true },
+        })
+      : [];
+    const names = new Map(users.map((user) => [user.id, user.full_name?.trim() || user.name]));
+    return items.map((item) => ({
+      ...item,
+      reset_scheduled_by_name: item.reset_scheduled_by
+        ? (names.get(item.reset_scheduled_by) ?? item.reset_scheduled_by)
+        : null,
+    }));
+  }
 
   async uploadAttachment(input: {
     user_id: string;
@@ -443,7 +480,7 @@ export class CommercialProspectingService {
         this.prisma.commercialProspecting.count({ where }),
       ]);
       return {
-        items,
+        items: await this.withResetSchedulerNames(items, organization_id),
         page: filters.page,
         page_size: filters.page_size,
         total,
@@ -519,7 +556,7 @@ export class CommercialProspectingService {
         select: PROSPECTING_SELECT,
       });
       if (!item) throw new ServiceError(404, "Prospecção comercial não encontrada.");
-      return item;
+      return (await this.withResetSchedulerNames([item], organization_id))[0];
     } catch (err: unknown) {
       logError("Erro ao buscar prospecção comercial", { err });
       if (err instanceof ServiceError) throw err;
@@ -666,6 +703,16 @@ export class CommercialProspectingService {
         if (data.meeting_mode !== undefined) updateData.meeting_mode = data.meeting_mode;
         if (data.branch !== undefined) updateData.branch = data.branch;
         if (data.pause_reason !== undefined) updateData.pause_reason = data.pause_reason;
+        if (data.reset_date !== undefined) {
+          const resetDate = data.reset_date ? new Date(`${data.reset_date}T00:00:00.000Z`) : null;
+          const currentResetDate = current.reset_date?.toISOString().slice(0, 10) ?? null;
+          if (currentResetDate !== data.reset_date) {
+            updateData.reset_date = resetDate;
+            updateData.reset_scheduled_by = resetDate ? data.user_id : null;
+            updateData.reset_registered_at = resetDate ? new Date() : null;
+            updateData.reset_processed_at = null;
+          }
+        }
         const nextPauseReason =
           data.pause_reason === undefined ? current.pause_reason : data.pause_reason;
         if (nextStatus === "Paralisado" && !nextPauseReason?.trim()) {
@@ -756,7 +803,7 @@ export class CommercialProspectingService {
         updatedData: updated as unknown as Record<string, unknown>,
         auditCorrelationId,
       });
-      return updated;
+      return (await this.withResetSchedulerNames([updated], data.organization_id))[0];
     } catch (err: unknown) {
       logError("Erro ao atualizar prospecção comercial", { err });
       if (err instanceof ServiceError) throw err;

@@ -37,6 +37,7 @@ export const commercialProspectingTransitionEventSchema = z
     to_status: z.enum(taskTransitionStatuses),
     status_date: z.string().datetime({ offset: true }).nullable(),
     description: z.string().nullable(),
+    scheduled_reset: z.literal(true).optional(),
     audit_correlation_id: z.string().trim().min(1),
     occurred_at: z.string().datetime({ offset: true }),
   })

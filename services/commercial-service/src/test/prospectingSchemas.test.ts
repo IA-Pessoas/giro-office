@@ -69,6 +69,12 @@ describe("prospecting schemas", () => {
     ).toBe(true);
   });
 
+  it("accepts or clears a calendar date for the scheduled reset", () => {
+    expect(updateProspectingBodySchema.safeParse({ reset_date: "2026-10-15" }).success).toBe(true);
+    expect(updateProspectingBodySchema.safeParse({ reset_date: null }).success).toBe(true);
+    expect(updateProspectingBodySchema.safeParse({ reset_date: "2026-13-40" }).success).toBe(false);
+  });
+
   it.each(["Baixada", "Inativo"] as const)("accepts the legacy status %s", (status) => {
     expect(updateProspectingBodySchema.safeParse({ status }).success).toBe(true);
     expect(prospectingListQuerySchema.safeParse({ status }).success).toBe(true);

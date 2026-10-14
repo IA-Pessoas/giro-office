@@ -77,6 +77,24 @@ describe("CommercialProspectingTransitionService", () => {
     expect(prisma.task.updateMany.mock.calls[0]?.[0]).not.toHaveProperty("where.billing");
   });
 
+  it("no reset agendado reativa Em Espera e preserva apenas concluídas e não contratadas", async () => {
+    const prisma = createPrismaMock();
+
+    await new CommercialProspectingTransitionService(prisma as never).apply({
+      ...event("Análise/Agendamento"),
+      scheduled_reset: true,
+    });
+
+    expect(prisma.task.updateMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: BASE_EVENT.organization_id,
+        client_id: BASE_EVENT.client_id,
+        status: { notIn: ["Concluída", "Não Contratado"] },
+      },
+      data: { status: "A Realizar" },
+    });
+  });
+
   it("não repete efeitos quando o mesmo evento é entregue novamente", async () => {
     const prisma = createPrismaMock();
     prisma.commercialProspectingTransitionEvent.findUnique.mockResolvedValue({

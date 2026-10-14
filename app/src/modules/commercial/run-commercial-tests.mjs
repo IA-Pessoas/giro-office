@@ -87,6 +87,18 @@ runTest("commercial prospecting uses the dedicated legacy-status contract", () =
   assert.doesNotMatch(catalog, /client\/[^"']+\/commercial/);
 });
 
+runTest("commercial prospecting exposes an auditable scheduled reset", () => {
+  const catalog = read("./components/CommercialCatalog.tsx");
+  const types = read("./types/index.ts");
+  const browserSmoke = read("./run-commercial-browser-smoke.mjs");
+
+  assert.match(catalog, /Data do reset agendado/);
+  assert.match(catalog, /Responsável:/);
+  assert.match(types, /reset_registered_at/);
+  assert.match(browserSmoke, /18-commercial-prospecting-reset-scheduled\.png/);
+  assert.match(browserSmoke, /reset_date: "2026-10-15"/);
+});
+
 runTest("commercial task billing exposes an authorized task outbox surface", () => {
   const contract = read("./services/commercialService.contract.ts");
   const service = read("./services/commercialService.ts");
