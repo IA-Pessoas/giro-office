@@ -12,6 +12,7 @@ import { prismaClient } from "../integrations/prisma.js";
 const RH_PERMISSION_ADMIN_LEVEL = 3;
 const USER_PERMISSION_TI = 1;
 const USER_PERMISSION_DIRECTOR = 2;
+const LEGACY_SCORE_FORMULA_VERSION = "LegacyV1";
 
 const LIST_PENDING_INCLUDE = {
   scoreQuarter: {
@@ -122,7 +123,7 @@ export class ScoreEvaluationService {
       include: { evaluations: true, nitro: true },
     });
 
-    if (!score?.nitro) {
+    if (!score?.nitro || score.formula_version !== LEGACY_SCORE_FORMULA_VERSION) {
       return;
     }
 
