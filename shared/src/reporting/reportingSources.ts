@@ -24,6 +24,7 @@ import { regularizeMunicipalTaxesReportingCatalog } from "./regularizeMunicipalT
 import { regularizePortfolioReportingCatalog } from "./regularizePortfolioReportingCatalog.js";
 import { regularizeProcessReportingCatalog } from "./regularizeProcessReportingCatalog.js";
 import { rhAttendanceReportingCatalog } from "./rhAttendanceReportingCatalog.js";
+import { rhEmployeeReportingCatalog } from "./rhEmployeeReportingCatalog.js";
 import { rhHolidayReportingCatalog } from "./rhHolidayReportingCatalog.js";
 import { rhRequestReportingCatalog } from "./rhRequestReportingCatalog.js";
 import { taskReportingCatalog } from "./taskReportingCatalog.js";
@@ -57,6 +58,7 @@ export const reportingSources = [
   ...regularizePortfolioReportingCatalog.sources,
   ...regularizeProcessReportingCatalog.sources,
   ...rhAttendanceReportingCatalog.sources,
+  ...rhEmployeeReportingCatalog.sources,
   ...rhHolidayReportingCatalog.sources,
   ...rhRequestReportingCatalog.sources,
   ...taskReportingCatalog.sources,
