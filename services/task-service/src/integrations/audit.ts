@@ -21,7 +21,7 @@ const recordAudit = createAuditRecorder({
 });
 
 export interface CreateLogParams {
-  userId: string;
+  userId: string | null;
   organizationId?: string | null;
   permission?: number | null;
   action: string;
@@ -32,7 +32,7 @@ export interface CreateLogParams {
 }
 
 export interface LogUpdateParams {
-  userId: string;
+  userId: string | null;
   organizationId?: string | null;
   permission?: number | null;
   action: string;

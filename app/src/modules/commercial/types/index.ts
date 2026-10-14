@@ -77,6 +77,11 @@ export interface CommercialProspecting {
   participants: string | null;
   meeting_mode: string | null;
   branch: string | null;
+  reset_date?: string | null;
+  reset_scheduled_by?: string | null;
+  reset_scheduled_by_name?: string | null;
+  reset_registered_at?: string | null;
+  reset_processed_at?: string | null;
   pause_reason: string | null;
   attachment_name: string | null;
   attachment_mime_type: string | null;
@@ -119,7 +124,10 @@ export interface CreateCommercialProspectingPayload {
 
 export type UpdateCommercialProspectingPayload = Partial<
   Omit<CreateCommercialProspectingPayload, "client_id" | "status">
-> & { status?: CommercialProspectingStatus | "Fechado SE" };
+> & {
+  status?: CommercialProspectingStatus | "Fechado SE";
+  reset_date?: string | null;
+};
 
 export const COMMERCIAL_TASK_HIRING_STATUSES = [
   "A Realizar",

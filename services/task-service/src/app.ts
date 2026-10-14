@@ -142,7 +142,7 @@ export function createTaskApp(
     new CommercialProspectingCloseService(nodeDeps.prisma);
   const commercialProspectingTransitionService =
     options?.commercialProspectingTransitionService ??
-    new CommercialProspectingTransitionService(nodeDeps.prisma);
+    new CommercialProspectingTransitionService(nodeDeps.prisma, nodeDeps.audit);
   const taskAttachmentRoutes = createTaskAttachmentRoutes({
     service:
       options?.taskAttachmentService ??

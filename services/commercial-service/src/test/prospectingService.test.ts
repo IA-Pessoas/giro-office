@@ -32,6 +32,7 @@ const item = {
   attachment_size_bytes: null,
   attachment_path: `comercial/organizations/${ORGANIZATION_ID}/prospecting/${PROSPECTING_ID}/old.pdf`,
   attachment_name: "motivo-anterior.pdf",
+  reset_scheduled_by_name: null,
   client,
 };
 
@@ -142,6 +143,25 @@ describe("CommercialProspectingService", () => {
     expect(result).toEqual({ items: [item], page: 2, page_size: 20, total: 41, total_pages: 3 });
   });
 
+  it("exibe o nome do responsável pelo reset com consulta limitada à organização", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.commercialProspecting.findMany).mockResolvedValue([
+      { ...item, reset_scheduled_by: USER_ID },
+    ] as never);
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    const result = await service.list(ORGANIZATION_ID);
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith({
+      where: { id: { in: [USER_ID] }, organization_id: ORGANIZATION_ID },
+      select: { id: true, full_name: true, name: true },
+    });
+    expect(result.items[0]).toMatchObject({
+      reset_scheduled_by: USER_ID,
+      reset_scheduled_by_name: "Usuária de Teste",
+    });
+  });
+
   it("mantém a projeção de detalhe sem os campos pessoais exclusivos da lista", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.commercialProspecting.findFirst).mockResolvedValue(item as never);
@@ -158,6 +178,89 @@ describe("CommercialProspectingService", () => {
           },
         }),
       }),
+    );
+  });
+
+  it("registra responsável e instante ao agendar um reset e preserva a conclusão anterior", async () => {
+    const prisma = createMockPrisma();
+    const current = {
+      ...item,
+      reset_date: null,
+      reset_scheduled_by: null,
+      reset_registered_at: null,
+      reset_processed_at: null,
+    };
+    const scheduledAt = new Date("2026-10-13T15:00:00.000Z");
+    const updated = {
+      ...current,
+      reset_date: new Date("2026-10-15T00:00:00.000Z"),
+      reset_scheduled_by: USER_ID,
+      reset_registered_at: scheduledAt,
+    };
+    prisma.commercialProspecting.findFirst = vi
+      .fn()
+      .mockResolvedValueOnce(current as never)
+      .mockResolvedValueOnce(updated as never);
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    await service.update({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      prospecting_id: PROSPECTING_ID,
+      reset_date: "2026-10-15",
+    });
+
+    expect(prisma.commercialProspecting.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reset_date: new Date("2026-10-15T00:00:00.000Z"),
+          reset_scheduled_by: USER_ID,
+          reset_registered_at: expect.any(Date),
+          reset_processed_at: null,
+        }),
+      }),
+    );
+    expect(prisma.commercialProspectingHistory.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ field: "reset_scheduled_by", changed_by: USER_ID }),
+          expect.objectContaining({ field: "reset_registered_at", changed_by: USER_ID }),
+        ]),
+      }),
+    );
+  });
+
+  it("não reagenda nem remove o instante de execução ao salvar outros campos", async () => {
+    const prisma = createMockPrisma();
+    const processedAt = new Date("2026-10-15T12:30:00.000Z");
+    const current = {
+      ...item,
+      reset_date: new Date("2026-10-15T00:00:00.000Z"),
+      reset_scheduled_by: USER_ID,
+      reset_registered_at: new Date("2026-10-10T11:00:00.000Z"),
+      reset_processed_at: processedAt,
+    };
+    prisma.commercialProspecting.findFirst = vi
+      .fn()
+      .mockResolvedValueOnce(current as never)
+      .mockResolvedValueOnce({ ...current, description: "Atualizada" } as never);
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    await service.update({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      prospecting_id: PROSPECTING_ID,
+      description: "Atualizada",
+      reset_date: "2026-10-15",
+    });
+
+    expect(prisma.commercialProspecting.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { description: "Atualizada" },
+      }),
+    );
+    expect(prisma.commercialProspecting.updateMany.mock.calls[0]?.[0].data).not.toHaveProperty(
+      "reset_processed_at",
     );
   });
 

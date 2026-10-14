@@ -5,6 +5,7 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type { TaskAudit } from "../integrations/audit.js";
 
 interface TaskTransitionEffect {
   status: string;
@@ -29,7 +30,11 @@ const WAITING = "Em Espera";
 
 function getTaskTransitionEffect(
   status: CommercialProspectingProjectionStatus,
+  scheduledReset = false,
 ): TaskTransitionEffect | null {
+  if (scheduledReset && status === "Análise/Agendamento") {
+    return { status: "A Realizar", excludedStatuses: [COMPLETED, NOT_CONTRACTED] };
+  }
   switch (status) {
     case "Paralisado":
       return { status, excludedStatuses: [COMPLETED, NOT_CONTRACTED, WAITING] };
@@ -48,18 +53,21 @@ function getTaskTransitionEffect(
 }
 
 export class CommercialProspectingTransitionService {
-  constructor(private readonly prisma: CommercialProspectingTransitionPrisma) {}
+  constructor(
+    private readonly prisma: CommercialProspectingTransitionPrisma,
+    private readonly audit: TaskAudit,
+  ) {}
 
   async apply(
     event: CommercialProspectingTransitionEvent,
   ): Promise<CommercialProspectingTransitionResult> {
-    const effect = getTaskTransitionEffect(event.to_status);
+    const effect = getTaskTransitionEffect(event.to_status, event.scheduled_reset === true);
     if (!effect) {
       throw new ServiceError(400, "Esta transição comercial não altera tarefas por este fluxo.");
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const existing = await tx.commercialProspectingTransitionEvent.findUnique({
           where: { event_id: event.event_id },
           select: {
@@ -81,10 +89,13 @@ export class CommercialProspectingTransitionService {
             );
           }
           return {
-            event_id: existing.event_id,
-            client_id: existing.client_id,
-            updated_count: 0,
-            duplicate: true,
+            response: {
+              event_id: existing.event_id,
+              client_id: existing.client_id,
+              updated_count: 0,
+              duplicate: true,
+            },
+            changedTasks: [],
           };
         }
 
@@ -100,6 +111,15 @@ export class CommercialProspectingTransitionService {
           },
         });
 
+        const where = {
+          organization_id: event.organization_id,
+          client_id: event.client_id,
+          status: { notIn: [...effect.excludedStatuses, effect.status] },
+        };
+        const changedTasks = await tx.task.findMany({
+          where,
+          select: { id: true, status: true },
+        });
         const updated = await tx.task.updateMany({
           where: {
             organization_id: event.organization_id,
@@ -110,12 +130,29 @@ export class CommercialProspectingTransitionService {
         });
 
         return {
-          event_id: event.event_id,
-          client_id: event.client_id,
-          updated_count: updated.count,
-          duplicate: false,
+          response: {
+            event_id: event.event_id,
+            client_id: event.client_id,
+            updated_count: updated.count,
+            duplicate: false,
+          },
+          changedTasks,
         };
       });
+      await Promise.all(
+        result.changedTasks.map((task) =>
+          this.audit.logUpdateIfChanged({
+            userId: null,
+            organizationId: event.organization_id,
+            action: "Atualização",
+            referring: "integracao.tasks",
+            referringId: task.id,
+            oldData: { status: task.status },
+            updatedData: { status: effect.status },
+          }),
+        ),
+      );
+      return result.response;
     } catch (error: unknown) {
       logError("Erro ao aplicar situação comercial nas tarefas", { error });
       if (error instanceof ServiceError) throw error;

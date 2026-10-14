@@ -9,6 +9,7 @@ import type { CommercialWorkerEnv } from "./env.js";
 import { CommercialOutboxWorkerService } from "./outbox.js";
 import { CommercialOutboxBindingDelivery } from "./outboxDelivery.js";
 import { PrismaClient } from "./prisma.js";
+import { ScheduledProspectingResetService } from "./scheduledProspectingReset.js";
 
 type ScheduledContext = { waitUntil(promise: Promise<unknown>): void };
 
@@ -47,6 +48,7 @@ export default {
             ),
           ),
         );
+        await new ScheduledProspectingResetService(prisma as never).processNext();
         await worker.processNext();
       }),
     );

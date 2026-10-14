@@ -22,13 +22,21 @@ function event(toStatus: string): CommercialProspectingTransitionEvent {
   return { ...BASE_EVENT, to_status: toStatus } as unknown as CommercialProspectingTransitionEvent;
 }
 
+const audit = {
+  createLog: vi.fn(),
+  logUpdateIfChanged: vi.fn().mockResolvedValue(undefined),
+};
+
 function createPrismaMock() {
   const tx = {
     commercialProspectingTransitionEvent: {
       findUnique: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockImplementation(async ({ data }: { data: unknown }) => data),
     },
-    task: { updateMany: vi.fn().mockResolvedValue({ count: 4 }) },
+    task: {
+      findMany: vi.fn().mockResolvedValue([]),
+      updateMany: vi.fn().mockResolvedValue({ count: 4 }),
+    },
   };
   return {
     ...tx,
@@ -51,7 +59,7 @@ describe("CommercialProspectingTransitionService", () => {
     const prisma = createPrismaMock();
 
     await expect(
-      new CommercialProspectingTransitionService(prisma as never).apply(event(toStatus)),
+      new CommercialProspectingTransitionService(prisma as never, audit).apply(event(toStatus)),
     ).resolves.toEqual({
       event_id: BASE_EVENT.event_id,
       client_id: BASE_EVENT.client_id,
@@ -72,9 +80,61 @@ describe("CommercialProspectingTransitionService", () => {
   it("inclui tarefas de cobrança única, pois o legado não as exclui nessas transições", async () => {
     const prisma = createPrismaMock();
 
-    await new CommercialProspectingTransitionService(prisma as never).apply(event("Baixada"));
+    await new CommercialProspectingTransitionService(prisma as never, audit).apply(
+      event("Baixada"),
+    );
 
     expect(prisma.task.updateMany.mock.calls[0]?.[0]).not.toHaveProperty("where.billing");
+  });
+
+  it("no reset agendado reativa Em Espera e preserva apenas concluídas e não contratadas", async () => {
+    const prisma = createPrismaMock();
+
+    await new CommercialProspectingTransitionService(prisma as never, audit).apply({
+      ...event("Análise/Agendamento"),
+      scheduled_reset: true,
+    });
+
+    expect(prisma.task.updateMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: BASE_EVENT.organization_id,
+        client_id: BASE_EVENT.client_id,
+        status: { notIn: ["Concluída", "Não Contratado"] },
+      },
+      data: { status: "A Realizar" },
+    });
+  });
+
+  it("registra auditoria por tarefa cujo status mudou", async () => {
+    const prisma = createPrismaMock();
+    prisma.task.findMany.mockResolvedValue([
+      { id: "task-1", status: "Em Espera" },
+      { id: "task-2", status: "Paralisado" },
+    ]);
+
+    await new CommercialProspectingTransitionService(prisma as never, audit).apply({
+      ...event("Análise/Agendamento"),
+      scheduled_reset: true,
+    });
+
+    expect(prisma.task.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: BASE_EVENT.organization_id,
+        client_id: BASE_EVENT.client_id,
+        status: { notIn: ["Concluída", "Não Contratado", "A Realizar"] },
+      },
+      select: { id: true, status: true },
+    });
+    expect(audit.logUpdateIfChanged).toHaveBeenCalledWith({
+      userId: null,
+      organizationId: BASE_EVENT.organization_id,
+      action: "Atualização",
+      referring: "integracao.tasks",
+      referringId: "task-1",
+      oldData: { status: "Em Espera" },
+      updatedData: { status: "A Realizar" },
+    });
+    expect(audit.logUpdateIfChanged).toHaveBeenCalledTimes(2);
   });
 
   it("não repete efeitos quando o mesmo evento é entregue novamente", async () => {
@@ -87,7 +147,7 @@ describe("CommercialProspectingTransitionService", () => {
     });
 
     await expect(
-      new CommercialProspectingTransitionService(prisma as never).apply(event("Baixada")),
+      new CommercialProspectingTransitionService(prisma as never, audit).apply(event("Baixada")),
     ).resolves.toMatchObject({ event_id: BASE_EVENT.event_id, duplicate: true });
 
     expect(prisma.task.updateMany).not.toHaveBeenCalled();
@@ -96,7 +156,7 @@ describe("CommercialProspectingTransitionService", () => {
 
   it("aplica cada nova mudança de situação uma vez", async () => {
     const prisma = createPrismaMock();
-    const service = new CommercialProspectingTransitionService(prisma as never);
+    const service = new CommercialProspectingTransitionService(prisma as never, audit);
 
     await service.apply(event("Baixada"));
     await service.apply({
@@ -131,7 +191,7 @@ describe("CommercialProspectingTransitionService", () => {
     });
 
     await expect(
-      new CommercialProspectingTransitionService(prisma as never).apply(event("Baixada")),
+      new CommercialProspectingTransitionService(prisma as never, audit).apply(event("Baixada")),
     ).rejects.toMatchObject({ statusCode: 409 });
 
     expect(prisma.task.updateMany).not.toHaveBeenCalled();

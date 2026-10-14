@@ -88,6 +88,10 @@ const prospecting = {
   meeting_mode: "Remota",
   branch: "Matriz",
   pause_reason: null,
+  reset_date: null,
+  reset_scheduled_by: null,
+  reset_registered_at: null,
+  reset_processed_at: null,
   attachment_name: null,
   attachment_mime_type: null,
   attachment_size_bytes: null,
@@ -454,7 +458,27 @@ async function installMocks(page, context, currentUser = smokeUser) {
     }
     if (request.method() === "PATCH") {
       const current = prospectingState.items.find((item) => item.id === prospectingId) ?? prospecting;
-      const updated = { ...current, ...request.postDataJSON() };
+      const body = request.postDataJSON();
+      const updated = {
+        ...current,
+        ...body,
+        ...(body.reset_date && body.reset_date !== current.reset_date
+          ? {
+              reset_scheduled_by: currentUser.id,
+              reset_scheduled_by_name: currentUser.name,
+              reset_registered_at: "2026-10-13T15:00:00.000Z",
+              reset_processed_at: null,
+            }
+          : {}),
+        ...(body.reset_date === null
+          ? {
+              reset_scheduled_by: null,
+              reset_scheduled_by_name: null,
+              reset_registered_at: null,
+              reset_processed_at: null,
+            }
+          : {}),
+      };
       prospectingState.items = prospectingState.items.map((item) => item.id === prospectingId ? updated : item);
       return json(route, updated);
     }
@@ -803,6 +827,8 @@ async function run() {
     await page.screenshot({ path: `${evidenceDir}/10-commercial-prospecting-history.png`, fullPage: true });
     await editProspectingForm.locator("select").first().selectOption("Paralisado");
     await editProspectingForm.getByLabel("Motivo da paralisação *").fill("Aguardando documentos");
+    await editProspectingForm.getByLabel("Data do reset agendado").fill("2026-10-15");
+    await editProspectingForm.screenshot({ path: `${evidenceDir}/18-commercial-prospecting-reset-scheduled.png` });
     await editProspectingForm.locator('input[type="file"]').setInputFiles(join(repoRoot, "scripts/fixtures/smoke-upload.png"));
     const prospectingUpdateResponsePromise = page.waitForResponse(
       (response) => response.request().method() === "PATCH" && response.url().endsWith(`/commercial/prospecting/${prospecting.id}`),
@@ -824,7 +850,9 @@ async function run() {
       meeting_mode: "Remota",
       branch: "Matriz",
       pause_reason: "Aguardando documentos",
+      reset_date: "2026-10-15",
     });
+    await editProspectingForm.waitFor({ state: "hidden" });
     const prospectingAttachmentResponse = await prospectingAttachmentResponsePromise;
     assert.equal(prospectingAttachmentResponse.status(), 200);
     assert.deepEqual((await prospectingAttachmentResponse.json()).data, {
@@ -832,6 +860,12 @@ async function run() {
       mime_type: "image/png",
       size_bytes: 68,
     });
+    await page.getByLabel("Prospecção", { exact: true }).getByRole("button", { name: "Editar", exact: true }).first().click();
+    const savedProspectingForm = page.getByRole("form", { name: "Editar prospecção" });
+    await savedProspectingForm.getByText(`Responsável: ${smokeUser.name}`, { exact: false }).waitFor();
+    await page.screenshot({ path: `${evidenceDir}/19-commercial-prospecting-reset-saved.png`, fullPage: true });
+    await savedProspectingForm.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await savedProspectingForm.waitFor({ state: "hidden" });
     await page.getByRole("cell", { name: "Paralisado", exact: true }).waitFor();
     await page.getByRole("cell", { name: "Retorno na próxima semana", exact: true }).first().waitFor();
     await page.screenshot({ path: `${evidenceDir}/11-commercial-prospecting-paused.png`, fullPage: true });
