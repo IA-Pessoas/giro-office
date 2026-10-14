@@ -10,9 +10,7 @@ export function canRecalculateScoreQuarter(
     return true;
   }
 
-  const hasPendingEvaluation = evaluations.some(
-    (evaluation) => evaluation.status === "Pending",
-  );
+  const hasPendingEvaluation = evaluations.some((evaluation) => evaluation.status === "Pending");
   const allEvaluationsCompleted =
     evaluations.length > 0 && evaluations.every((evaluation) => evaluation.status === "Completed");
 

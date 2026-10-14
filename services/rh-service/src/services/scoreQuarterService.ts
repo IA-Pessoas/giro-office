@@ -285,10 +285,7 @@ class ScoreQuarterService {
         throw new ServiceError(403, "Score Nitro não pertence à organização.");
       }
       if (
-        !canUpdateScoreNitro(
-          nitro.scoreQuarter.formula_version,
-          nitro.scoreQuarter.evaluations,
-        )
+        !canUpdateScoreNitro(nitro.scoreQuarter.formula_version, nitro.scoreQuarter.evaluations)
       ) {
         throw new ServiceError(
           409,
