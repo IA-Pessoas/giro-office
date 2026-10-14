@@ -31,6 +31,9 @@ import {
 const upload = createPhotoUploadMiddleware({
   allowedMimeTypes: [...RH_NITRO_HOURS_MIME_TYPES],
   maxSizeBytes: 5 * 1024 * 1024,
+  maxFields: 2,
+  maxFieldSizeBytes: 1024,
+  maxParts: 3,
 });
 
 export function createNitroHoursRoutes(

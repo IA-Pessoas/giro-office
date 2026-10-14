@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { error as logError, ServiceError } from "@workspace/shared";
-import { type PrismaClient, RhNitroHoursStatus } from "../generated/prisma/client.js";
+import { type Prisma, type PrismaClient, RhNitroHoursStatus } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 import type { NitroHoursCertificateStorage, NitroHoursMimeType } from "./nitroHoursStorage.js";
 import { canUpdateScoreNitro } from "./scoreFormulaVersion.js";
@@ -22,6 +22,10 @@ const PUBLIC_FIELDS = {
   user: { select: { id: true, name: true } },
 } as const;
 
+type NitroHoursPublicSubmission = Prisma.RhNitroHoursSubmissionGetPayload<{
+  select: typeof PUBLIC_FIELDS;
+}>;
+
 export class NitroHoursService {
   constructor(
     private readonly db: PrismaClient = prismaClient,
@@ -34,7 +38,7 @@ export class NitroHoursService {
     quarter: string;
     hours: number;
     file: { buffer: Buffer; mimetype: NitroHoursMimeType };
-  }) {
+  }): Promise<NitroHoursPublicSubmission> {
     try {
       const user = await this.db.user.findFirst({
         where: { id: input.user_id, organization_id: input.organization_id },
@@ -80,7 +84,7 @@ export class NitroHoursService {
     can_manage: boolean;
     quarter?: string;
     target_user_id?: string;
-  }) {
+  }): Promise<NitroHoursPublicSubmission[]> {
     try {
       return await this.db.rhNitroHoursSubmission.findMany({
         where: {
@@ -98,7 +102,11 @@ export class NitroHoursService {
     }
   }
 
-  async acceptedHours(input: { organization_id: string; quarter: string; user_id: string }) {
+  async acceptedHours(input: {
+    organization_id: string;
+    quarter: string;
+    user_id: string;
+  }): Promise<number> {
     try {
       const result = await this.db.rhNitroHoursSubmission.aggregate({
         where: {
@@ -120,9 +128,9 @@ export class NitroHoursService {
     organization_id: string;
     request_id: string;
     actor_user_id: string;
-    status: "Accepted" | "Rejected";
+    status: typeof RhNitroHoursStatus.Accepted | typeof RhNitroHoursStatus.Rejected;
     rejection_reason?: string;
-  }) {
+  }): Promise<NitroHoursPublicSubmission> {
     try {
       const result = await this.db.rhNitroHoursSubmission.updateMany({
         where: {
@@ -190,7 +198,7 @@ export class NitroHoursService {
     request_id: string;
     user_id: string;
     can_manage: boolean;
-  }) {
+  }): Promise<{ url: string }> {
     try {
       const request = await this.db.rhNitroHoursSubmission.findFirst({
         where: { id: input.request_id, organization_id: input.organization_id },

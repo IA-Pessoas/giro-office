@@ -23,6 +23,7 @@ const rhMocks: {
   employeeDossierServiceMock: MockGroup;
   employeeMeetingMinuteServiceMock: MockGroup;
   rhNotificationServiceMock: MockGroup;
+  nitroHoursServiceMock: MockGroup;
 } = vi.hoisted(() => ({
   pointConfigServiceMock: {
     upsert: vi.fn(),
@@ -129,6 +130,13 @@ const rhMocks: {
     markRead: vi.fn(),
     notify: vi.fn(),
   },
+  nitroHoursServiceMock: {
+    submit: vi.fn(),
+    list: vi.fn(),
+    acceptedHours: vi.fn(),
+    decide: vi.fn(),
+    certificateUrl: vi.fn(),
+  },
 }));
 
 const {
@@ -149,6 +157,7 @@ const {
   employeeDossierServiceMock,
   employeeMeetingMinuteServiceMock,
   rhNotificationServiceMock,
+  nitroHoursServiceMock,
 } = rhMocks;
 
 vi.mock("../services/pointConfigService.js", () => ({
@@ -252,6 +261,12 @@ vi.mock("../services/employeeMeetingMinuteService.js", () => ({
 
 vi.mock("../services/rhNotificationService.js", () => ({
   rhNotificationService: rhMocks.rhNotificationServiceMock,
+}));
+
+vi.mock("../services/nitroHoursService.js", () => ({
+  NitroHoursService: vi.fn(function NitroHoursService() {
+    return rhMocks.nitroHoursServiceMock;
+  }),
 }));
 
 const testAuthContext = vi.hoisted(() => ({
@@ -453,6 +468,11 @@ export function resetRhRouteMocks() {
   rhNotificationServiceMock.list.mockResolvedValue([]);
   rhNotificationServiceMock.markRead.mockResolvedValue({ count: 0 });
   rhNotificationServiceMock.notify.mockResolvedValue(undefined);
+  nitroHoursServiceMock.submit.mockResolvedValue({ id: "nitro-hours-id", status: "Pending" });
+  nitroHoursServiceMock.list.mockResolvedValue([]);
+  nitroHoursServiceMock.acceptedHours.mockResolvedValue(10);
+  nitroHoursServiceMock.decide.mockResolvedValue({ id: "nitro-hours-id", status: "Accepted" });
+  nitroHoursServiceMock.certificateUrl.mockResolvedValue({ url: "https://storage.test/signed" });
 }
 
 export function setRhRoutePermission(permission: number) {
@@ -477,4 +497,5 @@ export {
   employeeDossierServiceMock,
   employeeMeetingMinuteServiceMock,
   rhNotificationServiceMock,
+  nitroHoursServiceMock,
 };

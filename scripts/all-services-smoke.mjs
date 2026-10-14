@@ -8628,6 +8628,15 @@ const handlers = {
       path: `/rh/score/nitro/hours/submissions/${requireState("rhNitroHoursSubmissionId")}/decision`,
       json: { status: "Accepted" },
     });
+    if (isBadExpectation(op)) return;
+    const summary = await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/score/nitro/hours/summary",
+      query: { quarter: requireState("rhNitroHoursQuarter") },
+    });
+    if (summary.body?.data?.accepted_hours !== 10 || summary.body?.data?.nitro_bonus !== 1) {
+      throw new Error("Horas Nitro aceitas não atualizaram o resumo trimestral.");
+    }
   },
 
   async auditInternalIngest(op) {

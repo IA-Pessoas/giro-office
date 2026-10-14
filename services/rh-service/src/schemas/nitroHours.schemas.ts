@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RhNitroHoursStatus } from "../generated/prisma/client.js";
 
 const quarterSchema = z
   .string()
@@ -25,11 +26,14 @@ export const nitroHoursIdParamsSchema = z
 
 export const decideNitroHoursBodySchema = z
   .object({
-    status: z.enum(["Accepted", "Rejected"]),
+    status: z.enum([RhNitroHoursStatus.Accepted, RhNitroHoursStatus.Rejected]),
     rejection_reason: z.string().trim().max(500).optional(),
   })
   .strict()
-  .refine((value) => value.status !== "Rejected" || Boolean(value.rejection_reason), {
-    message: "Informe o motivo da rejeição.",
-    path: ["rejection_reason"],
-  });
+  .refine(
+    (value) => value.status !== RhNitroHoursStatus.Rejected || Boolean(value.rejection_reason),
+    {
+      message: "Informe o motivo da rejeição.",
+      path: ["rejection_reason"],
+    },
+  );

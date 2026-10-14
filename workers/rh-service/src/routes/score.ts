@@ -33,6 +33,42 @@ import {
   trimmedQuery,
 } from "./shared.js";
 
+const MAX_NITRO_HOURS_MULTIPART_BYTES = 5 * 1024 * 1024 + 64 * 1024;
+
+async function parseNitroHoursFormData(request: Request): Promise<FormData> {
+  const contentLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_NITRO_HOURS_MULTIPART_BYTES) {
+    throw new ServiceError(413, "O upload de certificado excede o limite permitido.");
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) throw new ServiceError(400, "Upload de certificado inválido.");
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > MAX_NITRO_HOURS_MULTIPART_BYTES) {
+      await reader.cancel();
+      throw new ServiceError(413, "O upload de certificado excede o limite permitido.");
+    }
+    chunks.push(value);
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const contentType = request.headers.get("content-type");
+  if (!contentType?.toLowerCase().startsWith("multipart/form-data;")) {
+    throw new ServiceError(400, "Upload de certificado inválido.");
+  }
+  return new Response(body, { headers: { "content-type": contentType } }).formData();
+}
+
 /** `/rh/score/{evaluations,quarters,nitro}` como em `scoreEvaluation|scoreQuarter|scoreNitro.routes.ts`. */
 export function registerScoreRoutes(app: RhApp, deps: RhRouteDeps): void {
   app.get("/rh/score/evaluations/pending", async (c) => {
@@ -133,9 +169,19 @@ export function registerScoreRoutes(app: RhApp, deps: RhRouteDeps): void {
     requireRhPermission(auth, RH_SELF_SERVICE_PERMISSION);
     let form: FormData;
     try {
-      form = await c.req.formData();
-    } catch {
+      form = await parseNitroHoursFormData(c.req.raw);
+    } catch (err: unknown) {
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(400, "Upload de certificado inválido.");
+    }
+    const entryCount = Array.from(form as unknown as Iterable<unknown>).length;
+    if (
+      entryCount !== 3 ||
+      form.getAll("certificate").length !== 1 ||
+      form.getAll("quarter").length !== 1 ||
+      form.getAll("hours").length !== 1
+    ) {
+      throw new ServiceError(400, "Envie somente certificado, trimestre e horas.");
     }
     const fileEntry = form.get("certificate");
     if (!(fileEntry instanceof File)) throw new ServiceError(400, "O certificado é obrigatório.");

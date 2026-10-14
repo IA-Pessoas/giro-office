@@ -4,6 +4,7 @@ import { error as logError, ServiceError } from "@workspace/shared";
 
 interface StorageClient {
   storage: {
+    getBucket(bucket: string): Promise<{ data: { public: boolean } | null; error: unknown | null }>;
     from(bucket: string): {
       upload(
         path: string,
@@ -56,6 +57,14 @@ export class SupabaseNitroHoursCertificateStorage implements NitroHoursCertifica
     private readonly createFileId: () => string = randomUUID,
   ) {}
 
+  private async assertPrivateBucket(): Promise<void> {
+    const { data, error } = await this.client.storage.getBucket(this.bucket);
+    if (error) throw error;
+    if (data?.public !== false) {
+      throw new ServiceError(503, "O bucket de certificados Nitro deve ser privado.");
+    }
+  }
+
   async upload(input: Parameters<NitroHoursCertificateStorage["upload"]>[0]): Promise<string> {
     const path = buildNitroHoursCertificatePath({
       organizationId: input.organizationId,
@@ -64,6 +73,7 @@ export class SupabaseNitroHoursCertificateStorage implements NitroHoursCertifica
       mimetype: input.file.mimetype,
     });
     try {
+      await this.assertPrivateBucket();
       const { error } = await this.client.storage
         .from(this.bucket)
         .upload(path, input.file.buffer, {
@@ -74,12 +84,14 @@ export class SupabaseNitroHoursCertificateStorage implements NitroHoursCertifica
       return path;
     } catch (err: unknown) {
       logError("Erro ao armazenar certificado de horas Nitro", { err });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível armazenar o certificado de horas.", err);
     }
   }
 
   async createSignedAccessUrl(path: string): Promise<string> {
     try {
+      await this.assertPrivateBucket();
       const { data, error } = await this.client.storage
         .from(this.bucket)
         .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
@@ -87,6 +99,7 @@ export class SupabaseNitroHoursCertificateStorage implements NitroHoursCertifica
       return data.signedUrl;
     } catch (err: unknown) {
       logError("Erro ao gerar acesso assinado ao certificado de horas Nitro", { err });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível acessar o certificado de horas.", err);
     }
   }

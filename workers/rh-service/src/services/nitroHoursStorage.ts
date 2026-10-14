@@ -37,6 +37,13 @@ export class SupabaseNitroHoursCertificateStorage implements NitroHoursCertifica
     private readonly createFileId: () => string = () => crypto.randomUUID(),
   ) {}
 
+  private async assertPrivateBucket(): Promise<void> {
+    const bucket = await this.storage.getBucket(this.bucket);
+    if (bucket.public) {
+      throw new ServiceError(503, "O bucket de certificados Nitro deve ser privado.");
+    }
+  }
+
   async upload(input: Parameters<NitroHoursCertificateStorage["upload"]>[0]): Promise<string> {
     const path = buildNitroHoursCertificatePath({
       organizationId: input.organizationId,
@@ -45,6 +52,7 @@ export class SupabaseNitroHoursCertificateStorage implements NitroHoursCertifica
       mimetype: input.file.mimetype,
     });
     try {
+      await this.assertPrivateBucket();
       await this.storage.upload(this.bucket, path, new Uint8Array(input.file.buffer), {
         contentType: input.file.mimetype,
         upsert: false,
@@ -52,15 +60,18 @@ export class SupabaseNitroHoursCertificateStorage implements NitroHoursCertifica
       return path;
     } catch (err: unknown) {
       logError("Erro ao armazenar certificado de horas Nitro", { err });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível armazenar o certificado de horas.", err);
     }
   }
 
   async createSignedAccessUrl(path: string): Promise<string> {
     try {
+      await this.assertPrivateBucket();
       return await this.storage.createSignedUrl(this.bucket, path, SIGNED_URL_TTL_SECONDS);
     } catch (err: unknown) {
       logError("Erro ao gerar acesso assinado ao certificado de horas Nitro", { err });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível acessar o certificado de horas.", err);
     }
   }

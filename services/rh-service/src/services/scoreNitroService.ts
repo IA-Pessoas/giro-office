@@ -1,6 +1,6 @@
 import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
-import { ScoreEvaluationStatus } from "../generated/prisma/client.js";
+import { RhNitroHoursStatus, ScoreEvaluationStatus } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 import type { UpdateScoreNitroBody } from "../schemas/scoreNitro.schemas.js";
 import { canRecalculateScoreQuarter, canUpdateScoreNitro } from "./scoreFormulaVersion.js";
@@ -116,7 +116,7 @@ export class ScoreNitroService {
     value: number,
   ): Pick<
     Prisma.ScoreNitroUpdateInput,
-    "projects_score" | "hours_score" | "errors_score" | "folders_score"
+    "projects_score" | "hours_score" | "errors_score" | "folders_score" | "total_hours"
   > {
     switch (type) {
       case "projects":
@@ -166,7 +166,25 @@ export class ScoreNitroService {
         );
       }
 
-      const data = this.buildNitroUpdateData(input.type, input.value);
+      const acceptedHours =
+        input.type === "hours"
+          ? await this.db.rhNitroHoursSubmission
+              .aggregate({
+                where: {
+                  organization_id: orgId,
+                  user_id: score.user_id,
+                  quarter: score.quarter,
+                  status: RhNitroHoursStatus.Accepted,
+                },
+                _sum: { hours: true },
+              })
+              .then((result) => result._sum.hours ?? 0)
+          : undefined;
+      const data = this.buildNitroUpdateData(
+        input.type,
+        acceptedHours === undefined ? input.value : acceptedHours >= 10 ? 1 : 0,
+      );
+      if (acceptedHours !== undefined) data.total_hours = acceptedHours;
 
       const updated = await this.db.scoreNitro.update({
         where: { score_id: scoreId },

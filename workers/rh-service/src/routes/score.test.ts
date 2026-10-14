@@ -186,18 +186,30 @@ describe("/rh/score/quarters", () => {
     fake.scoreNitro.findUnique.mockResolvedValue({
       ...nitroRow,
       scoreQuarter: {
+        user_id: TEST_USER_ID,
+        quarter: "2026-Q3",
         organization_id: TEST_ORGANIZATION_ID,
         formula_version: "LegacyV1",
         evaluations: [],
       },
     });
+    fake.rhNitroHoursSubmission.aggregate.mockResolvedValue({ _sum: { hours: 10 } });
     const response = await call(testApp(fake), "PATCH", "/rh/score/quarters/nitro", {
       body: { score_id: SCORE_ID, type: "hours", value: 1 },
     });
     expect(response.status).toBe(200);
     expect(fake.scoreNitro.update).toHaveBeenCalledWith({
       where: { score_id: SCORE_ID },
-      data: { hours_score: 1 },
+      data: { hours_score: 1, total_hours: 10 },
+    });
+    expect(fake.rhNitroHoursSubmission.aggregate).toHaveBeenCalledWith({
+      where: {
+        organization_id: TEST_ORGANIZATION_ID,
+        user_id: TEST_USER_ID,
+        quarter: "2026-Q3",
+        status: "Accepted",
+      },
+      _sum: { hours: true },
     });
   });
 

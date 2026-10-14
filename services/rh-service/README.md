@@ -9,7 +9,7 @@ Por defeito: **3034** (`PORT`).
 
 ## Variaveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (inteiro positivo, default 1), `JWT_SECRET`, `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`, `RH_REQUEST_MESSAGE_BUCKET` (default `rh-request-messages`) e `RH_NITRO_HOURS_BUCKET` (default `rh-nitro-hours`). Configure o bucket Nitro como privado no Supabase Storage. Os certificados só são liberados por link assinado após autorização; sem Storage configurado, o envio e o acesso retornam 503.
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (inteiro positivo, default 1), `JWT_SECRET`, `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`, `RH_REQUEST_MESSAGE_BUCKET` (default `rh-request-messages`) e `RH_NITRO_HOURS_BUCKET` (default `rh-nitro-hours`). Configure o bucket Nitro como privado no Supabase Storage e não crie políticas de leitura para `anon` ou `authenticated`; somente o service role do backend deve acessar objetos diretamente. A aplicação valida que o bucket não está marcado como público e libera certificados por link assinado de cinco minutos após autorizar o usuário. Sem Storage configurado, o envio e o acesso retornam 503.
 
 ## Gateway
 
